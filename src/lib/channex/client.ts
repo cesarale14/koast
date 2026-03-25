@@ -267,6 +267,42 @@ class ChannexClient {
     return res;
   }
 
+  // ==================== Webhooks ====================
+
+  async createWebhook(data: {
+    property_id: string;
+    callback_url: string;
+    event_mask: string;
+    is_active?: boolean;
+    send_data?: boolean;
+  }): Promise<AnyResponse> {
+    const res = await this.request("/webhooks", {
+      method: "POST",
+      body: JSON.stringify({
+        webhook: {
+          property_id: data.property_id,
+          callback_url: data.callback_url,
+          event_mask: data.event_mask,
+          is_active: data.is_active ?? true,
+          send_data: data.send_data ?? true,
+          headers: {},
+        },
+      }),
+    });
+    console.log(`[Channex] Webhook created: ${JSON.stringify(res.data?.id ?? res)}`);
+    return res;
+  }
+
+  async listWebhooks(): Promise<AnyResponse> {
+    return this.request("/webhooks");
+  }
+
+  async deleteWebhook(webhookId: string): Promise<void> {
+    await this.request(`/webhooks/${webhookId}`, { method: "DELETE" });
+  }
+
+  // ==================== Booking Revisions ====================
+
   async acknowledgeBookingRevision(revisionId: string): Promise<void> {
     await this.request(`/booking_revisions/${revisionId}/ack`, {
       method: "POST",
