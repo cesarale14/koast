@@ -3,5 +3,9 @@ export type {
   ChannexProperty,
   ChannexRoomType,
   ChannexBooking,
-  ChannexAvailability,
+  ChannexWebhookPayload,
+  ChannexResponse,
+  ChannexPropertyAttrs,
+  ChannexBookingAttrs,
+  ChannexRoomTypeAttrs,
 } from "@/lib/channex/types";
