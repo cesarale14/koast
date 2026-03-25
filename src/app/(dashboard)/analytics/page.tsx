@@ -40,6 +40,18 @@ export default async function AnalyticsPage() {
 
   const propertyId = properties[0].id;
 
+  // Fetch property lat/lng
+  const propDetailRes = await supabase
+    .from("properties")
+    .select("latitude, longitude")
+    .eq("id", propertyId)
+    .limit(1);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const propDetail = ((propDetailRes.data ?? []) as any[])[0];
+  const propertyLatLng = propDetail?.latitude && propDetail?.longitude
+    ? { lat: Number(propDetail.latitude), lng: Number(propDetail.longitude) }
+    : null;
+
   // Fetch market snapshot
   const snapRes = await supabase
     .from("market_snapshots")
@@ -53,7 +65,7 @@ export default async function AnalyticsPage() {
   // Fetch comps
   const compsRes = await supabase
     .from("market_comps")
-    .select("comp_name, comp_bedrooms, comp_adr, comp_occupancy, comp_revpar, distance_km")
+    .select("comp_listing_id, comp_name, comp_bedrooms, comp_adr, comp_occupancy, comp_revpar, distance_km")
     .eq("property_id", propertyId)
     .order("comp_adr", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,6 +118,8 @@ export default async function AnalyticsPage() {
       comps={comps}
       rates={rates}
       propertyStats={{ avgRate, occupancy, revpar }}
+      propertyLatLng={propertyLatLng}
+      propertyName={properties[0].name}
     />
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   ScatterChart,
   Scatter,
@@ -12,6 +13,8 @@ import {
   Cell,
 } from "recharts";
 import { useToast } from "@/components/ui/Toast";
+
+const CompMap = dynamic(() => import("./CompMap"), { ssr: false });
 
 // ---------- Types ----------
 
@@ -29,6 +32,7 @@ interface MarketSnapshot {
 }
 
 interface CompEntry {
+  comp_listing_id: string | null;
   comp_name: string | null;
   comp_bedrooms: number | null;
   comp_adr: number | null;
@@ -55,6 +59,8 @@ interface AnalyticsDashboardProps {
     occupancy: number;
     revpar: number;
   };
+  propertyLatLng: { lat: number; lng: number } | null;
+  propertyName: string;
 }
 
 // ---------- Helpers ----------
@@ -96,12 +102,15 @@ export default function AnalyticsDashboard({
   comps,
   rates,
   propertyStats,
+  propertyLatLng,
+  propertyName,
 }: AnalyticsDashboardProps) {
   const { toast } = useToast();
   const [propertyId, setPropertyId] = useState(initialPropertyId);
   const [refreshing, setRefreshing] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("comp_adr");
   const [sortAsc, setSortAsc] = useState(false);
+  const [compView, setCompView] = useState<"table" | "map">("table");
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -375,11 +384,41 @@ export default function AnalyticsDashboard({
         </div>
       </div>
 
-      {/* Comp Set Table */}
+      {/* Comp Set */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Comp Set ({comps.length} properties)</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Comp Set ({comps.length} properties)</h2>
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setCompView("table")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "table" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setCompView("map")}
+              disabled={!propertyLatLng}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "map" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"} disabled:opacity-40`}
+            >
+              Map
+            </button>
+          </div>
+        </div>
+
         {comps.length === 0 ? (
           <p className="text-sm text-gray-400 py-8 text-center">No comparable properties found. Run a market refresh.</p>
+        ) : compView === "map" && propertyLatLng ? (
+          <div>
+            <CompMap
+              center={propertyLatLng}
+              propertyName={propertyName}
+              comps={comps}
+              medianOccupancy={compMedianAdr > 0 ? comps.reduce((s, c) => s + (c.comp_occupancy ?? 0), 0) / comps.length : 50}
+            />
+            <p className="text-[10px] text-gray-400 mt-2">
+              Comp positions are approximated from distance. Green = above median occupancy, Red = below.
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -416,9 +455,23 @@ export default function AnalyticsDashboard({
                 {sortedComps.map((c, i) => {
                   const adrBetter = (c.comp_adr ?? 0) <= propertyStats.avgRate;
                   const occBetter = (c.comp_occupancy ?? 0) <= propertyStats.occupancy;
+                  const airbnbUrl = c.comp_listing_id && /^\d+$/.test(c.comp_listing_id)
+                    ? `https://www.airbnb.com/rooms/${c.comp_listing_id}`
+                    : null;
                   return (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="py-2.5 px-3 text-gray-700 max-w-[200px] truncate">{c.comp_name ?? "—"}</td>
+                      <td className="py-2.5 px-3 max-w-[250px]">
+                        {airbnbUrl ? (
+                          <a href={airbnbUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 truncate">
+                            {c.comp_name ?? "—"}
+                            <svg className="w-3 h-3 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="text-gray-700 truncate">{c.comp_name ?? "—"}</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-gray-500">{c.comp_bedrooms ?? "—"}</td>
                       <td className={`py-2.5 px-3 font-medium ${adrBetter ? "text-emerald-600" : "text-red-500"}`}>
                         ${Math.round(c.comp_adr ?? 0)}
