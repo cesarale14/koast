@@ -112,9 +112,7 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
           const icon = createIcon(color, 12);
 
           const compName = comp.comp_name ?? "Listing";
-          const airbnbUrl = comp.comp_listing_id
-            ? `https://www.airbnb.com/rooms/${comp.comp_listing_id}`
-            : null;
+          const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(compName + " airbnb")}`;
 
           return (
             <Marker key={i} position={pos} icon={icon}>
@@ -129,16 +127,14 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
                       <p>Distance: <span className="font-medium">{comp.distance_km} km</span></p>
                     )}
                   </div>
-                  {airbnbUrl && (
-                    <a
-                      href={airbnbUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-2 text-xs text-blue-600 hover:underline"
-                    >
-                      View on Airbnb →
-                    </a>
-                  )}
+                  <a
+                    href={searchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 text-xs text-blue-600 hover:underline"
+                  >
+                    Find on Airbnb →
+                  </a>
                 </div>
               </Popup>
             </Marker>

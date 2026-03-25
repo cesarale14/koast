@@ -456,22 +456,16 @@ export default function AnalyticsDashboard({
                   const adrBetter = (c.comp_adr ?? 0) <= propertyStats.avgRate;
                   const occBetter = (c.comp_occupancy ?? 0) <= propertyStats.occupancy;
                   const compName = c.comp_name ?? "Listing";
-                  const airbnbUrl = c.comp_listing_id
-                    ? `https://www.airbnb.com/rooms/${c.comp_listing_id}`
-                    : null;
+                  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(compName + " airbnb")}`;
                   return (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-2.5 px-3 max-w-[250px]">
-                        {airbnbUrl ? (
-                          <a href={airbnbUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 truncate">
-                            {compName}
-                            <svg className="w-3 h-3 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </a>
-                        ) : (
-                          <span className="text-gray-700 truncate">{compName}</span>
-                        )}
+                        <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 truncate">
+                          {compName}
+                          <svg className="w-3 h-3 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
                       </td>
                       <td className="py-2.5 px-3 text-gray-500">{c.comp_bedrooms ?? "—"}</td>
                       <td className={`py-2.5 px-3 font-medium ${adrBetter ? "text-emerald-600" : "text-red-500"}`}>
