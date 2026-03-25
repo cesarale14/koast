@@ -1,19 +1,40 @@
-export default function MessagesPage() {
+import { createClient } from "@/lib/supabase/server";
+import UnifiedInbox from "@/components/dashboard/UnifiedInbox";
+
+export default async function MessagesPage() {
+  const supabase = createClient();
+
+  // Fetch all messages, properties, and bookings
+  const messagesRes = await supabase
+    .from("messages")
+    .select("id, property_id, booking_id, platform, direction, sender_name, content, ai_draft, ai_draft_status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages = (messagesRes.data ?? []) as any[];
+
+  const propertiesRes = await supabase
+    .from("properties")
+    .select("id, name, city")
+    .order("name");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const properties = (propertiesRes.data ?? []) as any[];
+
+  const bookingsRes = await supabase
+    .from("bookings")
+    .select("id, guest_name, check_in, check_out, property_id")
+    .order("check_in", { ascending: false })
+    .limit(200);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookings = (bookingsRes.data ?? []) as any[];
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Unified Inbox</h1>
-      <p className="text-gray-500 mb-8">Guest messages across all platforms</p>
-
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <span className="inline-block px-3 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-full mb-4">
-          Phase 2
-        </span>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">Coming Soon</h3>
-        <p className="text-gray-500 text-sm max-w-md mx-auto">
-          Unified inbox with AI-suggested replies powered by Claude.
-          Manage Airbnb, Booking.com, and direct messages in one place.
-        </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Messages</h1>
+        <p className="text-gray-500">Unified inbox across all platforms</p>
       </div>
+      <UnifiedInbox messages={messages} properties={properties} bookings={bookings} />
     </div>
   );
 }
