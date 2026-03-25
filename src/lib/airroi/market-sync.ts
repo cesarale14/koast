@@ -91,7 +91,7 @@ export async function syncMarketData(
     market_adr: summary.average_daily_rate ?? null,
     market_occupancy: summary.occupancy != null ? Math.round(summary.occupancy * 10000) / 100 : null,
     market_revpar: summary.rev_par ?? null,
-    market_supply: summary.active_listings_count ?? null,
+    market_supply: summary.active_listings_count != null ? Math.round(summary.active_listings_count) : null,
     market_demand_score: null, // Computed from occupancy + booking lead time
     data_source: "airroi",
     raw_data: {
@@ -124,9 +124,13 @@ export async function syncMarketData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existingData = (existing ?? []) as any[];
   if (existingData.length > 0) {
-    await snapTable.update(snapshot).eq("id", existingData[0].id);
+    const { error: updateErr } = await snapTable.update(snapshot).eq("id", existingData[0].id);
+    if (updateErr) console.error("[market-sync] Update error:", JSON.stringify(updateErr));
   } else {
-    await snapTable.insert(snapshot);
+    console.log("[market-sync] Inserting snapshot:", JSON.stringify(snapshot));
+    const { error: insertErr } = await snapTable.insert(snapshot);
+    if (insertErr) console.error("[market-sync] Insert error:", JSON.stringify(insertErr));
+    else console.log("[market-sync] Insert successful");
   }
 
   console.log(
