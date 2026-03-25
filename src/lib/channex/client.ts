@@ -197,6 +197,75 @@ class ChannexClient {
     return res.data;
   }
 
+  async createBooking(data: {
+    property_id: string;
+    room_type_id: string;
+    rate_plan_id: string;
+    arrival_date: string;
+    departure_date: string;
+    guest_name: string;
+    guest_email?: string;
+    occupancy?: { adults: number; children: number; infants: number };
+    amount?: number; // in cents
+    currency?: string;
+  }): Promise<AnyResponse> {
+    const res = await this.request("/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        booking: {
+          status: "new",
+          currency: data.currency ?? "USD",
+          arrival_date: data.arrival_date,
+          departure_date: data.departure_date,
+          property_id: data.property_id,
+          rooms: [
+            {
+              room_type_id: data.room_type_id,
+              rate_plan_id: data.rate_plan_id,
+              occupancy: data.occupancy ?? { adults: 1, children: 0, infants: 0 },
+            },
+          ],
+          customer: {
+            name: data.guest_name.split(" ")[0],
+            surname: data.guest_name.split(" ").slice(1).join(" ") || "Guest",
+            mail: data.guest_email ?? "test@staycommand.com",
+          },
+        },
+      }),
+    });
+    console.log(`[Channex] Created booking: ${JSON.stringify(res.data?.id ?? res)}`);
+    return res;
+  }
+
+  async modifyBooking(bookingId: string, updates: {
+    departure_date?: string;
+    arrival_date?: string;
+  }): Promise<AnyResponse> {
+    const res = await this.request(`/bookings/${bookingId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        booking: {
+          ...updates,
+        },
+      }),
+    });
+    console.log(`[Channex] Modified booking ${bookingId}`);
+    return res;
+  }
+
+  async cancelBooking(bookingId: string): Promise<AnyResponse> {
+    const res = await this.request(`/bookings/${bookingId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        booking: {
+          status: "cancelled",
+        },
+      }),
+    });
+    console.log(`[Channex] Cancelled booking ${bookingId}`);
+    return res;
+  }
+
   async acknowledgeBookingRevision(revisionId: string): Promise<void> {
     await this.request(`/booking_revisions/${revisionId}/ack`, {
       method: "POST",
