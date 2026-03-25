@@ -214,6 +214,7 @@ class ChannexClient {
       body: JSON.stringify({
         booking: {
           status: "new",
+          ota_name: "BookingCRS",
           currency: data.currency ?? "USD",
           arrival_date: data.arrival_date,
           departure_date: data.departure_date,
