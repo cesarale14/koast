@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { syncMarketData, getApiUsage } from "@/lib/airroi/market-sync";
 import { buildCompSet, storeCompSet } from "@/lib/airroi/compsets";
 
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: { propertyId: string } }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = createServiceClient();
     const propertyId = params.propertyId;
 
     // Fetch property

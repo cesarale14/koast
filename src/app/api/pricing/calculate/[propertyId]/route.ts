@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from "next/server";
+import { PricingEngine } from "@/lib/pricing/engine";
+import { createServiceClient } from "@/lib/supabase/service";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { propertyId: string } }
+) {
+  try {
+    const propertyId = params.propertyId;
+    const body = await request.json().catch(() => ({}));
+    const days = body.days ?? 90;
+
+    const supabase = createServiceClient();
+
+    // Fetch property for config
+    const { data: props } = await supabase
+      .from("properties")
+      .select("id, name")
+      .eq("id", propertyId)
+      .limit(1);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const propData = (props ?? []) as any[];
+    if (propData.length === 0) {
+      return NextResponse.json({ error: "Property not found" }, { status: 404 });
+    }
+
+    // Get base rate from existing calendar_rates
+    const { data: rateData } = await supabase
+      .from("calendar_rates")
+      .select("base_rate, applied_rate")
+      .eq("property_id", propertyId)
+      .not("base_rate", "is", null)
+      .limit(1);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingRate = ((rateData ?? []) as any[])[0];
+    const baseRate = existingRate?.base_rate ?? existingRate?.applied_rate ?? 150;
+
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + days);
+
+    const engine = new PricingEngine();
+    const rates = await engine.calculateRates(propertyId, startDate, endDate, {
+      base_rate: baseRate,
+      min_rate: Math.round(baseRate * 0.5),
+      max_rate: Math.round(baseRate * 3),
+      pricing_mode: body.pricing_mode ?? "review",
+    });
+
+    // Apply to database
+    const updated = await engine.applyRates(rates);
+
+    return NextResponse.json({
+      property: propData[0].name,
+      dates_calculated: rates.length,
+      dates_updated: updated,
+      base_rate: baseRate,
+      rate_range: {
+        min: Math.min(...rates.map((r) => r.suggested_rate)),
+        max: Math.max(...rates.map((r) => r.suggested_rate)),
+        avg: Math.round(rates.reduce((s, r) => s + r.suggested_rate, 0) / rates.length),
+      },
+      sample: rates.slice(0, 7).map((r) => ({
+        date: r.date,
+        suggested: r.suggested_rate,
+        applied: r.applied_rate,
+        factors: r.factors,
+      })),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[pricing/calculate] Error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
