@@ -111,15 +111,14 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
           const color = occ >= medianOccupancy ? "#10b981" : "#ef4444";
           const icon = createIcon(color, 12);
 
-          const airbnbUrl = comp.comp_listing_id && /^\d+$/.test(comp.comp_listing_id)
-            ? `https://www.airbnb.com/rooms/${comp.comp_listing_id}`
-            : null;
+          const compName = comp.comp_name ?? "Listing";
+          const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(compName + " airbnb tampa")}`;
 
           return (
             <Marker key={i} position={pos} icon={icon}>
               <Popup>
                 <div className="text-sm min-w-[180px]">
-                  <p className="font-semibold text-gray-900">{comp.comp_name ?? "Listing"}</p>
+                  <p className="font-semibold text-gray-900">{compName}</p>
                   <div className="mt-1 space-y-0.5 text-gray-600">
                     <p>ADR: <span className="font-medium">${Math.round(comp.comp_adr ?? 0)}</span></p>
                     <p>Occupancy: <span className="font-medium">{Math.round(occ)}%</span></p>
@@ -128,16 +127,14 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
                       <p>Distance: <span className="font-medium">{comp.distance_km} km</span></p>
                     )}
                   </div>
-                  {airbnbUrl && (
-                    <a
-                      href={airbnbUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-2 text-xs text-blue-600 hover:underline"
-                    >
-                      View on Airbnb →
-                    </a>
-                  )}
+                  <a
+                    href={searchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 text-xs text-blue-600 hover:underline"
+                  >
+                    Find on Airbnb →
+                  </a>
                 </div>
               </Popup>
             </Marker>
