@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const navigation = [
   { name: "Overview", href: "/", icon: "grid" },
@@ -117,7 +118,9 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
+        <ToastProvider>
+          <div className="p-8">{children}</div>
+        </ToastProvider>
       </main>
     </div>
   );
