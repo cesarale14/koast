@@ -22,7 +22,7 @@ export interface PricingConfig {
   base_rate: number;
   min_rate: number;
   max_rate: number;
-  max_adjustment: number; // default 0.30 = ±30%
+  max_adjustment: number; // default 0.60 = ±60%
   pricing_mode: "manual" | "review" | "auto";
 }
 
@@ -30,7 +30,7 @@ const DEFAULT_CONFIG: PricingConfig = {
   base_rate: 150,
   min_rate: 50,
   max_rate: 500,
-  max_adjustment: 0.30,
+  max_adjustment: 0.60,
   pricing_mode: "review",
 };
 

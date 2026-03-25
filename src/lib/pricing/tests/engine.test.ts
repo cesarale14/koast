@@ -81,11 +81,11 @@ describe("competitorSignal", () => {
   const compAdrs = [150, 180, 200, 220, 236, 250, 260, 280, 300, 320, 350, 380, 400, 420, 450];
   const compOccs = [40, 45, 48, 50, 55, 58, 60, 62, 65, 68, 70, 72, 75, 80, 85];
 
-  it("returns positive when underpriced with high occupancy", () => {
+  it("returns strong positive when below 25th percentile with high occupancy", () => {
     // Rate $140 (below p25 of $180), occupancy 70% (above median 60%)
     const result = competitorSignal(140, 70, compAdrs, compOccs);
-    expect(result.score).toBe(0.5);
-    expect(result.reason).toContain("underpriced");
+    expect(result.score).toBe(0.6);
+    expect(result.reason).toContain("significantly underpriced");
   });
 
   it("returns negative when overpriced with low occupancy", () => {
@@ -95,9 +95,16 @@ describe("competitorSignal", () => {
     expect(result.reason).toContain("overpriced");
   });
 
-  it("returns moderate positive when cheap but empty", () => {
-    // Rate $200 (below median $260), occupancy 45% (below median 60%)
+  it("returns strong positive when below 25th percentile and empty", () => {
+    // Rate $200 (below p25 of $220), occupancy 45% (below median 60%)
     const result = competitorSignal(200, 45, compAdrs, compOccs);
+    expect(result.score).toBe(0.6);
+    expect(result.reason).toContain("significant room to raise");
+  });
+
+  it("returns moderate positive when below median but above 25th", () => {
+    // Rate $240 (above p25 $220 but below median $260), occupancy 45%
+    const result = competitorSignal(240, 45, compAdrs, compOccs);
     expect(result.score).toBe(0.3);
     expect(result.reason).toContain("price isn't the issue");
   });

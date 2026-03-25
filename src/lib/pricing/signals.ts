@@ -106,22 +106,26 @@ export function competitorSignal(
   let score: number;
   let detail: string;
 
-  if (currentRate < p25 && propOcc > medianOcc) {
-    score = 0.5;
-    detail = "below 25th percentile but high occupancy — underpriced";
+  if (currentRate < p25) {
+    // Far below comps — strong push up regardless of occupancy
+    score = 0.6;
+    detail = propOcc > medianOcc
+      ? "well below 25th percentile with high occupancy — significantly underpriced"
+      : "well below 25th percentile — significant room to raise";
   } else if (currentRate > p75 && propOcc < medianOcc) {
     score = -0.5;
     detail = "above 75th percentile with low occupancy — overpriced";
   } else if (currentRate < median && propOcc < medianOcc) {
     score = 0.3;
     detail = "below median and low occupancy — price isn't the issue";
+  } else if (currentRate < median) {
+    score = 0.3;
+    detail = "below median — room to increase";
   } else {
-    // Interpolate based on percentile position relative to median
+    // At or above median — interpolate
     score = (median - currentRate) / median * 0.5;
     score = Math.max(-1, Math.min(1, score));
-    detail = percentile < 50
-      ? "below median — room to increase"
-      : "at or above median";
+    detail = "at or above median";
   }
 
   return {
