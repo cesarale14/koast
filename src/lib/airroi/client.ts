@@ -83,7 +83,11 @@ class AirROIClient {
               throw new Error(`AirROI API error: ${res.status} ${res.statusText} — ${text}`);
             }
 
-            resolve(await res.json());
+            // Parse with large number protection: convert listing_id numeric values to strings
+            // to prevent JavaScript's Number from losing precision on 18+ digit IDs
+            const rawText = await res.text();
+            const safeText = rawText.replace(/"listing_id"\s*:\s*(\d{15,})/g, '"listing_id":"$1"');
+            resolve(JSON.parse(safeText));
             return;
           } catch (err) {
             lastError = err instanceof Error ? err : new Error(String(err));

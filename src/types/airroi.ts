@@ -1,7 +1,7 @@
 // AirROI API response types — matches API v2.0.7
 
 export interface AirROIListingInfo {
-  listing_id: number;
+  listing_id: string;
   listing_name: string;
   listing_type: string;
   room_type: string;
