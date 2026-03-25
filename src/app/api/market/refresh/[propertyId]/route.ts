@@ -32,15 +32,21 @@ export async function POST(
       );
     }
 
+    // Ensure property has defaults for comp search
+    const compProperty = {
+      ...property,
+      bedrooms: property.bedrooms ?? 2,
+      bathrooms: property.bathrooms ?? 1,
+      max_guests: property.max_guests ?? 4,
+    };
+
     // Force refresh both market snapshot and comp set
     const [snapshot, compSet] = await Promise.all([
       syncMarketData(supabase, property, true),
-      property.bedrooms
-        ? buildCompSet(property).then(async (cs) => {
-            await storeCompSet(supabase, propertyId, cs);
-            return cs;
-          })
-        : null,
+      buildCompSet(compProperty).then(async (cs) => {
+        await storeCompSet(supabase, propertyId, cs);
+        return cs;
+      }),
     ]);
 
     return NextResponse.json({

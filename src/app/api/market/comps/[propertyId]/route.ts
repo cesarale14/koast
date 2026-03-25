@@ -54,8 +54,14 @@ export async function GET(
       );
     }
 
-    // Build comp set from AirROI
-    const compSet = await buildCompSet(property);
+    // Build comp set from AirROI (use defaults if bedrooms/baths not set)
+    const compProperty = {
+      ...property,
+      bedrooms: property.bedrooms ?? 2,
+      bathrooms: property.bathrooms ?? 1,
+      max_guests: property.max_guests ?? 4,
+    };
+    const compSet = await buildCompSet(compProperty);
     await storeCompSet(supabase, propertyId, compSet);
 
     return NextResponse.json({
