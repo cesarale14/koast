@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PricingEngine } from "@/lib/pricing/engine";
 import { createServiceClient } from "@/lib/supabase/service";
+import { syncMarketData } from "@/lib/airroi/market-sync";
 
 export async function POST(
   request: NextRequest,
@@ -16,7 +17,7 @@ export async function POST(
     // Fetch property for config
     const { data: props } = await supabase
       .from("properties")
-      .select("id, name")
+      .select("id, name, latitude, longitude")
       .eq("id", propertyId)
       .limit(1);
 
@@ -24,6 +25,22 @@ export async function POST(
     const propData = (props ?? []) as any[];
     if (propData.length === 0) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
+    }
+
+    // Ensure market snapshot exists (auto-sync if missing)
+    const { data: existingSnap } = await supabase
+      .from("market_snapshots")
+      .select("id")
+      .eq("property_id", propertyId)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (((existingSnap ?? []) as any[]).length === 0 && propData[0].latitude && propData[0].longitude) {
+      console.log("[pricing/calculate] No market snapshot, triggering sync...");
+      try {
+        await syncMarketData(supabase, propData[0]);
+      } catch (e) {
+        console.warn("[pricing/calculate] Market sync failed:", e);
+      }
     }
 
     // Get base rate from existing calendar_rates

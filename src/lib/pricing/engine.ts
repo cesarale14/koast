@@ -57,15 +57,18 @@ export class PricingEngine {
     const endStr = endDate.toISOString().split("T")[0];
 
     // Fetch market snapshot
-    const { data: snapshots } = await this.supabase
+    const { data: snapshots, error: snapErr } = await this.supabase
       .from("market_snapshots")
       .select("market_demand_score")
       .eq("property_id", propertyId)
       .order("snapshot_date", { ascending: false })
       .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const snapshot = ((snapshots ?? []) as any[])[0] ?? null;
-    const demandScore = snapshot?.market_demand_score ?? null;
+    const snapshotRows = (snapshots ?? []) as any[];
+    if (snapErr) console.error("[PricingEngine] snapshot query error:", snapErr);
+    console.log(`[PricingEngine] market_snapshots rows: ${snapshotRows.length}`, snapshotRows[0] ?? "none");
+    const demandScore = snapshotRows[0]?.market_demand_score ?? null;
+    console.log(`[PricingEngine] demandScore: ${demandScore}`);
 
     // Fetch comp set
     const { data: comps } = await this.supabase
@@ -165,13 +168,12 @@ export class PricingEngine {
       // Guardrail: clamp to min/max
       suggested = Math.max(cfg.min_rate, Math.min(cfg.max_rate, suggested));
 
-      // Guardrail: smooth — never change more than 15% from previous applied rate
-      const prevApplied = rateMap.get(dateStr) ?? prevSuggested;
-      const maxChange = prevApplied * 0.15;
-      if (suggested > prevApplied + maxChange) {
-        suggested = prevApplied + maxChange;
-      } else if (suggested < prevApplied - maxChange) {
-        suggested = prevApplied - maxChange;
+      // Guardrail: smooth — never change more than 15% from previous day's suggested rate
+      const maxChange = prevSuggested * 0.15;
+      if (suggested > prevSuggested + maxChange) {
+        suggested = prevSuggested + maxChange;
+      } else if (suggested < prevSuggested - maxChange) {
+        suggested = prevSuggested - maxChange;
       }
 
       // Round to nearest $5
