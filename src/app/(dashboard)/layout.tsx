@@ -11,7 +11,7 @@ const navigation = [
   { name: "Bookings", href: "/bookings", icon: "clipboard" },
   { name: "Pricing", href: "/pricing", icon: "dollar" },
   { name: "Messages", href: "/messages", icon: "mail" },
-  { name: "Turnover", href: "/turnover", icon: "refresh", phase: 3 },
+  { name: "Turnover", href: "/turnover", icon: "refresh" },
   { name: "Analytics", href: "/analytics", icon: "chart", phase: 2 },
 ];
 
