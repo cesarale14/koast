@@ -12,7 +12,7 @@ const navigation = [
   { name: "Pricing", href: "/pricing", icon: "dollar" },
   { name: "Messages", href: "/messages", icon: "mail" },
   { name: "Turnover", href: "/turnover", icon: "refresh" },
-  { name: "Analytics", href: "/analytics", icon: "chart", phase: 2 },
+  { name: "Analytics", href: "/analytics", icon: "chart" },
 ];
 
 const icons: Record<string, JSX.Element> = {
@@ -93,11 +93,6 @@ export default function DashboardLayout({
               >
                 {icons[item.icon]}
                 {item.name}
-                {item.phase && (
-                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">
-                    P{item.phase}
-                  </span>
-                )}
               </Link>
             );
           })}
