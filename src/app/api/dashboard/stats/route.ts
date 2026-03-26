@@ -9,9 +9,14 @@ function getDateRange(range: TimeRange): { start: string; end: string; totalDays
 
   switch (range) {
     case "this_week": {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 6);
-      return { start: fmt(today), end: fmt(end), totalDays: 7 };
+      // Start on Monday of the current week
+      const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() + mondayOffset);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      return { start: fmt(monday), end: fmt(sunday), totalDays: 7 };
     }
     case "this_month": {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -85,10 +90,19 @@ export async function POST(request: NextRequest) {
     }[];
 
     // === REVENUE ===
-    // Sum total_price for bookings with check_in in range
-    const revenue = bookings
-      .filter((b) => b.check_in >= start && b.check_in <= end)
-      .reduce((s, b) => s + (b.total_price ?? 0), 0);
+    // Sum total_price for all overlapping bookings, prorated by nights in range
+    let revenue = 0;
+    for (const b of bookings) {
+      if (!b.total_price || b.total_price <= 0) continue;
+      const totalNights = Math.max(1, Math.round(
+        (new Date(b.check_out + "T00:00:00Z").getTime() - new Date(b.check_in + "T00:00:00Z").getTime()) / 86400000
+      ));
+      const overlapStart = Math.max(new Date(b.check_in + "T00:00:00Z").getTime(), new Date(start + "T00:00:00Z").getTime());
+      const overlapEnd = Math.min(new Date(b.check_out + "T00:00:00Z").getTime(), new Date(addDay(end) + "T00:00:00Z").getTime());
+      const overlapNights = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+      revenue += (b.total_price * overlapNights) / totalNights;
+    }
+    revenue = Math.round(revenue * 100) / 100;
 
     // === OCCUPANCY (per-property, only properties with bookings) ===
     const propBookings = new Map<string, typeof bookings>();
@@ -101,8 +115,10 @@ export async function POST(request: NextRequest) {
     let totalOccupancy = 0;
     let propertiesWithBookings = 0;
     let totalBookedNights = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const debugPerProperty: any[] = [];
 
-    propBookings.forEach((pBookings) => {
+    propBookings.forEach((pBookings, propertyId) => {
       // Count unique booked nights for this property in the range
       const bookedDates = new Set<string>();
       for (const b of pBookings) {
@@ -113,6 +129,13 @@ export async function POST(request: NextRequest) {
         }
       }
       const nights = bookedDates.size;
+      debugPerProperty.push({
+        propertyId: propertyId.slice(0, 8),
+        bookingCount: pBookings.length,
+        bookedNights: nights,
+        occupancy: totalDays > 0 ? Math.round((nights / totalDays) * 100) : 0,
+        dates: Array.from(bookedDates).sort().slice(0, 10),
+      });
       if (nights > 0) {
         totalOccupancy += (nights / totalDays) * 100;
         propertiesWithBookings++;
@@ -265,6 +288,12 @@ export async function POST(request: NextRequest) {
       return { month: r.month, revenue: rev };
     });
 
+    // Log occupancy debug info
+    console.log(`[dashboard] range=${range} period=${start}..${end} (${totalDays}d) bookings=${bookings.length} occupancy=${occupancyRate}%`);
+    for (const dp of debugPerProperty) {
+      console.log(`[dashboard]   property=${dp.propertyId} bookings=${dp.bookingCount} nights=${dp.bookedNights} occ=${dp.occupancy}% dates=${dp.dates.join(",")}`);
+    }
+
     return NextResponse.json({
       range,
       dateRange: { start, end, totalDays },
@@ -285,6 +314,7 @@ export async function POST(request: NextRequest) {
       propertyWeeks,
       revenueData,
       properties: props,
+      debug: { totalBookingsInRange: bookings.length, perProperty: debugPerProperty },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
