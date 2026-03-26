@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -264,7 +264,11 @@ export default function PropertyDetail({
       )}
 
       {tab === "Settings" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+        <div className="space-y-6 max-w-2xl">
+        {/* Calendar Connections */}
+        <CalendarConnections propertyId={property.id} hasChannex={!!property.channex_property_id} />
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Property Settings</h2>
             {!editing && (
@@ -370,6 +374,154 @@ export default function PropertyDetail({
               ))}
             </div>
           )}
+        </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Calendar Connections sub-component
+function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; hasChannex: boolean }) {
+  const { toast } = useToast();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [feeds, setFeeds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [addPlatform, setAddPlatform] = useState("airbnb");
+  const [addUrl, setAddUrl] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const fetchFeeds = useCallback(async () => {
+    const res = await fetch(`/api/ical/status/${propertyId}`);
+    const data = await res.json();
+    setFeeds(data.feeds ?? []);
+    setLoading(false);
+  }, [propertyId]);
+
+  useEffect(() => { fetchFeeds(); }, [fetchFeeds]);
+
+  const addFeed = async () => {
+    if (!addUrl) return;
+    setAdding(true);
+    try {
+      const res = await fetch("/api/ical/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: propertyId, feed_url: addUrl, platform: addPlatform }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast(`Connected! ${data.bookings_found} bookings found`);
+      setShowAdd(false);
+      setAddUrl("");
+      fetchFeeds();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    }
+    setAdding(false);
+  };
+
+  const syncAll = async () => {
+    setSyncing(true);
+    try {
+      await fetch(`/api/ical/sync/${propertyId}`, { method: "POST" });
+      toast("Synced!");
+      fetchFeeds();
+    } catch { toast("Sync failed", "error"); }
+    setSyncing(false);
+  };
+
+  const removeFeed = async (feedId: string) => {
+    await fetch(`/api/ical/${feedId}`, { method: "DELETE" });
+    toast("Feed removed");
+    fetchFeeds();
+  };
+
+  const timeAgo = (dateStr: string | null) => {
+    if (!dateStr) return "never";
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  const platformIcons: Record<string, string> = { airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700", booking_com: "bg-blue-50 text-blue-700", direct: "bg-emerald-50 text-emerald-700" };
+  const platformNames: Record<string, string> = { airbnb: "Airbnb", vrbo: "VRBO", booking_com: "Booking.com", direct: "Direct" };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Calendar Connections</h2>
+        <div className="flex gap-2">
+          {feeds.length > 0 && (
+            <button onClick={syncAll} disabled={syncing}
+              className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 disabled:opacity-50">
+              {syncing ? "Syncing..." : "Sync All"}
+            </button>
+          )}
+          <button onClick={() => setShowAdd(!showAdd)}
+            className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            Add Calendar
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading...</p>
+      ) : feeds.length === 0 && !showAdd ? (
+        <p className="text-sm text-gray-400">No calendars connected. Add an iCal feed to sync bookings.</p>
+      ) : (
+        <div className="space-y-2">
+          {feeds.filter((f: {isActive: boolean}) => f.isActive !== false).map((f: {id: string; platform: string; feedUrl: string; lastSynced: string; syncCount: number}) => (
+            <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformIcons[f.platform] ?? "bg-gray-100 text-gray-600"}`}>
+                  {platformNames[f.platform] ?? f.platform}
+                </span>
+                <span className="text-xs text-gray-500 truncate max-w-[200px]">{f.feedUrl}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-gray-400">{timeAgo(f.lastSynced)}</span>
+                {f.syncCount > 0 && (
+                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{f.syncCount} syncs</span>
+                )}
+                <button onClick={() => removeFeed(f.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+          <div className="flex gap-3">
+            <select value={addPlatform} onChange={(e) => setAddPlatform(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+              <option value="airbnb">Airbnb</option>
+              <option value="vrbo">VRBO</option>
+              <option value="booking_com">Booking.com</option>
+              <option value="direct">Direct</option>
+            </select>
+            <input type="url" value={addUrl} onChange={(e) => setAddUrl(e.target.value)}
+              className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Paste calendar export URL..." />
+            <button onClick={addFeed} disabled={adding || !addUrl}
+              className="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {adding ? "Adding..." : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!hasChannex && feeds.length > 0 && (
+        <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800">
+            <span className="font-semibold">Upgrade to Pro</span> for automatic rate pushing — your pricing suggestions will sync directly to Airbnb, VRBO, and Booking.com.
+          </p>
         </div>
       )}
     </div>

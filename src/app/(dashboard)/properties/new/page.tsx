@@ -11,6 +11,10 @@ type PricingMode = "manual" | "review" | "auto";
 
 interface PlatformListing {
   enabled: boolean;
+  connectionMode: "ical" | "channex";
+  icalUrl: string;
+  icalStatus: "idle" | "testing" | "success" | "error";
+  icalMessage: string;
   platform_listing_id: string;
   listing_url: string;
 }
@@ -37,10 +41,17 @@ interface FormData {
 }
 
 const defaultPlatforms: Record<string, PlatformListing> = {
-  airbnb: { enabled: false, platform_listing_id: "", listing_url: "" },
-  vrbo: { enabled: false, platform_listing_id: "", listing_url: "" },
-  booking_com: { enabled: false, platform_listing_id: "", listing_url: "" },
-  direct: { enabled: false, platform_listing_id: "", listing_url: "" },
+  airbnb: { enabled: false, connectionMode: "ical", icalUrl: "", icalStatus: "idle", icalMessage: "", platform_listing_id: "", listing_url: "" },
+  vrbo: { enabled: false, connectionMode: "ical", icalUrl: "", icalStatus: "idle", icalMessage: "", platform_listing_id: "", listing_url: "" },
+  booking_com: { enabled: false, connectionMode: "ical", icalUrl: "", icalStatus: "idle", icalMessage: "", platform_listing_id: "", listing_url: "" },
+  direct: { enabled: false, connectionMode: "ical", icalUrl: "", icalStatus: "idle", icalMessage: "", platform_listing_id: "", listing_url: "" },
+};
+
+const platformHelp: Record<string, string> = {
+  airbnb: "In Airbnb → Calendar → Availability → Export Calendar → copy the link",
+  vrbo: "In VRBO → Calendar → Import/export calendars → copy export URL",
+  booking_com: "In Booking.com → Rates & Availability → Sync calendars → Export → copy URL",
+  direct: "Paste the .ics calendar export URL from your booking system",
 };
 
 const platformLabels: Record<string, string> = {
@@ -292,9 +303,9 @@ export default function AddPropertyPage() {
         {step === 1 && (
           <div className="space-y-4">
             <p className="text-sm text-gray-500 mb-4">
-              Toggle platforms where this property is listed. You can add listing IDs now or later.
+              Connect your calendars to sync bookings automatically.
             </p>
-            {Object.entries(form.platforms).map(([platform, data]) => (
+            {Object.entries(form.platforms).filter(([p]) => p !== "direct").map(([platform, data]) => (
               <div key={platform} className={`border rounded-lg p-4 transition-colors ${data.enabled ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -306,21 +317,90 @@ export default function AddPropertyPage() {
                   <span className="text-sm font-medium text-gray-900">{platformLabels[platform]}</span>
                 </label>
                 {data.enabled && (
-                  <div className="grid grid-cols-2 gap-3 mt-3 ml-7">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Listing ID</label>
-                      <input type="text" value={data.platform_listing_id}
-                        onChange={(e) => updatePlatform(platform, "platform_listing_id", e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="Optional" />
+                  <div className="mt-3 ml-7 space-y-3">
+                    {/* Connection mode selector */}
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`mode-${platform}`} checked={data.connectionMode === "ical"}
+                          onChange={() => updatePlatform(platform, "connectionMode", "ical")}
+                          className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-xs font-medium text-gray-700">iCal (free)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`mode-${platform}`} checked={data.connectionMode === "channex"}
+                          onChange={() => updatePlatform(platform, "connectionMode", "channex")}
+                          className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-xs font-medium text-gray-700">Channex (premium)</span>
+                      </label>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Listing URL</label>
-                      <input type="url" value={data.listing_url}
-                        onChange={(e) => updatePlatform(platform, "listing_url", e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="https://..." />
-                    </div>
+
+                    {data.connectionMode === "ical" ? (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Calendar Export URL</label>
+                        <div className="flex gap-2">
+                          <input type="url" value={data.icalUrl}
+                            onChange={(e) => updatePlatform(platform, "icalUrl", e.target.value)}
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            placeholder="https://www.airbnb.com/calendar/ical/..." />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!data.icalUrl) return;
+                              updatePlatform(platform, "icalStatus", "testing");
+                              try {
+                                const res = await fetch("/api/ical/add", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ property_id: "preview", feed_url: data.icalUrl, platform }),
+                                });
+                                const d = await res.json();
+                                if (res.ok) {
+                                  updatePlatform(platform, "icalStatus", "success");
+                                  updatePlatform(platform, "icalMessage", `${d.bookings_found} bookings, ${d.blocked_dates} blocked dates`);
+                                } else {
+                                  updatePlatform(platform, "icalStatus", "error");
+                                  updatePlatform(platform, "icalMessage", d.error ?? "Invalid calendar URL");
+                                }
+                              } catch {
+                                updatePlatform(platform, "icalStatus", "error");
+                                updatePlatform(platform, "icalMessage", "Connection failed");
+                              }
+                            }}
+                            disabled={data.icalStatus === "testing" || !data.icalUrl}
+                            className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                          >
+                            {data.icalStatus === "testing" ? "Testing..." : "Test"}
+                          </button>
+                        </div>
+                        {data.icalStatus === "success" && (
+                          <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            Connected — {data.icalMessage}
+                          </p>
+                        )}
+                        {data.icalStatus === "error" && (
+                          <p className="text-xs text-red-500 mt-1">{data.icalMessage}</p>
+                        )}
+                        <p className="text-[10px] text-gray-400 mt-1">{platformHelp[platform]}</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Channex Listing ID</label>
+                          <input type="text" value={data.platform_listing_id}
+                            onChange={(e) => updatePlatform(platform, "platform_listing_id", e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            placeholder="Optional" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Listing URL</label>
+                          <input type="url" value={data.listing_url}
+                            onChange={(e) => updatePlatform(platform, "listing_url", e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            placeholder="https://..." />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

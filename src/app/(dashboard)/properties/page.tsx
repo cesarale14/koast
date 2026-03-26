@@ -14,12 +14,12 @@ export default async function PropertiesPage() {
 
   const propertiesRes = await supabase
     .from("properties")
-    .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests")
+    .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests, channex_property_id")
     .order("name");
   const properties = (propertiesRes.data ?? []) as {
     id: string; name: string; address: string | null; city: string | null;
     state: string | null; property_type: string | null; bedrooms: number | null;
-    bathrooms: number | null; max_guests: number | null;
+    bathrooms: number | null; max_guests: number | null; channex_property_id: string | null;
   }[];
 
   if (properties.length === 0) {
@@ -195,6 +195,15 @@ export default async function PropertiesPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Connection badge */}
+                <div className="mt-3">
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    prop.channex_property_id ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {prop.channex_property_id ? "Channex" : "iCal"}
+                  </span>
+                </div>
 
                 {/* Stats */}
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
