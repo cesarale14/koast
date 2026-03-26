@@ -228,7 +228,7 @@ export default function RevenueCheckPage() {
             {[
               { label: "Market ADR", value: `$${result.market_adr}` },
               { label: "Occupancy", value: `${result.market_occupancy}%` },
-              { label: "Your Percentile", value: `${result.percentile}th` },
+              { label: "Your Percentile", value: result.percentile <= 10 ? "Below avg" : result.percentile >= 75 ? "Top 25%" : `${result.percentile}th` },
               { label: "Active Listings", value: result.active_listings?.toLocaleString() ?? "—" },
             ].map((s) => (
               <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">

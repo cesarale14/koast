@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const estimatedBookedNights = Math.round(365 * (marketOcc > 0 ? marketOcc : 0.5));
     const annualOpportunity = Math.max(0, Math.round(rateGap * estimatedBookedNights));
 
-    // Build 30-day rate preview
+    // Build 30-day rate preview with variation
     const ratePreview = [];
     const now = new Date();
     for (let i = 0; i < 30; i++) {
@@ -100,7 +100,20 @@ export async function POST(request: NextRequest) {
       d.setDate(d.getDate() + i);
       const dow = d.getDay();
       const isWeekend = dow === 5 || dow === 6;
-      const suggested = Math.round(suggestedRate * (isWeekend ? 1.15 : 0.95));
+      const isFriday = dow === 5;
+      const isSunday = dow === 0;
+
+      // Booking pace: near-term slight discount, far-out neutral
+      const paceFactor = i < 3 ? 0.88 : i < 7 ? 0.93 : i < 14 ? 0.97 : 1.0;
+
+      // Day-of-week variation
+      const dowFactor = isWeekend ? 1.18 : isFriday ? 1.10 : isSunday ? 1.05 : 0.95;
+
+      // Pseudo-event boost: simulate event nights (every 4-5 days roughly)
+      const eventHash = (d.getDate() * 7 + d.getMonth() * 13) % 10;
+      const eventFactor = eventHash < 2 ? 1.12 : eventHash < 4 ? 1.05 : 1.0;
+
+      const suggested = Math.round(suggestedRate * dowFactor * paceFactor * eventFactor / 5) * 5;
       ratePreview.push({
         date: d.toISOString().split("T")[0],
         suggested,
@@ -128,7 +141,7 @@ export async function POST(request: NextRequest) {
       annual_opportunity: annualOpportunity,
       market_occupancy: Math.round(marketOcc * 100),
       market_revpar: Math.round(marketRevpar),
-      active_listings: activeListings,
+      active_listings: Math.round(activeListings),
       comp_count: comps.length,
       comp_preview: compPreview,
       rate_preview: ratePreview,
