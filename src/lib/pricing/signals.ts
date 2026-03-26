@@ -7,11 +7,11 @@ export interface SignalResult {
   reason: string;
 }
 
-// ---------- Demand Signal (weight: 0.30) ----------
+// ---------- Demand Signal (weight: 0.25) ----------
 
 export function demandSignal(demandScore: number | null): SignalResult {
   if (demandScore == null) {
-    return { score: 0, weight: 0.30, reason: "No market demand data available" };
+    return { score: 0, weight: 0.25, reason: "No market demand data available" };
   }
 
   const score = Math.max(-1, Math.min(1, (demandScore - 50) / 50));
@@ -24,12 +24,12 @@ export function demandSignal(demandScore: number | null): SignalResult {
 
   return {
     score: Math.round(score * 100) / 100,
-    weight: 0.30,
+    weight: 0.25,
     reason: `Market demand score ${Math.round(demandScore)}/100 — ${label}`,
   };
 }
 
-// ---------- Seasonality Signal (weight: 0.25) ----------
+// ---------- Seasonality Signal (weight: 0.20) ----------
 
 const DOW_ADJUSTMENTS: Record<number, number> = {
   0: 0.05,   // Sunday
@@ -71,12 +71,12 @@ export function seasonalitySignal(date: Date): SignalResult {
 
   return {
     score: Math.round(combined * 100) / 100,
-    weight: 0.25,
+    weight: 0.20,
     reason: `${DOW_NAMES[dow]} in ${MONTH_NAMES[month]} (${monthInfo.label} Tampa)`,
   };
 }
 
-// ---------- Competitor Signal (weight: 0.25) ----------
+// ---------- Competitor Signal (weight: 0.20) ----------
 
 export function competitorSignal(
   currentRate: number | null,
@@ -85,7 +85,7 @@ export function competitorSignal(
   compOccupancies: number[]
 ): SignalResult {
   if (compAdrs.length === 0 || currentRate == null) {
-    return { score: 0, weight: 0.25, reason: "No comp data available" };
+    return { score: 0, weight: 0.20, reason: "No comp data available" };
   }
 
   const sorted = [...compAdrs].sort((a, b) => a - b);
@@ -130,7 +130,7 @@ export function competitorSignal(
 
   return {
     score: Math.round(score * 100) / 100,
-    weight: 0.25,
+    weight: 0.20,
     reason: `Priced at ${percentile}th percentile of comps ($${Math.round(currentRate)} vs median $${Math.round(median)}) — ${detail}`,
   };
 }
@@ -221,4 +221,30 @@ export function bookingPaceSignal(
   }
 
   return { score: 0, weight: 0.10, reason: `${daysOut} days out, open` };
+}
+
+// ---------- Event Signal (weight: 0.15) ----------
+
+export function eventSignal(
+  events: { event_name: string; venue_name: string | null; demand_impact: number; estimated_attendance: number; event_type: string }[]
+): SignalResult {
+  if (events.length === 0) {
+    return { score: 0, weight: 0.15, reason: "No significant events nearby" };
+  }
+
+  // Take the highest-impact event
+  const top = events.reduce((best, e) => e.demand_impact > best.demand_impact ? e : best, events[0]);
+  const score = Math.min(1, top.demand_impact);
+
+  const attendanceStr = top.estimated_attendance > 0
+    ? ` (est. ${top.estimated_attendance.toLocaleString()} attendees)`
+    : "";
+
+  const impactLabel = score >= 0.7 ? "very high demand" : score >= 0.4 ? "high demand" : "moderate demand";
+
+  return {
+    score: Math.round(score * 100) / 100,
+    weight: 0.15,
+    reason: `${top.event_name}${top.venue_name ? ` at ${top.venue_name}` : ""}${attendanceStr} — ${impactLabel}`,
+  };
 }

@@ -5,8 +5,10 @@ import {
   competitorSignal,
   gapNightSignal,
   bookingPaceSignal,
+  eventSignal,
   type SignalResult,
 } from "./signals";
+import { getEventsForDate } from "@/lib/events/cache";
 
 export interface CalendarRateUpdate {
   property_id: string;
@@ -142,7 +144,10 @@ export class PricingEngine {
           dateStr >= b.check_in && dateStr < b.check_out
       );
 
-      // Calculate all signals
+      // Fetch events for this date
+      const dateEvents = await getEventsForDate(this.supabase, propertyId, dateStr);
+
+      // Calculate all 6 signals
       const signals: Record<string, SignalResult> = {
         demand: demandSignal(demandScore),
         seasonality: seasonalitySignal(current),
@@ -152,6 +157,7 @@ export class PricingEngine {
           compAdrs,
           compOccs
         ),
+        event: eventSignal(dateEvents),
         gap_night: gapNightSignal(dateStr, bookings),
         booking_pace: bookingPaceSignal(dateStr, todayStr, isBooked),
       };

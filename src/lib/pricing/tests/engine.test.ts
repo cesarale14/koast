@@ -12,7 +12,7 @@ describe("demandSignal", () => {
   it("returns neutral for demand score of 50", () => {
     const result = demandSignal(50);
     expect(result.score).toBe(0);
-    expect(result.weight).toBe(0.30);
+    expect(result.weight).toBe(0.25);
     expect(result.reason).toContain("50/100");
   });
 
