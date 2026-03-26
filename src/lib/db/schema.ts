@@ -355,6 +355,27 @@ export const revenueChecks = pgTable("revenue_checks", {
   index("idx_revenue_checks_ip").on(t.ipAddress, t.createdAt),
 ]);
 
+// ==================== iCal Feeds ====================
+
+export const icalFeeds = pgTable("ical_feeds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  platform: text("platform").notNull(),
+  feedUrl: text("feed_url").notNull(),
+  isActive: boolean("is_active").default(true),
+  lastSynced: timestamp("last_synced", { withTimezone: true }),
+  lastError: text("last_error"),
+  syncCount: integer("sync_count").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_ical_feeds_property_platform").on(t.propertyId, t.platform),
+  index("idx_ical_feeds_active").on(t.isActive),
+]);
+
+export const icalFeedsRelations = relations(icalFeeds, ({ one }) => ({
+  property: one(properties, { fields: [icalFeeds.propertyId], references: [properties.id] }),
+}));
+
 // ==================== Notifications ====================
 
 export const notifications = pgTable("notifications", {
