@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { db } from "@/lib/db/connection";
+import { leads } from "@/lib/db/schema";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,19 +11,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from("leads") as any).insert({
+    await db.insert(leads).values({
       email,
       address: address ?? null,
       city: city ?? null,
       state: state ?? null,
       zip: zip ?? null,
       bedrooms: bedrooms ?? null,
-      current_rate: current_rate ?? null,
-      estimated_opportunity: estimated_opportunity ?? null,
-      market_adr: market_adr ?? null,
+      currentRate: current_rate ? String(current_rate) : null,
+      estimatedOpportunity: estimated_opportunity ? String(estimated_opportunity) : null,
+      marketAdr: market_adr ? String(market_adr) : null,
       source: "revenue_check",
     });
 

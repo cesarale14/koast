@@ -1,0 +1,368 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  decimal,
+  date,
+  boolean,
+  timestamp,
+  jsonb,
+  integer,
+  time,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+
+// ==================== Properties ====================
+
+export const properties = pgTable("properties", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  name: text("name").notNull(),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  bedrooms: integer("bedrooms"),
+  bathrooms: decimal("bathrooms", { precision: 3, scale: 1 }),
+  maxGuests: integer("max_guests"),
+  propertyType: text("property_type"),
+  amenities: jsonb("amenities").default([]),
+  photos: jsonb("photos").default([]),
+  channexPropertyId: text("channex_property_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_properties_user").on(t.userId),
+  uniqueIndex("idx_properties_channex_id").on(t.channexPropertyId),
+]);
+
+export const propertiesRelations = relations(properties, ({ many }) => ({
+  listings: many(listings),
+  bookings: many(bookings),
+  calendarRates: many(calendarRates),
+  marketComps: many(marketComps),
+  marketSnapshots: many(marketSnapshots),
+  messages: many(messages),
+  cleaningTasks: many(cleaningTasks),
+  localEvents: many(localEvents),
+  guestReviews: many(guestReviews),
+  reviewRules: many(reviewRules),
+}));
+
+// ==================== Listings ====================
+
+export const listings = pgTable("listings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  platform: text("platform").notNull(),
+  platformListingId: text("platform_listing_id"),
+  channexRoomId: text("channex_room_id"),
+  listingUrl: text("listing_url"),
+  status: text("status").default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_listings_property").on(t.propertyId),
+]);
+
+export const listingsRelations = relations(listings, ({ one }) => ({
+  property: one(properties, { fields: [listings.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Bookings ====================
+
+export const bookings = pgTable("bookings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  listingId: uuid("listing_id").references(() => listings.id),
+  platform: text("platform").notNull(),
+  platformBookingId: text("platform_booking_id"),
+  channexBookingId: text("channex_booking_id"),
+  guestName: text("guest_name"),
+  guestEmail: text("guest_email"),
+  guestPhone: text("guest_phone"),
+  checkIn: date("check_in").notNull(),
+  checkOut: date("check_out").notNull(),
+  numGuests: integer("num_guests"),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+  currency: text("currency").default("USD"),
+  status: text("status").default("confirmed"),
+  notes: text("notes"),
+  reviewSolicitationSent: boolean("review_solicitation_sent").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_bookings_property_checkin").on(t.propertyId, t.checkIn),
+  uniqueIndex("idx_bookings_channex_booking_id").on(t.channexBookingId),
+]);
+
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  property: one(properties, { fields: [bookings.propertyId], references: [properties.id] }),
+  listing: one(listings, { fields: [bookings.listingId], references: [listings.id] }),
+}));
+
+// ==================== Calendar Rates ====================
+
+export const calendarRates = pgTable("calendar_rates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  date: date("date").notNull(),
+  baseRate: decimal("base_rate", { precision: 10, scale: 2 }),
+  suggestedRate: decimal("suggested_rate", { precision: 10, scale: 2 }),
+  appliedRate: decimal("applied_rate", { precision: 10, scale: 2 }),
+  minStay: integer("min_stay").default(1),
+  isAvailable: boolean("is_available").default(true),
+  rateSource: text("rate_source").default("manual"),
+  factors: jsonb("factors"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_calendar_rates_property_date").on(t.propertyId, t.date),
+]);
+
+export const calendarRatesRelations = relations(calendarRates, ({ one }) => ({
+  property: one(properties, { fields: [calendarRates.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Market Comps ====================
+
+export const marketComps = pgTable("market_comps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  compListingId: text("comp_listing_id"),
+  compName: text("comp_name"),
+  compBedrooms: integer("comp_bedrooms"),
+  compAdr: decimal("comp_adr", { precision: 10, scale: 2 }),
+  compOccupancy: decimal("comp_occupancy", { precision: 5, scale: 2 }),
+  compRevpar: decimal("comp_revpar", { precision: 10, scale: 2 }),
+  distanceKm: decimal("distance_km", { precision: 5, scale: 2 }),
+  lastSynced: timestamp("last_synced", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_market_comps_property").on(t.propertyId),
+]);
+
+export const marketCompsRelations = relations(marketComps, ({ one }) => ({
+  property: one(properties, { fields: [marketComps.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Market Snapshots ====================
+
+export const marketSnapshots = pgTable("market_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  snapshotDate: date("snapshot_date").notNull(),
+  marketAdr: decimal("market_adr", { precision: 10, scale: 2 }),
+  marketOccupancy: decimal("market_occupancy", { precision: 5, scale: 2 }),
+  marketRevpar: decimal("market_revpar", { precision: 10, scale: 2 }),
+  marketSupply: integer("market_supply"),
+  marketDemandScore: decimal("market_demand_score", { precision: 5, scale: 2 }),
+  dataSource: text("data_source").default("airroi"),
+  rawData: jsonb("raw_data"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_market_snapshots_property_date").on(t.propertyId, t.snapshotDate),
+]);
+
+export const marketSnapshotsRelations = relations(marketSnapshots, ({ one }) => ({
+  property: one(properties, { fields: [marketSnapshots.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Messages ====================
+
+export const messages = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bookingId: uuid("booking_id").references(() => bookings.id),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  platform: text("platform").notNull(),
+  direction: text("direction"),
+  senderName: text("sender_name"),
+  content: text("content").notNull(),
+  aiDraft: text("ai_draft"),
+  aiDraftStatus: text("ai_draft_status").default("none"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_messages_property_created").on(t.propertyId, t.createdAt),
+]);
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  property: one(properties, { fields: [messages.propertyId], references: [properties.id] }),
+  booking: one(bookings, { fields: [messages.bookingId], references: [bookings.id] }),
+}));
+
+// ==================== Cleaning Tasks ====================
+
+export const cleaningTasks = pgTable("cleaning_tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  bookingId: uuid("booking_id").references(() => bookings.id),
+  nextBookingId: uuid("next_booking_id").references(() => bookings.id),
+  cleanerId: uuid("cleaner_id"),
+  status: text("status").default("pending"),
+  scheduledDate: date("scheduled_date").notNull(),
+  scheduledTime: time("scheduled_time"),
+  checklist: jsonb("checklist").default([]),
+  photos: jsonb("photos").default([]),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  cleanerToken: text("cleaner_token"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_cleaning_tasks_property_date").on(t.propertyId, t.scheduledDate),
+  uniqueIndex("idx_cleaning_tasks_token").on(t.cleanerToken),
+]);
+
+export const cleaningTasksRelations = relations(cleaningTasks, ({ one }) => ({
+  property: one(properties, { fields: [cleaningTasks.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Review Rules ====================
+
+export const reviewRules = pgTable("review_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  isActive: boolean("is_active").default(true),
+  autoPublish: boolean("auto_publish").default(false),
+  publishDelayDays: integer("publish_delay_days").default(3),
+  tone: text("tone").default("warm"),
+  targetKeywords: text("target_keywords").array(),
+  badReviewDelay: boolean("bad_review_delay").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_review_rules_property").on(t.propertyId),
+]);
+
+export const reviewRulesRelations = relations(reviewRules, ({ one }) => ({
+  property: one(properties, { fields: [reviewRules.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Guest Reviews ====================
+
+export const guestReviews = pgTable("guest_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bookingId: uuid("booking_id").notNull().references(() => bookings.id),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  direction: text("direction"),
+  draftText: text("draft_text"),
+  finalText: text("final_text"),
+  starRating: integer("star_rating").default(5),
+  recommendGuest: boolean("recommend_guest").default(true),
+  privateNote: text("private_note"),
+  incomingText: text("incoming_text"),
+  incomingRating: decimal("incoming_rating", { precision: 2, scale: 1 }),
+  incomingDate: timestamp("incoming_date", { withTimezone: true }),
+  responseDraft: text("response_draft"),
+  responseFinal: text("response_final"),
+  responseSent: boolean("response_sent").default(false),
+  status: text("status").default("pending"),
+  scheduledPublishAt: timestamp("scheduled_publish_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  isBadReview: boolean("is_bad_review").default(false),
+  aiContext: jsonb("ai_context"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_guest_reviews_property").on(t.propertyId),
+  index("idx_guest_reviews_status").on(t.status),
+]);
+
+export const guestReviewsRelations = relations(guestReviews, ({ one }) => ({
+  property: one(properties, { fields: [guestReviews.propertyId], references: [properties.id] }),
+  booking: one(bookings, { fields: [guestReviews.bookingId], references: [bookings.id] }),
+}));
+
+// ==================== Pricing Outcomes ====================
+
+export const pricingOutcomes = pgTable("pricing_outcomes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id),
+  date: date("date").notNull(),
+  suggestedRate: decimal("suggested_rate", { precision: 10, scale: 2 }),
+  appliedRate: decimal("applied_rate", { precision: 10, scale: 2 }),
+  rateSource: text("rate_source"),
+  wasBooked: boolean("was_booked").default(false),
+  bookingId: uuid("booking_id").references(() => bookings.id),
+  actualRevenue: decimal("actual_revenue", { precision: 10, scale: 2 }),
+  bookedAt: timestamp("booked_at", { withTimezone: true }),
+  daysBeforeCheckin: integer("days_before_checkin"),
+  marketAdr: decimal("market_adr", { precision: 10, scale: 2 }),
+  marketOccupancy: decimal("market_occupancy", { precision: 5, scale: 2 }),
+  demandScore: decimal("demand_score", { precision: 5, scale: 2 }),
+  compMedianAdr: decimal("comp_median_adr", { precision: 10, scale: 2 }),
+  signals: jsonb("signals"),
+  revenueVsSuggested: decimal("revenue_vs_suggested", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_pricing_outcomes_property_date").on(t.propertyId, t.date),
+  index("idx_pricing_outcomes_booked").on(t.wasBooked, t.date),
+]);
+
+// ==================== Local Events ====================
+
+export const localEvents = pgTable("local_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").references(() => properties.id),
+  eventName: text("event_name").notNull(),
+  eventDate: date("event_date").notNull(),
+  venueName: text("venue_name"),
+  eventType: text("event_type"),
+  estimatedAttendance: integer("estimated_attendance"),
+  demandImpact: decimal("demand_impact", { precision: 3, scale: 2 }),
+  source: text("source").default("ticketmaster"),
+  rawData: jsonb("raw_data"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_local_events_property_date").on(t.propertyId, t.eventDate),
+  index("idx_local_events_date").on(t.eventDate),
+]);
+
+export const localEventsRelations = relations(localEvents, ({ one }) => ({
+  property: one(properties, { fields: [localEvents.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Leads ====================
+
+export const leads = pgTable("leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  bedrooms: integer("bedrooms"),
+  currentRate: decimal("current_rate", { precision: 10, scale: 2 }),
+  estimatedOpportunity: decimal("estimated_opportunity", { precision: 10, scale: 2 }),
+  marketAdr: decimal("market_adr", { precision: 10, scale: 2 }),
+  source: text("source").default("revenue_check"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ==================== Revenue Checks ====================
+
+export const revenueChecks = pgTable("revenue_checks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ipAddress: text("ip_address"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  bedrooms: integer("bedrooms"),
+  currentRate: decimal("current_rate", { precision: 10, scale: 2 }),
+  resultJson: jsonb("result_json"),
+  leadId: uuid("lead_id").references(() => leads.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_revenue_checks_ip").on(t.ipAddress, t.createdAt),
+]);
+
+// ==================== Notifications ====================
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: text("type").notNull(),
+  recipient: text("recipient"),
+  message: text("message").notNull(),
+  channel: text("channel").default("console"),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
