@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/Toast";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyData = any;
+
+interface InlineDraft {
+  bookingId: string;
+  text: string;
+  privateNote: string;
+  rating: number;
+  recommend: boolean;
+  reviewId: string | null;
+  scheduledAt: string | null;
+}
 
 export default function ReviewsPage() {
   const { toast } = useToast();
@@ -12,6 +22,12 @@ export default function ReviewsPage() {
   const [data, setData] = useState<AnyData>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [inlineDrafts, setInlineDrafts] = useState<Map<string, InlineDraft>>(new Map());
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editDraftText, setEditDraftText] = useState("");
+  const [editDraftRating, setEditDraftRating] = useState(5);
+  const draftRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const [ruleForm, setRuleForm] = useState({
     auto_publish: false,
     publish_delay_days: 3,
@@ -32,33 +48,99 @@ export default function ReviewsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Scenario 1: Generate review and show inline
   const generateReview = async (bookingId: string) => {
     setGenerating(bookingId);
     try {
       const res = await fetch(`/api/reviews/generate/${bookingId}`, { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
-      toast("Review draft generated!");
-      fetchData();
+
+      // Show draft inline immediately
+      const newDrafts = new Map(inlineDrafts);
+      newDrafts.set(bookingId, {
+        bookingId,
+        text: d.review_text,
+        privateNote: d.private_note ?? "",
+        rating: 5,
+        recommend: true,
+        reviewId: d.review_id ?? null,
+        scheduledAt: d.scheduled_publish_at ?? null,
+      });
+      setInlineDrafts(newDrafts);
+
+      toast("Review draft ready — see below");
+
+      // Refresh data to get the review ID
+      await fetchData();
+
+      // Auto-scroll to the draft
+      setTimeout(() => {
+        const ref = draftRefs.current.get(bookingId);
+        if (ref) ref.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
     }
     setGenerating(null);
   };
 
-  const approveReview = async (reviewId: string, isBad = false) => {
+  // Approve with optional edits
+  const approveReview = async (reviewId: string, isBad = false, finalText?: string, starRating?: number) => {
+    setApprovingId(reviewId);
     try {
       const res = await fetch(`/api/reviews/approve/${reviewId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_bad_review: isBad }),
+        body: JSON.stringify({
+          is_bad_review: isBad,
+          ...(finalText !== undefined && { final_text: finalText }),
+          ...(starRating !== undefined && { star_rating: starRating }),
+        }),
       });
-      if (!res.ok) throw new Error("Failed");
-      toast(isBad ? "Held for delayed publishing" : "Approved & scheduled!");
-      fetchData();
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Failed");
+
+      const publishDate = d.scheduled_publish_at
+        ? new Date(d.scheduled_publish_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        : "soon";
+
+      if (isBad) {
+        toast("Held for delayed publishing");
+      } else {
+        toast(`Review scheduled for ${publishDate}. You can edit it until then.`);
+      }
+
+      // Clear inline drafts
+      setInlineDrafts(new Map());
+      setEditingDraftId(null);
+
+      await fetchData();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
     }
+    setApprovingId(null);
+  };
+
+  // Approve inline draft (from "Needs Review" section)
+  const approveInlineDraft = async (bookingId: string) => {
+    const draft = inlineDrafts.get(bookingId);
+    if (!draft) return;
+
+    // Find the review ID from the data
+    const reviewId = draft.reviewId ?? data?.draft_reviews?.find((r: AnyData) => r.booking_id === bookingId)?.id;
+    if (!reviewId) {
+      toast("Review not found. Please refresh and try again.", "error");
+      return;
+    }
+
+    await approveReview(reviewId, false, draft.text, draft.rating);
+  };
+
+  const dismissInlineDraft = (bookingId: string) => {
+    const newDrafts = new Map(inlineDrafts);
+    newDrafts.delete(bookingId);
+    setInlineDrafts(newDrafts);
   };
 
   const respondToReview = async (reviewId: string) => {
@@ -93,6 +175,22 @@ export default function ReviewsPage() {
     }
   };
 
+  const StarRating = ({ rating, onChange, size = "text-lg" }: { rating: number; onChange?: (r: number) => void; size?: string }) => (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange?.(star)}
+          disabled={!onChange}
+          className={`${size} transition-colors ${star <= rating ? "text-amber-400" : "text-gray-300"} ${onChange ? "cursor-pointer hover:text-amber-500" : "cursor-default"}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
       pending: "bg-gray-100 text-gray-600",
@@ -104,10 +202,12 @@ export default function ReviewsPage() {
     };
     return (
       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${colors[status] ?? "bg-gray-100 text-gray-500"}`}>
-        {status.replace("_", " ")}
+        {status.replace(/_/g, " ")}
       </span>
     );
   };
+
+  const pendingCount = (data?.needs_approval ?? 0) + (data?.needs_review ?? 0);
 
   return (
     <div>
@@ -148,6 +248,9 @@ export default function ReviewsPage() {
             }`}
           >
             {label}
+            {key === "outgoing" && pendingCount > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full">{pendingCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -161,64 +264,198 @@ export default function ReviewsPage() {
           {/* Outgoing Reviews */}
           {tab === "outgoing" && data && (
             <div className="space-y-6">
+
+              {/* Pending approval banner */}
+              {data.needs_approval > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-amber-600 text-sm font-bold">{data.needs_approval}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      {data.needs_approval} review{data.needs_approval !== 1 ? "s" : ""} pending your approval
+                    </p>
+                    <p className="text-xs text-amber-600">Review the drafts below and approve or edit before publishing</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Draft reviews (shown at TOP with yellow highlight) */}
+              {data.draft_reviews.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Drafts ({data.draft_reviews.length})</h2>
+                  <div className="space-y-3">
+                    {data.draft_reviews.map((r: AnyData) => {
+                      const isEditing = editingDraftId === r.id;
+                      return (
+                        <div key={r.id} className="bg-amber-50 rounded-xl border border-amber-200 p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              {statusBadge(r.status)}
+                              <StarRating
+                                rating={isEditing ? editDraftRating : r.star_rating}
+                                onChange={isEditing ? (v) => setEditDraftRating(v) : undefined}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-400">Booking: {r.booking_id?.slice(0, 8)}</span>
+                          </div>
+
+                          {isEditing ? (
+                            <textarea
+                              value={editDraftText}
+                              onChange={(e) => setEditDraftText(e.target.value)}
+                              rows={4}
+                              className="w-full px-3 py-2 text-sm border border-amber-300 rounded-lg mb-4 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                          ) : (
+                            <p className="text-sm text-gray-700 mb-4 italic bg-white rounded-lg p-3 border border-amber-100">
+                              &quot;{r.draft_text}&quot;
+                            </p>
+                          )}
+
+                          <div className="flex gap-2 flex-wrap">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  onClick={() => { approveReview(r.id, false, editDraftText, editDraftRating); setEditingDraftId(null); }}
+                                  disabled={approvingId === r.id}
+                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
+                                </button>
+                                <button
+                                  onClick={() => setEditingDraftId(null)}
+                                  className="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-900"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => approveReview(r.id)}
+                                  disabled={approvingId === r.id}
+                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
+                                </button>
+                                <button
+                                  onClick={() => { setEditingDraftId(r.id); setEditDraftText(r.draft_text); setEditDraftRating(r.star_rating); }}
+                                  className="px-4 py-2 bg-white text-gray-700 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => approveReview(r.id, true)}
+                                  className="px-4 py-2 bg-white text-red-600 text-xs font-medium rounded-lg border border-red-200 hover:bg-red-50"
+                                >
+                                  Mark as Bad Review
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Pending bookings needing reviews */}
               {data.pending_bookings.length > 0 && (
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-3">Needs Review ({data.pending_bookings.length})</h2>
                   <div className="space-y-2">
-                    {data.pending_bookings.map((b: AnyData) => (
-                      <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{b.guest_name ?? "Guest"}</p>
-                          <p className="text-xs text-gray-400">
-                            {b.check_in} → {b.check_out} · {b.platform}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => generateReview(b.id)}
-                          disabled={generating === b.id}
-                          className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {generating === b.id ? "Generating..." : "Generate AI Review"}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Draft reviews */}
-              {data.draft_reviews.length > 0 && (
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Drafts ({data.draft_reviews.length})</h2>
-                  <div className="space-y-3">
-                    {data.draft_reviews.map((r: AnyData) => (
-                      <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            {statusBadge(r.status)}
-                            <span className="text-xs text-gray-400">
-                              {"★".repeat(r.star_rating)}{"☆".repeat(5 - r.star_rating)}
-                            </span>
+                    {data.pending_bookings.map((b: AnyData) => {
+                      const draft = inlineDrafts.get(b.id);
+                      return (
+                        <div key={b.id}>
+                          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{b.guest_name ?? "Guest"}</p>
+                              <p className="text-xs text-gray-400">
+                                {b.check_in} → {b.check_out} · {b.platform}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => generateReview(b.id)}
+                              disabled={generating === b.id}
+                              className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {generating === b.id ? (
+                                <span className="flex items-center gap-2">
+                                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                  Generating...
+                                </span>
+                              ) : "Generate AI Review"}
+                            </button>
                           </div>
+
+                          {/* Inline draft display */}
+                          {draft && (
+                            <div
+                              ref={(el) => { draftRefs.current.set(b.id, el); }}
+                              className="ml-4 mt-2 bg-blue-50 rounded-xl border border-blue-200 p-5 animate-in"
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">AI-Generated Draft</p>
+                                <StarRating
+                                  rating={draft.rating}
+                                  onChange={(r) => {
+                                    const newDrafts = new Map(inlineDrafts);
+                                    newDrafts.set(b.id, { ...draft, rating: r });
+                                    setInlineDrafts(newDrafts);
+                                  }}
+                                />
+                              </div>
+
+                              <textarea
+                                value={draft.text}
+                                onChange={(e) => {
+                                  const newDrafts = new Map(inlineDrafts);
+                                  newDrafts.set(b.id, { ...draft, text: e.target.value });
+                                  setInlineDrafts(newDrafts);
+                                }}
+                                rows={4}
+                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg mb-3 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                              />
+
+                              <div className="flex items-center gap-4 mb-4">
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={draft.recommend}
+                                    onChange={(e) => {
+                                      const newDrafts = new Map(inlineDrafts);
+                                      newDrafts.set(b.id, { ...draft, recommend: e.target.checked });
+                                      setInlineDrafts(newDrafts);
+                                    }}
+                                    className="w-4 h-4 rounded text-blue-600"
+                                  />
+                                  <span className="text-gray-700">Recommend guest</span>
+                                </label>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => approveInlineDraft(b.id)}
+                                  disabled={approvingId !== null}
+                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {approvingId ? "Scheduling..." : "Approve & Schedule"}
+                                </button>
+                                <button
+                                  onClick={() => dismissInlineDraft(b.id)}
+                                  className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-gray-700"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-700 mb-4 italic">&quot;{r.draft_text}&quot;</p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => approveReview(r.id)}
-                            className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700"
-                          >
-                            Approve & Schedule
-                          </button>
-                          <button
-                            onClick={() => approveReview(r.id, true)}
-                            className="px-4 py-2 bg-white text-red-600 text-xs font-medium rounded-lg border border-red-200 hover:bg-red-50"
-                          >
-                            Mark as Bad Review
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -230,11 +467,12 @@ export default function ReviewsPage() {
                   <div className="space-y-2">
                     {data.scheduled_reviews.map((r: AnyData) => (
                       <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-700 truncate max-w-md">{r.final_text ?? "—"}</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Publishes: {r.scheduled_publish_at ? new Date(r.scheduled_publish_at).toLocaleDateString() : "—"}
+                        <div className="min-w-0 flex-1 mr-4">
+                          <p className="text-sm text-gray-700 truncate">{r.final_text ?? "\u2014"}</p>
+                          <p className="text-xs text-emerald-600 mt-1 font-medium">
+                            Publishes: {r.scheduled_publish_at ? new Date(r.scheduled_publish_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "\u2014"}
                           </p>
+                          <p className="text-[10px] text-gray-400">You can edit until the publish date</p>
                         </div>
                         {statusBadge("scheduled")}
                       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -70,6 +71,20 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [reviewBadge, setReviewBadge] = useState(0);
+
+  useEffect(() => {
+    const fetchReviewCount = async () => {
+      try {
+        const res = await fetch("/api/reviews/pending");
+        const d = await res.json();
+        setReviewBadge((d.needs_approval ?? 0) + (d.needs_review ?? 0));
+      } catch { /* silent */ }
+    };
+    fetchReviewCount();
+    const interval = setInterval(fetchReviewCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -99,6 +114,11 @@ export default function DashboardLayout({
               >
                 {icons[item.icon]}
                 {item.name}
+                {item.name === "Reviews" && reviewBadge > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full font-medium">
+                    {reviewBadge}
+                  </span>
+                )}
               </Link>
             );
           })}

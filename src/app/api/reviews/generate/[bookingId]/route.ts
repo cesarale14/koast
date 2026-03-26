@@ -75,15 +75,20 @@ export async function POST(
       },
     };
 
+    let reviewId: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (existing && (existing as any[]).length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await reviewTable.update(reviewData).eq("id", (existing as any[])[0].id);
+      reviewId = (existing as any[])[0].id;
+      await reviewTable.update(reviewData).eq("id", reviewId);
     } else {
-      await reviewTable.insert(reviewData);
+      const { data: inserted } = await reviewTable.insert(reviewData).select("id");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      reviewId = ((inserted ?? []) as any[])[0]?.id ?? "";
     }
 
     return NextResponse.json({
+      review_id: reviewId,
       review_text: result.review_text,
       private_note: result.private_note,
       status: reviewData.status,
