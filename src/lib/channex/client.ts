@@ -27,7 +27,7 @@ class ChannexClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    console.log(`[Channex] ${options.method ?? "GET"} ${endpoint}`);
+    console.log(`[Channex] ${options.method ?? "GET"} ${url}`);
 
     const res = await fetch(url, {
       ...options,
