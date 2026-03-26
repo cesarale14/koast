@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyData = any;
@@ -98,9 +99,13 @@ export default function RevenueCheckPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Property Address</label>
-                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
+                <AddressAutocomplete
+                  value={form.address}
+                  onChange={(v) => setForm({ ...form, address: v })}
+                  onSelect={(r) => setForm({ ...form, address: r.address, city: r.city, state: r.state, zip: r.zip })}
+                  placeholder="Start typing an address..."
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="123 Main Street" />
+                />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>

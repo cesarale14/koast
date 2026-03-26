@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 
 type PropertyType = "entire_home" | "private_room" | "shared_room";
 type PricingMode = "manual" | "review" | "auto";
@@ -249,9 +250,17 @@ export default function AddPropertyPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <input type="text" value={form.address} onChange={(e) => updateField("address", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="123 Main St" />
+              <AddressAutocomplete
+                value={form.address}
+                onChange={(v) => updateField("address", v)}
+                onSelect={(r) => {
+                  updateField("address", r.address);
+                  updateField("city", r.city);
+                  updateField("state", r.state);
+                  updateField("zip", r.zip);
+                }}
+                placeholder="Start typing an address..."
+              />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
