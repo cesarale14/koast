@@ -41,6 +41,16 @@ export const DEFAULT_TEMPLATES: MessageTemplate[] = [
     content: `Hi {guest_name}! We can sometimes offer late checkout depending on our cleaning schedule and next guest arrival. Let us check and get back to you — we'll do our best to make it work!`,
     autoReplyType: "late_checkout",
   },
+  {
+    id: "review_request",
+    name: "Review Request (1 day after checkout)",
+    content: `Hi {guest_name}! We hope you enjoyed your stay at {property_name}. We'd love to hear about your experience — your feedback helps us keep improving! If you have a moment, a review would mean the world to us.`,
+  },
+  {
+    id: "review_followup",
+    name: "Review Follow-up (5 days after checkout)",
+    content: `Hi {guest_name}, just a gentle reminder — we'd really appreciate your review of {property_name}. It only takes a minute and helps future guests know what to expect. Thank you!`,
+  },
 ];
 
 export function fillTemplate(
