@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
+import { createServiceClient } from "@/lib/supabase/service";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -12,107 +13,135 @@ export async function POST(request: NextRequest) {
 
     const channex = createChannexClient();
 
-    // Get room types and rate plans for this property
+    // Get room types and rate plans
     console.log("[booking-test] Fetching room types and rate plans...");
     const roomTypes = await channex.getRoomTypes(propertyId);
     const ratePlans = await channex.getRatePlans(propertyId);
 
     if (roomTypes.length === 0 || ratePlans.length === 0) {
       return NextResponse.json(
-        { error: "No room types or rate plans found for this property" },
+        { error: "No room types or rate plans found" },
         { status: 400 }
       );
     }
 
-    // Use the first room type (Twin) and its first rate plan
     const roomTypeId = roomTypes[0].id;
     const ratePlanId = ratePlans[0].id;
+    console.log(`[booking-test] Room: ${roomTypes[0].attributes.title} (${roomTypeId})`);
+    console.log(`[booking-test] Rate plan: ${ratePlanId}`);
 
-    console.log(`[booking-test] Using room type: ${roomTypes[0].attributes.title} (${roomTypeId})`);
-    console.log(`[booking-test] Using rate plan: ${ratePlanId}`);
-
-    // Step 1: Create a test booking
-    console.log("\n[booking-test] === STEP 1: Create Booking ===");
-    const createRes = await channex.createBooking({
+    const bookingBase = {
       property_id: propertyId,
       room_type_id: roomTypeId,
       rate_plan_id: ratePlanId,
-      arrival_date: "2026-12-01",
-      departure_date: "2026-12-03",
       guest_name: "Test Guest",
       guest_email: "testguest@staycommand.com",
+    };
+
+    // ===== Step 1: Create Booking =====
+    console.log("\n[booking-test] === STEP 1: Create Booking (CRS) ===");
+    const createRes = await channex.createBooking({
+      ...bookingBase,
+      arrival_date: "2026-12-01",
+      departure_date: "2026-12-03",
     });
 
-    const bookingId = createRes.data?.id;
-    console.log(`[booking-test] Booking created: ${bookingId}`);
-    console.log(`[booking-test] Create response:`, JSON.stringify(createRes, null, 2));
+    const bookingId = createRes.data?.attributes?.booking_id ?? createRes.data?.id;
+    const createRevisionId = createRes.data?.attributes?.revision_id ?? null;
+    console.log(`[booking-test] Booking ID: ${bookingId}`);
+    console.log(`[booking-test] Create revision: ${createRevisionId}`);
+    console.log(`[booking-test] Full create response:`, JSON.stringify(createRes, null, 2));
 
-    // Get the initial revision
-    const createRevisions = await channex.getUnacknowledgedRevisions(propertyId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createRevision = (createRevisions as any)?.data?.[0]?.id ?? null;
-    console.log(`[booking-test] Create revision ID: ${createRevision}`);
+    // Wait for async processing
+    console.log("[booking-test] Waiting 5 seconds for async processing...");
+    await sleep(5000);
 
-    // Acknowledge the creation
-    if (createRevision) {
-      await channex.acknowledgeBookingRevision(createRevision);
+    // Fetch booking to confirm
+    let fetchedBooking;
+    try {
+      fetchedBooking = await channex.getBooking(bookingId);
+      console.log(`[booking-test] Fetched booking status: ${fetchedBooking.attributes?.status}`);
+    } catch (e) {
+      console.log(`[booking-test] Could not fetch booking yet: ${e}`);
     }
 
-    // Step 2: Wait then modify (extend stay)
-    console.log("\n[booking-test] Waiting 3 seconds before modification...");
-    await sleep(3000);
+    // Acknowledge create revision
+    if (createRevisionId) {
+      try { await channex.acknowledgeBookingRevision(createRevisionId); } catch (e) {
+        console.warn(`[booking-test] Ack failed: ${e}`);
+      }
+    }
 
-    console.log("[booking-test] === STEP 2: Modify Booking ===");
+    // ===== Step 2: Modify Booking =====
+    console.log("\n[booking-test] === STEP 2: Modify Booking (extend to Dec 5) ===");
     const modifyRes = await channex.modifyBooking(bookingId, {
+      ...bookingBase,
+      arrival_date: "2026-12-01",
       departure_date: "2026-12-05",
     });
-    console.log(`[booking-test] Modify response:`, JSON.stringify(modifyRes, null, 2));
 
-    // Get the modification revision
-    await sleep(1000);
-    const modRevisions = await channex.getUnacknowledgedRevisions(propertyId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const modRevData = (modRevisions as any)?.data ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const modRevision = modRevData.find((r: any) => r.id !== createRevision)?.id ?? modRevData[0]?.id ?? null;
-    console.log(`[booking-test] Modification revision ID: ${modRevision}`);
+    const modRevisionId = modifyRes.data?.attributes?.revision_id ?? null;
+    console.log(`[booking-test] Modify revision: ${modRevisionId}`);
+    console.log(`[booking-test] Full modify response:`, JSON.stringify(modifyRes, null, 2));
 
-    if (modRevision) {
-      await channex.acknowledgeBookingRevision(modRevision);
+    console.log("[booking-test] Waiting 5 seconds...");
+    await sleep(5000);
+
+    if (modRevisionId) {
+      try { await channex.acknowledgeBookingRevision(modRevisionId); } catch (e) {
+        console.warn(`[booking-test] Ack failed: ${e}`);
+      }
     }
 
-    // Step 3: Wait then cancel
-    console.log("\n[booking-test] Waiting 3 seconds before cancellation...");
-    await sleep(3000);
+    // ===== Step 3: Cancel Booking =====
+    console.log("\n[booking-test] === STEP 3: Cancel Booking ===");
+    const cancelRes = await channex.cancelBooking(bookingId, {
+      ...bookingBase,
+      arrival_date: "2026-12-01",
+      departure_date: "2026-12-05",
+    });
 
-    console.log("[booking-test] === STEP 3: Cancel Booking ===");
-    const cancelRes = await channex.cancelBooking(bookingId);
-    console.log(`[booking-test] Cancel response:`, JSON.stringify(cancelRes, null, 2));
+    const cancelRevisionId = cancelRes.data?.attributes?.revision_id ?? null;
+    console.log(`[booking-test] Cancel revision: ${cancelRevisionId}`);
+    console.log(`[booking-test] Full cancel response:`, JSON.stringify(cancelRes, null, 2));
 
-    // Get the cancellation revision
-    await sleep(1000);
-    const cancelRevisions = await channex.getUnacknowledgedRevisions(propertyId);
+    console.log("[booking-test] Waiting 5 seconds...");
+    await sleep(5000);
+
+    if (cancelRevisionId) {
+      try { await channex.acknowledgeBookingRevision(cancelRevisionId); } catch (e) {
+        console.warn(`[booking-test] Ack failed: ${e}`);
+      }
+    }
+
+    // ===== Step 4: Check webhook delivery =====
+    console.log("\n[booking-test] === Checking webhook delivery ===");
+    const supabase = createServiceClient();
+    const { data: webhookBookings } = await supabase
+      .from("bookings")
+      .select("id, channex_booking_id, guest_name, check_in, check_out, status")
+      .eq("channex_booking_id", bookingId)
+      .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cancelRevData = (cancelRevisions as any)?.data ?? [];
-    const cancelRevision = cancelRevData.find(
+    const webhookDelivered = ((webhookBookings ?? []) as any[]).length > 0;
+    console.log(`[booking-test] Webhook delivered to Supabase: ${webhookDelivered}`);
+    if (webhookDelivered) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (r: any) => r.id !== createRevision && r.id !== modRevision
-    )?.id ?? cancelRevData[0]?.id ?? null;
-    console.log(`[booking-test] Cancellation revision ID: ${cancelRevision}`);
-
-    if (cancelRevision) {
-      await channex.acknowledgeBookingRevision(cancelRevision);
+      console.log(`[booking-test] Supabase booking:`, JSON.stringify((webhookBookings as any[])[0]));
     }
 
     const result = {
       booking_id: bookingId,
-      create_revision_id: createRevision,
-      modify_revision_id: modRevision,
-      cancel_revision_id: cancelRevision,
+      new_revision_id: createRevisionId,
+      modified_revision_id: modRevisionId,
+      cancelled_revision_id: cancelRevisionId,
+      webhook_delivered: webhookDelivered,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      webhook_data: webhookDelivered ? (webhookBookings as any[])[0] : null,
       timeline: [
-        { step: "create", booking_id: bookingId, revision_id: createRevision, guest: "Test Guest", check_in: "2026-12-01", check_out: "2026-12-03" },
-        { step: "modify", booking_id: bookingId, revision_id: modRevision, change: "check_out extended to 2026-12-05" },
-        { step: "cancel", booking_id: bookingId, revision_id: cancelRevision },
+        { step: "create", booking_id: bookingId, revision_id: createRevisionId, check_in: "2026-12-01", check_out: "2026-12-03" },
+        { step: "modify", booking_id: bookingId, revision_id: modRevisionId, change: "check_out → 2026-12-05" },
+        { step: "cancel", booking_id: bookingId, revision_id: cancelRevisionId },
       ],
     };
 

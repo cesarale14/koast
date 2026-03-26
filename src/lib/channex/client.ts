@@ -209,12 +209,22 @@ class ChannexClient {
     amount?: number; // in cents
     currency?: string;
   }): Promise<AnyResponse> {
+    // Build per-day rates
+    const days: Record<string, string> = {};
+    const ci = new Date(data.arrival_date);
+    const co = new Date(data.departure_date);
+    const nightRate = data.amount ? (data.amount / 100).toFixed(2) : "100.00";
+    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+      days[d.toISOString().split("T")[0]] = nightRate;
+    }
+
     const res = await this.request("/bookings", {
       method: "POST",
       body: JSON.stringify({
         booking: {
           status: "new",
           ota_name: "BookingCRS",
+          ota_reservation_code: `SC-${Date.now()}`,
           currency: data.currency ?? "USD",
           arrival_date: data.arrival_date,
           departure_date: data.departure_date,
@@ -223,7 +233,14 @@ class ChannexClient {
             {
               room_type_id: data.room_type_id,
               rate_plan_id: data.rate_plan_id,
-              occupancy: data.occupancy ?? { adults: 1, children: 0, infants: 0 },
+              days,
+              occupancy: data.occupancy ?? { adults: 1, children: 0, infants: 0, ages: [] },
+              guests: [
+                {
+                  name: data.guest_name.split(" ")[0],
+                  surname: data.guest_name.split(" ").slice(1).join(" ") || "Guest",
+                },
+              ],
             },
           ],
           customer: {
@@ -238,15 +255,59 @@ class ChannexClient {
     return res;
   }
 
-  async modifyBooking(bookingId: string, updates: {
-    departure_date?: string;
-    arrival_date?: string;
-  }): Promise<AnyResponse> {
+  async modifyBooking(
+    bookingId: string,
+    originalData: {
+      property_id: string;
+      room_type_id: string;
+      rate_plan_id: string;
+      guest_name: string;
+      guest_email?: string;
+      arrival_date: string;
+      departure_date: string;
+      currency?: string;
+      amount?: number;
+    }
+  ): Promise<AnyResponse> {
+    // CRS modify requires full booking body with status: "modified"
+    const days: Record<string, string> = {};
+    const ci = new Date(originalData.arrival_date);
+    const co = new Date(originalData.departure_date);
+    const nightRate = originalData.amount ? (originalData.amount / 100).toFixed(2) : "100.00";
+    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+      days[d.toISOString().split("T")[0]] = nightRate;
+    }
+
     const res = await this.request(`/bookings/${bookingId}`, {
       method: "PUT",
       body: JSON.stringify({
         booking: {
-          ...updates,
+          status: "modified",
+          ota_name: "BookingCRS",
+          ota_reservation_code: `SC-${Date.now()}`,
+          currency: originalData.currency ?? "USD",
+          arrival_date: originalData.arrival_date,
+          departure_date: originalData.departure_date,
+          property_id: originalData.property_id,
+          rooms: [
+            {
+              room_type_id: originalData.room_type_id,
+              rate_plan_id: originalData.rate_plan_id,
+              days,
+              occupancy: { adults: 1, children: 0, infants: 0, ages: [] },
+              guests: [
+                {
+                  name: originalData.guest_name.split(" ")[0],
+                  surname: originalData.guest_name.split(" ").slice(1).join(" ") || "Guest",
+                },
+              ],
+            },
+          ],
+          customer: {
+            name: originalData.guest_name.split(" ")[0],
+            surname: originalData.guest_name.split(" ").slice(1).join(" ") || "Guest",
+            mail: originalData.guest_email ?? "test@staycommand.com",
+          },
         },
       }),
     });
@@ -254,12 +315,49 @@ class ChannexClient {
     return res;
   }
 
-  async cancelBooking(bookingId: string): Promise<AnyResponse> {
+  async cancelBooking(
+    bookingId: string,
+    originalData: {
+      property_id: string;
+      room_type_id: string;
+      rate_plan_id: string;
+      guest_name: string;
+      arrival_date: string;
+      departure_date: string;
+      currency?: string;
+    }
+  ): Promise<AnyResponse> {
+    // CRS cancel requires full body with status: "cancelled"
+    const days: Record<string, string> = {};
+    const ci = new Date(originalData.arrival_date);
+    const co = new Date(originalData.departure_date);
+    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+      days[d.toISOString().split("T")[0]] = "100.00";
+    }
+
     const res = await this.request(`/bookings/${bookingId}`, {
       method: "PUT",
       body: JSON.stringify({
         booking: {
           status: "cancelled",
+          ota_name: "BookingCRS",
+          ota_reservation_code: `SC-${Date.now()}`,
+          currency: originalData.currency ?? "USD",
+          arrival_date: originalData.arrival_date,
+          departure_date: originalData.departure_date,
+          property_id: originalData.property_id,
+          rooms: [
+            {
+              room_type_id: originalData.room_type_id,
+              rate_plan_id: originalData.rate_plan_id,
+              days,
+              occupancy: { adults: 1, children: 0, infants: 0, ages: [] },
+            },
+          ],
+          customer: {
+            name: originalData.guest_name.split(" ")[0],
+            surname: originalData.guest_name.split(" ").slice(1).join(" ") || "Guest",
+          },
         },
       }),
     });
