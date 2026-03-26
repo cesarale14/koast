@@ -2,8 +2,14 @@ import type { ICalBooking } from "./types";
 
 const BLOCKED_SUMMARIES = [
   "not available", "blocked", "airbnb (not available)",
-  "reserved", "unavailable", "closed", "block",
+  "unavailable", "closed", "block", "closed - not available",
 ];
+
+// "Reserved" on Airbnb = real booking (privacy-masked guest name)
+// "Reserved" on other platforms = blocked date
+const PLATFORM_BOOKING_SUMMARIES: Record<string, string[]> = {
+  airbnb: ["reserved"],
+};
 
 function detectPlatform(url: string): string {
   const lower = url.toLowerCase();
@@ -67,11 +73,17 @@ export async function parseICalFeed(url: string): Promise<ICalBooking[]> {
     if (!dtstart || !dtend) continue;
     if (!uid) uid = `${platform}-${dtstart}-${dtend}-${summary}`;
 
-    const isBlocked = BLOCKED_SUMMARIES.some((b) => summary.toLowerCase().includes(b))
-      || summary === ""
-      || summary.toLowerCase() === "reserved";
+    const lower = summary.toLowerCase();
+    const platformBookings = PLATFORM_BOOKING_SUMMARIES[platform] ?? [];
+    const isPlatformBooking = platformBookings.includes(lower);
 
-    const guestName = isBlocked ? null : (summary || null);
+    const isBlocked = !isPlatformBooking && (
+      BLOCKED_SUMMARIES.some((b) => lower.includes(b))
+      || summary === ""
+    );
+
+    // "Reserved" on Airbnb = booking with masked name
+    const guestName = isBlocked ? null : (isPlatformBooking ? "Guest (via " + platform + ")" : summary || null);
 
     bookings.push({
       uid,
