@@ -6,6 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 
+interface Booking {
+  id: string;
+  guest_name: string | null;
+  platform: string;
+  check_in: string;
+  check_out: string;
+  total_price: number | null;
+  status: string;
+}
+
 interface PropertyDetailProps {
   property: {
     id: string; name: string; address: string | null; city: string | null;
@@ -40,12 +50,33 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function PropertyDetail({
-  property, listings, allBookings, stats, calendarBookings, calendarRates,
+  property, listings, allBookings: initialBookings, stats, calendarBookings, calendarRates,
 }: PropertyDetailProps) {
   const [tab, setTab] = useState("Overview");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+
+  // Scenario 1: Full Sync state
+  const [syncing, setSyncing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [syncResult, setSyncResult] = useState<any>(null);
+
+  // Scenario 2: Add Booking state
+  const [showAddBooking, setShowAddBooking] = useState(false);
+  const [addingBooking, setAddingBooking] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    guest_name: "", check_in: "", check_out: "", total_price: "",
+  });
+
+  // Scenario 3: Edit/Cancel Booking state
+  const [editingBooking, setEditingBooking] = useState<string | null>(null);
+  const [editBookingForm, setEditBookingForm] = useState({
+    guest_name: "", check_in: "", check_out: "", total_price: "",
+  });
+  const [savingBooking, setSavingBooking] = useState(false);
+  const [cancellingBooking, setCancellingBooking] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
     name: property.name,
@@ -87,6 +118,134 @@ export default function PropertyDetail({
     }
   };
 
+  // ==================== Scenario 1: Full Sync ====================
+  const handleFullSync = async () => {
+    if (!property.channex_property_id) {
+      toast("No Channex property ID connected", "error");
+      return;
+    }
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/channex/full-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channex_property_id: property.channex_property_id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSyncResult(data);
+      toast(`Full sync complete! ${data.roomTypes} room types, ${data.ratePlans} rate plans synced`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Full sync failed", "error");
+      setSyncResult({ error: err instanceof Error ? err.message : "Failed" });
+    }
+    setSyncing(false);
+  };
+
+  // ==================== Scenario 2: Add Booking ====================
+  const handleAddBooking = async () => {
+    if (!bookingForm.guest_name || !bookingForm.check_in || !bookingForm.check_out) {
+      toast("Please fill in guest name, check-in, and check-out dates", "error");
+      return;
+    }
+    setAddingBooking(true);
+    try {
+      const res = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          property_id: property.id,
+          guest_name: bookingForm.guest_name,
+          check_in: bookingForm.check_in,
+          check_out: bookingForm.check_out,
+          total_price: bookingForm.total_price ? parseFloat(bookingForm.total_price) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const channexMsg = data.channex?.error
+        ? ` (Channex: ${data.channex.error})`
+        : data.channex
+          ? " + Channex availability updated"
+          : "";
+      toast(`Booking created${channexMsg}`);
+      setBookings([data.booking, ...bookings]);
+      setBookingForm({ guest_name: "", check_in: "", check_out: "", total_price: "" });
+      setShowAddBooking(false);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create booking", "error");
+    }
+    setAddingBooking(false);
+  };
+
+  // ==================== Scenario 3: Edit Booking ====================
+  const startEditBooking = (b: Booking) => {
+    setEditingBooking(b.id);
+    setEditBookingForm({
+      guest_name: b.guest_name ?? "",
+      check_in: b.check_in,
+      check_out: b.check_out,
+      total_price: b.total_price?.toString() ?? "",
+    });
+  };
+
+  const handleEditBooking = async () => {
+    if (!editingBooking) return;
+    setSavingBooking(true);
+    try {
+      const res = await fetch(`/api/bookings/${editingBooking}/edit`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guest_name: editBookingForm.guest_name,
+          check_in: editBookingForm.check_in,
+          check_out: editBookingForm.check_out,
+          total_price: editBookingForm.total_price ? parseFloat(editBookingForm.total_price) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const channexMsg = data.channex?.error
+        ? ` (Channex: ${data.channex.error})`
+        : data.channex
+          ? " + Channex availability updated"
+          : "";
+      toast(`Booking updated${channexMsg}`);
+      setBookings(bookings.map((b) => b.id === editingBooking ? data.booking : b));
+      setEditingBooking(null);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update booking", "error");
+    }
+    setSavingBooking(false);
+  };
+
+  // ==================== Scenario 3: Cancel Booking ====================
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!confirm("Cancel this booking? This will restore availability in Channex.")) return;
+    setCancellingBooking(bookingId);
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const channexMsg = data.channex?.error
+        ? ` (Channex: ${data.channex.error})`
+        : data.channex
+          ? " + Channex availability restored"
+          : "";
+      toast(`Booking cancelled${channexMsg}`);
+      setBookings(bookings.map((b) => b.id === bookingId ? { ...b, status: "cancelled" } : b));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to cancel booking", "error");
+    }
+    setCancellingBooking(null);
+  };
+
   const statusColors: Record<string, string> = {
     confirmed: "bg-green-50 text-green-700",
     pending: "bg-amber-50 text-amber-700",
@@ -116,7 +275,7 @@ export default function PropertyDetail({
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
           { label: "Occupancy", value: `${stats.occupancy}%`, sub: "This month" },
-          { label: "ADR", value: stats.adr > 0 ? `$${stats.adr}` : "—", sub: "This month" },
+          { label: "ADR", value: stats.adr > 0 ? `$${stats.adr}` : "\u2014", sub: "This month" },
           { label: "Revenue", value: stats.revenue > 0 ? `$${stats.revenue.toLocaleString()}` : "$0", sub: "This month" },
           { label: "Total Bookings", value: stats.totalBookings.toString(), sub: "All time" },
         ].map((s) => (
@@ -153,19 +312,19 @@ export default function PropertyDetail({
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Type</span>
-                <span className="text-gray-900 font-medium">{typeLabels[property.property_type ?? ""] ?? "—"}</span>
+                <span className="text-gray-900 font-medium">{typeLabels[property.property_type ?? ""] ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Bedrooms</span>
-                <span className="text-gray-900 font-medium">{property.bedrooms ?? "—"}</span>
+                <span className="text-gray-900 font-medium">{property.bedrooms ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Bathrooms</span>
-                <span className="text-gray-900 font-medium">{property.bathrooms ?? "—"}</span>
+                <span className="text-gray-900 font-medium">{property.bathrooms ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Max Guests</span>
-                <span className="text-gray-900 font-medium">{property.max_guests ?? "—"}</span>
+                <span className="text-gray-900 font-medium">{property.max_guests ?? "\u2014"}</span>
               </div>
               {property.channex_property_id && (
                 <div className="flex justify-between">
@@ -174,6 +333,43 @@ export default function PropertyDetail({
                 </div>
               )}
             </div>
+
+            {/* Scenario 1: Full Sync Button */}
+            {property.channex_property_id && (
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <button
+                  onClick={handleFullSync}
+                  disabled={syncing}
+                  className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {syncing ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      Syncing 500 days...
+                    </>
+                  ) : (
+                    "Full Sync to Channex"
+                  )}
+                </button>
+                {syncResult && !syncResult.error && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800">
+                    <p className="font-medium">Sync complete</p>
+                    <p className="mt-1">Room types: {syncResult.roomTypes} | Rate plans: {syncResult.ratePlans}</p>
+                    {syncResult.availabilityResult?.data && (
+                      <p>Availability task: {JSON.stringify(syncResult.availabilityResult.data).slice(0, 80)}...</p>
+                    )}
+                    {syncResult.restrictionsResult?.data && (
+                      <p>Restrictions task: {JSON.stringify(syncResult.restrictionsResult.data).slice(0, 80)}...</p>
+                    )}
+                  </div>
+                )}
+                {syncResult?.error && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800">
+                    Error: {syncResult.error}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -213,53 +409,175 @@ export default function PropertyDetail({
       )}
 
       {tab === "Bookings" && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <div className="grid grid-cols-7 text-xs font-medium text-gray-400 uppercase tracking-wider">
-              <span>Guest</span>
-              <span>Platform</span>
-              <span>Check-in</span>
-              <span>Check-out</span>
-              <span>Nights</span>
-              <span>Total</span>
-              <span>Status</span>
-            </div>
+        <div className="space-y-4">
+          {/* Scenario 2: Add Booking Button + Form */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddBooking(!showAddBooking)}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {showAddBooking ? "Cancel" : "Add Booking"}
+            </button>
           </div>
-          {allBookings.length === 0 ? (
-            <div className="p-12 text-center text-gray-400 text-sm">No bookings yet.</div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {allBookings.map((b: {
-                id: string; guest_name: string | null; platform: string;
-                check_in: string; check_out: string; total_price: number | null; status: string;
-              }) => {
-                const nights = Math.round(
-                  (new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / 86400000
-                );
-                return (
-                  <div key={b.id} className="px-6 py-3 grid grid-cols-7 items-center text-sm">
-                    <span className="font-medium text-gray-900">{b.guest_name ?? "—"}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${platformBadgeColors[b.platform] ?? "bg-gray-100 text-gray-600"}`}>
-                      {platformLabels[b.platform] ?? b.platform}
-                    </span>
-                    <span className="text-gray-600">
-                      {new Date(b.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </span>
-                    <span className="text-gray-600">
-                      {new Date(b.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </span>
-                    <span className="text-gray-600">{nights}</span>
-                    <span className="text-gray-900 font-medium">
-                      {b.total_price != null ? `$${b.total_price.toLocaleString()}` : "—"}
-                    </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${statusColors[b.status] ?? "bg-gray-100 text-gray-600"}`}>
-                      {b.status}
-                    </span>
-                  </div>
-                );
-              })}
+
+          {showAddBooking && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">New Booking</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Guest Name *</label>
+                  <input type="text" value={bookingForm.guest_name}
+                    onChange={(e) => setBookingForm({ ...bookingForm, guest_name: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="John Smith" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
+                  <input type="number" value={bookingForm.total_price}
+                    onChange={(e) => setBookingForm({ ...bookingForm, total_price: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="500.00" min="0" step="0.01" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Check-in *</label>
+                  <input type="date" value={bookingForm.check_in}
+                    onChange={(e) => setBookingForm({ ...bookingForm, check_in: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Check-out *</label>
+                  <input type="date" value={bookingForm.check_out}
+                    onChange={(e) => setBookingForm({ ...bookingForm, check_out: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                </div>
+              </div>
+              <div className="mt-4 flex gap-3">
+                <button onClick={handleAddBooking} disabled={addingBooking}
+                  className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {addingBooking ? "Creating..." : "Create Booking"}
+                </button>
+                {property.channex_property_id && (
+                  <span className="text-xs text-gray-400 self-center">
+                    Channex availability will be automatically updated
+                  </span>
+                )}
+              </div>
             </div>
           )}
+
+          {/* Bookings Table */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="grid grid-cols-8 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <span>Guest</span>
+                <span>Platform</span>
+                <span>Check-in</span>
+                <span>Check-out</span>
+                <span>Nights</span>
+                <span>Total</span>
+                <span>Status</span>
+                <span>Actions</span>
+              </div>
+            </div>
+            {bookings.length === 0 ? (
+              <div className="p-12 text-center text-gray-400 text-sm">No bookings yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {bookings.map((b) => {
+                  const nights = Math.round(
+                    (new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / 86400000
+                  );
+                  const isEditing = editingBooking === b.id;
+
+                  if (isEditing) {
+                    return (
+                      <div key={b.id} className="px-6 py-3 bg-blue-50 border-l-4 border-blue-500">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Guest Name</label>
+                            <input type="text" value={editBookingForm.guest_name}
+                              onChange={(e) => setEditBookingForm({ ...editBookingForm, guest_name: e.target.value })}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
+                            <input type="number" value={editBookingForm.total_price}
+                              onChange={(e) => setEditBookingForm({ ...editBookingForm, total_price: e.target.value })}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                              min="0" step="0.01" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Check-in</label>
+                            <input type="date" value={editBookingForm.check_in}
+                              onChange={(e) => setEditBookingForm({ ...editBookingForm, check_in: e.target.value })}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Check-out</label>
+                            <input type="date" value={editBookingForm.check_out}
+                              onChange={(e) => setEditBookingForm({ ...editBookingForm, check_out: e.target.value })}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={handleEditBooking} disabled={savingBooking}
+                            className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            {savingBooking ? "Saving..." : "Save Changes"}
+                          </button>
+                          <button onClick={() => setEditingBooking(null)}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900">
+                            Cancel
+                          </button>
+                          {property.channex_property_id && (
+                            <span className="text-[10px] text-gray-400 self-center ml-2">
+                              Old dates restored + new dates blocked in Channex
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={b.id} className="px-6 py-3 grid grid-cols-8 items-center text-sm group hover:bg-gray-50">
+                      <span className="font-medium text-gray-900">{b.guest_name ?? "\u2014"}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${platformBadgeColors[b.platform] ?? "bg-gray-100 text-gray-600"}`}>
+                        {platformLabels[b.platform] ?? b.platform}
+                      </span>
+                      <span className="text-gray-600">
+                        {new Date(b.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                      <span className="text-gray-600">
+                        {new Date(b.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                      <span className="text-gray-600">{nights}</span>
+                      <span className="text-gray-900 font-medium">
+                        {b.total_price != null ? `$${Number(b.total_price).toLocaleString()}` : "\u2014"}
+                      </span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${statusColors[b.status] ?? "bg-gray-100 text-gray-600"}`}>
+                        {b.status}
+                      </span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {b.status !== "cancelled" && (
+                          <>
+                            <button onClick={() => startEditBooking(b)}
+                              className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded">
+                              Edit
+                            </button>
+                            <button onClick={() => handleCancelBooking(b.id)}
+                              disabled={cancellingBooking === b.id}
+                              className="px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded disabled:opacity-50">
+                              {cancellingBooking === b.id ? "..." : "Cancel"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -369,7 +687,7 @@ export default function PropertyDetail({
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-1">
                   <span className="text-gray-500">{label}</span>
-                  <span className="text-gray-900 font-medium">{value || "—"}</span>
+                  <span className="text-gray-900 font-medium">{value || "\u2014"}</span>
                 </div>
               ))}
             </div>
