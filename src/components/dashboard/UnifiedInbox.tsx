@@ -244,9 +244,9 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
   }, [activeConversation, bookingMap, propMap]);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
       {/* Left panel: conversation list */}
-      <div className="w-80 border-r border-[var(--border)] flex flex-col">
+      <div className={`${activeConvo ? "hidden md:flex" : "flex"} w-full md:w-80 border-r border-[var(--border)] flex-col`}>
         {/* Filter tabs */}
         <div className="p-3 border-b border-neutral-100">
           <div className="flex gap-1 bg-neutral-100 rounded-lg p-0.5 mb-3">
@@ -311,13 +311,22 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
       </div>
 
       {/* Right panel: conversation thread */}
-      <div className="flex-1 flex flex-col">
+      <div className={`${!activeConvo ? "hidden md:flex" : "flex"} flex-1 flex-col`}>
         {activeConversation ? (
           <>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-neutral-100">
+            <div className="px-4 md:px-6 py-4 border-b border-neutral-100">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setActiveConvo(null)}
+                    className="md:hidden text-neutral-400 hover:text-neutral-600"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <div>
                   <h2 className="text-lg font-semibold text-neutral-900">{activeConversation.guestName}</h2>
                   <p className="text-xs text-neutral-400">
                     {activeConversation.propertyName} ·{" "}
@@ -329,6 +338,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                       return b ? ` · ${b.check_in} → ${b.check_out}` : "";
                     })()}
                   </p>
+                  </div>
                 </div>
               </div>
             </div>

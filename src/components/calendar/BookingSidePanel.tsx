@@ -47,7 +47,7 @@ export default function BookingSidePanel({ booking, onClose }: BookingSidePanelP
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
         {/* Header */}
         <div className="sticky top-0 bg-neutral-0 border-b border-neutral-100 px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-neutral-800">Booking Details</h2>

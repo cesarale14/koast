@@ -124,12 +124,12 @@ export default function DashboardClient() {
   return (
     <div>
       {/* Header with time range selector */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 md:mb-8">
         <div>
           <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dashboard</h1>
-          <p className="text-neutral-500">Overview of your properties and bookings</p>
+          <p className="text-neutral-500 text-sm">Overview of your properties and bookings</p>
         </div>
-        <div className="flex gap-1 bg-neutral-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-neutral-100 rounded-lg p-1 overflow-x-auto flex-shrink-0">
           {rangeKeys.map((r) => (
             <button
               key={r}
@@ -150,7 +150,7 @@ export default function DashboardClient() {
       <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
         <StatCard
           label="Revenue"
           value={stats.revenue > 0 ? formatCurrency(stats.revenue) : "$0"}

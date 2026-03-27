@@ -313,7 +313,7 @@ export default function CalendarGrid({
         {/* Header: date labels */}
         <div className="flex border-b border-[var(--border)]">
           {/* Sticky property name column header */}
-          <div className="w-44 min-w-[176px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
+          <div className="w-[120px] md:w-44 min-w-[120px] md:min-w-[176px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
             <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
               Property
             </span>
@@ -363,7 +363,7 @@ export default function CalendarGrid({
         {filteredProperties.map((prop) => (
           <div key={prop.id} className="flex">
             {/* Sticky property name */}
-            <div className="w-44 min-w-[176px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-4 flex items-center sticky left-0 z-20 border-b border-neutral-100">
+            <div className="w-[120px] md:w-44 min-w-[120px] md:min-w-[176px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-4 flex items-center sticky left-0 z-20 border-b border-neutral-100">
               <span className="text-sm font-medium text-neutral-700 truncate">
                 {prop.name}
               </span>

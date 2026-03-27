@@ -26,7 +26,7 @@ export default function StatCard({
 
   return (
     <div
-      className="relative bg-neutral-0 border rounded-lg p-5 shadow-sm hover:shadow-md transition-all duration-base group"
+      className="relative bg-neutral-0 border rounded-lg p-4 md:p-5 shadow-sm hover:shadow-md transition-all duration-base group"
       style={{ borderColor: "var(--border)" }}
     >
       {/* Icon */}
