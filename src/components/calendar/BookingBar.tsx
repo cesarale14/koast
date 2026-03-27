@@ -37,23 +37,29 @@ export default function BookingBar({ booking, startCol, span, onClick }: Booking
   );
   const firstName = booking.guest_name?.split(" ")[0] ?? "Guest";
 
+  // Airbnb-style positioning:
+  // Start at 50% of check-in cell (afternoon arrival)
+  // End at 50% of check-out cell (morning departure)
+  const cellWidth = 80;
+  const barLeft = startCol * cellWidth + cellWidth / 2;
+  const barWidth = span * cellWidth;
+
   return (
     <div
-      className="absolute top-1 bottom-1 cursor-pointer flex items-center px-2 text-white text-xs font-medium rounded-md shadow-sm hover:shadow-md transition-shadow overflow-hidden whitespace-nowrap z-10"
+      className="absolute top-1 bottom-1 cursor-pointer flex items-center gap-1.5 px-2.5 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md hover:brightness-110 transition-all overflow-hidden whitespace-nowrap z-10"
       style={{
-        left: `${startCol * 80}px`,
-        width: `${span * 80 - 4}px`,
+        left: `${barLeft}px`,
+        width: `${Math.max(barWidth - 2, 20)}px`,
         backgroundColor: color,
       }}
       onClick={(e) => {
         e.stopPropagation();
         onClick(booking);
       }}
-      title={`${booking.guest_name} · ${nights}n · ${booking.platform}`}
+      title={`${booking.guest_name} · ${nights} night${nights !== 1 ? "s" : ""} · ${booking.platform}`}
     >
-      <span className="truncate">
-        {firstName} · {nights}n
-      </span>
+      <span className="truncate">{firstName}</span>
+      <span className="text-white/70 text-[10px] flex-shrink-0">{nights}n</span>
     </div>
   );
 }

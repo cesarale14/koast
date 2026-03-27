@@ -32,21 +32,31 @@ export default function PropertyRow({
   onDragStart,
   onDragEnter,
 }: PropertyRowProps) {
-  // Only render visible date cells
   const visibleDates = dates.slice(visibleStart, visibleEnd);
+
+  // Determine cell coverage for each visible date
+  const getCoverage = (date: string): "full" | "checkin" | "checkout" | "booked" => {
+    for (const b of bookings) {
+      // Fully inside booking (not check-in or check-out day)
+      if (date > b.check_in && date < b.check_out) return "booked";
+      // Check-in day: right half is booked (guest arrives PM)
+      if (date === b.check_in) return "checkin";
+      // Check-out day: left half is booked (guest departs AM)
+      if (date === b.check_out) return "checkout";
+    }
+    return "full";
+  };
 
   return (
     <div className="flex border-b border-neutral-100 h-10">
-      {/* Date cells container */}
       <div className="relative flex" style={{ width: `${dates.length * 80}px` }}>
-        {/* Render visible date cells */}
+        {/* Render date cells — visible range only */}
         {visibleDates.map((date, i) => {
           const absIdx = visibleStart + i;
-          // Check if this date is covered by a booking
-          const hasBooking = bookings.some(
-            (b) => date >= b.check_in && date < b.check_out
-          );
-          if (hasBooking) {
+          const coverage = getCoverage(date);
+
+          // Fully booked dates: render empty cell (bar covers it)
+          if (coverage === "booked") {
             return (
               <div
                 key={date}
@@ -55,6 +65,7 @@ export default function PropertyRow({
               />
             );
           }
+
           return (
             <div
               key={date}
@@ -68,12 +79,13 @@ export default function PropertyRow({
                 isSelected={selectedDates.has(date)}
                 onDragStart={(d) => onDragStart(property.id, d)}
                 onDragEnter={(d) => onDragEnter(property.id, d)}
+                coverage={coverage}
               />
             </div>
           );
         })}
 
-        {/* Booking bars */}
+        {/* Booking bars — positioned with Airbnb-style 50% offset */}
         {bookings.map((booking) => {
           const startIdx = Math.max(
             0,

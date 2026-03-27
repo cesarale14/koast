@@ -22,17 +22,35 @@ interface WeekCalendarProps {
   properties: PropertyWeek[];
 }
 
-const statusColors = {
-  booked: "bg-brand-500",
-  available: "bg-brand-300",
-  blocked: "bg-neutral-200",
-};
+interface BookingSpan {
+  startIdx: number;
+  endIdx: number;
+  guestName: string;
+}
 
-const statusLabels = {
-  booked: "Booked",
-  available: "Open",
-  blocked: "Blocked",
-};
+const platformColor = "#10B981"; // brand-500 for mini calendar
+
+/** Group consecutive booked days with same guest into spans */
+function getBookingSpans(days: PropertyWeek["days"]): BookingSpan[] {
+  const spans: BookingSpan[] = [];
+  let current: BookingSpan | null = null;
+
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
+    if (day.status === "booked" && day.guestName) {
+      if (current && current.guestName === day.guestName) {
+        current.endIdx = i;
+      } else {
+        if (current) spans.push(current);
+        current = { startIdx: i, endIdx: i, guestName: day.guestName };
+      }
+    } else {
+      if (current) { spans.push(current); current = null; }
+    }
+  }
+  if (current) spans.push(current);
+  return spans;
+}
 
 export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
   if (properties.length === 0) {
@@ -43,16 +61,18 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
     );
   }
 
+  const colCount = days.length;
+
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[600px]">
         {/* Day headers */}
-        <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: `140px repeat(${days.length}, 1fr)` }}>
+        <div className="grid gap-0 mb-2" style={{ gridTemplateColumns: `140px repeat(${colCount}, 1fr)` }}>
           <div />
           {days.map((d) => (
             <div
               key={d.date}
-              className={`text-center text-xs ${
+              className={`text-center text-xs py-1 ${
                 d.isToday ? "text-brand-500 font-semibold" : "text-neutral-400"
               }`}
             >
@@ -64,40 +84,78 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
           ))}
         </div>
 
-        {/* Property rows */}
-        {properties.map((prop) => (
-          <div
-            key={prop.propertyId}
-            className="grid gap-1 mb-1"
-            style={{ gridTemplateColumns: `140px repeat(${days.length}, 1fr)` }}
-          >
-            <div className="text-sm font-medium text-neutral-700 truncate flex items-center">
-              {prop.propertyName}
-            </div>
-            {prop.days.map((day) => (
-              <div
-                key={day.date}
-                className={`h-8 rounded ${statusColors[day.status]} flex items-center justify-center`}
-                title={day.guestName ? `${day.guestName} — ${statusLabels[day.status]}` : statusLabels[day.status]}
-              >
-                {day.status === "booked" && day.guestName && (
-                  <span className="text-[10px] text-white font-medium truncate px-1">
-                    {day.guestName.split(" ")[0]}
-                  </span>
-                )}
+        {/* Property rows with continuous booking bars */}
+        {properties.map((prop) => {
+          const spans = getBookingSpans(prop.days);
+
+          return (
+            <div
+              key={prop.propertyId}
+              className="grid gap-0 mb-1 relative"
+              style={{
+                gridTemplateColumns: `140px repeat(${colCount}, 1fr)`,
+                height: "36px",
+              }}
+            >
+              <div className="text-sm font-medium text-neutral-700 truncate flex items-center">
+                {prop.propertyName}
               </div>
-            ))}
-          </div>
-        ))}
+
+              {/* Background cells */}
+              {prop.days.map((day) => (
+                <div
+                  key={day.date}
+                  className={`h-full rounded-sm ${
+                    day.status === "blocked" ? "bg-neutral-100" : "bg-neutral-50"
+                  }`}
+                  title={day.guestName ? `${day.guestName}` : day.status}
+                />
+              ))}
+
+              {/* Booking spans overlaid */}
+              {spans.map((span, si) => {
+                // Calculate position relative to grid
+                // Column 0 = property name, booking columns start at 1
+                const colStart = span.startIdx + 2; // +2 because grid is 1-indexed and first col is name
+                const colSpan = span.endIdx - span.startIdx + 1;
+                const firstName = span.guestName.split(" ")[0];
+
+                return (
+                  <div
+                    key={si}
+                    className="absolute flex items-center px-2 text-white text-[10px] font-medium rounded-md overflow-hidden whitespace-nowrap"
+                    style={{
+                      gridColumn: `${colStart} / span ${colSpan}`,
+                      // Position using CSS calc based on grid
+                      left: `calc(140px + ${(span.startIdx * 100) / colCount}% * (100% - 140px) / 100%)`,
+                      width: `calc(${(colSpan * 100) / colCount}% * (100% - 140px) / 100%)`,
+                      top: "4px",
+                      bottom: "4px",
+                      backgroundColor: platformColor,
+                    }}
+                  >
+                    <span className="truncate">{firstName}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
 
         {/* Legend */}
         <div className="flex gap-4 mt-3 pt-3 border-t border-neutral-100">
-          {(["booked", "available", "blocked"] as const).map((s) => (
-            <div key={s} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded ${statusColors[s]}`} />
-              <span className="text-xs text-neutral-500">{statusLabels[s]}</span>
-            </div>
-          ))}
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: platformColor }} />
+            <span className="text-xs text-neutral-500">Booked</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-neutral-50" />
+            <span className="text-xs text-neutral-500">Open</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-neutral-100" />
+            <span className="text-xs text-neutral-500">Blocked</span>
+          </div>
         </div>
       </div>
     </div>
