@@ -110,8 +110,15 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (err) {
+  } catch (err: unknown) {
+    const e = err as Record<string, unknown>;
     console.error("[revenue-check] Error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({
+      error: String(err),
+      code: e?.code,
+      detail: e?.detail,
+      cause: e?.cause ? String(e.cause) : undefined,
+      message: e?.message,
+    }, { status: 500 });
   }
 }
