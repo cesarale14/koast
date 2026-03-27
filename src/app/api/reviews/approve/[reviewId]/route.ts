@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { calculatePublishTime } from "@/lib/reviews/generator";
+import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { reviewId: string } }
 ) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyReviewOwnership(user.id, params.reviewId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const body = await request.json().catch(() => ({}));
     const supabase = createServiceClient();
 

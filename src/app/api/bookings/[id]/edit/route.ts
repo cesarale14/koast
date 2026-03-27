@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { owned } = await verifyBookingOwnership(user.id, params.id);
+    if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const body = await request.json();
     const { check_in, check_out, guest_name, total_price } = body;
 

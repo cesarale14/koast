@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 type TimeRange = "this_week" | "this_month" | "next_30" | "next_90" | "this_year";
 
@@ -60,6 +61,9 @@ function getRevenueMonths(range: TimeRange): { offset: number; count: number } {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await request.json().catch(() => ({}));
     const range: TimeRange = body.range || "next_30";
     const { start, end, totalDays } = getDateRange(range);

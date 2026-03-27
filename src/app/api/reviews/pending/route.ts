@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function GET() {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const supabase = createServiceClient();
     const today = new Date().toISOString().split("T")[0];
 

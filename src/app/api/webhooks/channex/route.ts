@@ -6,6 +6,15 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function POST(request: NextRequest) {
   try {
     const payload: ChannexWebhookPayload = await request.json();
+
+    // Validate required webhook fields
+    if (!payload.event || !payload.payload) {
+      return NextResponse.json(
+        { status: "error", message: "Missing required fields: event, payload" },
+        { status: 400 }
+      );
+    }
+
     const event = payload.event;
     const bookingId = payload.payload?.booking_id;
     const revisionId = payload.payload?.revision_id;

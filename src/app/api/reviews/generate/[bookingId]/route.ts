@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateGuestReview, calculatePublishTime } from "@/lib/reviews/generator";
+import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(
   _request: Request,
   { params }: { params: { bookingId: string } }
 ) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { owned } = await verifyBookingOwnership(user.id, params.bookingId);
+    if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const supabase = createServiceClient();
 
     // Fetch booking

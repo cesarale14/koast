@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { channex_property_id } = await request.json();
     if (!channex_property_id) {
       return NextResponse.json({ error: "channex_property_id required" }, { status: 400 });

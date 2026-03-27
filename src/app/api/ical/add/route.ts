@@ -3,6 +3,7 @@ import { db } from "@/lib/db/connection";
 import { icalFeeds } from "@/lib/db/schema";
 import { parseICalFeed, validateICalUrl } from "@/lib/ical/parser";
 import { syncICalFeeds } from "@/lib/ical/sync";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 function detectPlatform(url: string): string {
   const lower = url.toLowerCase();
@@ -14,11 +15,17 @@ function detectPlatform(url: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { property_id, feed_url, platform } = await request.json();
 
     if (!property_id || !feed_url) {
       return NextResponse.json({ error: "property_id and feed_url required" }, { status: 400 });
     }
+
+    const isOwner = await verifyPropertyOwnership(user.id, property_id);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     // Validate by fetching
     let parsed;

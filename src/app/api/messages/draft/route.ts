@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateDraft } from "@/lib/claude/messaging";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { messageId } = await request.json();
     if (!messageId) {
       return NextResponse.json({ error: "messageId required" }, { status: 400 });
@@ -22,6 +26,9 @@ export async function POST(request: NextRequest) {
     if (!message) {
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
+
+    const isOwner = await verifyPropertyOwnership(user.id, message.property_id);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     // Fetch property
     const { data: props } = await supabase

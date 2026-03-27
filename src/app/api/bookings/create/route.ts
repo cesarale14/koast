@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await request.json();
     const { property_id, guest_name, check_in, check_out, total_price } = body;
+
+    const isOwner = await verifyPropertyOwnership(user.id, property_id);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     if (!property_id || !guest_name || !check_in || !check_out) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });

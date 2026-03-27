@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { PricingEngine } from "@/lib/pricing/engine";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncMarketData } from "@/lib/airroi/market-sync";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { propertyId: string } }
 ) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const propertyId = params.propertyId;
     const body = await request.json().catch(() => ({}));
     const days = body.days ?? 90;

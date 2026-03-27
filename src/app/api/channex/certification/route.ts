@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setupTestProperty, runCertification } from "@/lib/channex/certification";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await request.json().catch(() => ({}));
 
     // If config provided, use it; otherwise set up new test property

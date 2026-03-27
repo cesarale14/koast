@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -8,6 +9,9 @@ function sleep(ms: number) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await request.json().catch(() => ({}));
     const propertyId = body.property_id ?? "c83ba211-2e79-4de0-b388-c88d9f695581";
     const mode = body.mode ?? "crs"; // "crs" or "poll"
