@@ -3,15 +3,130 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  color-scheme: light;
+  /* Brand */
+  --brand-50: #ecfdf5;
+  --brand-100: #d1fae5;
+  --brand-200: #a7f3d0;
+  --brand-300: #6ee7b7;
+  --brand-400: #34d399;
+  --brand-500: #10b981;
+  --brand-600: #059669;
+  --brand-700: #047857;
+  --brand-800: #065f46;
+  --brand-900: #064e3b;
+  --brand-950: #022c22;
+
+  /* Neutrals — warm grays */
+  --neutral-0: #ffffff;
+  --neutral-25: #fafaf9;
+  --neutral-50: #f5f5f4;
+  --neutral-100: #e7e5e4;
+  --neutral-200: #d6d3d1;
+  --neutral-300: #a8a29e;
+  --neutral-400: #78716c;
+  --neutral-500: #57534e;
+  --neutral-600: #44403c;
+  --neutral-700: #292524;
+  --neutral-800: #1c1917;
+  --neutral-900: #0c0a09;
+
+  /* Sidebar */
+  --sidebar-bg: #0f1117;
+  --sidebar-text: #a1a1aa;
+  --sidebar-text-active: #ffffff;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active-bg: rgba(16, 185, 129, 0.12);
+  --sidebar-active-text: #34d399;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  /* Semantic */
+  --success: #10b981;
+  --success-light: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-light: #fffbeb;
+  --danger: #ef4444;
+  --danger-light: #fef2f2;
+  --info: #3b82f6;
+  --info-light: #eff6ff;
+
+  /* Platform colors */
+  --airbnb: #FF5A5F;
+  --vrbo: #3B5998;
+  --booking-com: #003580;
+  --direct: var(--brand-500);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(12, 10, 9, 0.04);
+  --shadow-md: 0 2px 8px rgba(12, 10, 9, 0.06), 0 1px 2px rgba(12, 10, 9, 0.04);
+  --shadow-lg: 0 4px 16px rgba(12, 10, 9, 0.08), 0 2px 4px rgba(12, 10, 9, 0.04);
+  --shadow-xl: 0 8px 32px rgba(12, 10, 9, 0.10), 0 4px 8px rgba(12, 10, 9, 0.04);
+
+  /* Borders */
+  --border: #e7e5e4;
+  --border-hover: #d6d3d1;
+  --border-focus: var(--brand-500);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'General Sans', system-ui, sans-serif;
+  color: var(--neutral-700);
+  background: var(--neutral-25);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Revenue/stat numbers get monospace treatment */
+.font-mono, [data-stat], .stat-value {
+  font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+}
+
+/* Subtle page transitions */
+.page-enter {
+  animation: fadeIn var(--transition-slow) ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @layer utilities {
@@ -21,12 +136,8 @@ body {
 }
 
 @keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 .animate-slide-in {

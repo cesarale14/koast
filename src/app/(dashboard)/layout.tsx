@@ -4,66 +4,105 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import ReviewBadge from "@/components/ui/ReviewBadge";
+import {
+  LayoutGrid,
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  DollarSign,
+  BarChart3,
+  Star,
+  MessageSquare,
+  RefreshCw,
+  Bell,
+  Settings,
+  RefreshCcw,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const navigation = [
-  { name: "Overview", href: "/", icon: "grid" },
-  { name: "Properties", href: "/properties", icon: "building" },
-  { name: "Calendar", href: "/calendar", icon: "calendar" },
-  { name: "Bookings", href: "/bookings", icon: "clipboard" },
-  { name: "Pricing", href: "/pricing", icon: "dollar" },
-  { name: "Messages", href: "/messages", icon: "mail" },
-  { name: "Reviews", href: "/reviews", icon: "star" },
-  { name: "Turnover", href: "/turnover", icon: "refresh" },
-  { name: "Analytics", href: "/analytics", icon: "chart" },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: boolean;
+}
+
+const navGroups: NavItem[][] = [
+  // MAIN
+  [
+    { name: "Overview", href: "/", icon: LayoutGrid },
+    { name: "Properties", href: "/properties", icon: Building2 },
+    { name: "Calendar", href: "/calendar", icon: CalendarDays },
+    { name: "Bookings", href: "/bookings", icon: ClipboardList },
+  ],
+  // REVENUE
+  [
+    { name: "Pricing", href: "/pricing", icon: DollarSign },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "Reviews", href: "/reviews", icon: Star, badge: true },
+  ],
+  // OPERATIONS
+  [
+    { name: "Messages", href: "/messages", icon: MessageSquare },
+    { name: "Turnover", href: "/turnover", icon: RefreshCw },
+  ],
 ];
 
-const icons: Record<string, JSX.Element> = {
-  grid: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-    </svg>
-  ),
-  building: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-    </svg>
-  ),
-  calendar: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  ),
-  clipboard: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-    </svg>
-  ),
-  dollar: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  mail: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-    </svg>
-  ),
-  refresh: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-  ),
-  chart: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  ),
-  star: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-    </svg>
-  ),
-};
+function NavLink({
+  item,
+  isActive,
+}: {
+  item: NavItem;
+  isActive: boolean;
+}) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={`
+        relative flex items-center gap-3 px-3 h-8 text-sm font-medium
+        rounded-md transition-all duration-fast
+        ${
+          isActive
+            ? "bg-sidebar-active-bg text-sidebar-active-text"
+            : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+        }
+      `}
+    >
+      {isActive && (
+        <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-brand-400" />
+      )}
+      <Icon size={18} strokeWidth={1.5} />
+      <span>{item.name}</span>
+      {item.badge && <ReviewBadge />}
+    </Link>
+  );
+}
+
+function Breadcrumb() {
+  const pathname = usePathname();
+  const allItems = navGroups.flat();
+  const current = allItems.find((item) =>
+    item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+  );
+  const sectionIdx = navGroups.findIndex((group) =>
+    group.some((item) =>
+      item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+    )
+  );
+  const sectionNames = ["Main", "Revenue", "Operations"];
+  const section = sectionNames[sectionIdx] ?? "Main";
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-neutral-400">{section}</span>
+      <span className="text-neutral-300">/</span>
+      <span className="text-neutral-700 font-medium">
+        {current?.name ?? "Overview"}
+      </span>
+    </div>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -73,58 +112,86 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="p-6">
-          <h1 className="text-xl font-bold">StayCommand</h1>
-          <p className="text-xs text-gray-400 mt-1">Property Management</p>
+      <aside
+        className="w-60 flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30"
+        style={{ background: "var(--sidebar-bg)" }}
+      >
+        {/* Logo */}
+        <div className="px-5 h-14 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-brand-400" />
+          <span className="text-white font-semibold text-md tracking-tight">
+            StayCommand
+          </span>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
-          {navigation.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-white/10 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                {icons[item.icon]}
-                {item.name}
-                {item.name === "Reviews" && <ReviewBadge />}
-              </Link>
-            );
-          })}
+        {/* Navigation */}
+        <nav className="flex-1 px-3 overflow-y-auto">
+          {navGroups.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? "mt-5 pt-5 border-t border-sidebar-border" : ""}>
+              <div className="space-y-0.5">
+                {group.map((item) => {
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : pathname.startsWith(item.href);
+                  return (
+                    <NavLink key={item.name} item={item} isActive={isActive} />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-800">
+        {/* User section */}
+        <div className="px-4 py-3 border-t border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium">
+            <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center text-sm font-medium text-brand-200">
               U
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">User</p>
-              <p className="text-xs text-gray-400 truncate">user@example.com</p>
+              <p className="text-sm font-medium text-white truncate">User</p>
             </div>
+            <button className="text-sidebar-text hover:text-white transition-colors duration-fast">
+              <Settings size={16} strokeWidth={1.5} />
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <ToastProvider>
-          <div className="p-8">{children}</div>
-        </ToastProvider>
-      </main>
+      {/* Main content area */}
+      <div className="flex-1 ml-60 flex flex-col min-h-screen">
+        {/* Topbar */}
+        <header
+          className="h-14 flex-shrink-0 flex items-center justify-between px-6 border-b bg-neutral-0"
+          style={{
+            borderColor: "var(--border)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <Breadcrumb />
+          <div className="flex items-center gap-3">
+            <button className="relative text-neutral-400 hover:text-neutral-600 transition-colors duration-fast">
+              <Bell size={18} strokeWidth={1.5} />
+            </button>
+            <button className="flex items-center gap-2 px-3 h-8 text-sm font-medium text-neutral-500 hover:text-neutral-700 border rounded-md hover:border-neutral-300 transition-all duration-fast"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <RefreshCcw size={14} strokeWidth={1.5} />
+              Sync Now
+            </button>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto">
+          <ToastProvider>
+            <div className="p-6 page-enter">{children}</div>
+          </ToastProvider>
+        </main>
+      </div>
     </div>
   );
 }

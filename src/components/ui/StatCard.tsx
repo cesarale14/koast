@@ -1,0 +1,59 @@
+"use client";
+
+import type { LucideIcon } from "lucide-react";
+
+interface StatCardProps {
+  label: string;
+  value: string;
+  change?: string;
+  changeType?: "positive" | "negative" | "neutral";
+  icon?: LucideIcon;
+}
+
+export default function StatCard({
+  label,
+  value,
+  change,
+  changeType = "neutral",
+  icon: Icon,
+}: StatCardProps) {
+  const changeBg =
+    changeType === "positive"
+      ? "bg-brand-50 text-brand-600"
+      : changeType === "negative"
+        ? "bg-danger-light text-danger"
+        : "bg-neutral-50 text-neutral-400";
+
+  return (
+    <div
+      className="relative bg-neutral-0 border rounded-lg p-5 shadow-sm hover:shadow-md transition-all duration-base group"
+      style={{ borderColor: "var(--border)" }}
+    >
+      {/* Icon */}
+      {Icon && (
+        <div className="absolute top-5 right-5 text-neutral-300">
+          <Icon size={16} strokeWidth={1.5} />
+        </div>
+      )}
+
+      {/* Label */}
+      <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">
+        {label}
+      </p>
+
+      {/* Value */}
+      <p className="text-2xl font-semibold text-neutral-800 font-mono" data-stat>
+        {value}
+      </p>
+
+      {/* Change badge */}
+      {change && (
+        <span
+          className={`inline-flex items-center mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${changeBg}`}
+        >
+          {change}
+        </span>
+      )}
+    </div>
+  );
+}
