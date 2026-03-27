@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/connection";
+import { db } from "@/lib/db/pooled";
 import { revenueChecks } from "@/lib/db/schema";
 import { eq, gte, and } from "drizzle-orm";
 import { createAirROIClient } from "@/lib/airroi/client";

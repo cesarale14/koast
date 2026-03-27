@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/connection";
+import { db } from "@/lib/db/pooled";
 import { leads } from "@/lib/db/schema";
 
 export async function POST(request: NextRequest) {
