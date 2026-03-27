@@ -203,7 +203,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Market Overview Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
           <p className="text-xs text-neutral-400">Market ADR</p>
           <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">

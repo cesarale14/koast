@@ -272,7 +272,7 @@ export default function PropertyDetail({
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: "Occupancy", value: `${stats.occupancy}%`, sub: "This month" },
           { label: "ADR", value: stats.adr > 0 ? `$${stats.adr}` : "\u2014", sub: "This month" },
@@ -611,7 +611,7 @@ export default function PropertyDetail({
                   onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                   <input type="text" value={editForm.city}
@@ -631,7 +631,7 @@ export default function PropertyDetail({
                     className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                   <input type="number" value={editForm.bedrooms}

@@ -191,7 +191,7 @@ export default function DashboardLayout({
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-x-hidden">
       {/* Desktop sidebar — hidden on mobile */}
       <aside
         className="hidden md:flex w-60 flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30"
@@ -224,7 +224,7 @@ export default function DashboardLayout({
       )}
 
       {/* Main content area */}
-      <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
+      <div className="flex-1 md:ml-60 flex flex-col min-h-screen w-full overflow-x-hidden">
         {/* Topbar */}
         <header
           className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-neutral-0"

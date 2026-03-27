@@ -102,6 +102,11 @@
   --transition-slow: 300ms ease;
 }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 body {
   font-family: 'General Sans', system-ui, sans-serif;
   color: var(--neutral-700);

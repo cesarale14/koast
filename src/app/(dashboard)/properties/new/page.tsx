@@ -262,7 +262,7 @@ export default function AddPropertyPage() {
                 placeholder="Start typing an address..."
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                 <input type="text" value={form.city} onChange={(e) => updateField("city", e.target.value)}
@@ -279,7 +279,7 @@ export default function AddPropertyPage() {
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                 <input type="number" value={form.bedrooms} onChange={(e) => updateField("bedrooms", e.target.value)}
@@ -508,7 +508,7 @@ export default function AddPropertyPage() {
 
             <div>
               <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-3">Pricing</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-neutral-400">Base Rate</p>
                   <p className="text-sm font-semibold font-mono text-neutral-800">${form.base_rate}/night</p>

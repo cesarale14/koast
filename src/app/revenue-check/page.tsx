@@ -110,7 +110,7 @@ export default function RevenueCheckPage() {
                   className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                   <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
@@ -232,7 +232,7 @@ export default function RevenueCheckPage() {
           )}
 
           {/* Market stats */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
               { label: "Market ADR", value: `$${result.market_adr}` },
               { label: "Occupancy", value: `${result.market_occupancy}%` },
