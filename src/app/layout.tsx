@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@fontsource-variable/nunito-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
 
@@ -14,12 +15,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link
-          href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

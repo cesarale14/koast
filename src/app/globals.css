@@ -108,7 +108,7 @@ html, body {
 }
 
 body {
-  font-family: 'General Sans', system-ui, sans-serif;
+  font-family: 'Nunito Sans Variable', system-ui, sans-serif;
   color: var(--neutral-700);
   background: var(--neutral-25);
   font-size: var(--text-base);
