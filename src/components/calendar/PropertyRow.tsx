@@ -36,7 +36,7 @@ export default function PropertyRow({
   const visibleDates = dates.slice(visibleStart, visibleEnd);
 
   return (
-    <div className="flex border-b border-gray-100 h-10">
+    <div className="flex border-b border-neutral-100 h-10">
       {/* Date cells container */}
       <div className="relative flex" style={{ width: `${dates.length * 80}px` }}>
         {/* Render visible date cells */}
@@ -50,7 +50,7 @@ export default function PropertyRow({
             return (
               <div
                 key={date}
-                className="w-[80px] h-full border-r border-gray-100 flex-shrink-0"
+                className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0"
                 style={{ position: "absolute", left: `${absIdx * 80}px` }}
               />
             );

@@ -31,8 +31,8 @@ export default async function MessagesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Messages</h1>
-        <p className="text-gray-500">Unified inbox across all platforms</p>
+        <h1 className="text-xl font-semibold text-neutral-800 mb-1">Messages</h1>
+        <p className="text-neutral-500">Unified inbox across all platforms</p>
       </div>
       <UnifiedInbox messages={messages} properties={properties} bookings={bookings} />
     </div>

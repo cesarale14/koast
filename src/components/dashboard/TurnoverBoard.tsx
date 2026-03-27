@@ -25,19 +25,19 @@ interface TurnoverBoardProps {
 }
 
 const COLUMNS = [
-  { key: "pending", label: "Upcoming", color: "border-gray-300" },
-  { key: "today", label: "Today", color: "border-amber-400" },
-  { key: "in_progress", label: "In Progress", color: "border-blue-400" },
-  { key: "completed", label: "Completed", color: "border-emerald-400" },
-  { key: "issue", label: "Issues", color: "border-red-400" },
+  { key: "pending", label: "Upcoming", color: "border-neutral-300" },
+  { key: "today", label: "Today", color: "border-warning" },
+  { key: "in_progress", label: "In Progress", color: "border-info" },
+  { key: "completed", label: "Completed", color: "border-success" },
+  { key: "issue", label: "Issues", color: "border-danger" },
 ];
 
 const statusColors: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-600",
-  assigned: "bg-blue-50 text-blue-600",
-  in_progress: "bg-amber-50 text-amber-700",
-  completed: "bg-emerald-50 text-emerald-700",
-  issue: "bg-red-50 text-red-700",
+  pending: "bg-neutral-100 text-neutral-600",
+  assigned: "bg-info-light text-info",
+  in_progress: "bg-info-light text-info",
+  completed: "bg-success-light text-success",
+  issue: "bg-danger-light text-danger",
 };
 
 export default function TurnoverBoard({ tasks: initialTasks, properties, bookings }: TurnoverBoardProps) {
@@ -104,13 +104,13 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Turnover Ops</h1>
-          <p className="text-gray-500">Cleaning schedules and task management</p>
+          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Turnover Ops</h1>
+          <p className="text-neutral-500">Cleaning schedules and task management</p>
         </div>
         <button
           onClick={backfill}
           disabled={backfilling}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
         >
           {backfilling ? "Creating..." : "Auto-Create Tasks"}
         </button>
@@ -122,15 +122,15 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
           return (
             <div key={col.key} className="flex-shrink-0 w-64">
               {/* Column header */}
-              <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 ${col.color} bg-gray-50`}>
-                <span className="text-sm font-semibold text-gray-700">{col.label}</span>
-                <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full">{colTasks.length}</span>
+              <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 ${col.color} bg-neutral-50`}>
+                <span className="text-sm uppercase tracking-wider text-neutral-400">{col.label}</span>
+                <span className="text-xs text-neutral-400 bg-neutral-0 px-2 py-0.5 rounded-full">{colTasks.length}</span>
               </div>
 
               {/* Task cards */}
-              <div className="bg-gray-50/50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
+              <div className="bg-neutral-50/50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
                 {colTasks.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-8">No tasks</p>
+                  <p className="text-xs text-neutral-400 text-center py-8">No tasks</p>
                 ) : (
                   colTasks.map((task) => {
                     const propName = propMap.get(task.property_id) ?? "Property";
@@ -146,39 +146,39 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       <div
                         key={task.id}
                         onClick={() => setSelectedTask(task.id)}
-                        className={`bg-white rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${
-                          isUrgent ? "border-red-300" : "border-gray-100"
-                        } ${selectedTask === task.id ? "ring-2 ring-blue-400" : ""}`}
+                        className={`bg-neutral-0 rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${
+                          isUrgent ? "border-danger/40" : "border-[var(--border)]"
+                        } ${selectedTask === task.id ? "ring-2 ring-brand-400" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">{propName}</p>
+                          <p className="text-sm font-medium text-neutral-900 truncate">{propName}</p>
                           {isUrgent && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-red-100 text-red-600 rounded">URGENT</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-danger-light text-danger rounded">URGENT</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-neutral-400">
                           {new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                           {task.scheduled_time ? ` at ${task.scheduled_time.slice(0, 5)}` : ""}
                         </p>
                         {checkoutBooking && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-neutral-500 mt-1">
                             Out: {checkoutBooking.guest_name ?? "Guest"}
                           </p>
                         )}
                         {nextBooking && (
-                          <p className="text-xs text-blue-500 mt-0.5">
+                          <p className="text-xs text-brand-500 mt-0.5">
                             In: {nextBooking.guest_name ?? "Guest"} ({nextBooking.check_in})
                           </p>
                         )}
                         {/* Checklist progress */}
                         {totalCount > 0 && (
                           <div className="mt-2">
-                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
-                              <span>{doneCount}/{totalCount}</span>
+                            <div className="flex items-center justify-between text-[10px] text-neutral-400 mb-0.5">
+                              <span className="font-mono">{doneCount}/{totalCount}</span>
                             </div>
-                            <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-emerald-400 rounded-full"
+                                className="h-full bg-brand-500 rounded-full"
                                 style={{ width: `${(doneCount / totalCount) * 100}%` }}
                               />
                             </div>
@@ -198,10 +198,10 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       {selectedTaskData && (
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setSelectedTask(null)} />
-          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 overflow-y-auto animate-slide-in">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Task Details</h2>
-              <button onClick={() => setSelectedTask(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <div className="fixed right-0 top-0 h-full w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
+            <div className="sticky top-0 bg-neutral-0 border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-neutral-800">Task Details</h2>
+              <button onClick={() => setSelectedTask(null)} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -210,15 +210,15 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
             <div className="p-6 space-y-6">
               <div>
-                <p className="text-xs text-gray-400">Property</p>
-                <p className="text-lg font-semibold text-gray-900">{propMap.get(selectedTaskData.property_id) ?? "Property"}</p>
+                <p className="text-xs text-neutral-400">Property</p>
+                <p className="text-lg font-semibold text-neutral-800">{propMap.get(selectedTaskData.property_id) ?? "Property"}</p>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[selectedTaskData.status] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[selectedTaskData.status] ?? "bg-neutral-100 text-neutral-600"}`}>
                   {selectedTaskData.status.replace("_", " ")}
                 </span>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-neutral-500">
                   {new Date(selectedTaskData.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 </span>
               </div>
@@ -226,14 +226,14 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
               {/* Guest info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-400">Checkout Guest</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-xs text-neutral-400">Checkout Guest</p>
+                  <p className="text-sm font-medium text-neutral-900">
                     {selectedTaskData.booking_id ? (bookingMap.get(selectedTaskData.booking_id)?.guest_name ?? "—") : "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">Next Guest</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-xs text-neutral-400">Next Guest</p>
+                  <p className="text-sm font-medium text-neutral-900">
                     {selectedTaskData.next_booking_id ? (bookingMap.get(selectedTaskData.next_booking_id)?.guest_name ?? "—") : "None"}
                   </p>
                 </div>
@@ -241,18 +241,18 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
               {/* Checklist */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Checklist</h3>
+                <h3 className="text-sm font-semibold text-neutral-700 mb-2">Checklist</h3>
                 <div className="space-y-1">
                   {(selectedTaskData.checklist ?? []).map((item) => (
                     <div key={item.id} className="flex items-center gap-2 py-1">
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-emerald-500 border-emerald-500" : "border-gray-300"}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-success border-success" : "border-neutral-300"}`}>
                         {item.done && (
                           <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
                       </div>
-                      <span className={`text-sm ${item.done ? "text-gray-400 line-through" : "text-gray-700"}`}>{item.label}</span>
+                      <span className={`text-sm ${item.done ? "text-neutral-400 line-through" : "text-neutral-700"}`}>{item.label}</span>
                     </div>
                   ))}
                 </div>
@@ -260,16 +260,16 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
               {selectedTaskData.notes && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">Notes</h3>
-                  <p className="text-sm text-gray-600">{selectedTaskData.notes}</p>
+                  <h3 className="text-sm font-semibold text-neutral-700 mb-1">Notes</h3>
+                  <p className="text-sm text-neutral-600">{selectedTaskData.notes}</p>
                 </div>
               )}
 
               {/* Cleaner mobile link */}
               {selectedTaskData.cleaner_token && (
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">Cleaner Mobile Link</p>
-                  <p className="text-xs text-blue-600 break-all font-mono">
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-xs text-neutral-400 mb-1">Cleaner Mobile Link</p>
+                  <p className="text-xs text-brand-500 break-all font-mono">
                     /clean/{selectedTaskData.id}/{selectedTaskData.cleaner_token}
                   </p>
                 </div>
@@ -280,7 +280,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 {selectedTaskData.status === "pending" && (
                   <button
                     onClick={() => updateStatus(selectedTaskData.id, "in_progress")}
-                    className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                    className="w-full py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
                   >
                     Mark In Progress
                   </button>
@@ -288,7 +288,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 {selectedTaskData.status === "in_progress" && (
                   <button
                     onClick={() => updateStatus(selectedTaskData.id, "completed")}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700"
+                    className="w-full py-2.5 bg-success text-white text-sm font-medium rounded-lg hover:bg-success/90"
                   >
                     Mark Complete
                   </button>
@@ -296,7 +296,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 {selectedTaskData.status !== "issue" && selectedTaskData.status !== "completed" && (
                   <button
                     onClick={() => updateStatus(selectedTaskData.id, "issue")}
-                    className="w-full py-2.5 bg-white text-red-600 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-50"
+                    className="w-full py-2.5 bg-neutral-0 text-danger text-sm font-medium rounded-lg border border-danger/20 hover:bg-danger-light"
                   >
                     Report Issue
                   </button>

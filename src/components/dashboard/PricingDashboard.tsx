@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
+import StatCard from "@/components/ui/StatCard";
 
 // ---------- Types ----------
 
@@ -49,13 +50,13 @@ interface PricingDashboardProps {
 // ---------- Helpers ----------
 
 function rateColor(rate: number, min: number, max: number): string {
-  if (max === min) return "bg-blue-100";
+  if (max === min) return "bg-brand-100";
   const t = (rate - min) / (max - min);
-  if (t < 0.2) return "bg-blue-50";
-  if (t < 0.4) return "bg-blue-100";
-  if (t < 0.6) return "bg-blue-200";
-  if (t < 0.8) return "bg-blue-300";
-  return "bg-blue-400";
+  if (t < 0.2) return "bg-brand-50";
+  if (t < 0.4) return "bg-brand-100";
+  if (t < 0.6) return "bg-brand-200";
+  if (t < 0.8) return "bg-brand-300";
+  return "bg-brand-400";
 }
 
 function formatDate(d: string) {
@@ -72,18 +73,18 @@ function SignalBar({ name, score, weight, reason }: { name: string; score: numbe
   return (
     <div className="mb-3">
       <div className="flex items-center justify-between text-xs mb-1">
-        <span className="font-medium text-gray-700 capitalize">{name.replace("_", " ")}</span>
-        <span className={`font-mono font-semibold ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
-          {score >= 0 ? "+" : ""}{score.toFixed(2)} × {weight.toFixed(2)}
+        <span className="font-medium text-neutral-700 capitalize">{name.replace("_", " ")}</span>
+        <span className={`font-mono font-semibold ${isPositive ? "text-emerald-600" : "text-danger"}`}>
+          {score >= 0 ? "+" : ""}{score.toFixed(2)} &times; {weight.toFixed(2)}
         </span>
       </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full ${isPositive ? "bg-emerald-400" : "bg-red-400"}`}
+          className={`h-full rounded-full ${isPositive ? "bg-brand-400" : "bg-danger"}`}
           style={{ width: `${Math.max(2, pct)}%` }}
         />
       </div>
-      <p className="text-[11px] text-gray-400 mt-0.5">{reason}</p>
+      <p className="text-[11px] text-neutral-400 mt-0.5">{reason}</p>
     </div>
   );
 }
@@ -322,15 +323,15 @@ export default function PricingDashboard({
     <div onMouseUp={handleMouseUp}>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Dynamic Pricing</h1>
-          <p className="text-gray-500">AI-powered rate optimization</p>
+          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dynamic Pricing</h1>
+          <p className="text-neutral-500">AI-powered rate optimization</p>
         </div>
         <div className="flex items-center gap-3">
           {properties.length > 1 && (
             <select
               value={propertyId}
               onChange={(e) => setPropertyId(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
             >
               {properties.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -338,13 +339,13 @@ export default function PricingDashboard({
             </select>
           )}
           {/* Pricing mode toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <div className="flex bg-neutral-100 rounded-lg p-0.5">
             {(["auto", "review", "manual"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setPricingMode(mode)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-                  pricingMode === mode ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+                  pricingMode === mode ? "bg-brand-500 text-white" : "text-neutral-500 hover:text-neutral-700"
                 }`}
               >
                 {mode}
@@ -356,32 +357,30 @@ export default function PricingDashboard({
 
       {/* Stats cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Avg Applied Rate</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">${stats.avgApplied}</p>
-          {snapshot?.market_adr && (
-            <p className="text-[11px] text-gray-400 mt-1">Market ADR: ${Math.round(snapshot.market_adr)}</p>
-          )}
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Avg Suggested Rate</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">${stats.avgSuggested}</p>
-          <p className="text-[11px] text-gray-400 mt-1">
-            {stats.avgSuggested > stats.avgApplied ? "↑" : "↓"} {Math.abs(stats.avgSuggested - stats.avgApplied)} vs applied
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Revenue Opportunity</p>
-          <p className={`text-2xl font-bold mt-1 ${stats.potentialChange >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {stats.potentialChange >= 0 ? "+" : ""}{stats.potentialChange > 0 ? `$${stats.potentialChange}` : "$0"}
-          </p>
-          <p className="text-[11px] text-gray-400 mt-1">If all suggestions accepted</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Needs Approval</p>
-          <p className="text-2xl font-bold text-amber-600 mt-1">{stats.needsApproval}</p>
-          <p className="text-[11px] text-gray-400 mt-1">dates with suggestions</p>
-        </div>
+        <StatCard
+          label="Avg Applied Rate"
+          value={`$${stats.avgApplied}`}
+          change={snapshot?.market_adr ? `Market ADR: $${Math.round(snapshot.market_adr)}` : undefined}
+          changeType="neutral"
+        />
+        <StatCard
+          label="Avg Suggested Rate"
+          value={`$${stats.avgSuggested}`}
+          change={`${stats.avgSuggested > stats.avgApplied ? "\u2191" : "\u2193"} ${Math.abs(stats.avgSuggested - stats.avgApplied)} vs applied`}
+          changeType={stats.avgSuggested >= stats.avgApplied ? "positive" : "negative"}
+        />
+        <StatCard
+          label="Revenue Opportunity"
+          value={stats.potentialChange > 0 ? `+$${stats.potentialChange}` : "$0"}
+          change="If all suggestions accepted"
+          changeType={stats.potentialChange >= 0 ? "positive" : "negative"}
+        />
+        <StatCard
+          label="Needs Approval"
+          value={`${stats.needsApproval}`}
+          change="dates with suggestions"
+          changeType="neutral"
+        />
       </div>
 
       {/* Action buttons */}
@@ -389,7 +388,7 @@ export default function PricingDashboard({
         <button
           onClick={runEngine}
           disabled={loading === "engine"}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
         >
           {loading === "engine" ? "Running..." : "Run Pricing Engine"}
         </button>
@@ -397,7 +396,7 @@ export default function PricingDashboard({
           <button
             onClick={approveAll}
             disabled={loading === "approve"}
-            className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 bg-neutral-0 text-brand-500 text-sm font-medium rounded-lg border border-brand-500 hover:bg-brand-50 disabled:opacity-50 transition-colors"
           >
             {loading === "approve" ? "Approving..." : `Apply All Suggestions (${stats.needsApproval})`}
           </button>
@@ -405,7 +404,7 @@ export default function PricingDashboard({
         <button
           onClick={pushToOTAs}
           disabled={loading === "push"}
-          className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
         >
           {loading === "push" ? "Pushing..." : "Push to OTAs"}
         </button>
@@ -413,32 +412,32 @@ export default function PricingDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar heatmap (2/3 width) */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
+        <div className="lg:col-span-2 bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Rate Calendar</h2>
+            <h2 className="text-lg font-semibold text-neutral-800">Rate Calendar</h2>
             {/* Legend */}
-            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+            <div className="flex items-center gap-2 text-[10px] text-neutral-400">
               <span>Low</span>
               <div className="flex gap-0.5">
-                {["bg-blue-50", "bg-blue-100", "bg-blue-200", "bg-blue-300", "bg-blue-400"].map((c) => (
+                {["bg-brand-50", "bg-brand-100", "bg-brand-200", "bg-brand-300", "bg-brand-400"].map((c) => (
                   <div key={c} className={`w-4 h-3 rounded-sm ${c}`} />
                 ))}
               </div>
               <span>High</span>
-              <span className="ml-2">●</span>
-              <span className="text-emerald-500">↑ raise</span>
-              <span className="text-red-500">↓ lower</span>
+              <span className="ml-2">{"\u25CF"}</span>
+              <span className="text-emerald-500">{"\u2191"} raise</span>
+              <span className="text-danger">{"\u2193"} lower</span>
             </div>
           </div>
 
           {/* Bulk action bar */}
           {selectedDates.size > 1 && (
-            <div className="flex items-center gap-3 p-3 mb-4 bg-blue-50 rounded-lg border border-blue-200">
-              <span className="text-sm font-medium text-blue-900">{selectedDates.size} dates selected</span>
+            <div className="flex items-center gap-3 p-3 mb-4 bg-brand-50 rounded-lg border border-brand-200">
+              <span className="text-sm font-medium text-neutral-800">{selectedDates.size} dates selected</span>
               <button
                 onClick={approveSelected}
                 disabled={!!loading}
-                className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
               >
                 Approve Selected
               </button>
@@ -448,17 +447,17 @@ export default function PricingDashboard({
                   value={bulkRate}
                   onChange={(e) => setBulkRate(e.target.value)}
                   placeholder="$rate"
-                  className="w-20 px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
+                  className="w-20 px-2 py-1.5 text-xs border border-[var(--border)] rounded-lg"
                 />
                 <button
                   onClick={bulkOverride}
                   disabled={!!loading}
-                  className="px-3 py-1.5 text-xs font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-medium bg-neutral-700 text-white rounded-lg hover:bg-neutral-800 disabled:opacity-50"
                 >
                   Override
                 </button>
               </div>
-              <button onClick={() => setSelectedDates(new Set())} className="text-xs text-gray-500 hover:text-gray-700 ml-auto">
+              <button onClick={() => setSelectedDates(new Set())} className="text-xs text-neutral-500 hover:text-neutral-700 ml-auto">
                 Clear
               </button>
             </div>
@@ -467,7 +466,7 @@ export default function PricingDashboard({
           {/* Calendar grid */}
           {monthGroups.map((group) => (
             <div key={group.month} className="mb-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">{group.month}</h3>
+              <h3 className="text-sm font-medium text-neutral-500 mb-2">{group.month}</h3>
               <div className="grid grid-cols-7 gap-1">
                 {group.dates.map((r) => {
                   const d = new Date(r.date + "T00:00:00");
@@ -477,31 +476,31 @@ export default function PricingDashboard({
                   const suggestDown = hasSuggestion && (r.suggested_rate ?? 0) < (r.applied_rate ?? 0);
                   const isSelected = selectedDates.has(r.date);
                   const isActive = selectedDate === r.date;
-                  const bg = rate > 0 ? rateColor(rate, rateRange.min, rateRange.max) : "bg-gray-50";
+                  const bg = rate > 0 ? rateColor(rate, rateRange.min, rateRange.max) : "bg-neutral-50";
 
                   return (
                     <div
                       key={r.date}
                       className={`relative p-1.5 rounded-lg cursor-pointer transition-all select-none ${bg} ${
-                        isActive ? "ring-2 ring-blue-500" : isSelected ? "ring-2 ring-blue-300" : "hover:ring-1 hover:ring-gray-300"
+                        isActive ? "ring-2 ring-brand-500" : isSelected ? "ring-2 ring-brand-300" : "hover:ring-1 hover:ring-neutral-300"
                       } ${!r.is_available ? "opacity-40" : ""}`}
                       onClick={() => handleDateClick(r.date)}
                       onMouseDown={() => handleMouseDown(r.date)}
                       onMouseEnter={() => handleMouseEnter(r.date)}
                     >
-                      <div className="text-[10px] text-gray-400">
+                      <div className="text-[10px] text-neutral-400">
                         {d.toLocaleDateString("en-US", { weekday: "narrow" })} {d.getDate()}
                       </div>
-                      <div className="text-sm font-bold text-gray-900">
-                        ${rate > 0 ? Math.round(rate) : "—"}
+                      <div className="text-sm font-bold font-mono text-neutral-800">
+                        ${rate > 0 ? Math.round(rate) : "\u2014"}
                       </div>
                       {hasSuggestion && (
-                        <div className={`text-[10px] font-medium ${suggestUp ? "text-emerald-600" : "text-red-500"}`}>
-                          {suggestUp ? "↑" : "↓"}${Math.round(r.suggested_rate!)}
+                        <div className={`text-[10px] font-medium font-mono ${suggestUp ? "text-emerald-600" : "text-danger"}`}>
+                          {suggestUp ? "\u2191" : "\u2193"}${Math.round(r.suggested_rate!)}
                         </div>
                       )}
                       {(suggestUp || suggestDown) && (
-                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-emerald-500" : "bg-red-400"}`} />
+                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-emerald-500" : "bg-danger"}`} />
                       )}
                     </div>
                   );
@@ -514,8 +513,8 @@ export default function PricingDashboard({
         {/* Side panel: date detail / market context */}
         <div className="space-y-6">
           {/* Date detail panel */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+            <h2 className="text-lg font-semibold text-neutral-800 mb-4">
               {selectedDate ? formatDate(selectedDate) : "Select a Date"}
             </h2>
 
@@ -523,13 +522,13 @@ export default function PricingDashboard({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-xs text-gray-400">Applied Rate</p>
-                    <p className="text-xl font-bold text-gray-900">${Math.round(selectedRateEntry.applied_rate ?? 0)}</p>
+                    <p className="text-xs text-neutral-400">Applied Rate</p>
+                    <p className="text-xl font-bold font-mono text-neutral-800">${Math.round(selectedRateEntry.applied_rate ?? 0)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">Suggested Rate</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {selectedRateEntry.suggested_rate != null ? `$${Math.round(selectedRateEntry.suggested_rate)}` : "—"}
+                    <p className="text-xs text-neutral-400">Suggested Rate</p>
+                    <p className="text-xl font-bold font-mono text-brand-500">
+                      {selectedRateEntry.suggested_rate != null ? `$${Math.round(selectedRateEntry.suggested_rate)}` : "\u2014"}
                     </p>
                   </div>
                 </div>
@@ -550,7 +549,7 @@ export default function PricingDashboard({
                         });
                         toast(`Accepted $${Math.round(selectedRateEntry.suggested_rate!)} for ${formatDate(selectedDate!)}`);
                       }}
-                      className="w-full py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700"
+                      className="w-full py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
                     >
                       Accept Suggestion
                     </button>
@@ -562,12 +561,12 @@ export default function PricingDashboard({
                     type="number"
                     value={overrideRate}
                     onChange={(e) => setOverrideRate(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg"
                     placeholder="Override rate"
                   />
                   <button
                     onClick={overrideSingle}
-                    className="px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-lg hover:bg-gray-800"
+                    className="px-4 py-2 bg-neutral-700 text-white text-sm font-medium rounded-lg hover:bg-neutral-800"
                   >
                     Set
                   </button>
@@ -575,69 +574,69 @@ export default function PricingDashboard({
 
                 {/* Signal breakdown */}
                 {selectedRateEntry.factors && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Signal Breakdown</h3>
+                  <div className="pt-4 border-t border-neutral-100">
+                    <h3 className="text-sm font-semibold text-neutral-700 mb-3">Signal Breakdown</h3>
                     {Object.entries(selectedRateEntry.factors).map(([name, sig]) => (
                       <SignalBar key={name} name={name} score={sig.score} weight={sig.weight} reason={sig.reason} />
                     ))}
                   </div>
                 )}
 
-                <div className="pt-3 border-t border-gray-100 text-xs text-gray-400">
-                  Source: {selectedRateEntry.rate_source} · Min stay: {selectedRateEntry.min_stay}
+                <div className="pt-3 border-t border-neutral-100 text-xs text-neutral-400">
+                  Source: {selectedRateEntry.rate_source} &middot; Min stay: {selectedRateEntry.min_stay}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400">Click a date on the calendar to see details and signal breakdown.</p>
+              <p className="text-sm text-neutral-400">Click a date on the calendar to see details and signal breakdown.</p>
             )}
           </div>
 
           {/* Market context */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Market Context</h2>
+          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+            <h2 className="text-lg font-semibold text-neutral-800 mb-4">Market Context</h2>
             {snapshot ? (
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Market ADR</span>
-                  <span className="font-semibold text-gray-900">${Math.round(snapshot.market_adr ?? 0)}</span>
+                  <span className="text-neutral-500">Market ADR</span>
+                  <span className="font-semibold font-mono text-neutral-800">${Math.round(snapshot.market_adr ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Market Occupancy</span>
-                  <span className="font-semibold text-gray-900">{snapshot.market_occupancy ?? 0}%</span>
+                  <span className="text-neutral-500">Market Occupancy</span>
+                  <span className="font-semibold font-mono text-neutral-800">{snapshot.market_occupancy ?? 0}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Market RevPAR</span>
-                  <span className="font-semibold text-gray-900">${Math.round(snapshot.market_revpar ?? 0)}</span>
+                  <span className="text-neutral-500">Market RevPAR</span>
+                  <span className="font-semibold font-mono text-neutral-800">${Math.round(snapshot.market_revpar ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Demand Score</span>
-                  <span className="font-semibold text-gray-900">{snapshot.market_demand_score ?? 0}/100</span>
+                  <span className="text-neutral-500">Demand Score</span>
+                  <span className="font-semibold font-mono text-neutral-800">{snapshot.market_demand_score ?? 0}/100</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Active Listings</span>
-                  <span className="font-semibold text-gray-900">{(snapshot.market_supply ?? 0).toLocaleString()}</span>
+                  <span className="text-neutral-500">Active Listings</span>
+                  <span className="font-semibold font-mono text-neutral-800">{(snapshot.market_supply ?? 0).toLocaleString()}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400">No market data. Run a market refresh.</p>
+              <p className="text-sm text-neutral-400">No market data. Run a market refresh.</p>
             )}
 
             {/* Comp set */}
             {comps.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Comp Set ({comps.length})</h3>
+              <div className="mt-6 pt-4 border-t border-neutral-100">
+                <h3 className="text-sm font-semibold text-neutral-700 mb-3">Comp Set ({comps.length})</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {comps.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-neutral-50 last:border-0">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-gray-700 truncate">{c.comp_name ?? "Listing"}</p>
-                        <p className="text-[10px] text-gray-400">
-                          {c.comp_bedrooms ?? "?"}BR · {c.distance_km != null ? `${c.distance_km}km` : "—"}
+                        <p className="text-xs font-medium text-neutral-700 truncate">{c.comp_name ?? "Listing"}</p>
+                        <p className="text-[10px] text-neutral-400">
+                          {c.comp_bedrooms ?? "?"}BR &middot; {c.distance_km != null ? `${c.distance_km}km` : "\u2014"}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-semibold text-gray-900">${Math.round(c.comp_adr ?? 0)}</p>
-                        <p className="text-[10px] text-gray-400">{c.comp_occupancy ?? 0}% occ</p>
+                        <p className="text-xs font-semibold font-mono text-neutral-800">${Math.round(c.comp_adr ?? 0)}</p>
+                        <p className="text-[10px] text-neutral-400">{c.comp_occupancy ?? 0}% occ</p>
                       </div>
                     </div>
                   ))}
@@ -655,7 +654,7 @@ export default function PricingDashboard({
                 setLoading(null);
               }}
               disabled={loading === "market"}
-              className="w-full mt-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              className="w-full mt-4 py-2 text-sm font-medium text-neutral-500 bg-neutral-50 rounded-lg hover:bg-neutral-100 disabled:opacity-50 transition-colors"
             >
               {loading === "market" ? "Refreshing..." : "Refresh Market Data"}
             </button>

@@ -244,18 +244,18 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
   }, [activeConversation, bookingMap, propMap]);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="flex h-[calc(100vh-8rem)] bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
       {/* Left panel: conversation list */}
-      <div className="w-80 border-r border-gray-200 flex flex-col">
+      <div className="w-80 border-r border-[var(--border)] flex flex-col">
         {/* Filter tabs */}
-        <div className="p-3 border-b border-gray-100">
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-3">
+        <div className="p-3 border-b border-neutral-100">
+          <div className="flex gap-1 bg-neutral-100 rounded-lg p-0.5 mb-3">
             {([["all", "All"], ["unread", "Unread"], ["needs_reply", "Needs Reply"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  filter === key ? "bg-white shadow-sm text-gray-900" : "text-gray-500"
+                  filter === key ? "bg-brand-500 text-white" : "text-neutral-500"
                 }`}
               >
                 {label}
@@ -267,14 +267,14 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search guests..."
-            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           />
         </div>
 
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="p-6 text-center text-gray-400 text-sm">
+            <div className="p-6 text-center text-neutral-400 text-sm">
               {messages.length === 0 ? "No messages yet" : "No matches"}
             </div>
           ) : (
@@ -282,26 +282,26 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
               <div
                 key={convo.key}
                 onClick={() => setActiveConvo(convo.key)}
-                className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-50 transition-colors ${
-                  activeConvo === convo.key ? "bg-blue-50" : "hover:bg-gray-50"
+                className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-neutral-50 transition-colors ${
+                  activeConvo === convo.key ? "bg-brand-50 border-l-2 border-brand-500" : "hover:bg-neutral-50"
                 }`}
               >
                 {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600 flex-shrink-0">
                   {initials(convo.guestName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900 truncate">{convo.guestName}</span>
-                    <span className="text-[10px] text-gray-400 flex-shrink-0">{timeAgo(convo.lastMessage.created_at)}</span>
+                    <span className="text-sm font-medium text-neutral-900 truncate">{convo.guestName}</span>
+                    <span className="text-[10px] text-neutral-300 flex-shrink-0">{timeAgo(convo.lastMessage.created_at)}</span>
                   </div>
-                  <p className="text-xs text-gray-400 truncate">{convo.propertyName}</p>
+                  <p className="text-xs text-neutral-400 truncate">{convo.propertyName}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${platformColors[convo.platform] ?? "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${platformColors[convo.platform] ?? "bg-neutral-100 text-neutral-500"}`}>
                       {platformLabels[convo.platform] ?? convo.platform}
                     </span>
-                    <p className="text-xs text-gray-500 truncate flex-1">{convo.lastMessage.content}</p>
-                    {convo.unread && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                    <p className="text-xs text-neutral-500 truncate flex-1">{convo.lastMessage.content}</p>
+                    {convo.unread && <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0" />}
                   </div>
                 </div>
               </div>
@@ -315,13 +315,13 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
         {activeConversation ? (
           <>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-4 border-b border-neutral-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">{activeConversation.guestName}</h2>
-                  <p className="text-xs text-gray-400">
+                  <h2 className="text-lg font-semibold text-neutral-900">{activeConversation.guestName}</h2>
+                  <p className="text-xs text-neutral-400">
                     {activeConversation.propertyName} ·{" "}
-                    <span className={`font-medium ${platformColors[activeConversation.platform]?.split(" ")[1] ?? "text-gray-500"}`}>
+                    <span className={`font-medium ${platformColors[activeConversation.platform]?.split(" ")[1] ?? "text-neutral-500"}`}>
                       {platformLabels[activeConversation.platform] ?? activeConversation.platform}
                     </span>
                     {activeConversation.bookingId && (() => {
@@ -340,11 +340,11 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                 return (
                   <div key={msg.id}>
                     <div className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
-                      <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl ${
-                        isInbound ? "bg-gray-100 text-gray-900 rounded-bl-md" : "bg-blue-600 text-white rounded-br-md"
+                      <div className={`max-w-[70%] px-4 py-2.5 rounded-lg ${
+                        isInbound ? "bg-neutral-100 text-neutral-900 rounded-bl-md" : "bg-brand-50 text-neutral-800 rounded-br-md"
                       }`}>
                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        <div className={`flex items-center gap-2 mt-1 ${isInbound ? "text-gray-400" : "text-blue-200"}`}>
+                        <div className={`flex items-center gap-2 mt-1 ${isInbound ? "text-neutral-400" : "text-neutral-300"}`}>
                           <span className="text-[10px]">
                             {new Date(msg.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </span>
@@ -359,35 +359,35 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                     {isInbound && msg.ai_draft_status !== "sent" && (
                       <div className="mt-2 ml-4">
                         {draftLoading === msg.id ? (
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                          <div className="flex items-center gap-2 text-sm text-neutral-400">
+                            <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
                             Generating AI draft...
                           </div>
                         ) : editingDraft === msg.id ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                            <p className="text-[10px] text-blue-500 font-medium mb-2">AI DRAFT</p>
+                          <div className="bg-brand-50 border border-brand-200 rounded-lg p-3">
+                            <p className="text-[10px] text-brand-500 font-medium mb-2">AI DRAFT</p>
                             <textarea
                               value={draftText}
                               onChange={(e) => setDraftText(e.target.value)}
-                              className="w-full p-2 text-sm bg-white border border-blue-200 rounded-lg resize-none outline-none focus:ring-2 focus:ring-blue-400"
+                              className="w-full p-2 text-sm bg-neutral-0 border border-brand-200 rounded-lg resize-none outline-none focus:ring-2 focus:ring-brand-500"
                               rows={3}
                             />
                             <div className="flex gap-2 mt-2">
                               <button
                                 onClick={() => sendMessage(draftText)}
-                                className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                className="px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600"
                               >
                                 Send as-is
                               </button>
                               <button
                                 onClick={() => { setComposing(draftText); setEditingDraft(null); }}
-                                className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                                className="px-3 py-1.5 text-xs font-medium bg-neutral-0 text-neutral-700 border border-[var(--border)] rounded-lg hover:bg-neutral-50"
                               >
                                 Edit & Send
                               </button>
                               <button
                                 onClick={() => { setEditingDraft(null); setDraftText(""); }}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+                                className="px-3 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-700"
                               >
                                 Dismiss
                               </button>
@@ -396,14 +396,14 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                         ) : msg.ai_draft ? (
                           <button
                             onClick={() => { setEditingDraft(msg.id); setDraftText(msg.ai_draft!); }}
-                            className="text-xs text-blue-600 hover:underline"
+                            className="text-xs text-brand-500 hover:underline"
                           >
                             View AI draft
                           </button>
                         ) : (
                           <button
                             onClick={() => generateDraft(msg.id)}
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            className="text-xs text-brand-500 hover:underline flex items-center gap-1"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -419,12 +419,12 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
             </div>
 
             {/* Compose area */}
-            <div className="border-t border-gray-100 p-4">
+            <div className="border-t border-neutral-100 p-4">
               <div className="flex items-center gap-2 mb-2">
                 <select
                   value={selectedTemplate}
                   onChange={(e) => { setSelectedTemplate(e.target.value); applyTemplate(e.target.value); }}
-                  className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-600"
+                  className="px-2 py-1 text-xs border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600"
                 >
                   <option value="">Templates...</option>
                   {DEFAULT_TEMPLATES.map((t) => (
@@ -436,14 +436,14 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                     const lastInbound = activeConversation.messages.filter((m) => m.direction === "inbound").pop();
                     if (lastInbound) generateDraft(lastInbound.id);
                   }}
-                  className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1"
+                  className="px-2 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 rounded-lg flex items-center gap-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   AI Draft
                 </button>
-                <span className={`ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full ${platformColors[activeConversation.platform] ?? "bg-gray-100 text-gray-500"}`}>
+                <span className={`ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full ${platformColors[activeConversation.platform] ?? "bg-neutral-100 text-neutral-500"}`}>
                   via {platformLabels[activeConversation.platform] ?? activeConversation.platform}
                 </span>
               </div>
@@ -452,7 +452,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                   value={composing}
                   onChange={(e) => setComposing(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg resize-none outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   rows={2}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -464,7 +464,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                 <button
                   onClick={() => sendMessage(composing)}
                   disabled={!composing.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 self-end transition-colors"
+                  className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 self-end transition-colors"
                 >
                   Send
                 </button>
@@ -472,9 +472,9 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center text-neutral-400">
             <div className="text-center">
-              <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 mx-auto mb-3 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               <p className="text-sm">Select a conversation</p>

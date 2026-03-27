@@ -23,9 +23,9 @@ interface WeekCalendarProps {
 }
 
 const statusColors = {
-  booked: "bg-blue-500",
-  available: "bg-emerald-400",
-  blocked: "bg-gray-300",
+  booked: "bg-brand-500",
+  available: "bg-brand-300",
+  blocked: "bg-neutral-200",
 };
 
 const statusLabels = {
@@ -37,7 +37,7 @@ const statusLabels = {
 export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
   if (properties.length === 0) {
     return (
-      <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+      <div className="h-32 flex items-center justify-center text-neutral-400 text-sm">
         Add properties to see your weekly availability.
       </div>
     );
@@ -53,11 +53,11 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
             <div
               key={d.date}
               className={`text-center text-xs ${
-                d.isToday ? "text-blue-600 font-semibold" : "text-gray-400"
+                d.isToday ? "text-brand-500 font-semibold" : "text-neutral-400"
               }`}
             >
               <div>{d.dayLabel}</div>
-              <div className={`text-lg font-semibold ${d.isToday ? "text-blue-600" : "text-gray-700"}`}>
+              <div className={`text-lg font-semibold ${d.isToday ? "text-brand-500" : "text-neutral-700"}`}>
                 {d.dayNum}
               </div>
             </div>
@@ -71,7 +71,7 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
             className="grid gap-1 mb-1"
             style={{ gridTemplateColumns: `140px repeat(${days.length}, 1fr)` }}
           >
-            <div className="text-sm font-medium text-gray-700 truncate flex items-center">
+            <div className="text-sm font-medium text-neutral-700 truncate flex items-center">
               {prop.propertyName}
             </div>
             {prop.days.map((day) => (
@@ -91,11 +91,11 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
         ))}
 
         {/* Legend */}
-        <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+        <div className="flex gap-4 mt-3 pt-3 border-t border-neutral-100">
           {(["booked", "available", "blocked"] as const).map((s) => (
             <div key={s} className="flex items-center gap-1.5">
               <div className={`w-3 h-3 rounded ${statusColors[s]}`} />
-              <span className="text-xs text-gray-500">{statusLabels[s]}</span>
+              <span className="text-xs text-neutral-500">{statusLabels[s]}</span>
             </div>
           ))}
         </div>

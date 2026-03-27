@@ -101,13 +101,13 @@ export default function ImportPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
-        <Link href="/properties" className="text-sm text-gray-400 hover:text-gray-600">
+        <Link href="/properties" className="text-sm text-neutral-400 hover:text-neutral-600">
           Properties
         </Link>
-        <span className="text-gray-300">/</span>
+        <span className="text-neutral-300">/</span>
       </div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Import from Channex</h1>
-      <p className="text-gray-500 mb-8">
+      <h1 className="text-xl font-semibold text-neutral-800 mb-1">Import from Channex</h1>
+      <p className="text-neutral-500 mb-8">
         Import your properties, bookings, and rates from Channex
       </p>
 
@@ -118,10 +118,10 @@ export default function ImportPage() {
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                 i < step
-                  ? "bg-blue-600 text-white"
+                  ? "bg-brand-500 text-white"
                   : i === step
-                  ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600"
-                  : "bg-gray-100 text-gray-400"
+                  ? "bg-brand-100 text-brand-700 ring-2 ring-brand-500"
+                  : "bg-neutral-100 text-neutral-400"
               }`}
             >
               {i < step ? (
@@ -132,25 +132,25 @@ export default function ImportPage() {
                 i + 1
               )}
             </div>
-            <span className={`text-sm ${i === step ? "text-gray-900 font-medium" : "text-gray-400"}`}>
+            <span className={`text-sm ${i === step ? "text-neutral-800 font-medium" : "text-neutral-400"}`}>
               {label}
             </span>
-            {i < 3 && <div className="w-6 h-px bg-gray-200" />}
+            {i < 3 && <div className="w-6 h-px bg-neutral-200" />}
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
         {/* Step 0: Connect */}
         {step === 0 && (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Connect to Channex</h2>
-            <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
+            <h2 className="text-lg font-semibold text-neutral-800 mb-2">Connect to Channex</h2>
+            <p className="text-neutral-500 text-sm mb-6 max-w-md mx-auto">
               We&apos;ll fetch your properties from Channex. Make sure your API key is configured
               in the environment variables.
             </p>
@@ -164,7 +164,7 @@ export default function ImportPage() {
             <button
               onClick={handleConnect}
               disabled={loading}
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
             >
               {loading ? "Connecting..." : "Connect & Fetch Properties"}
             </button>
@@ -175,16 +175,16 @@ export default function ImportPage() {
         {step === 1 && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-neutral-800">
                 {properties.length} properties found
               </h2>
-              <button onClick={toggleAll} className="text-sm text-blue-600 hover:underline">
+              <button onClick={toggleAll} className="text-sm text-brand-500 hover:underline">
                 {selected.size === properties.length ? "Deselect All" : "Select All"}
               </button>
             </div>
 
             {properties.length === 0 ? (
-              <p className="text-gray-400 text-sm py-8 text-center">
+              <p className="text-neutral-400 text-sm py-8 text-center">
                 No properties found in your Channex account.
               </p>
             ) : (
@@ -193,23 +193,23 @@ export default function ImportPage() {
                   <label
                     key={p.channex_id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selected.has(p.channex_id) ? "border-blue-200 bg-blue-50/30" : "border-gray-200 hover:border-gray-300"
+                      selected.has(p.channex_id) ? "border-brand-200 bg-brand-50/30" : "border-[var(--border)] hover:border-neutral-300"
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.channex_id)}
                       onChange={() => toggleSelect(p.channex_id)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      className="w-4 h-4 rounded border-neutral-300 text-brand-500"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-sm font-medium text-neutral-800">{p.name}</p>
+                      <p className="text-xs text-neutral-400">
                         {[p.city, p.country].filter(Boolean).join(", ")} · {p.currency}
                       </p>
                     </div>
                     {!p.is_active && (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-neutral-100 text-neutral-500">
                         Inactive
                       </span>
                     )}
@@ -218,14 +218,14 @@ export default function ImportPage() {
               </div>
             )}
 
-            <div className="flex justify-between pt-4 border-t border-gray-100">
-              <button onClick={() => setStep(0)} className="text-sm text-gray-500 hover:text-gray-700">
+            <div className="flex justify-between pt-4 border-t border-neutral-100">
+              <button onClick={() => setStep(0)} className="text-sm text-neutral-500 hover:text-neutral-700">
                 Back
               </button>
               <button
                 onClick={handleImport}
                 disabled={selected.size === 0}
-                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
               >
                 Import {selected.size} {selected.size === 1 ? "Property" : "Properties"}
               </button>
@@ -236,9 +236,9 @@ export default function ImportPage() {
         {/* Step 2: Importing */}
         {step === 2 && importing && (
           <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 font-medium">Importing properties...</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-neutral-600 font-medium">Importing properties...</p>
+            <p className="text-sm text-neutral-400 mt-1">
               Fetching properties, bookings, and rates from Channex
             </p>
           </div>
@@ -247,7 +247,7 @@ export default function ImportPage() {
         {/* Step 3: Results */}
         {step === 3 && (
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Complete</h2>
+            <h2 className="text-lg font-semibold text-neutral-800 mb-4">Import Complete</h2>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg">{error}</div>
@@ -255,11 +255,11 @@ export default function ImportPage() {
 
             <div className="space-y-3 mb-6">
               {results.map((r) => (
-                <div key={r.channex_id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg">
+                <div key={r.channex_id} className="flex items-center justify-between p-3 border border-neutral-100 rounded-lg">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{r.name ?? r.channex_id}</p>
+                    <p className="text-sm font-medium text-neutral-800">{r.name ?? r.channex_id}</p>
                     {r.status === "imported" && (
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-neutral-400">
                         {r.rooms ?? 0} rooms · {r.bookings ?? 0} bookings · {r.rates ?? 0} rate entries
                       </p>
                     )}
@@ -280,7 +280,7 @@ export default function ImportPage() {
 
             <button
               onClick={() => router.push("/properties")}
-              className="w-full px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="w-full px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
             >
               Go to Properties
             </button>

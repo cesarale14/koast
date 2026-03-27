@@ -20,22 +20,22 @@ export default async function CalendarPage() {
   if (properties.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Calendar</h1>
-        <p className="text-gray-500 mb-8">Multi-property availability calendar</p>
+        <h1 className="text-xl font-semibold text-neutral-800 mb-1">Calendar</h1>
+        <p className="text-neutral-500 mb-8">Multi-property availability calendar</p>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
+          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No properties yet</h2>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+          <h2 className="text-xl font-semibold text-neutral-800 mb-2">No properties yet</h2>
+          <p className="text-neutral-500 mb-6 max-w-md mx-auto">
             Add your first property to see the multi-property calendar view.
           </p>
           <Link
             href="/properties"
-            className="inline-flex px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
           >
             Add Your First Property
           </Link>
@@ -91,8 +91,8 @@ export default async function CalendarPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Calendar</h1>
-        <p className="text-gray-500">Multi-property availability calendar</p>
+        <h1 className="text-xl font-semibold text-neutral-800 mb-1">Calendar</h1>
+        <p className="text-neutral-500">Multi-property availability calendar</p>
       </div>
 
       <CalendarGrid

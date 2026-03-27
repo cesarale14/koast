@@ -134,18 +134,18 @@ export default function AddressAutocomplete({
         onKeyDown={handleKeyDown}
         onFocus={() => results.length > 0 && setOpen(true)}
         placeholder={placeholder}
-        className={className || "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"}
+        className={className || "w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"}
       />
       {loading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
         </div>
       )}
 
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-neutral-0 border border-[var(--border)] rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {results.length === 0 && !loading ? (
-            <div className="px-3 py-2 text-sm text-gray-400">No addresses found</div>
+            <div className="px-3 py-2 text-sm text-neutral-400">No addresses found</div>
           ) : (
             results.map((r, i) => (
               <div
@@ -153,7 +153,7 @@ export default function AddressAutocomplete({
                 onClick={() => selectResult(r)}
                 onMouseEnter={() => setActiveIdx(i)}
                 className={`px-3 py-2 text-sm cursor-pointer ${
-                  i === activeIdx ? "bg-blue-50 text-blue-900" : "text-gray-700 hover:bg-gray-50"
+                  i === activeIdx ? "bg-brand-50 text-brand-900" : "text-neutral-700 hover:bg-neutral-50"
                 }`}
               >
                 {r.display_name}

@@ -66,24 +66,24 @@ interface AnalyticsDashboardProps {
 // ---------- Helpers ----------
 
 function demandColor(score: number | null): string {
-  if (score == null) return "text-gray-400";
+  if (score == null) return "text-neutral-400";
   if (score > 60) return "text-emerald-600";
   if (score > 30) return "text-amber-600";
   return "text-red-600";
 }
 
 function demandBg(score: number | null): string {
-  if (score == null) return "bg-gray-50";
+  if (score == null) return "bg-neutral-50";
   if (score > 60) return "bg-emerald-50";
   if (score > 30) return "bg-amber-50";
   return "bg-red-50";
 }
 
 function comparisonBar(yours: number, market: number): { pct: number; color: string; label: string } {
-  if (market === 0) return { pct: 50, color: "bg-gray-300", label: "—" };
+  if (market === 0) return { pct: 50, color: "bg-neutral-300", label: "—" };
   const ratio = yours / market;
   const pct = Math.min(100, Math.max(5, ratio * 50));
-  const color = ratio >= 1 ? "bg-emerald-500" : ratio >= 0.85 ? "bg-amber-400" : "bg-red-400";
+  const color = ratio >= 1 ? "bg-brand-500" : ratio >= 0.85 ? "bg-amber-400" : "bg-red-400";
   const diff = Math.round((ratio - 1) * 100);
   const label = diff >= 0 ? `+${diff}%` : `${diff}%`;
   return { pct, color, label };
@@ -186,14 +186,14 @@ export default function AnalyticsDashboard({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Analytics</h1>
-          <p className="text-gray-500">Market analysis and performance metrics</p>
+          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Analytics</h1>
+          <p className="text-neutral-500">Market analysis and performance metrics</p>
         </div>
         {properties.length > 1 && (
           <select
             value={propertyId}
             onChange={(e) => setPropertyId(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+            className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
           >
             {properties.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -204,47 +204,47 @@ export default function AnalyticsDashboard({
 
       {/* Market Overview Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-400">Market ADR</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+          <p className="text-xs text-neutral-400">Market ADR</p>
+          <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             ${snapshot?.market_adr != null ? Math.round(snapshot.market_adr) : "—"}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-400">Market Occupancy</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+          <p className="text-xs text-neutral-400">Market Occupancy</p>
+          <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             {snapshot?.market_occupancy != null ? `${snapshot.market_occupancy}%` : "—"}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-400">Market RevPAR</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+          <p className="text-xs text-neutral-400">Market RevPAR</p>
+          <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             ${snapshot?.market_revpar != null ? Math.round(snapshot.market_revpar) : "—"}
           </p>
         </div>
-        <div className={`rounded-xl border border-gray-200 p-5 ${demandBg(snapshot?.market_demand_score ?? null)}`}>
+        <div className={`rounded-lg border border-[var(--border)] p-5 ${demandBg(snapshot?.market_demand_score ?? null)}`}>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">Demand Score</p>
+            <p className="text-xs text-neutral-400">Demand Score</p>
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="text-[10px] text-blue-600 hover:underline disabled:opacity-50"
+              className="text-[10px] text-brand-500 hover:underline disabled:opacity-50"
             >
               {refreshing ? "..." : "Refresh"}
             </button>
           </div>
-          <p className={`text-2xl font-bold mt-1 ${demandColor(snapshot?.market_demand_score ?? null)}`}>
+          <p className={`text-2xl font-bold font-mono mt-1 ${demandColor(snapshot?.market_demand_score ?? null)}`}>
             {snapshot?.market_demand_score != null ? `${Math.round(snapshot.market_demand_score)}/100` : "—"}
           </p>
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-[11px] text-neutral-400 mt-1">
             {snapshot?.market_supply != null ? `${snapshot.market_supply.toLocaleString()} active listings` : ""}
           </p>
         </div>
       </div>
 
       {/* Your Property vs Market */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Property vs Market</h2>
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
+        <h2 className="text-lg font-semibold text-neutral-900 mb-4">Your Property vs Market</h2>
         <div className="space-y-4">
           {[
             { label: "Avg Daily Rate", yours: propertyStats.avgRate, market: snapshot?.market_adr ?? 0, prefix: "$" },
@@ -255,23 +255,23 @@ export default function AnalyticsDashboard({
             return (
               <div key={metric.label}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-600">{metric.label}</span>
+                  <span className="text-sm text-neutral-600">{metric.label}</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold font-mono text-neutral-900">
                       {metric.prefix ?? ""}{Math.round(metric.yours)}{metric.suffix ?? ""}
                     </span>
-                    <span className="text-gray-400">vs</span>
-                    <span className="text-gray-500">
+                    <span className="text-neutral-400">vs</span>
+                    <span className="font-mono text-neutral-500">
                       {metric.prefix ?? ""}{Math.round(metric.market)}{metric.suffix ?? ""}
                     </span>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      bar.label.startsWith("+") ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                      bar.label.startsWith("+") ? "bg-brand-50 text-brand-600" : "bg-danger-light text-danger"
                     }`}>
                       {bar.label}
                     </span>
                   </div>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full transition-all ${bar.color}`} style={{ width: `${bar.pct}%` }} />
                 </div>
               </div>
@@ -282,21 +282,21 @@ export default function AnalyticsDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Scatter plot */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">ADR vs Occupancy</h2>
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4">ADR vs Occupancy</h2>
           {scatterData.length > 1 ? (
             <ResponsiveContainer width="100%" height={300}>
               <ScatterChart margin={{ top: 8, right: 8, bottom: 20, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
                 <XAxis
                   dataKey="x" type="number" name="ADR"
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  label={{ value: "ADR ($)", position: "bottom", fontSize: 11, fill: "#9ca3af" }}
+                  tick={{ fontSize: 11, fill: "#78716c" }}
+                  label={{ value: "ADR ($)", position: "bottom", fontSize: 11, fill: "#78716c" }}
                 />
                 <YAxis
                   dataKey="y" type="number" name="Occupancy"
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  label={{ value: "Occ %", angle: -90, position: "insideLeft", fontSize: 11, fill: "#9ca3af" }}
+                  tick={{ fontSize: 11, fill: "#78716c" }}
+                  label={{ value: "Occ %", angle: -90, position: "insideLeft", fontSize: 11, fill: "#78716c" }}
                 />
                 <Tooltip
                   formatter={(value, name) => [
@@ -309,9 +309,9 @@ export default function AnalyticsDashboard({
                   {scatterData.map((entry, i) => (
                     <Cell
                       key={i}
-                      fill={entry.isYours ? "#3b82f6" : "#d1d5db"}
+                      fill={entry.isYours ? "#10b981" : "#a8a29e"}
                       r={entry.isYours ? 8 : 4}
-                      stroke={entry.isYours ? "#1d4ed8" : "none"}
+                      stroke={entry.isYours ? "#047857" : "none"}
                       strokeWidth={entry.isYours ? 2 : 0}
                     />
                   ))}
@@ -319,36 +319,36 @@ export default function AnalyticsDashboard({
               </ScatterChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[300px] flex items-center justify-center text-neutral-400 text-sm">
               No comp data to display
             </div>
           )}
-          <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+          <div className="flex items-center gap-4 mt-2 text-xs text-neutral-400">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <div className="w-3 h-3 rounded-full bg-brand-500" />
               Your Property
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-gray-300" />
+              <div className="w-3 h-3 rounded-full bg-neutral-300" />
               Comps
             </div>
           </div>
         </div>
 
         {/* Revenue opportunity */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Revenue Opportunity</h2>
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4">Revenue Opportunity</h2>
           <div className="space-y-4">
-            <div className="bg-red-50 rounded-lg p-4">
+            <div className="bg-danger-light rounded-lg p-4">
               <p className="text-xs text-red-500 font-medium">Left on the Table (Past)</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">${revenueStats.leftOnTable}</p>
+              <p className="text-3xl font-bold font-mono text-red-600 mt-1">${revenueStats.leftOnTable}</p>
               <p className="text-xs text-red-400 mt-1">
                 Dates where applied rate was below engine suggestion
               </p>
             </div>
-            <div className="bg-emerald-50 rounded-lg p-4">
+            <div className="bg-success-light rounded-lg p-4">
               <p className="text-xs text-emerald-500 font-medium">Potential Upside (Next 90 Days)</p>
-              <p className="text-3xl font-bold text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
+              <p className="text-3xl font-bold font-mono text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
               <p className="text-xs text-emerald-400 mt-1">
                 If all pricing suggestions are accepted
               </p>
@@ -357,7 +357,7 @@ export default function AnalyticsDashboard({
 
           {/* Mini pricing calendar */}
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Last 30 Days Performance</h3>
+            <h3 className="text-sm font-semibold text-neutral-700 mb-2">Last 30 Days Performance</h3>
             <div className="grid grid-cols-10 gap-1">
               {pricingCalendar.map((r) => {
                 const applied = r.applied_rate ?? r.base_rate ?? 0;
@@ -375,7 +375,7 @@ export default function AnalyticsDashboard({
                 );
               })}
             </div>
-            <div className="flex gap-3 mt-2 text-[10px] text-gray-400">
+            <div className="flex gap-3 mt-2 text-[10px] text-neutral-400">
               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-emerald-200" /> At/above suggested</div>
               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-amber-200" /> Slightly below</div>
               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-red-200" /> Significantly below</div>
@@ -385,20 +385,20 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Comp Set */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Comp Set ({comps.length} properties)</h2>
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <h2 className="text-lg font-semibold text-neutral-900">Comp Set ({comps.length} properties)</h2>
+          <div className="flex bg-neutral-100 rounded-lg p-0.5">
             <button
               onClick={() => setCompView("table")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "table" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "table" ? "bg-brand-500 text-white" : "text-neutral-500"}`}
             >
               Table
             </button>
             <button
               onClick={() => setCompView("map")}
               disabled={!propertyLatLng}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "map" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"} disabled:opacity-40`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${compView === "map" ? "bg-brand-500 text-white" : "text-neutral-500"} disabled:opacity-40`}
             >
               Map
             </button>
@@ -406,7 +406,7 @@ export default function AnalyticsDashboard({
         </div>
 
         {comps.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">No comparable properties found. Run a market refresh.</p>
+          <p className="text-sm text-neutral-400 py-8 text-center">No comparable properties found. Run a market refresh.</p>
         ) : compView === "map" && propertyLatLng ? (
           <div>
             <CompMap
@@ -415,7 +415,7 @@ export default function AnalyticsDashboard({
               comps={comps}
               medianOccupancy={compMedianAdr > 0 ? comps.reduce((s, c) => s + (c.comp_occupancy ?? 0), 0) / comps.length : 50}
             />
-            <p className="text-[10px] text-gray-400 mt-2">
+            <p className="text-[10px] text-neutral-400 mt-2">
               Comp positions are approximated from distance. Green = above median occupancy, Red = below.
             </p>
           </div>
@@ -423,7 +423,7 @@ export default function AnalyticsDashboard({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
+                <tr className="border-b border-neutral-100">
                   {([
                     ["comp_name", "Name"],
                     ["comp_bedrooms", "BR"],
@@ -435,7 +435,7 @@ export default function AnalyticsDashboard({
                     <th
                       key={key}
                       onClick={() => handleSort(key)}
-                      className="text-left py-2 px-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-600"
+                      className="text-left py-2 px-3 text-xs font-medium text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-neutral-600"
                     >
                       {label} {sortKey === key ? (sortAsc ? "↑" : "↓") : ""}
                     </th>
@@ -444,13 +444,13 @@ export default function AnalyticsDashboard({
               </thead>
               <tbody>
                 {/* Your property row */}
-                <tr className="bg-blue-50 border-b border-blue-100">
-                  <td className="py-2.5 px-3 font-semibold text-blue-700">Your Property</td>
-                  <td className="py-2.5 px-3 text-blue-700">—</td>
-                  <td className="py-2.5 px-3 font-semibold text-blue-700">${Math.round(propertyStats.avgRate)}</td>
-                  <td className="py-2.5 px-3 font-semibold text-blue-700">{Math.round(propertyStats.occupancy)}%</td>
-                  <td className="py-2.5 px-3 font-semibold text-blue-700">${Math.round(propertyStats.revpar)}</td>
-                  <td className="py-2.5 px-3 text-blue-400">—</td>
+                <tr className="bg-brand-50 border-b border-brand-100">
+                  <td className="py-2.5 px-3 font-semibold text-brand-700">Your Property</td>
+                  <td className="py-2.5 px-3 text-brand-700">—</td>
+                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">${Math.round(propertyStats.avgRate)}</td>
+                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">{Math.round(propertyStats.occupancy)}%</td>
+                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">${Math.round(propertyStats.revpar)}</td>
+                  <td className="py-2.5 px-3 text-brand-400">—</td>
                 </tr>
                 {sortedComps.map((c, i) => {
                   const adrBetter = (c.comp_adr ?? 0) <= propertyStats.avgRate;
@@ -458,24 +458,24 @@ export default function AnalyticsDashboard({
                   const compName = c.comp_name ?? "Listing";
                   const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(compName + " airbnb")}`;
                   return (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                    <tr key={i} className="border-b border-neutral-50 hover:bg-neutral-50">
                       <td className="py-2.5 px-3 max-w-[250px]">
-                        <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 truncate">
+                        <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline flex items-center gap-1 truncate">
                           {compName}
-                          <svg className="w-3 h-3 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 flex-shrink-0 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
                       </td>
-                      <td className="py-2.5 px-3 text-gray-500">{c.comp_bedrooms ?? "—"}</td>
-                      <td className={`py-2.5 px-3 font-medium ${adrBetter ? "text-emerald-600" : "text-red-500"}`}>
+                      <td className="py-2.5 px-3 text-neutral-500">{c.comp_bedrooms ?? "—"}</td>
+                      <td className={`py-2.5 px-3 font-medium font-mono ${adrBetter ? "text-emerald-600" : "text-red-500"}`}>
                         ${Math.round(c.comp_adr ?? 0)}
                       </td>
-                      <td className={`py-2.5 px-3 font-medium ${occBetter ? "text-emerald-600" : "text-red-500"}`}>
+                      <td className={`py-2.5 px-3 font-medium font-mono ${occBetter ? "text-emerald-600" : "text-red-500"}`}>
                         {Math.round(c.comp_occupancy ?? 0)}%
                       </td>
-                      <td className="py-2.5 px-3 text-gray-700">${Math.round(c.comp_revpar ?? 0)}</td>
-                      <td className="py-2.5 px-3 text-gray-400">{c.distance_km != null ? `${c.distance_km} km` : "—"}</td>
+                      <td className="py-2.5 px-3 font-mono text-neutral-700">${Math.round(c.comp_revpar ?? 0)}</td>
+                      <td className="py-2.5 px-3 text-neutral-400">{c.distance_km != null ? `${c.distance_km} km` : "—"}</td>
                     </tr>
                   );
                 })}

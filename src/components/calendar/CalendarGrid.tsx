@@ -309,12 +309,12 @@ export default function CalendarGrid({
         onPropertyFilter={setSelectedPropertyId}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
         {/* Header: date labels */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-[var(--border)]">
           {/* Sticky property name column header */}
-          <div className="w-44 min-w-[176px] flex-shrink-0 bg-gray-50 border-r border-gray-200 px-4 py-2 sticky left-0 z-20">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+          <div className="w-44 min-w-[176px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
+            <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
               Property
             </span>
           </div>
@@ -337,18 +337,18 @@ export default function CalendarGrid({
                 return (
                   <div
                     key={date}
-                    className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-gray-100 ${
-                      isToday ? "bg-blue-50" : isWeekend ? "bg-gray-50/50" : ""
-                    } ${isFirstOfMonth ? "border-l-2 border-l-gray-300" : ""}`}
+                    className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
+                      isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-50/50" : ""
+                    } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
                   >
-                    <div className={`text-[10px] uppercase ${isToday ? "text-blue-600 font-semibold" : "text-gray-400"}`}>
+                    <div className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}>
                       {d.toLocaleDateString("en-US", { weekday: "short" })}
                     </div>
-                    <div className={`text-sm font-medium ${isToday ? "text-blue-600" : "text-gray-700"}`}>
+                    <div className={`text-sm font-medium ${isToday ? "text-brand-500" : "text-neutral-700"}`}>
                       {d.getDate()}
                     </div>
                     {isFirstOfMonth && (
-                      <div className="text-[9px] text-gray-400 font-medium">
+                      <div className="text-[9px] text-neutral-400 font-medium">
                         {d.toLocaleDateString("en-US", { month: "short" })}
                       </div>
                     )}
@@ -363,8 +363,8 @@ export default function CalendarGrid({
         {filteredProperties.map((prop) => (
           <div key={prop.id} className="flex">
             {/* Sticky property name */}
-            <div className="w-44 min-w-[176px] flex-shrink-0 bg-white border-r border-gray-200 px-4 flex items-center sticky left-0 z-20 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-700 truncate">
+            <div className="w-44 min-w-[176px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-4 flex items-center sticky left-0 z-20 border-b border-neutral-100">
+              <span className="text-sm font-medium text-neutral-700 truncate">
                 {prop.name}
               </span>
             </div>
@@ -401,7 +401,7 @@ export default function CalendarGrid({
         ))}
 
         {filteredProperties.length === 0 && (
-          <div className="p-12 text-center text-gray-400 text-sm">
+          <div className="p-12 text-center text-neutral-400 text-sm">
             No properties to display.
           </div>
         )}

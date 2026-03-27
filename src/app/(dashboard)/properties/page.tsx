@@ -27,23 +27,23 @@ export default async function PropertiesPage() {
       <div>
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Properties</h1>
-            <p className="text-gray-500">Manage your vacation rental properties</p>
+            <h1 className="text-xl font-semibold text-neutral-800 mb-1">Properties</h1>
+            <p className="text-neutral-500">Manage your vacation rental properties</p>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
+          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No properties yet</h2>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+          <h2 className="text-xl font-semibold text-neutral-800 mb-2">No properties yet</h2>
+          <p className="text-neutral-500 mb-6 max-w-md mx-auto">
             Add your first property to start managing bookings, availability, and pricing.
           </p>
           <Link
             href="/properties/new"
-            className="inline-flex px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
           >
             Add Your First Property
           </Link>
@@ -132,12 +132,12 @@ export default async function PropertiesPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Properties</h1>
-          <p className="text-gray-500">{properties.length} propert{properties.length === 1 ? "y" : "ies"}</p>
+          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Properties</h1>
+          <p className="text-neutral-500">{properties.length} propert{properties.length === 1 ? "y" : "ies"}</p>
         </div>
         <Link
           href="/properties/new"
-          className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
         >
           Add Property
         </Link>
@@ -153,27 +153,27 @@ export default async function PropertiesPage() {
             <Link
               key={prop.id}
               href={`/properties/${prop.id}`}
-              className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all group"
+              className="bg-neutral-0 rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-all group"
             >
               {/* Photo placeholder */}
-              <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-50 rounded-t-xl flex items-center justify-center">
-                <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="h-40 bg-neutral-100 rounded-t-lg flex items-center justify-center">
+                <svg className="w-12 h-12 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
 
               <div className="p-5">
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                <h3 className="text-lg font-semibold text-neutral-800 group-hover:text-brand-500 transition-colors">
                   {prop.name}
                 </h3>
                 {(prop.city || prop.state) && (
-                  <p className="text-sm text-gray-500 mt-0.5">
+                  <p className="text-sm text-neutral-500 mt-0.5">
                     {[prop.city, prop.state].filter(Boolean).join(", ")}
                   </p>
                 )}
 
                 {/* Property type + specs */}
-                <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                <div className="flex items-center gap-3 mt-3 text-xs text-neutral-400">
                   {prop.property_type && (
                     <span>{typeLabels[prop.property_type] ?? prop.property_type}</span>
                   )}
@@ -188,7 +188,7 @@ export default async function PropertiesPage() {
                     {platforms.map((p) => (
                       <span
                         key={p}
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformBadgeColors[p] ?? "bg-gray-100 text-gray-600"}`}
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformBadgeColors[p] ?? "bg-neutral-100 text-neutral-500"}`}
                       >
                         {platformLabels[p] ?? p}
                       </span>
@@ -199,27 +199,27 @@ export default async function PropertiesPage() {
                 {/* Connection badge */}
                 <div className="mt-3">
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    prop.channex_property_id ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                    prop.channex_property_id ? "bg-brand-100 text-brand-700" : "bg-neutral-100 text-neutral-500"
                   }`}>
                     {prop.channex_property_id ? "Channex" : "iCal"}
                   </span>
                 </div>
 
                 {/* Stats */}
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-100">
                   <div>
-                    <p className="text-xs text-gray-400">Occupancy</p>
-                    <p className="text-sm font-semibold text-gray-900">{occupancy}%</p>
+                    <p className="text-xs text-neutral-400">Occupancy</p>
+                    <p className="text-sm font-semibold font-mono text-neutral-800">{occupancy}%</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-400">Next check-in</p>
-                    <p className="text-sm font-medium text-gray-700">
+                    <p className="text-xs text-neutral-400">Next check-in</p>
+                    <p className="text-sm font-medium text-neutral-700">
                       {nextCheckin
                         ? new Date(nextCheckin.date + "T00:00:00").toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
                           })
-                        : "—"}
+                        : "\u2014"}
                     </p>
                   </div>
                 </div>

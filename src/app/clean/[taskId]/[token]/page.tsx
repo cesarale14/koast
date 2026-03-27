@@ -73,18 +73,18 @@ export default function CleanerMobilePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4">
         <div className="text-center">
           <p className="text-lg font-semibold text-red-600 mb-2">Access Denied</p>
-          <p className="text-sm text-gray-500">{error ?? "Invalid link"}</p>
+          <p className="text-sm text-neutral-500">{error ?? "Invalid link"}</p>
         </div>
       </div>
     );
@@ -95,10 +95,13 @@ export default function CleanerMobilePage({
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-blue-600 text-white px-4 py-5">
-        <p className="text-xs font-medium opacity-80">CLEANING TASK</p>
+      <div className="bg-brand-500 text-white px-4 py-5">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2 h-2 rounded-full bg-white/60" />
+          <p className="text-xs font-medium opacity-80">CLEANING TASK</p>
+        </div>
         <h1 className="text-xl font-bold mt-1">{property.name}</h1>
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-sm opacity-90 underline mt-1 block">
           {address} →
@@ -123,65 +126,65 @@ export default function CleanerMobilePage({
 
       <div className="px-4 py-4 space-y-4">
         {/* Time window */}
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <div className="bg-neutral-0 rounded-lg p-4 shadow-sm border border-[var(--border)]">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-gray-400">Checkout Guest</p>
-              <p className="text-sm font-medium text-gray-900">{checkoutGuest?.guest_name ?? "—"}</p>
-              <p className="text-xs text-gray-400">out by 11:00 AM</p>
+              <p className="text-xs text-neutral-400">Checkout Guest</p>
+              <p className="text-sm font-medium text-neutral-900">{checkoutGuest?.guest_name ?? "---"}</p>
+              <p className="text-xs text-neutral-400">out by 11:00 AM</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400">Next Guest</p>
-              <p className="text-sm font-medium text-gray-900">{nextGuest?.guest_name ?? "None"}</p>
-              {nextGuest && <p className="text-xs text-gray-400">in at 3:00 PM</p>}
+              <p className="text-xs text-neutral-400">Next Guest</p>
+              <p className="text-sm font-medium text-neutral-900">{nextGuest?.guest_name ?? "None"}</p>
+              {nextGuest && <p className="text-xs text-neutral-400">in at 3:00 PM</p>}
             </div>
           </div>
           {nextGuest && (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <div className="flex items-center justify-between text-xs text-neutral-400 mb-1">
                 <span>11:00 AM</span>
                 <span>3:00 PM</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-400 rounded-full" style={{ width: "100%" }} />
+              <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-400 rounded-full" style={{ width: "100%" }} />
               </div>
-              <p className="text-xs text-gray-500 mt-1 text-center">4-hour cleaning window</p>
+              <p className="text-xs text-neutral-500 mt-1 text-center">4-hour cleaning window</p>
             </div>
           )}
         </div>
 
         {/* Notes */}
         {task.notes && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-xs font-medium text-amber-700 mb-1">SPECIAL INSTRUCTIONS</p>
             <p className="text-sm text-amber-900">{task.notes}</p>
           </div>
         )}
 
         {/* Checklist */}
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <div className="bg-neutral-0 rounded-lg p-4 shadow-sm border border-[var(--border)]">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900">Checklist</h2>
-            <span className="text-xs text-gray-400">{doneCount}/{checklist.length}</span>
+            <h2 className="text-sm font-semibold text-neutral-900">Checklist</h2>
+            <span className="text-xs text-neutral-400">{doneCount}/{checklist.length}</span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {checklist.map((item) => (
-              <label key={item.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0 cursor-pointer">
+              <label key={item.id} className="flex items-center gap-3 py-3 px-2 border-b border-neutral-50 last:border-0 cursor-pointer rounded-md hover:bg-neutral-50 transition-colors">
                 <input
                   type="checkbox"
                   checked={item.done}
                   onChange={() => toggleItem(item.id)}
-                  className="w-5 h-5 rounded border-gray-300 text-blue-600"
+                  className="w-6 h-6 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
                 />
-                <span className={`text-sm ${item.done ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                <span className={`text-sm ${item.done ? "text-neutral-400 line-through" : "text-neutral-900"}`}>
                   {item.label}
                 </span>
               </label>
             ))}
           </div>
-          <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="mt-3 h-2 bg-neutral-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all"
+              className="h-full bg-brand-500 rounded-full transition-all"
               style={{ width: `${checklist.length > 0 ? (doneCount / checklist.length) * 100 : 0}%` }}
             />
           </div>
@@ -193,7 +196,7 @@ export default function CleanerMobilePage({
             <button
               onClick={() => updateTask({ status: "in_progress" })}
               disabled={saving}
-              className="w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50"
+              className="w-full py-4 bg-brand-500 text-white text-base font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
             >
               {saving ? "Starting..." : "Start Cleaning"}
             </button>
@@ -203,7 +206,7 @@ export default function CleanerMobilePage({
             <button
               onClick={() => updateTask({ status: "completed", checklist })}
               disabled={saving}
-              className="w-full py-3.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full py-4 bg-brand-500 text-white text-base font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
             >
               {saving ? "Completing..." : `Mark Complete (${doneCount}/${checklist.length})`}
             </button>
@@ -214,8 +217,8 @@ export default function CleanerMobilePage({
               <svg className="w-12 h-12 text-emerald-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <p className="text-lg font-semibold text-gray-900">Cleaning Complete!</p>
-              <p className="text-sm text-gray-500">Thank you</p>
+              <p className="text-lg font-semibold text-neutral-900">Cleaning Complete!</p>
+              <p className="text-sm text-neutral-500">Thank you</p>
             </div>
           )}
 
@@ -224,12 +227,12 @@ export default function CleanerMobilePage({
               {!showIssue ? (
                 <button
                   onClick={() => setShowIssue(true)}
-                  className="w-full py-3 bg-white text-red-600 text-sm font-medium rounded-xl border border-red-200 hover:bg-red-50"
+                  className="w-full py-3 bg-neutral-0 text-red-600 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-50"
                 >
                   Report Issue
                 </button>
               ) : (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <textarea
                     value={issueText}
                     onChange={(e) => setIssueText(e.target.value)}
@@ -247,7 +250,7 @@ export default function CleanerMobilePage({
                     </button>
                     <button
                       onClick={() => setShowIssue(false)}
-                      className="px-4 py-2 text-sm text-gray-500"
+                      className="px-4 py-2 text-sm text-neutral-500"
                     >
                       Cancel
                     </button>

@@ -183,7 +183,7 @@ export default function ReviewsPage() {
           type="button"
           onClick={() => onChange?.(star)}
           disabled={!onChange}
-          className={`${size} transition-colors ${star <= rating ? "text-amber-400" : "text-gray-300"} ${onChange ? "cursor-pointer hover:text-amber-500" : "cursor-default"}`}
+          className={`${size} font-mono transition-colors ${star <= rating ? "text-warning" : "text-neutral-300"} ${onChange ? "cursor-pointer hover:text-warning" : "cursor-default"}`}
         >
           ★
         </button>
@@ -193,15 +193,15 @@ export default function ReviewsPage() {
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-gray-100 text-gray-600",
-      draft_generated: "bg-blue-50 text-blue-700",
-      approved: "bg-emerald-50 text-emerald-700",
-      scheduled: "bg-amber-50 text-amber-700",
-      published: "bg-green-50 text-green-700",
-      bad_review_held: "bg-red-50 text-red-700",
+      pending: "bg-neutral-100 text-neutral-600",
+      draft_generated: "bg-brand-50 text-brand-600",
+      approved: "bg-success-light text-success",
+      scheduled: "bg-brand-50 text-brand-600",
+      published: "bg-success-light text-success",
+      bad_review_held: "bg-warning-light text-warning",
     };
     return (
-      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${colors[status] ?? "bg-gray-100 text-gray-500"}`}>
+      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${colors[status] ?? "bg-neutral-100 text-neutral-500"}`}>
         {status.replace(/_/g, " ")}
       </span>
     );
@@ -213,23 +213,23 @@ export default function ReviewsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Reviews</h1>
-          <p className="text-gray-500">AI-powered review automation</p>
+          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Reviews</h1>
+          <p className="text-neutral-500">AI-powered review automation</p>
         </div>
         {data && (
           <div className="flex gap-3">
             {data.needs_review > 0 && (
-              <span className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 bg-warning-light text-warning text-xs font-medium rounded-full">
                 {data.needs_review} needs review
               </span>
             )}
             {data.needs_approval > 0 && (
-              <span className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 bg-brand-50 text-brand-600 text-xs font-medium rounded-full">
                 {data.needs_approval} drafts ready
               </span>
             )}
             {data.needs_response > 0 && (
-              <span className="px-3 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 bg-danger-light text-danger text-xs font-medium rounded-full">
                 {data.needs_response} needs response
               </span>
             )}
@@ -238,18 +238,18 @@ export default function ReviewsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex gap-1 border-b border-[var(--border)] mb-6">
         {([["outgoing", "Outgoing Reviews"], ["incoming", "Incoming Reviews"], ["settings", "Settings"]] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+              tab === key ? "border-brand-500 text-brand-500" : "border-transparent text-neutral-500 hover:text-neutral-700"
             }`}
           >
             {label}
             {key === "outgoing" && pendingCount > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full">{pendingCount}</span>
+              <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-warning text-white rounded-full">{pendingCount}</span>
             )}
           </button>
         ))}
@@ -257,7 +257,7 @@ export default function ReviewsPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
         </div>
       ) : (
         <>
@@ -267,28 +267,28 @@ export default function ReviewsPage() {
 
               {/* Pending approval banner */}
               {data.needs_approval > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-amber-600 text-sm font-bold">{data.needs_approval}</span>
+                <div className="bg-warning-light border border-warning/20 rounded-lg p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 bg-warning/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-warning text-sm font-bold">{data.needs_approval}</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-amber-900">
+                    <p className="text-sm font-medium text-neutral-900">
                       {data.needs_approval} review{data.needs_approval !== 1 ? "s" : ""} pending your approval
                     </p>
-                    <p className="text-xs text-amber-600">Review the drafts below and approve or edit before publishing</p>
+                    <p className="text-xs text-warning">Review the drafts below and approve or edit before publishing</p>
                   </div>
                 </div>
               )}
 
-              {/* Draft reviews (shown at TOP with yellow highlight) */}
+              {/* Draft reviews (shown at TOP with warning highlight) */}
               {data.draft_reviews.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Drafts ({data.draft_reviews.length})</h2>
+                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Drafts ({data.draft_reviews.length})</h2>
                   <div className="space-y-3">
                     {data.draft_reviews.map((r: AnyData) => {
                       const isEditing = editingDraftId === r.id;
                       return (
-                        <div key={r.id} className="bg-amber-50 rounded-xl border border-amber-200 p-5">
+                        <div key={r.id} className="bg-warning-light rounded-lg border border-warning/20 p-5">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               {statusBadge(r.status)}
@@ -297,7 +297,7 @@ export default function ReviewsPage() {
                                 onChange={isEditing ? (v) => setEditDraftRating(v) : undefined}
                               />
                             </div>
-                            <span className="text-xs text-gray-400">Booking: {r.booking_id?.slice(0, 8)}</span>
+                            <span className="text-xs text-neutral-400 font-mono">Booking: {r.booking_id?.slice(0, 8)}</span>
                           </div>
 
                           {isEditing ? (
@@ -305,10 +305,10 @@ export default function ReviewsPage() {
                               value={editDraftText}
                               onChange={(e) => setEditDraftText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 text-sm border border-amber-300 rounded-lg mb-4 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                              className="w-full px-3 py-2 text-sm border border-warning/30 rounded-lg mb-4 bg-neutral-0 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
                             />
                           ) : (
-                            <p className="text-sm text-gray-700 mb-4 italic bg-white rounded-lg p-3 border border-amber-100">
+                            <p className="text-sm text-neutral-700 mb-4 italic bg-neutral-0 rounded-lg p-3 border border-neutral-100">
                               &quot;{r.draft_text}&quot;
                             </p>
                           )}
@@ -319,13 +319,13 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => { approveReview(r.id, false, editDraftText, editDraftRating); setEditingDraftId(null); }}
                                   disabled={approvingId === r.id}
-                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
                                 >
                                   {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
                                 <button
                                   onClick={() => setEditingDraftId(null)}
-                                  className="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-900"
+                                  className="px-4 py-2 text-xs font-medium text-neutral-600 hover:text-neutral-900"
                                 >
                                   Cancel
                                 </button>
@@ -335,19 +335,19 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => approveReview(r.id)}
                                   disabled={approvingId === r.id}
-                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
                                 >
                                   {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
                                 <button
                                   onClick={() => { setEditingDraftId(r.id); setEditDraftText(r.draft_text); setEditDraftRating(r.star_rating); }}
-                                  className="px-4 py-2 bg-white text-gray-700 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50"
+                                  className="px-4 py-2 bg-neutral-0 text-neutral-700 text-xs font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => approveReview(r.id, true)}
-                                  className="px-4 py-2 bg-white text-red-600 text-xs font-medium rounded-lg border border-red-200 hover:bg-red-50"
+                                  className="px-4 py-2 bg-neutral-0 text-danger text-xs font-medium rounded-lg border border-danger/20 hover:bg-danger-light"
                                 >
                                   Mark as Bad Review
                                 </button>
@@ -364,23 +364,23 @@ export default function ReviewsPage() {
               {/* Pending bookings needing reviews */}
               {data.pending_bookings.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Needs Review ({data.pending_bookings.length})</h2>
+                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Needs Review ({data.pending_bookings.length})</h2>
                   <div className="space-y-2">
                     {data.pending_bookings.map((b: AnyData) => {
                       const draft = inlineDrafts.get(b.id);
                       return (
                         <div key={b.id}>
-                          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{b.guest_name ?? "Guest"}</p>
-                              <p className="text-xs text-gray-400">
+                              <p className="text-sm font-medium text-neutral-900">{b.guest_name ?? "Guest"}</p>
+                              <p className="text-xs text-neutral-400">
                                 {b.check_in} → {b.check_out} · {b.platform}
                               </p>
                             </div>
                             <button
                               onClick={() => generateReview(b.id)}
                               disabled={generating === b.id}
-                              className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                              className="px-4 py-2 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50"
                             >
                               {generating === b.id ? (
                                 <span className="flex items-center gap-2">
@@ -395,10 +395,10 @@ export default function ReviewsPage() {
                           {draft && (
                             <div
                               ref={(el) => { draftRefs.current.set(b.id, el); }}
-                              className="ml-4 mt-2 bg-blue-50 rounded-xl border border-blue-200 p-5 animate-in"
+                              className="ml-4 mt-2 bg-brand-50 rounded-lg border border-brand-200 p-5 animate-in"
                             >
                               <div className="flex items-center justify-between mb-3">
-                                <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">AI-Generated Draft</p>
+                                <p className="text-xs font-medium text-brand-500 uppercase tracking-wider">AI-Generated Draft</p>
                                 <StarRating
                                   rating={draft.rating}
                                   onChange={(r) => {
@@ -417,7 +417,7 @@ export default function ReviewsPage() {
                                   setInlineDrafts(newDrafts);
                                 }}
                                 rows={4}
-                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg mb-3 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg mb-3 bg-neutral-0 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
                               />
 
                               <div className="flex items-center gap-4 mb-4">
@@ -430,9 +430,9 @@ export default function ReviewsPage() {
                                       newDrafts.set(b.id, { ...draft, recommend: e.target.checked });
                                       setInlineDrafts(newDrafts);
                                     }}
-                                    className="w-4 h-4 rounded text-blue-600"
+                                    className="w-4 h-4 rounded text-brand-500"
                                   />
-                                  <span className="text-gray-700">Recommend guest</span>
+                                  <span className="text-neutral-700">Recommend guest</span>
                                 </label>
                               </div>
 
@@ -440,13 +440,13 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => approveInlineDraft(b.id)}
                                   disabled={approvingId !== null}
-                                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
                                 >
                                   {approvingId ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
                                 <button
                                   onClick={() => dismissInlineDraft(b.id)}
-                                  className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-gray-700"
+                                  className="px-4 py-2 text-xs font-medium text-neutral-500 hover:text-neutral-700"
                                 >
                                   Dismiss
                                 </button>
@@ -463,16 +463,16 @@ export default function ReviewsPage() {
               {/* Scheduled */}
               {data.scheduled_reviews.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Scheduled ({data.scheduled_reviews.length})</h2>
+                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Scheduled ({data.scheduled_reviews.length})</h2>
                   <div className="space-y-2">
                     {data.scheduled_reviews.map((r: AnyData) => (
-                      <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                      <div key={r.id} className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 flex items-center justify-between">
                         <div className="min-w-0 flex-1 mr-4">
-                          <p className="text-sm text-gray-700 truncate">{r.final_text ?? "\u2014"}</p>
-                          <p className="text-xs text-emerald-600 mt-1 font-medium">
+                          <p className="text-sm text-neutral-700 truncate">{r.final_text ?? "\u2014"}</p>
+                          <p className="text-xs text-success mt-1 font-medium">
                             Publishes: {r.scheduled_publish_at ? new Date(r.scheduled_publish_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "\u2014"}
                           </p>
-                          <p className="text-[10px] text-gray-400">You can edit until the publish date</p>
+                          <p className="text-[10px] text-neutral-400">You can edit until the publish date</p>
                         </div>
                         {statusBadge("scheduled")}
                       </div>
@@ -482,7 +482,7 @@ export default function ReviewsPage() {
               )}
 
               {data.pending_bookings.length === 0 && data.draft_reviews.length === 0 && data.scheduled_reviews.length === 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+                <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-12 text-center text-neutral-400 text-sm">
                   No outgoing reviews to manage. Reviews will appear after guests check out.
                 </div>
               )}
@@ -493,40 +493,40 @@ export default function ReviewsPage() {
           {tab === "incoming" && data && (
             <div className="space-y-3">
               {data.incoming_reviews.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+                <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-12 text-center text-neutral-400 text-sm">
                   No incoming reviews yet.
                 </div>
               ) : (
                 data.incoming_reviews.map((r: AnyData) => (
-                  <div key={r.id} className={`bg-white rounded-xl border p-5 ${
-                    (r.incoming_rating ?? 5) < 4 ? "border-red-200" : "border-gray-200"
+                  <div key={r.id} className={`bg-neutral-0 rounded-lg border p-5 ${
+                    (r.incoming_rating ?? 5) < 4 ? "border-danger/30" : "border-[var(--border)]"
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-bold ${(r.incoming_rating ?? 5) < 4 ? "text-red-600" : "text-amber-500"}`}>
+                        <span className={`text-sm font-bold font-mono ${(r.incoming_rating ?? 5) < 4 ? "text-danger" : "text-warning"}`}>
                           {"★".repeat(Math.round(r.incoming_rating ?? 5))}
                         </span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-neutral-400 font-mono">
                           {r.incoming_rating}/5
                         </span>
                       </div>
                       {r.response_sent ? (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700">responded</span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-light text-success">responded</span>
                       ) : (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">needs response</span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-danger-light text-danger">needs response</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 mb-3">{r.incoming_text}</p>
+                    <p className="text-sm text-neutral-700 mb-3">{r.incoming_text}</p>
                     {r.response_draft && (
-                      <div className="bg-blue-50 rounded-lg p-3 mb-3">
-                        <p className="text-[10px] text-blue-500 font-medium mb-1">AI RESPONSE DRAFT</p>
-                        <p className="text-sm text-blue-900">{r.response_draft}</p>
+                      <div className="bg-brand-50 rounded-lg p-3 mb-3">
+                        <p className="text-[10px] text-brand-500 font-medium mb-1">AI RESPONSE DRAFT</p>
+                        <p className="text-sm text-neutral-800">{r.response_draft}</p>
                       </div>
                     )}
                     {!r.response_sent && (
                       <button
                         onClick={() => respondToReview(r.id)}
-                        className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
+                        className="px-4 py-2 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600"
                       >
                         {r.response_draft ? "Approve Response" : "Generate & Send Response"}
                       </button>
@@ -539,33 +539,33 @@ export default function ReviewsPage() {
 
           {/* Settings */}
           {tab === "settings" && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-xl">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Review Rules</h2>
+            <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 max-w-xl">
+              <h2 className="text-lg font-semibold text-neutral-800 mb-4">Review Rules</h2>
               <div className="space-y-4">
                 <label className="flex items-center gap-3">
                   <input type="checkbox" checked={ruleForm.auto_publish}
                     onChange={(e) => setRuleForm({ ...ruleForm, auto_publish: e.target.checked })}
-                    className="w-4 h-4 rounded text-blue-600" />
+                    className="w-4 h-4 rounded text-brand-500" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Auto-publish reviews</p>
-                    <p className="text-xs text-gray-400">Post AI reviews without manual approval</p>
+                    <p className="text-sm font-medium text-neutral-900">Auto-publish reviews</p>
+                    <p className="text-xs text-neutral-400">Post AI reviews without manual approval</p>
                   </div>
                 </label>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
                     Publish Delay (days after checkout)
                   </label>
                   <input type="number" value={ruleForm.publish_delay_days} min={1} max={13}
                     onChange={(e) => setRuleForm({ ...ruleForm, publish_delay_days: parseInt(e.target.value) || 3 })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                    className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg text-sm" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tone</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Tone</label>
                   <select value={ruleForm.tone}
                     onChange={(e) => setRuleForm({ ...ruleForm, tone: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                    className="px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-neutral-0">
                     <option value="warm">Warm</option>
                     <option value="professional">Professional</option>
                     <option value="enthusiastic">Enthusiastic</option>
@@ -573,14 +573,14 @@ export default function ReviewsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
                     Target Keywords (comma-separated)
                   </label>
                   <input type="text" value={ruleForm.target_keywords}
                     onChange={(e) => setRuleForm({ ...ruleForm, target_keywords: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
                     placeholder="clean, location, quiet, spacious" />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     These keywords will be naturally woven into AI-generated reviews for Airbnb SEO.
                   </p>
                 </div>
@@ -588,16 +588,16 @@ export default function ReviewsPage() {
                 <label className="flex items-center gap-3">
                   <input type="checkbox" checked={ruleForm.bad_review_delay}
                     onChange={(e) => setRuleForm({ ...ruleForm, bad_review_delay: e.target.checked })}
-                    className="w-4 h-4 rounded text-blue-600" />
+                    className="w-4 h-4 rounded text-brand-500" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Delay bad reviews</p>
-                    <p className="text-xs text-gray-400">Hold negative reviews until the last 2 hours of the 14-day window</p>
+                    <p className="text-sm font-medium text-neutral-900">Delay bad reviews</p>
+                    <p className="text-xs text-neutral-400">Hold negative reviews until the last 2 hours of the 14-day window</p>
                   </div>
                 </label>
 
                 <button
                   onClick={() => saveRules(data?.pending_bookings?.[0]?.property_id ?? "")}
-                  className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
                 >
                   Save Rules
                 </button>

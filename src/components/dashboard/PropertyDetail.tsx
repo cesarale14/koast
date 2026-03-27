@@ -43,7 +43,7 @@ const platformLabels: Record<string, string> = {
 };
 const platformBadgeColors: Record<string, string> = {
   airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700",
-  booking_com: "bg-blue-50 text-blue-700", direct: "bg-emerald-50 text-emerald-700",
+  booking_com: "bg-brand-50 text-brand-700", direct: "bg-emerald-50 text-emerald-700",
 };
 const typeLabels: Record<string, string> = {
   entire_home: "Entire Home", private_room: "Private Room", shared_room: "Shared Room",
@@ -250,7 +250,7 @@ export default function PropertyDetail({
     confirmed: "bg-green-50 text-green-700",
     pending: "bg-amber-50 text-amber-700",
     cancelled: "bg-red-50 text-red-700",
-    completed: "bg-gray-100 text-gray-600",
+    completed: "bg-neutral-100 text-neutral-600",
   };
 
   return (
@@ -259,12 +259,12 @@ export default function PropertyDetail({
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link href="/properties" className="text-sm text-gray-400 hover:text-gray-600">Properties</Link>
-            <span className="text-gray-300">/</span>
+            <Link href="/properties" className="text-sm text-neutral-400 hover:text-neutral-600">Properties</Link>
+            <span className="text-neutral-300">/</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
+          <h1 className="text-xl font-semibold text-neutral-800">{property.name}</h1>
           {(property.city || property.state) && (
-            <p className="text-gray-500 mt-0.5">
+            <p className="text-neutral-500 mt-0.5">
               {[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ")}
             </p>
           )}
@@ -279,24 +279,24 @@ export default function PropertyDetail({
           { label: "Revenue", value: stats.revenue > 0 ? `$${stats.revenue.toLocaleString()}` : "$0", sub: "This month" },
           { label: "Total Bookings", value: stats.totalBookings.toString(), sub: "All time" },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-xs text-gray-400">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">{s.sub}</p>
+          <div key={s.label} className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4">
+            <p className="text-xs text-neutral-400">{s.label}</p>
+            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{s.value}</p>
+            <p className="text-[11px] text-neutral-400 mt-0.5">{s.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex gap-1 border-b border-[var(--border)] mb-6">
         {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-brand-500 text-brand-500"
+                : "border-transparent text-neutral-500 hover:text-neutral-700"
             }`}
           >
             {t}
@@ -307,40 +307,40 @@ export default function PropertyDetail({
       {/* Tab content */}
       {tab === "Overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Property Info</h2>
+          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+            <h2 className="text-lg font-semibold text-neutral-800 mb-4">Property Info</h2>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Type</span>
-                <span className="text-gray-900 font-medium">{typeLabels[property.property_type ?? ""] ?? "\u2014"}</span>
+                <span className="text-neutral-500">Type</span>
+                <span className="text-neutral-800 font-medium">{typeLabels[property.property_type ?? ""] ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Bedrooms</span>
-                <span className="text-gray-900 font-medium">{property.bedrooms ?? "\u2014"}</span>
+                <span className="text-neutral-500">Bedrooms</span>
+                <span className="text-neutral-800 font-medium">{property.bedrooms ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Bathrooms</span>
-                <span className="text-gray-900 font-medium">{property.bathrooms ?? "\u2014"}</span>
+                <span className="text-neutral-500">Bathrooms</span>
+                <span className="text-neutral-800 font-medium">{property.bathrooms ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Max Guests</span>
-                <span className="text-gray-900 font-medium">{property.max_guests ?? "\u2014"}</span>
+                <span className="text-neutral-500">Max Guests</span>
+                <span className="text-neutral-800 font-medium">{property.max_guests ?? "\u2014"}</span>
               </div>
               {property.channex_property_id && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Channex ID</span>
-                  <span className="text-gray-900 font-mono text-xs">{property.channex_property_id}</span>
+                  <span className="text-neutral-500">Channex ID</span>
+                  <span className="text-neutral-800 font-mono text-xs">{property.channex_property_id}</span>
                 </div>
               )}
             </div>
 
             {/* Scenario 1: Full Sync Button */}
             {property.channex_property_id && (
-              <div className="mt-6 pt-4 border-t border-gray-100">
+              <div className="mt-6 pt-4 border-t border-neutral-100">
                 <button
                   onClick={handleFullSync}
                   disabled={syncing}
-                  className="w-full px-4 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2.5 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
                   {syncing ? (
                     <>
@@ -372,23 +372,23 @@ export default function PropertyDetail({
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Connected Platforms</h2>
+          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+            <h2 className="text-lg font-semibold text-neutral-800 mb-4">Connected Platforms</h2>
             {listings.length === 0 ? (
-              <p className="text-sm text-gray-400">No platforms connected yet.</p>
+              <p className="text-sm text-neutral-400">No platforms connected yet.</p>
             ) : (
               <div className="space-y-3">
                 {listings.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div key={l.id} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${platformBadgeColors[l.platform] ?? "bg-gray-100 text-gray-600"}`}>
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${platformBadgeColors[l.platform] ?? "bg-neutral-100 text-neutral-600"}`}>
                         {platformLabels[l.platform] ?? l.platform}
                       </span>
                       {l.platform_listing_id && (
-                        <span className="text-xs text-gray-400 font-mono">{l.platform_listing_id}</span>
+                        <span className="text-xs text-neutral-400 font-mono">{l.platform_listing_id}</span>
                       )}
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded ${l.status === "active" ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${l.status === "active" ? "bg-green-50 text-green-600" : "bg-neutral-100 text-neutral-500"}`}>
                       {l.status ?? "active"}
                     </span>
                   </div>
@@ -414,50 +414,50 @@ export default function PropertyDetail({
           <div className="flex justify-end">
             <button
               onClick={() => setShowAddBooking(!showAddBooking)}
-              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
             >
               {showAddBooking ? "Cancel" : "Add Booking"}
             </button>
           </div>
 
           {showAddBooking && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">New Booking</h3>
+            <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+              <h3 className="text-sm font-semibold text-neutral-800 mb-4">New Booking</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Guest Name *</label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name *</label>
                   <input type="text" value={bookingForm.guest_name}
                     onChange={(e) => setBookingForm({ ...bookingForm, guest_name: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
                     placeholder="John Smith" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
                   <input type="number" value={bookingForm.total_price}
                     onChange={(e) => setBookingForm({ ...bookingForm, total_price: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
                     placeholder="500.00" min="0" step="0.01" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Check-in *</label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in *</label>
                   <input type="date" value={bookingForm.check_in}
                     onChange={(e) => setBookingForm({ ...bookingForm, check_in: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Check-out *</label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Check-out *</label>
                   <input type="date" value={bookingForm.check_out}
                     onChange={(e) => setBookingForm({ ...bookingForm, check_out: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
               </div>
               <div className="mt-4 flex gap-3">
                 <button onClick={handleAddBooking} disabled={addingBooking}
-                  className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  className="px-5 py-2 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
                   {addingBooking ? "Creating..." : "Create Booking"}
                 </button>
                 {property.channex_property_id && (
-                  <span className="text-xs text-gray-400 self-center">
+                  <span className="text-xs text-neutral-400 self-center">
                     Channex availability will be automatically updated
                   </span>
                 )}
@@ -466,9 +466,9 @@ export default function PropertyDetail({
           )}
 
           {/* Bookings Table */}
-          <div className="bg-white rounded-xl border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <div className="grid grid-cols-8 text-xs font-medium text-gray-400 uppercase tracking-wider">
+          <div className="bg-neutral-0 rounded-lg border border-[var(--border)]">
+            <div className="px-6 py-4 border-b border-neutral-100">
+              <div className="grid grid-cols-8 text-xs font-medium text-neutral-400 uppercase tracking-wider">
                 <span>Guest</span>
                 <span>Platform</span>
                 <span>Check-in</span>
@@ -480,9 +480,9 @@ export default function PropertyDetail({
               </div>
             </div>
             {bookings.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 text-sm">No bookings yet.</div>
+              <div className="p-12 text-center text-neutral-400 text-sm">No bookings yet.</div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-neutral-50">
                 {bookings.map((b) => {
                   const nights = Math.round(
                     (new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / 86400000
@@ -491,45 +491,45 @@ export default function PropertyDetail({
 
                   if (isEditing) {
                     return (
-                      <div key={b.id} className="px-6 py-3 bg-blue-50 border-l-4 border-blue-500">
+                      <div key={b.id} className="px-6 py-3 bg-brand-50 border-l-4 border-brand-500">
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Guest Name</label>
+                            <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name</label>
                             <input type="text" value={editBookingForm.guest_name}
                               onChange={(e) => setEditBookingForm({ ...editBookingForm, guest_name: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
+                            <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
                             <input type="number" value={editBookingForm.total_price}
                               onChange={(e) => setEditBookingForm({ ...editBookingForm, total_price: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
                               min="0" step="0.01" />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Check-in</label>
+                            <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in</label>
                             <input type="date" value={editBookingForm.check_in}
                               onChange={(e) => setEditBookingForm({ ...editBookingForm, check_in: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Check-out</label>
+                            <label className="block text-xs font-medium text-neutral-600 mb-1">Check-out</label>
                             <input type="date" value={editBookingForm.check_out}
                               onChange={(e) => setEditBookingForm({ ...editBookingForm, check_out: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button onClick={handleEditBooking} disabled={savingBooking}
-                            className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            className="px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
                             {savingBooking ? "Saving..." : "Save Changes"}
                           </button>
                           <button onClick={() => setEditingBooking(null)}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900">
+                            className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-800">
                             Cancel
                           </button>
                           {property.channex_property_id && (
-                            <span className="text-[10px] text-gray-400 self-center ml-2">
+                            <span className="text-[10px] text-neutral-400 self-center ml-2">
                               Old dates restored + new dates blocked in Channex
                             </span>
                           )}
@@ -539,29 +539,29 @@ export default function PropertyDetail({
                   }
 
                   return (
-                    <div key={b.id} className="px-6 py-3 grid grid-cols-8 items-center text-sm group hover:bg-gray-50">
-                      <span className="font-medium text-gray-900">{b.guest_name ?? "\u2014"}</span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${platformBadgeColors[b.platform] ?? "bg-gray-100 text-gray-600"}`}>
+                    <div key={b.id} className="px-6 py-3 grid grid-cols-8 items-center text-sm group hover:bg-neutral-50">
+                      <span className="font-medium text-neutral-800">{b.guest_name ?? "\u2014"}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${platformBadgeColors[b.platform] ?? "bg-neutral-100 text-neutral-600"}`}>
                         {platformLabels[b.platform] ?? b.platform}
                       </span>
-                      <span className="text-gray-600">
+                      <span className="text-neutral-600">
                         {new Date(b.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
-                      <span className="text-gray-600">
+                      <span className="text-neutral-600">
                         {new Date(b.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
-                      <span className="text-gray-600">{nights}</span>
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-neutral-600">{nights}</span>
+                      <span className="text-neutral-800 font-medium font-mono">
                         {b.total_price != null ? `$${Number(b.total_price).toLocaleString()}` : "\u2014"}
                       </span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${statusColors[b.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${statusColors[b.status] ?? "bg-neutral-100 text-neutral-600"}`}>
                         {b.status}
                       </span>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {b.status !== "cancelled" && (
                           <>
                             <button onClick={() => startEditBooking(b)}
-                              className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded">
+                              className="px-2 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 rounded">
                               Edit
                             </button>
                             <button onClick={() => handleCancelBooking(b.id)}
@@ -586,12 +586,12 @@ export default function PropertyDetail({
         {/* Calendar Connections */}
         <CalendarConnections propertyId={property.id} hasChannex={!!property.channex_property_id} />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Property Settings</h2>
+            <h2 className="text-lg font-semibold text-neutral-800">Property Settings</h2>
             {!editing && (
               <button onClick={() => setEditing(true)}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                className="px-4 py-2 text-sm font-medium text-brand-500 hover:bg-brand-50 rounded-lg transition-colors">
                 Edit
               </button>
             )}
@@ -600,61 +600,61 @@ export default function PropertyDetail({
           {editing ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Name</label>
                 <input type="text" value={editForm.name}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Address</label>
                 <input type="text" value={editForm.address}
                   onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                   <input type="text" value={editForm.city}
                     onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                   <input type="text" value={editForm.state}
                     onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                   <input type="text" value={editForm.zip}
                     onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bedrooms</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                   <input type="number" value={editForm.bedrooms}
                     onChange={(e) => setEditForm({ ...editForm, bedrooms: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" min="0" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bathrooms</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Bathrooms</label>
                   <input type="number" value={editForm.bathrooms}
                     onChange={(e) => setEditForm({ ...editForm, bathrooms: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" min="0" step="0.5" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" step="0.5" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Guests</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Max Guests</label>
                   <input type="number" value={editForm.max_guests}
                     onChange={(e) => setEditForm({ ...editForm, max_guests: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" min="1" />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="1" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
                   <select value={editForm.property_type}
                     onChange={(e) => setEditForm({ ...editForm, property_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white">
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none bg-neutral-0">
                     <option value="entire_home">Entire Home</option>
                     <option value="private_room">Private Room</option>
                     <option value="shared_room">Shared Room</option>
@@ -663,11 +663,11 @@ export default function PropertyDetail({
               </div>
               <div className="flex gap-3 pt-4">
                 <button onClick={handleSaveSettings} disabled={saving}
-                  className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button onClick={() => setEditing(false)}
-                  className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                  className="px-5 py-2.5 text-sm font-medium text-neutral-600 hover:text-neutral-800 transition-colors">
                   Cancel
                 </button>
               </div>
@@ -686,8 +686,8 @@ export default function PropertyDetail({
                 ["Type", typeLabels[property.property_type ?? ""]],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-1">
-                  <span className="text-gray-500">{label}</span>
-                  <span className="text-gray-900 font-medium">{value || "\u2014"}</span>
+                  <span className="text-neutral-500">{label}</span>
+                  <span className="text-neutral-800 font-medium">{value || "\u2014"}</span>
                 </div>
               ))}
             </div>
@@ -767,45 +767,45 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const platformIcons: Record<string, string> = { airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700", booking_com: "bg-blue-50 text-blue-700", direct: "bg-emerald-50 text-emerald-700" };
+  const platformIcons: Record<string, string> = { airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700", booking_com: "bg-brand-50 text-brand-700", direct: "bg-emerald-50 text-emerald-700" };
   const platformNames: Record<string, string> = { airbnb: "Airbnb", vrbo: "VRBO", booking_com: "Booking.com", direct: "Direct" };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Calendar Connections</h2>
+        <h2 className="text-lg font-semibold text-neutral-800">Calendar Connections</h2>
         <div className="flex gap-2">
           {feeds.length > 0 && (
             <button onClick={syncAll} disabled={syncing}
-              className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 disabled:opacity-50">
+              className="px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-500 rounded-lg hover:bg-brand-100 disabled:opacity-50">
               {syncing ? "Syncing..." : "Sync All"}
             </button>
           )}
           <button onClick={() => setShowAdd(!showAdd)}
-            className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            className="px-3 py-1.5 text-xs font-medium bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200">
             Add Calendar
           </button>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400">Loading...</p>
+        <p className="text-sm text-neutral-400">Loading...</p>
       ) : feeds.length === 0 && !showAdd ? (
-        <p className="text-sm text-gray-400">No calendars connected. Add an iCal feed to sync bookings.</p>
+        <p className="text-sm text-neutral-400">No calendars connected. Add an iCal feed to sync bookings.</p>
       ) : (
         <div className="space-y-2">
           {feeds.filter((f: {isActive: boolean}) => f.isActive !== false).map((f: {id: string; platform: string; feedUrl: string; lastSynced: string; syncCount: number}) => (
-            <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+            <div key={f.id} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
               <div className="flex items-center gap-3 min-w-0">
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformIcons[f.platform] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformIcons[f.platform] ?? "bg-neutral-100 text-neutral-600"}`}>
                   {platformNames[f.platform] ?? f.platform}
                 </span>
-                <span className="text-xs text-gray-500 truncate max-w-[200px]">{f.feedUrl}</span>
+                <span className="text-xs text-neutral-500 truncate max-w-[200px]">{f.feedUrl}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-gray-400">{timeAgo(f.lastSynced)}</span>
+                <span className="text-[10px] text-neutral-400">{timeAgo(f.lastSynced)}</span>
                 {f.syncCount > 0 && (
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{f.syncCount} syncs</span>
+                  <span className="text-[10px] bg-neutral-100 text-neutral-500 px-1.5 py-0.5 rounded">{f.syncCount} syncs</span>
                 )}
                 <button onClick={() => removeFeed(f.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
               </div>
@@ -815,20 +815,20 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
       )}
 
       {showAdd && (
-        <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+        <div className="mt-4 pt-4 border-t border-neutral-100 space-y-3">
           <div className="flex gap-3">
             <select value={addPlatform} onChange={(e) => setAddPlatform(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+              className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg bg-neutral-0">
               <option value="airbnb">Airbnb</option>
               <option value="vrbo">VRBO</option>
               <option value="booking_com">Booking.com</option>
               <option value="direct">Direct</option>
             </select>
             <input type="url" value={addUrl} onChange={(e) => setAddUrl(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="Paste calendar export URL..." />
             <button onClick={addFeed} disabled={adding || !addUrl}
-              className="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              className="px-4 py-1.5 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
               {adding ? "Adding..." : "Add"}
             </button>
           </div>
@@ -836,8 +836,8 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
       )}
 
       {!hasChannex && feeds.length > 0 && (
-        <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-          <p className="text-xs text-blue-800">
+        <div className="mt-4 p-3 bg-gradient-to-r from-brand-50 to-indigo-50 border border-brand-200 rounded-lg">
+          <p className="text-xs text-brand-800">
             <span className="font-semibold">Upgrade to Pro</span> for automatic rate pushing — your pricing suggestions will sync directly to Airbnb, VRBO, and Booking.com.
           </p>
         </div>
