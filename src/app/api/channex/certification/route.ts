@@ -1,3 +1,4 @@
+// DEV-ONLY: Channex certification/testing endpoint — not for production use
 import { NextRequest, NextResponse } from "next/server";
 import { setupTestProperty, runCertification } from "@/lib/channex/certification";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";

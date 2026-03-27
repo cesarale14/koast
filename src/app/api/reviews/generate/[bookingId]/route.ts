@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { db } from "@/lib/db/pooled";
+import { bookings, properties, reviewRules, guestReviews } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { generateGuestReview, calculatePublishTime } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
 
@@ -14,84 +16,118 @@ export async function POST(
     const { owned } = await verifyBookingOwnership(user.id, params.bookingId);
     if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const supabase = createServiceClient();
-
     // Fetch booking
-    const { data: bookings } = await supabase
-      .from("bookings")
-      .select("id, property_id, guest_name, check_in, check_out, platform")
-      .eq("id", params.bookingId)
+    const [booking] = await db
+      .select({
+        id: bookings.id,
+        propertyId: bookings.propertyId,
+        guestName: bookings.guestName,
+        checkIn: bookings.checkIn,
+        checkOut: bookings.checkOut,
+        platform: bookings.platform,
+      })
+      .from(bookings)
+      .where(eq(bookings.id, params.bookingId))
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const booking = ((bookings ?? []) as any[])[0];
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
     // Fetch property
-    const { data: props } = await supabase
-      .from("properties")
-      .select("name, city, bedrooms, bathrooms")
-      .eq("id", booking.property_id)
+    const [property] = await db
+      .select({
+        name: properties.name,
+        city: properties.city,
+        bedrooms: properties.bedrooms,
+        bathrooms: properties.bathrooms,
+      })
+      .from(properties)
+      .where(eq(properties.id, booking.propertyId))
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const property = ((props ?? []) as any[])[0];
     if (!property) return NextResponse.json({ error: "Property not found" }, { status: 404 });
 
     // Fetch review rules (or use defaults)
-    const { data: rules } = await supabase
-      .from("review_rules")
-      .select("tone, target_keywords, auto_publish, publish_delay_days, bad_review_delay")
-      .eq("property_id", booking.property_id)
-      .eq("is_active", true)
+    const [ruleRow] = await db
+      .select({
+        tone: reviewRules.tone,
+        targetKeywords: reviewRules.targetKeywords,
+        autoPublish: reviewRules.autoPublish,
+        publishDelayDays: reviewRules.publishDelayDays,
+        badReviewDelay: reviewRules.badReviewDelay,
+      })
+      .from(reviewRules)
+      .where(
+        and(
+          eq(reviewRules.propertyId, booking.propertyId),
+          eq(reviewRules.isActive, true)
+        )
+      )
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rule = ((rules ?? []) as any[])[0] ?? {
+
+    const rule = ruleRow ?? {
       tone: "warm",
-      target_keywords: ["clean", "location", "comfortable"],
-      auto_publish: false,
-      publish_delay_days: 3,
-      bad_review_delay: true,
+      targetKeywords: ["clean", "location", "comfortable"],
+      autoPublish: false,
+      publishDelayDays: 3,
+      badReviewDelay: true,
     };
 
     // Generate review
-    const result = await generateGuestReview(booking, property, rule);
-    const publishAt = calculatePublishTime(booking.check_out, rule.publish_delay_days, false, rule.bad_review_delay);
+    const bookingCtx = {
+      guest_name: booking.guestName,
+      check_in: booking.checkIn,
+      check_out: booking.checkOut,
+      platform: booking.platform,
+    };
+    const ruleCtx = {
+      tone: rule.tone ?? "warm",
+      target_keywords: rule.targetKeywords as string[],
+    };
+    const propCtx = {
+      name: property.name,
+      city: property.city,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms ? Number(property.bathrooms) : null,
+    };
+    const result = await generateGuestReview(bookingCtx, propCtx, ruleCtx);
+    const publishAt = calculatePublishTime(booking.checkOut, rule.publishDelayDays ?? 3, false, rule.badReviewDelay ?? true);
 
     // Upsert guest_review
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const reviewTable = supabase.from("guest_reviews") as any;
-    const { data: existing } = await reviewTable
-      .select("id")
-      .eq("booking_id", params.bookingId)
+    const [existing] = await db
+      .select({ id: guestReviews.id })
+      .from(guestReviews)
+      .where(eq(guestReviews.bookingId, params.bookingId))
       .limit(1);
 
     const reviewData = {
-      booking_id: params.bookingId,
-      property_id: booking.property_id,
+      bookingId: params.bookingId,
+      propertyId: booking.propertyId,
       direction: "outgoing",
-      draft_text: result.review_text,
-      private_note: result.private_note,
-      recommend_guest: result.recommended,
-      star_rating: 5,
-      status: rule.auto_publish ? "scheduled" : "draft_generated",
-      scheduled_publish_at: rule.auto_publish ? publishAt.toISOString() : null,
-      ai_context: {
+      draftText: result.review_text,
+      privateNote: result.private_note,
+      recommendGuest: result.recommended,
+      starRating: 5,
+      status: rule.autoPublish ? "scheduled" : "draft_generated",
+      scheduledPublishAt: rule.autoPublish ? publishAt : null,
+      aiContext: {
         tone: rule.tone,
-        keywords: rule.target_keywords,
-        guest: booking.guest_name,
-        nights: Math.round((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000),
+        keywords: rule.targetKeywords,
+        guest: booking.guestName,
+        nights: Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000),
       },
     };
 
     let reviewId: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (existing && (existing as any[]).length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      reviewId = (existing as any[])[0].id;
-      await reviewTable.update(reviewData).eq("id", reviewId);
+    if (existing) {
+      reviewId = existing.id;
+      await db
+        .update(guestReviews)
+        .set(reviewData)
+        .where(eq(guestReviews.id, reviewId));
     } else {
-      const { data: inserted } = await reviewTable.insert(reviewData).select("id");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      reviewId = ((inserted ?? []) as any[])[0]?.id ?? "";
+      const [inserted] = await db
+        .insert(guestReviews)
+        .values(reviewData)
+        .returning({ id: guestReviews.id });
+      reviewId = inserted.id;
     }
 
     return NextResponse.json({
@@ -99,7 +135,7 @@ export async function POST(
       review_text: result.review_text,
       private_note: result.private_note,
       status: reviewData.status,
-      scheduled_publish_at: reviewData.scheduled_publish_at,
+      scheduled_publish_at: reviewData.scheduledPublishAt,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

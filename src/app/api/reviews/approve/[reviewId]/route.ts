@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { db } from "@/lib/db/pooled";
+import { bookings, guestReviews, reviewRules } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { calculatePublishTime } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 
@@ -15,52 +17,59 @@ export async function POST(
     if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await request.json().catch(() => ({}));
-    const supabase = createServiceClient();
 
     // Fetch review
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const reviewTable = supabase.from("guest_reviews") as any;
-    const { data: reviews } = await reviewTable
-      .select("id, booking_id, property_id, draft_text, star_rating, is_bad_review")
-      .eq("id", params.reviewId)
+    const [review] = await db
+      .select({
+        id: guestReviews.id,
+        bookingId: guestReviews.bookingId,
+        propertyId: guestReviews.propertyId,
+        draftText: guestReviews.draftText,
+        starRating: guestReviews.starRating,
+        isBadReview: guestReviews.isBadReview,
+      })
+      .from(guestReviews)
+      .where(eq(guestReviews.id, params.reviewId))
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const review = ((reviews ?? []) as any[])[0];
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
     // Get booking checkout date for scheduling
-    const { data: bookings } = await supabase
-      .from("bookings")
-      .select("check_out")
-      .eq("id", review.booking_id)
+    const [bookingRow] = await db
+      .select({ checkOut: bookings.checkOut })
+      .from(bookings)
+      .where(eq(bookings.id, review.bookingId))
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const checkOut = ((bookings ?? []) as any[])[0]?.check_out;
+    const checkOut = bookingRow?.checkOut;
 
     // Get review rules
-    const { data: rules } = await supabase
-      .from("review_rules")
-      .select("publish_delay_days, bad_review_delay")
-      .eq("property_id", review.property_id)
+    const [ruleRow] = await db
+      .select({
+        publishDelayDays: reviewRules.publishDelayDays,
+        badReviewDelay: reviewRules.badReviewDelay,
+      })
+      .from(reviewRules)
+      .where(eq(reviewRules.propertyId, review.propertyId))
       .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rule = ((rules ?? []) as any[])[0] ?? { publish_delay_days: 3, bad_review_delay: true };
+    const rule = ruleRow ?? { publishDelayDays: 3, badReviewDelay: true };
 
-    const isBad = body.is_bad_review ?? review.is_bad_review ?? false;
-    const finalText = body.final_text ?? review.draft_text;
-    const starRating = body.star_rating ?? review.star_rating;
+    const isBad = body.is_bad_review ?? review.isBadReview ?? false;
+    const finalText = body.final_text ?? review.draftText;
+    const starRating = body.star_rating ?? review.starRating;
 
     const publishAt = checkOut
-      ? calculatePublishTime(checkOut, rule.publish_delay_days, isBad, rule.bad_review_delay)
+      ? calculatePublishTime(checkOut, rule.publishDelayDays ?? 3, isBad, rule.badReviewDelay ?? true)
       : new Date(Date.now() + 3 * 86400000);
 
-    await reviewTable.update({
-      final_text: finalText,
-      star_rating: starRating,
-      is_bad_review: isBad,
-      status: isBad ? "bad_review_held" : "scheduled",
-      scheduled_publish_at: publishAt.toISOString(),
-    }).eq("id", params.reviewId);
+    await db
+      .update(guestReviews)
+      .set({
+        finalText,
+        starRating,
+        isBadReview: isBad,
+        status: isBad ? "bad_review_held" : "scheduled",
+        scheduledPublishAt: publishAt,
+      })
+      .where(eq(guestReviews.id, params.reviewId));
 
     return NextResponse.json({
       status: isBad ? "bad_review_held" : "scheduled",

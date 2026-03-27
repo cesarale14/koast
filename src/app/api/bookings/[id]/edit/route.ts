@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
+import { db } from "@/lib/db/pooled";
+import { bookings, properties } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function PUT(
   request: NextRequest,
@@ -21,62 +23,61 @@ export async function PUT(
       return NextResponse.json({ error: "check_in and check_out required" }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
     // Get existing booking with old dates
-    const { data: existing } = await supabase
-      .from("bookings")
-      .select("id, property_id, check_in, check_out, guest_name, total_price, status")
-      .eq("id", params.id)
-      .single();
+    const [existing] = await db
+      .select({
+        id: bookings.id,
+        propertyId: bookings.propertyId,
+        checkIn: bookings.checkIn,
+        checkOut: bookings.checkOut,
+        guestName: bookings.guestName,
+        totalPrice: bookings.totalPrice,
+        status: bookings.status,
+      })
+      .from(bookings)
+      .where(eq(bookings.id, params.id));
 
     if (!existing) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    const oldCheckIn = existing.check_in;
-    const oldCheckOut = existing.check_out;
+    const oldCheckIn = existing.checkIn;
+    const oldCheckOut = existing.checkOut;
 
-    // Update booking in Supabase
+    // Update booking
     const updateData: Record<string, unknown> = {
-      check_in,
-      check_out,
-      updated_at: new Date().toISOString(),
+      checkIn: check_in,
+      checkOut: check_out,
+      updatedAt: new Date().toISOString(),
     };
-    if (guest_name !== undefined) updateData.guest_name = guest_name;
-    if (total_price !== undefined) updateData.total_price = total_price;
+    if (guest_name !== undefined) updateData.guestName = guest_name;
+    if (total_price !== undefined) updateData.totalPrice = total_price;
 
-    const { data: updated, error: updateError } = await supabase
-      .from("bookings")
-      .update(updateData)
-      .eq("id", params.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
+    const [updated] = await db
+      .update(bookings)
+      .set(updateData)
+      .where(eq(bookings.id, params.id))
+      .returning();
 
     // Update Channex availability: restore old dates, decrease new dates
     let channexResponse = null;
-    const { data: prop } = await supabase
-      .from("properties")
-      .select("channex_property_id")
-      .eq("id", existing.property_id)
-      .single();
+    const [prop] = await db
+      .select({ channexPropertyId: properties.channexPropertyId })
+      .from(properties)
+      .where(eq(properties.id, existing.propertyId));
 
-    if (prop?.channex_property_id) {
+    if (prop?.channexPropertyId) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
+        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
 
         if (roomTypes.length > 0) {
           const rtId = roomTypes[0].id;
           const values = [
             // Restore availability on OLD dates (set to 1 = available)
-            ...buildAvailabilityValues(prop.channex_property_id, rtId, oldCheckIn, oldCheckOut, 1),
+            ...buildAvailabilityValues(prop.channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1),
             // Decrease availability on NEW dates (set to 0 = booked)
-            ...buildAvailabilityValues(prop.channex_property_id, rtId, check_in, check_out, 0),
+            ...buildAvailabilityValues(prop.channexPropertyId, rtId, check_in, check_out, 0),
           ];
 
           channexResponse = await channex.updateAvailability(values);

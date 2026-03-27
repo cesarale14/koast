@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
+import { db } from "@/lib/db/pooled";
+import { bookings, properties } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(
   _request: NextRequest,
@@ -14,14 +16,18 @@ export async function POST(
     const { owned } = await verifyBookingOwnership(user.id, params.id);
     if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const supabase = createServiceClient();
-
     // Get existing booking
-    const { data: existing } = await supabase
-      .from("bookings")
-      .select("id, property_id, check_in, check_out, guest_name, status")
-      .eq("id", params.id)
-      .single();
+    const [existing] = await db
+      .select({
+        id: bookings.id,
+        propertyId: bookings.propertyId,
+        checkIn: bookings.checkIn,
+        checkOut: bookings.checkOut,
+        guestName: bookings.guestName,
+        status: bookings.status,
+      })
+      .from(bookings)
+      .where(eq(bookings.id, params.id));
 
     if (!existing) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -32,44 +38,38 @@ export async function POST(
     }
 
     // Update booking status to cancelled
-    const { data: updated, error: updateError } = await supabase
-      .from("bookings")
-      .update({
+    const [updated] = await db
+      .update(bookings)
+      .set({
         status: "cancelled",
-        updated_at: new Date().toISOString(),
+        updatedAt: new Date(),
       })
-      .eq("id", params.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
+      .where(eq(bookings.id, params.id))
+      .returning();
 
     // Restore Channex availability on all booked dates
     let channexResponse = null;
-    const { data: prop } = await supabase
-      .from("properties")
-      .select("channex_property_id")
-      .eq("id", existing.property_id)
-      .single();
+    const [prop] = await db
+      .select({ channexPropertyId: properties.channexPropertyId })
+      .from(properties)
+      .where(eq(properties.id, existing.propertyId));
 
-    if (prop?.channex_property_id) {
+    if (prop?.channexPropertyId) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
+        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
 
         if (roomTypes.length > 0) {
           const values = buildAvailabilityValues(
-            prop.channex_property_id,
+            prop.channexPropertyId,
             roomTypes[0].id,
-            existing.check_in,
-            existing.check_out,
+            existing.checkIn,
+            existing.checkOut,
             1 // restore to available
           );
 
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/cancel] Channex availability restored for ${existing.check_in} to ${existing.check_out}`);
+          console.log(`[bookings/cancel] Channex availability restored for ${existing.checkIn} to ${existing.checkOut}`);
         }
       } catch (err) {
         console.error("[bookings/cancel] Channex update failed:", err);

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { db } from "@/lib/db/pooled";
+import { properties, bookings } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,50 +20,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
     // Get property with Channex ID
-    const { data: prop } = await supabase
-      .from("properties")
-      .select("id, channex_property_id")
-      .eq("id", property_id)
-      .single();
+    const [prop] = await db
+      .select({ id: properties.id, channexPropertyId: properties.channexPropertyId })
+      .from(properties)
+      .where(eq(properties.id, property_id));
 
     if (!prop) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    // Insert booking into Supabase
-    const { data: booking, error: insertError } = await supabase
-      .from("bookings")
-      .insert({
-        property_id,
-        guest_name,
-        check_in,
-        check_out,
-        total_price: total_price || null,
+    // Insert booking
+    const [booking] = await db
+      .insert(bookings)
+      .values({
+        propertyId: property_id,
+        guestName: guest_name,
+        checkIn: check_in,
+        checkOut: check_out,
+        totalPrice: total_price || null,
         platform: "direct",
         status: "confirmed",
         currency: "USD",
       })
-      .select()
-      .single();
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
+      .returning();
 
     // Update Channex availability if connected
     let channexResponse = null;
-    if (prop.channex_property_id) {
+    if (prop.channexPropertyId) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
+        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
 
         if (roomTypes.length > 0) {
           // Build per-date availability updates (decrease by 1 for each booked date)
           const values = buildAvailabilityValues(
-            prop.channex_property_id,
+            prop.channexPropertyId,
             roomTypes[0].id,
             check_in,
             check_out,

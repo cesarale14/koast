@@ -3,11 +3,15 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { syncMarketData, getApiUsage } from "@/lib/airroi/market-sync";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
+const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 export async function GET(
   _request: Request,
   { params }: { params: { propertyId: string } }
 ) {
   try {
+    if (!isValidUUID(params.propertyId)) return NextResponse.json({ error: "Invalid property ID" }, { status: 400 });
+
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
