@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/nunito-sans";
-import "@fontsource-variable/jetbrains-mono";
+import "@fontsource/dm-mono/400.css";
+import "@fontsource/dm-mono/500.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

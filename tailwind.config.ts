@@ -10,7 +10,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["'Nunito Sans Variable'", "system-ui", "sans-serif"],
-        mono: ["'JetBrains Mono Variable'", "'JetBrains Mono'", "monospace"],
+        mono: ["'DM Mono'", "monospace"],
       },
       colors: {
         background: "var(--background)",
