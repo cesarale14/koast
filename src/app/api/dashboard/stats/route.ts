@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    console.log("[dashboard/stats] AUTH USER:", user.id, user.email);
+
     const body = await request.json().catch(() => ({}));
     const range: TimeRange = body.range || "next_30";
     const { start, end, totalDays } = getDateRange(range);
@@ -75,7 +77,10 @@ export async function POST(request: NextRequest) {
     const { data: properties } = await supabase.from("properties").select("id, name").eq("user_id", user.id);
     const props = (properties ?? []) as { id: string; name: string }[];
 
+    console.log("[dashboard/stats] PROPERTIES FOUND:", props.length, props.map(p => p.name));
+
     if (props.length === 0) {
+      console.log("[dashboard/stats] No properties, returning empty");
       return NextResponse.json({ empty: true });
     }
 
