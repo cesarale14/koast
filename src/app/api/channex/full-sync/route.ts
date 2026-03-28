@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
@@ -10,6 +11,19 @@ export async function POST(request: NextRequest) {
     const { channex_property_id } = await request.json();
     if (!channex_property_id) {
       return NextResponse.json({ error: "channex_property_id required" }, { status: 400 });
+    }
+
+    // Verify the authenticated user owns the property with this channex_property_id
+    const supabase = createServiceClient();
+    const { data: propData } = await supabase
+      .from("properties")
+      .select("id, user_id")
+      .eq("channex_property_id", channex_property_id)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = ((propData ?? []) as any[])[0];
+    if (!prop || prop.user_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const channex = createChannexClient();

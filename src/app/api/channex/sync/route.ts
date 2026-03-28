@@ -13,10 +13,11 @@ export async function POST() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get all properties with channex_property_id
+    // Get only this user's properties with channex_property_id
     const propsRes = await supabase
       .from("properties")
       .select("id, channex_property_id")
+      .eq("user_id", user.id)
       .not("channex_property_id", "is", null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties = (propsRes.data ?? []) as any[];

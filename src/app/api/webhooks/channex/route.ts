@@ -4,11 +4,14 @@ import type { ChannexWebhookPayload } from "@/lib/channex/types";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
+  const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
+
   try {
     const payload: ChannexWebhookPayload = await request.json();
 
     // Validate required webhook fields
     if (!payload.event || !payload.payload) {
+      console.warn(`[webhook] Rejected malformed payload from ${sourceIp}: missing event or payload`);
       return NextResponse.json(
         { status: "error", message: "Missing required fields: event, payload" },
         { status: 400 }
@@ -20,7 +23,7 @@ export async function POST(request: NextRequest) {
     const revisionId = payload.payload?.revision_id;
     const channexPropertyId = payload.property_id;
 
-    console.log(`[webhook] Event: ${event}, booking: ${bookingId}, revision: ${revisionId}, property: ${channexPropertyId}`);
+    console.log(`[webhook] ${new Date().toISOString()} | Event: ${event}, booking: ${bookingId}, revision: ${revisionId}, property: ${channexPropertyId}, ip: ${sourceIp}`);
 
     if (!bookingId) {
       return NextResponse.json({ status: "ok", message: "No booking_id, skipping" });
@@ -32,11 +35,37 @@ export async function POST(request: NextRequest) {
       "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
     ];
     if (!bookingEvents.includes(event)) {
-      console.log(`[webhook] Event ${event} not a booking event, skipping`);
+      console.log(`[webhook] ${new Date().toISOString()} | Event ${event} not a booking event, skipping, ip: ${sourceIp}`);
       return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
     }
 
+    // Validate property_id is present in the payload
+    if (!channexPropertyId) {
+      console.warn(`[webhook] ${new Date().toISOString()} | Rejected: missing property_id in payload, ip: ${sourceIp}`);
+      return NextResponse.json(
+        { status: "error", message: "Missing property_id in webhook payload" },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServiceClient();
+
+    // Verify the property exists in our database before fetching from Channex API
+    const propCheck = await supabase
+      .from("properties")
+      .select("id")
+      .eq("channex_property_id", channexPropertyId)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const verifiedProps = (propCheck.data ?? []) as any[];
+    if (verifiedProps.length === 0) {
+      console.warn(`[webhook] ${new Date().toISOString()} | Rejected: property ${channexPropertyId} not found in DB, ip: ${sourceIp}`);
+      return NextResponse.json(
+        { status: "error", message: `Property ${channexPropertyId} not found` },
+        { status: 404 }
+      );
+    }
+
     const channex = createChannexClient();
 
     // Fetch full booking from Channex API
@@ -44,30 +73,7 @@ export async function POST(request: NextRequest) {
     const booking = await channex.getBooking(bookingId);
     const ba = booking.attributes;
 
-    // Find the property in our DB by channex_property_id
-    const propRes = await supabase
-      .from("properties")
-      .select("id")
-      .eq("channex_property_id", channexPropertyId)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const props = (propRes.data ?? []) as any[];
-
-    if (props.length === 0) {
-      console.log(`[webhook] Property ${channexPropertyId} not in DB, skipping`);
-      // Still acknowledge the revision
-      if (revisionId) {
-        try { await channex.acknowledgeBookingRevision(revisionId); } catch (e) {
-          console.warn(`[webhook] Failed to ack revision ${revisionId}:`, e);
-        }
-      }
-      return NextResponse.json({
-        status: "ok",
-        message: `Property ${channexPropertyId} not found in DB`,
-      });
-    }
-
-    const propertyId = props[0].id;
+    const propertyId = verifiedProps[0].id;
 
     const guestName = ba.customer
       ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ")

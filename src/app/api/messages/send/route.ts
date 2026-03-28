@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getAuthenticatedUser } from "@/lib/auth/api-auth";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +11,11 @@ export async function POST(request: NextRequest) {
 
     if (!propertyId || !content || !platform) {
       return NextResponse.json({ error: "propertyId, platform, and content required" }, { status: 400 });
+    }
+
+    const owned = await verifyPropertyOwnership(user.id, propertyId);
+    if (!owned) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const supabase = createServiceClient();
