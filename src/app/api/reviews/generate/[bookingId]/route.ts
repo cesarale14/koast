@@ -14,7 +14,7 @@ export async function POST(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Debug: log ownership check details
-    const { owned, propertyId: ownershipPropertyId } = await verifyBookingOwnership(user.id, params.bookingId);
+    const { owned, propertyId: _ownershipPropertyId } = await verifyBookingOwnership(user.id, params.bookingId);
     if (!owned) {
       // Fetch booking and property for debug info
       const [debugBooking] = await db
