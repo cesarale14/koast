@@ -10,7 +10,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["'Nunito Sans Variable'", "system-ui", "sans-serif"],
-        mono: ["'IBM Plex Mono'", "monospace"],
+        mono: ["'Nunito Sans Variable'", "system-ui", "sans-serif"],
       },
       colors: {
         background: "var(--background)",

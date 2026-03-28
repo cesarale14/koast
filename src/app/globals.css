@@ -119,9 +119,11 @@ body {
 
 /* Revenue/stat numbers get monospace treatment */
 .font-mono, [data-stat], .stat-value {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Nunito Sans Variable', system-ui, sans-serif;
   font-feature-settings: 'tnum';
-  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  font-weight: 700;
 }
 
 /* Subtle page transitions */
