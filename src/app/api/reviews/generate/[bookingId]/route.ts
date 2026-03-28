@@ -113,7 +113,8 @@ export async function POST(
       bathrooms: property.bathrooms ? Number(property.bathrooms) : null,
     };
     const result = await generateGuestReview(bookingCtx, propCtx, ruleCtx);
-    const publishAt = calculatePublishTime(booking.checkOut, rule.publishDelayDays ?? 3, false, rule.badReviewDelay ?? true);
+    const isBadReview = !result.recommended;
+    const publishAt = calculatePublishTime(booking.checkOut, rule.publishDelayDays ?? 3, isBadReview, rule.badReviewDelay ?? true);
 
     // Upsert guest_review
     const [existing] = await db
