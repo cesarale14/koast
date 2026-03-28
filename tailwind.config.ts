@@ -9,8 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["'Nunito Sans Variable'", "system-ui", "sans-serif"],
-        mono: ["'Nunito Sans Variable'", "system-ui", "sans-serif"],
+        sans: ["'Nunito Variable'", "system-ui", "sans-serif"],
+        mono: ["'Nunito Variable'", "system-ui", "sans-serif"],
       },
       colors: {
         background: "var(--background)",
