@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db/connection";
+import { db } from "@/lib/db/pooled";
 import { icalFeeds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";

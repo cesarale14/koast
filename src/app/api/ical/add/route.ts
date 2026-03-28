@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/connection";
+import { db } from "@/lib/db/pooled";
 import { icalFeeds } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { parseICalFeed, validateICalUrl } from "@/lib/ical/parser";
 import { syncICalFeeds } from "@/lib/ical/sync";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
@@ -47,16 +48,24 @@ export async function POST(request: NextRequest) {
 
     const detectedPlatform = platform ?? detectPlatform(feed_url);
 
-    // Insert feed
-    await db.insert(icalFeeds).values({
-      propertyId: property_id,
-      platform: detectedPlatform,
-      feedUrl: feed_url,
-      isActive: true,
-    }).onConflictDoUpdate({
-      target: [icalFeeds.propertyId, icalFeeds.platform],
-      set: { feedUrl: feed_url, isActive: true, lastError: null },
-    });
+    // Upsert feed — check existing then insert or update
+    const [existing] = await db.select({ id: icalFeeds.id })
+      .from(icalFeeds)
+      .where(and(eq(icalFeeds.propertyId, property_id), eq(icalFeeds.platform, detectedPlatform)))
+      .limit(1);
+
+    if (existing) {
+      await db.update(icalFeeds)
+        .set({ feedUrl: feed_url, isActive: true, lastError: null })
+        .where(eq(icalFeeds.id, existing.id));
+    } else {
+      await db.insert(icalFeeds).values({
+        propertyId: property_id,
+        platform: detectedPlatform,
+        feedUrl: feed_url,
+        isActive: true,
+      });
+    }
 
     // Run initial sync
     const syncResults = await syncICalFeeds(db, property_id);

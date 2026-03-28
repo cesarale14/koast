@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db/connection";
+import { db } from "@/lib/db/pooled";
 import { syncICalFeeds } from "@/lib/ical/sync";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
