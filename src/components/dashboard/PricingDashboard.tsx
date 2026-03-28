@@ -321,12 +321,12 @@ export default function PricingDashboard({
 
   return (
     <div onMouseUp={handleMouseUp}>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-neutral-800 mb-1">Dynamic Pricing</h1>
           <p className="text-neutral-500">AI-powered rate optimization</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {properties.length > 1 && (
             <select
               value={propertyId}
@@ -384,7 +384,7 @@ export default function PricingDashboard({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
           onClick={runEngine}
           disabled={loading === "engine"}

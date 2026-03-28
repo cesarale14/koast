@@ -394,9 +394,9 @@ export default function AnalyticsDashboard({
             const bar = showDash ? { pct: 50, color: "bg-neutral-300", label: "—" } : comparisonBar(metric.yours, metric.market);
             return (
               <div key={metric.label}>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1 gap-1">
                   <span className="text-sm text-neutral-600">{metric.label}</span>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm flex-wrap">
                     {showDash ? (
                       <span className="font-mono text-neutral-400">—</span>
                     ) : (

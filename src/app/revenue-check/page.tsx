@@ -193,18 +193,18 @@ export default function RevenueCheckPage() {
           {/* Rate comparison */}
           <div className="bg-neutral-0 border border-[var(--border)] rounded-lg shadow-md p-8 mb-6">
             <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-6">Your Rate vs Market</h3>
-            <div className="flex items-end justify-center gap-8 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center">
-                <div className="text-4xl font-bold font-mono text-neutral-900">${result.your_rate}</div>
-                <div className="text-sm text-neutral-500 mt-1">Your Rate</div>
+                <div className="text-2xl sm:text-4xl font-bold font-mono text-neutral-900">${result.your_rate}</div>
+                <div className="text-xs sm:text-sm text-neutral-500 mt-1">Your Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold font-mono text-brand-500">${result.market_adr}</div>
-                <div className="text-sm text-neutral-500 mt-1">Market Average</div>
+                <div className="text-2xl sm:text-4xl font-bold font-mono text-brand-500">${result.market_adr}</div>
+                <div className="text-xs sm:text-sm text-neutral-500 mt-1">Market Avg</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold font-mono text-emerald-500">${result.top_performers}</div>
-                <div className="text-sm text-neutral-500 mt-1">Top Performers</div>
+                <div className="text-2xl sm:text-4xl font-bold font-mono text-emerald-500">${result.top_performers}</div>
+                <div className="text-xs sm:text-sm text-neutral-500 mt-1">Top Perf.</div>
               </div>
             </div>
             {/* Bar visualization */}
