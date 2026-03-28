@@ -119,7 +119,7 @@ body {
 
 /* Revenue/stat numbers get monospace treatment */
 .font-mono, [data-stat], .stat-value {
-  font-family: 'DM Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
   font-feature-settings: 'tnum';
   letter-spacing: -0.02em;
 }
