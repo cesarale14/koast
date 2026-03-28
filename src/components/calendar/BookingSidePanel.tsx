@@ -65,7 +65,7 @@ export default function BookingSidePanel({ booking, onClose }: BookingSidePanelP
           {/* Guest info */}
           <div>
             <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-3">Guest</h3>
-            <p className="text-lg font-semibold text-neutral-800">
+            <p className="text-lg font-bold text-neutral-800">
               {booking.guest_name ?? "Unknown Guest"}
             </p>
             {booking.guest_email && (

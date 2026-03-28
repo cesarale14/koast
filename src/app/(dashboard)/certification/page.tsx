@@ -34,7 +34,7 @@ export default function CertificationPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-xl font-semibold text-neutral-800 mb-1">Channex PMS Certification</h1>
+      <h1 className="text-xl font-bold text-neutral-800 mb-1">Channex PMS Certification</h1>
       <p className="text-neutral-500 mb-6">Run all 14 certification tests</p>
 
       {/* Config display */}

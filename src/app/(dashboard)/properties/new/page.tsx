@@ -181,7 +181,7 @@ export default function AddPropertyPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-xl font-semibold text-neutral-800 mb-1">Add Property</h1>
+      <h1 className="text-xl font-bold text-neutral-800 mb-1">Add Property</h1>
       <p className="text-neutral-500 mb-4">Set up a new rental property</p>
 
       {/* Import from Channex option */}

@@ -84,7 +84,7 @@ export default function DashboardClient() {
   if (loading && !data) {
     return (
       <div>
-        <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dashboard</h1>
+        <h1 className="text-xl font-bold text-neutral-800 mb-1">Dashboard</h1>
         <p className="text-neutral-500 mb-8">Overview of your properties and bookings</p>
         <div className="flex items-center justify-center h-64">
           <div className="text-neutral-400 text-sm">Loading...</div>
@@ -96,7 +96,7 @@ export default function DashboardClient() {
   if (!data) {
     return (
       <div>
-        <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dashboard</h1>
+        <h1 className="text-xl font-bold text-neutral-800 mb-1">Dashboard</h1>
         <p className="text-neutral-500 mb-8">Overview of your properties and bookings</p>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -105,7 +105,7 @@ export default function DashboardClient() {
                 d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-neutral-800 mb-2">No properties yet</h2>
+          <h2 className="text-xl font-bold text-neutral-800 mb-2">No properties yet</h2>
           <p className="text-neutral-500 mb-6 max-w-md mx-auto">
             Add your first property to start tracking bookings, revenue, and occupancy.
           </p>
@@ -126,7 +126,7 @@ export default function DashboardClient() {
       {/* Header with time range selector */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dashboard</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Dashboard</h1>
           <p className="text-neutral-500 text-sm">Overview of your properties and bookings</p>
         </div>
         <div className="flex gap-1 bg-neutral-100 rounded-lg p-1 overflow-x-auto flex-shrink-0">
@@ -190,7 +190,7 @@ export default function DashboardClient() {
         {/* Check-ins today */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-neutral-800">Check-ins Today</h2>
+            <h2 className="text-lg font-bold text-neutral-800">Check-ins Today</h2>
             <span className="text-xs px-2 py-1 rounded-full bg-brand-50 text-brand-500 font-medium font-mono">
               {todayCheckIns.length}
             </span>
@@ -215,7 +215,7 @@ export default function DashboardClient() {
         {/* Check-outs today */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-neutral-800">Check-outs Today</h2>
+            <h2 className="text-lg font-bold text-neutral-800">Check-outs Today</h2>
             <div className="flex items-center gap-3">
               {unreadMsgCount > 0 && (
                 <Link href="/messages"
@@ -262,13 +262,13 @@ export default function DashboardClient() {
 
       {/* Week calendar */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-8">
-        <h2 className="text-lg font-semibold text-neutral-800 mb-4">Next 7 Days</h2>
+        <h2 className="text-lg font-bold text-neutral-800 mb-4">Next 7 Days</h2>
         <WeekCalendar days={days} properties={propertyWeeks} />
       </div>
 
       {/* Revenue chart */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-        <h2 className="text-lg font-semibold text-neutral-800 mb-4">
+        <h2 className="text-lg font-bold text-neutral-800 mb-4">
           Monthly Revenue
           {range === "this_year" && <span className="text-sm font-normal text-neutral-400 ml-2">(12 months)</span>}
           {range === "next_90" && <span className="text-sm font-normal text-neutral-400 ml-2">(3 months)</span>}

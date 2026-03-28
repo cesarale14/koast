@@ -344,7 +344,7 @@ export default function CalendarGrid({
                     <div className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}>
                       {d.toLocaleDateString("en-US", { weekday: "short" })}
                     </div>
-                    <div className={`text-sm font-medium ${isToday ? "text-brand-500" : "text-neutral-700"}`}>
+                    <div className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}>
                       {d.getDate()}
                     </div>
                     {isFirstOfMonth && (

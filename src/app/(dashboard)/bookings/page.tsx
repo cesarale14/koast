@@ -3,7 +3,7 @@ export default function BookingsPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Bookings</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Bookings</h1>
           <p className="text-neutral-500">All reservations across your properties</p>
         </div>
         <div className="flex items-center gap-3">

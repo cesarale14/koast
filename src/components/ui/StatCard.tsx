@@ -42,7 +42,7 @@ export default function StatCard({
       </p>
 
       {/* Value */}
-      <p className="text-2xl font-semibold text-neutral-800 font-mono" data-stat>
+      <p className="text-3xl font-bold text-neutral-800 font-mono tracking-tight" data-stat>
         {value}
       </p>
 

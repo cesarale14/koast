@@ -186,7 +186,7 @@ export default function AnalyticsDashboard({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Analytics</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
           <p className="text-neutral-500">Market analysis and performance metrics</p>
         </div>
         {properties.length > 1 && (
@@ -244,7 +244,7 @@ export default function AnalyticsDashboard({
 
       {/* Your Property vs Market */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
-        <h2 className="text-lg font-semibold text-neutral-900 mb-4">Your Property vs Market</h2>
+        <h2 className="text-lg font-bold text-neutral-900 mb-4">Your Property vs Market</h2>
         <div className="space-y-4">
           {[
             { label: "Avg Daily Rate", yours: propertyStats.avgRate, market: snapshot?.market_adr ?? 0, prefix: "$" },
@@ -257,14 +257,14 @@ export default function AnalyticsDashboard({
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm text-neutral-600">{metric.label}</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="font-semibold font-mono text-neutral-900">
+                    <span className="font-bold font-mono text-neutral-900">
                       {metric.prefix ?? ""}{Math.round(metric.yours)}{metric.suffix ?? ""}
                     </span>
                     <span className="text-neutral-400">vs</span>
                     <span className="font-mono text-neutral-500">
                       {metric.prefix ?? ""}{Math.round(metric.market)}{metric.suffix ?? ""}
                     </span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                       bar.label.startsWith("+") ? "bg-brand-50 text-brand-600" : "bg-danger-light text-danger"
                     }`}>
                       {bar.label}
@@ -283,7 +283,7 @@ export default function AnalyticsDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Scatter plot */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4">ADR vs Occupancy</h2>
+          <h2 className="text-lg font-bold text-neutral-900 mb-4">ADR vs Occupancy</h2>
           {scatterData.length > 1 ? (
             <ResponsiveContainer width="100%" height={300}>
               <ScatterChart margin={{ top: 8, right: 8, bottom: 20, left: 0 }}>
@@ -337,7 +337,7 @@ export default function AnalyticsDashboard({
 
         {/* Revenue opportunity */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4">Revenue Opportunity</h2>
+          <h2 className="text-lg font-bold text-neutral-900 mb-4">Revenue Opportunity</h2>
           <div className="space-y-4">
             <div className="bg-danger-light rounded-lg p-4">
               <p className="text-xs text-red-500 font-medium">Left on the Table (Past)</p>
@@ -357,7 +357,7 @@ export default function AnalyticsDashboard({
 
           {/* Mini pricing calendar */}
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-neutral-700 mb-2">Last 30 Days Performance</h3>
+            <h3 className="text-sm font-bold text-neutral-700 mb-2">Last 30 Days Performance</h3>
             <div className="grid grid-cols-10 gap-1">
               {pricingCalendar.map((r) => {
                 const applied = r.applied_rate ?? r.base_rate ?? 0;
@@ -387,7 +387,7 @@ export default function AnalyticsDashboard({
       {/* Comp Set */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-neutral-900">Comp Set ({comps.length} properties)</h2>
+          <h2 className="text-lg font-bold text-neutral-900">Comp Set ({comps.length} properties)</h2>
           <div className="flex bg-neutral-100 rounded-lg p-0.5">
             <button
               onClick={() => setCompView("table")}
@@ -445,11 +445,11 @@ export default function AnalyticsDashboard({
               <tbody>
                 {/* Your property row */}
                 <tr className="bg-brand-50 border-b border-brand-100">
-                  <td className="py-2.5 px-3 font-semibold text-brand-700">Your Property</td>
+                  <td className="py-2.5 px-3 font-bold text-brand-700">Your Property</td>
                   <td className="py-2.5 px-3 text-brand-700">—</td>
-                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">${Math.round(propertyStats.avgRate)}</td>
-                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">{Math.round(propertyStats.occupancy)}%</td>
-                  <td className="py-2.5 px-3 font-semibold font-mono text-brand-700">${Math.round(propertyStats.revpar)}</td>
+                  <td className="py-2.5 px-3 font-bold font-mono text-brand-700">${Math.round(propertyStats.avgRate)}</td>
+                  <td className="py-2.5 px-3 font-bold font-mono text-brand-700">{Math.round(propertyStats.occupancy)}%</td>
+                  <td className="py-2.5 px-3 font-bold font-mono text-brand-700">${Math.round(propertyStats.revpar)}</td>
                   <td className="py-2.5 px-3 text-brand-400">—</td>
                 </tr>
                 {sortedComps.map((c, i) => {

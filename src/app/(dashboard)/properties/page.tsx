@@ -27,7 +27,7 @@ export default async function PropertiesPage() {
       <div>
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-xl font-semibold text-neutral-800 mb-1">Properties</h1>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Properties</h1>
             <p className="text-neutral-500">Manage your vacation rental properties</p>
           </div>
         </div>
@@ -37,7 +37,7 @@ export default async function PropertiesPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-neutral-800 mb-2">No properties yet</h2>
+          <h2 className="text-xl font-bold text-neutral-800 mb-2">No properties yet</h2>
           <p className="text-neutral-500 mb-6 max-w-md mx-auto">
             Add your first property to start managing bookings, availability, and pricing.
           </p>
@@ -132,7 +132,7 @@ export default async function PropertiesPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Properties</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Properties</h1>
           <p className="text-neutral-500">{properties.length} propert{properties.length === 1 ? "y" : "ies"}</p>
         </div>
         <Link

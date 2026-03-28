@@ -213,7 +213,7 @@ export default function ReviewsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Reviews</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Reviews</h1>
           <p className="text-neutral-500">AI-powered review automation</p>
         </div>
         {data && (

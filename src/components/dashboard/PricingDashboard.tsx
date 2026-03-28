@@ -323,7 +323,7 @@ export default function PricingDashboard({
     <div onMouseUp={handleMouseUp}>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-800 mb-1">Dynamic Pricing</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Dynamic Pricing</h1>
           <p className="text-neutral-500">AI-powered rate optimization</p>
         </div>
         <div className="flex items-center gap-3">
@@ -414,7 +414,7 @@ export default function PricingDashboard({
         {/* Calendar heatmap (2/3 width) */}
         <div className="lg:col-span-2 bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-neutral-800">Rate Calendar</h2>
+            <h2 className="text-lg font-bold text-neutral-800">Rate Calendar</h2>
             {/* Legend */}
             <div className="flex items-center gap-2 text-[10px] text-neutral-400">
               <span>Low</span>
@@ -514,7 +514,7 @@ export default function PricingDashboard({
         <div className="space-y-6">
           {/* Date detail panel */}
           <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-            <h2 className="text-lg font-semibold text-neutral-800 mb-4">
+            <h2 className="text-lg font-bold text-neutral-800 mb-4">
               {selectedDate ? formatDate(selectedDate) : "Select a Date"}
             </h2>
 
@@ -575,7 +575,7 @@ export default function PricingDashboard({
                 {/* Signal breakdown */}
                 {selectedRateEntry.factors && (
                   <div className="pt-4 border-t border-neutral-100">
-                    <h3 className="text-sm font-semibold text-neutral-700 mb-3">Signal Breakdown</h3>
+                    <h3 className="text-sm font-bold text-neutral-700 mb-3">Signal Breakdown</h3>
                     {Object.entries(selectedRateEntry.factors).map(([name, sig]) => (
                       <SignalBar key={name} name={name} score={sig.score} weight={sig.weight} reason={sig.reason} />
                     ))}
@@ -593,28 +593,28 @@ export default function PricingDashboard({
 
           {/* Market context */}
           <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-            <h2 className="text-lg font-semibold text-neutral-800 mb-4">Market Context</h2>
+            <h2 className="text-lg font-bold text-neutral-800 mb-4">Market Context</h2>
             {snapshot ? (
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Market ADR</span>
-                  <span className="font-semibold font-mono text-neutral-800">${Math.round(snapshot.market_adr ?? 0)}</span>
+                  <span className="font-bold font-mono text-neutral-800">${Math.round(snapshot.market_adr ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Market Occupancy</span>
-                  <span className="font-semibold font-mono text-neutral-800">{snapshot.market_occupancy ?? 0}%</span>
+                  <span className="font-bold font-mono text-neutral-800">{snapshot.market_occupancy ?? 0}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Market RevPAR</span>
-                  <span className="font-semibold font-mono text-neutral-800">${Math.round(snapshot.market_revpar ?? 0)}</span>
+                  <span className="font-bold font-mono text-neutral-800">${Math.round(snapshot.market_revpar ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Demand Score</span>
-                  <span className="font-semibold font-mono text-neutral-800">{snapshot.market_demand_score ?? 0}/100</span>
+                  <span className="font-bold font-mono text-neutral-800">{snapshot.market_demand_score ?? 0}/100</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Active Listings</span>
-                  <span className="font-semibold font-mono text-neutral-800">{(snapshot.market_supply ?? 0).toLocaleString()}</span>
+                  <span className="font-bold font-mono text-neutral-800">{(snapshot.market_supply ?? 0).toLocaleString()}</span>
                 </div>
               </div>
             ) : (
@@ -624,7 +624,7 @@ export default function PricingDashboard({
             {/* Comp set */}
             {comps.length > 0 && (
               <div className="mt-6 pt-4 border-t border-neutral-100">
-                <h3 className="text-sm font-semibold text-neutral-700 mb-3">Comp Set ({comps.length})</h3>
+                <h3 className="text-sm font-bold text-neutral-700 mb-3">Comp Set ({comps.length})</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {comps.map((c, i) => (
                     <div key={i} className="flex items-center justify-between py-1.5 border-b border-neutral-50 last:border-0">
@@ -635,7 +635,7 @@ export default function PricingDashboard({
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-semibold font-mono text-neutral-800">${Math.round(c.comp_adr ?? 0)}</p>
+                        <p className="text-xs font-bold font-mono text-neutral-800">${Math.round(c.comp_adr ?? 0)}</p>
                         <p className="text-[10px] text-neutral-400">{c.comp_occupancy ?? 0}% occ</p>
                       </div>
                     </div>

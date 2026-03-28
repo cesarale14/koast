@@ -106,7 +106,7 @@ export default function ImportPage() {
         </Link>
         <span className="text-neutral-300">/</span>
       </div>
-      <h1 className="text-xl font-semibold text-neutral-800 mb-1">Import from Channex</h1>
+      <h1 className="text-xl font-bold text-neutral-800 mb-1">Import from Channex</h1>
       <p className="text-neutral-500 mb-8">
         Import your properties, bookings, and rates from Channex
       </p>

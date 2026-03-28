@@ -262,7 +262,7 @@ export default function PropertyDetail({
             <Link href="/properties" className="text-sm text-neutral-400 hover:text-neutral-600">Properties</Link>
             <span className="text-neutral-300">/</span>
           </div>
-          <h1 className="text-xl font-semibold text-neutral-800">{property.name}</h1>
+          <h1 className="text-xl font-bold text-neutral-800">{property.name}</h1>
           {(property.city || property.state) && (
             <p className="text-neutral-500 mt-0.5">
               {[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ")}
