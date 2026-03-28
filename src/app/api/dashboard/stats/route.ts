@@ -71,19 +71,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Fetch properties
-    const { data: properties } = await supabase.from("properties").select("id, name");
+    // Fetch properties — scoped to authenticated user
+    const { data: properties } = await supabase.from("properties").select("id, name").eq("user_id", user.id);
     const props = (properties ?? []) as { id: string; name: string }[];
 
     if (props.length === 0) {
       return NextResponse.json({ empty: true });
     }
 
-    // Fetch ALL bookings that overlap with the date range
-    // A booking overlaps if: check_in < range_end+1 AND check_out > range_start
+    const propIds = props.map((p) => p.id);
+
+    // Fetch bookings that overlap with the date range — scoped to user's properties
     const { data: rangeBookings } = await supabase
       .from("bookings")
       .select("id, property_id, guest_name, platform, check_in, check_out, total_price, status")
+      .in("property_id", propIds)
       .lt("check_in", addDay(end))
       .gt("check_out", start)
       .in("status", ["confirmed", "completed"]);
@@ -172,6 +174,7 @@ export async function POST(request: NextRequest) {
       const { data: rates } = await supabase
         .from("calendar_rates")
         .select("applied_rate")
+        .in("property_id", propIds)
         .gte("date", start)
         .lte("date", end)
         .not("applied_rate", "is", null);
@@ -190,6 +193,7 @@ export async function POST(request: NextRequest) {
     const { data: todayCIData } = await supabase
       .from("bookings")
       .select("guest_name, property_id, platform, status")
+      .in("property_id", propIds)
       .eq("check_in", today)
       .in("status", ["confirmed", "completed"])
       .limit(10);
@@ -198,6 +202,7 @@ export async function POST(request: NextRequest) {
     const { data: todayCOData } = await supabase
       .from("bookings")
       .select("id, guest_name, property_id, platform")
+      .in("property_id", propIds)
       .eq("check_out", today)
       .in("status", ["confirmed", "completed"])
       .limit(10);
@@ -219,6 +224,7 @@ export async function POST(request: NextRequest) {
     const { count: unreadMsgCount } = await supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
+      .in("property_id", propIds)
       .eq("direction", "inbound")
       .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
@@ -227,6 +233,7 @@ export async function POST(request: NextRequest) {
     const { data: next7Data } = await supabase
       .from("bookings")
       .select("property_id, guest_name, check_in, check_out")
+      .in("property_id", propIds)
       .lte("check_in", next7End)
       .gte("check_out", today)
       .in("status", ["confirmed", "completed"]);
@@ -280,6 +287,7 @@ export async function POST(request: NextRequest) {
         supabase
           .from("bookings")
           .select("total_price, check_in, check_out")
+          .in("property_id", propIds)
           .lt("check_in", addDay(r.end))
           .gt("check_out", r.start)
           .in("status", ["confirmed", "completed"])

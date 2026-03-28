@@ -9,7 +9,7 @@ export async function POST() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const supabase = createServiceClient();
-    const result = await backfillCleaningTasks(supabase);
+    const result = await backfillCleaningTasks(supabase, user.id);
     return NextResponse.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

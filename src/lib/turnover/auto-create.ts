@@ -74,17 +74,31 @@ export async function createCleaningTask(
 
 export async function backfillCleaningTasks(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any
+  supabase: any,
+  userId?: string
 ): Promise<{ created: number; skipped: number }> {
   const today = new Date().toISOString().split("T")[0];
 
-  // Find all confirmed bookings with checkouts from today onwards
-  const { data: bookings } = await supabase
+  // Get user's property IDs if userId provided
+  let propIds: string[] | null = null;
+  if (userId) {
+    const { data: props } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("user_id", userId);
+    propIds = ((props ?? []) as { id: string }[]).map((p) => p.id);
+    if (propIds.length === 0) return { created: 0, skipped: 0 };
+  }
+
+  // Find confirmed bookings with checkouts from today onwards — scoped to user
+  let query = supabase
     .from("bookings")
     .select("id, property_id, check_out")
     .gte("check_out", today)
     .in("status", ["confirmed", "completed"])
     .order("check_out");
+  if (propIds) query = query.in("property_id", propIds);
+  const { data: bookings } = await query;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allBookings = (bookings ?? []) as any[];
 
