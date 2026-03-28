@@ -2,6 +2,8 @@ import { eq, and, sql } from "drizzle-orm";
 import { parseICalFeed } from "./parser";
 import { icalFeeds, bookings, calendarRates } from "@/lib/db/schema";
 import type { ICalBooking } from "./types";
+import { createCleaningTask } from "@/lib/turnover/auto-create";
+import { createServiceClient } from "@/lib/supabase/service";
 
 interface SyncResult {
   feedId: string;
@@ -131,6 +133,19 @@ async function syncFeedBookings(
         notes: entry.description,
       });
       newCount++;
+
+      // Auto-create cleaning task for new booking
+      const supabase = createServiceClient();
+      const [inserted] = await db.select({ id: bookings.id }).from(bookings)
+        .where(and(eq(bookings.propertyId, propertyId), eq(bookings.platformBookingId, entry.uid)))
+        .limit(1);
+      if (inserted) {
+        await createCleaningTask(supabase, {
+          id: inserted.id,
+          property_id: propertyId,
+          check_out: entry.checkOut,
+        });
+      }
     }
   }
 

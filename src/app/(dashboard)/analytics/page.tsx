@@ -55,7 +55,7 @@ export default async function AnalyticsPage() {
   // Fetch market snapshot
   const snapRes = await supabase
     .from("market_snapshots")
-    .select("market_adr, market_occupancy, market_revpar, market_supply, market_demand_score")
+    .select("market_adr, market_occupancy, market_revpar, market_supply, market_demand_score, snapshot_date")
     .eq("property_id", propertyId)
     .order("snapshot_date", { ascending: false })
     .limit(1);
@@ -120,6 +120,8 @@ export default async function AnalyticsPage() {
       propertyStats={{ avgRate, occupancy, revpar }}
       propertyLatLng={propertyLatLng}
       propertyName={properties[0].name}
+      lastUpdated={snapshot?.snapshot_date ?? null}
+      hasRevenueData={avgRate > 0}
     />
   );
 }

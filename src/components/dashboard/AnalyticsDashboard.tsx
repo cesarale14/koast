@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { useToast } from "@/components/ui/Toast";
+import { BarChart3 } from "lucide-react";
 
 const CompMap = dynamic(() => import("./CompMap"), { ssr: false });
 
@@ -61,9 +62,26 @@ interface AnalyticsDashboardProps {
   };
   propertyLatLng: { lat: number; lng: number } | null;
   propertyName: string;
+  lastUpdated: string | null;
+  hasRevenueData: boolean;
 }
 
 // ---------- Helpers ----------
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `${diffD}d ago`;
+  const diffMo = Math.floor(diffD / 30);
+  return `${diffMo}mo ago`;
+}
 
 function demandColor(score: number | null): string {
   if (score == null) return "text-neutral-400";
@@ -104,6 +122,8 @@ export default function AnalyticsDashboard({
   propertyStats,
   propertyLatLng,
   propertyName,
+  lastUpdated,
+  hasRevenueData,
 }: AnalyticsDashboardProps) {
   const { toast } = useToast();
   const [propertyId, setPropertyId] = useState(initialPropertyId);
@@ -182,12 +202,88 @@ export default function AnalyticsDashboard({
     setRefreshing(false);
   }, [propertyId, toast]);
 
+  // 30-day demand calendar data
+  const demandCalendar = useMemo(() => {
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    const overallScore = snapshot?.market_demand_score ?? 50;
+    const days: { date: Date; dayNum: number; dow: number; demandLevel: "high" | "moderate" | "low" }[] = [];
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const dow = d.getDay(); // 0=Sun, 5=Fri, 6=Sat
+      let demandLevel: "high" | "moderate" | "low";
+      if (dow === 5 || dow === 6) {
+        demandLevel = "high";
+      } else if (dow === 4 || dow === 0) {
+        demandLevel = "moderate";
+      } else {
+        // Mon-Wed: use overall market demand score
+        demandLevel = overallScore > 60 ? "high" : overallScore > 30 ? "moderate" : "low";
+      }
+      days.push({ date: d, dayNum: d.getDate(), dow, demandLevel });
+    }
+    return days;
+  }, [snapshot]);
+
+  // Pad demand calendar so first day aligns to its day-of-week column
+  const demandCalendarPadded = useMemo(() => {
+    if (demandCalendar.length === 0) return [];
+    const firstDow = demandCalendar[0].dow;
+    const padding: (null)[] = Array(firstDow).fill(null);
+    return [...padding, ...demandCalendar];
+  }, [demandCalendar]);
+
+  // Empty state: no snapshot AND no comps
+  if (!snapshot && comps.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
+            <p className="text-neutral-500">Market analysis and performance metrics</p>
+          </div>
+          {properties.length > 1 && (
+            <select
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
+            >
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
+          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <BarChart3 className="w-8 h-8 text-brand-500" />
+          </div>
+          <h2 className="text-xl font-bold text-neutral-800 mb-2">Run your first market analysis to see how your property compares</h2>
+          <p className="text-neutral-500 mb-6">We&apos;ll find comparable properties, analyze market rates, and show you where you stand.</p>
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
+          >
+            {refreshing ? "Analyzing..." : "Analyze My Market"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const marketOcc = snapshot?.market_occupancy ?? 0;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
-          <p className="text-neutral-500">Market analysis and performance metrics</p>
+          <p className="text-neutral-500">
+            Market analysis and performance metrics
+            {lastUpdated && <span className="text-xs text-neutral-400 ml-2">Last updated: {timeAgo(lastUpdated)}</span>}
+          </p>
         </div>
         {properties.length > 1 && (
           <select
@@ -242,33 +338,85 @@ export default function AnalyticsDashboard({
         </div>
       </div>
 
+      {/* Occupancy Comparison Highlight */}
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-6">
+            <div>
+              <p className="text-xs text-neutral-400">Your Occupancy</p>
+              <p className="text-2xl font-bold font-mono text-brand-600">{propertyStats.occupancy}%</p>
+            </div>
+            <div className="text-neutral-300 text-lg">|</div>
+            <div>
+              <p className="text-xs text-neutral-400">Market Average</p>
+              <p className="text-2xl font-bold font-mono text-neutral-600">{marketOcc}%</p>
+            </div>
+          </div>
+          {marketOcc > 0 && (
+            <span className={`text-sm font-bold px-3 py-1 rounded-full ${
+              propertyStats.occupancy >= marketOcc ? "bg-brand-50 text-brand-600" : "bg-danger-light text-danger"
+            }`}>
+              {propertyStats.occupancy >= marketOcc
+                ? `+${propertyStats.occupancy - marketOcc}pp above market`
+                : `${propertyStats.occupancy - marketOcc}pp below market`}
+            </span>
+          )}
+        </div>
+        <div className="relative h-3 bg-neutral-100 rounded-full overflow-hidden">
+          <div
+            className="absolute top-0 left-0 h-full bg-brand-500 rounded-full transition-all"
+            style={{ width: `${Math.min(100, propertyStats.occupancy)}%` }}
+          />
+          {marketOcc > 0 && (
+            <div
+              className="absolute top-0 h-full w-0.5 bg-neutral-500"
+              style={{ left: `${Math.min(100, marketOcc)}%` }}
+              title={`Market average: ${marketOcc}%`}
+            />
+          )}
+        </div>
+        <div className="flex justify-between mt-1.5 text-[10px] text-neutral-400">
+          <span>0%</span>
+          <span>100%</span>
+        </div>
+      </div>
+
       {/* Your Property vs Market */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
         <h2 className="text-lg font-bold text-neutral-900 mb-4">Your Property vs Market</h2>
         <div className="space-y-4">
           {[
-            { label: "Avg Daily Rate", yours: propertyStats.avgRate, market: snapshot?.market_adr ?? 0, prefix: "$" },
-            { label: "Occupancy", yours: propertyStats.occupancy, market: snapshot?.market_occupancy ?? 0, suffix: "%" },
-            { label: "RevPAR", yours: propertyStats.revpar, market: snapshot?.market_revpar ?? 0, prefix: "$" },
+            { label: "Avg Daily Rate", yours: propertyStats.avgRate, market: snapshot?.market_adr ?? 0, prefix: "$", isRevenue: true },
+            { label: "Occupancy", yours: propertyStats.occupancy, market: snapshot?.market_occupancy ?? 0, suffix: "%", isRevenue: false },
+            { label: "RevPAR", yours: propertyStats.revpar, market: snapshot?.market_revpar ?? 0, prefix: "$", isRevenue: true },
           ].map((metric) => {
-            const bar = comparisonBar(metric.yours, metric.market);
+            const showDash = !hasRevenueData && metric.isRevenue;
+            const bar = showDash ? { pct: 50, color: "bg-neutral-300", label: "—" } : comparisonBar(metric.yours, metric.market);
             return (
               <div key={metric.label}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm text-neutral-600">{metric.label}</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="font-bold font-mono text-neutral-900">
-                      {metric.prefix ?? ""}{Math.round(metric.yours)}{metric.suffix ?? ""}
-                    </span>
+                    {showDash ? (
+                      <span className="font-mono text-neutral-400">—</span>
+                    ) : (
+                      <span className="font-bold font-mono text-neutral-900">
+                        {metric.prefix ?? ""}{Math.round(metric.yours)}{metric.suffix ?? ""}
+                      </span>
+                    )}
                     <span className="text-neutral-400">vs</span>
                     <span className="font-mono text-neutral-500">
                       {metric.prefix ?? ""}{Math.round(metric.market)}{metric.suffix ?? ""}
                     </span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      bar.label.startsWith("+") ? "bg-brand-50 text-brand-600" : "bg-danger-light text-danger"
-                    }`}>
-                      {bar.label}
-                    </span>
+                    {showDash ? (
+                      <span className="text-[10px] text-neutral-400">Revenue data available with Channex integration</span>
+                    ) : (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        bar.label.startsWith("+") ? "bg-brand-50 text-brand-600" : "bg-danger-light text-danger"
+                      }`}>
+                        {bar.label}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
@@ -338,56 +486,71 @@ export default function AnalyticsDashboard({
         {/* Revenue opportunity */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
           <h2 className="text-lg font-bold text-neutral-900 mb-4">Revenue Opportunity</h2>
-          <div className="space-y-4">
-            <div className="bg-danger-light rounded-lg p-4">
-              <p className="text-xs text-red-500 font-medium">Left on the Table (Past)</p>
-              <p className="text-3xl font-bold font-mono text-red-600 mt-1">${revenueStats.leftOnTable}</p>
-              <p className="text-xs text-red-400 mt-1">
-                Dates where applied rate was below engine suggestion
-              </p>
+          {hasRevenueData ? (
+            <div className="space-y-4">
+              <div className="bg-danger-light rounded-lg p-4">
+                <p className="text-xs text-red-500 font-medium">Left on the Table (Past)</p>
+                <p className="text-3xl font-bold font-mono text-red-600 mt-1">${revenueStats.leftOnTable}</p>
+                <p className="text-xs text-red-400 mt-1">
+                  Dates where applied rate was below engine suggestion
+                </p>
+              </div>
+              <div className="bg-success-light rounded-lg p-4">
+                <p className="text-xs text-emerald-500 font-medium">Potential Upside (Next 90 Days)</p>
+                <p className="text-3xl font-bold font-mono text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
+                <p className="text-xs text-emerald-400 mt-1">
+                  If all pricing suggestions are accepted
+                </p>
+              </div>
             </div>
-            <div className="bg-success-light rounded-lg p-4">
-              <p className="text-xs text-emerald-500 font-medium">Potential Upside (Next 90 Days)</p>
-              <p className="text-3xl font-bold font-mono text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
-              <p className="text-xs text-emerald-400 mt-1">
-                If all pricing suggestions are accepted
-              </p>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center mb-4">
+                <BarChart3 className="w-6 h-6 text-neutral-400" />
+              </div>
+              <p className="text-sm text-neutral-500 mb-1">Connect Channex for revenue tracking</p>
+              <p className="text-xs text-neutral-400">Revenue data will appear here once rate information is available</p>
             </div>
-          </div>
+          )}
 
           {/* Mini pricing calendar */}
-          <div className="mt-6">
-            <h3 className="text-sm font-bold text-neutral-700 mb-2">Last 30 Days Performance</h3>
-            <div className="grid grid-cols-10 gap-1">
-              {pricingCalendar.map((r) => {
-                const applied = r.applied_rate ?? r.base_rate ?? 0;
-                const suggested = r.suggested_rate ?? applied;
-                const status =
-                  applied >= suggested ? "bg-emerald-200" :
-                  applied >= suggested * 0.9 ? "bg-amber-200" :
-                  "bg-red-200";
-                return (
-                  <div
-                    key={r.date}
-                    className={`w-full aspect-square rounded-sm ${status}`}
-                    title={`${r.date}: Applied $${Math.round(applied)} vs Suggested $${Math.round(suggested)} vs Market $${Math.round(compMedianAdr)}`}
-                  />
-                );
-              })}
+          {hasRevenueData && (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-neutral-700 mb-2">Last 30 Days Performance</h3>
+              <div className="grid grid-cols-10 gap-1">
+                {pricingCalendar.map((r) => {
+                  const applied = r.applied_rate ?? r.base_rate ?? 0;
+                  const suggested = r.suggested_rate ?? applied;
+                  const status =
+                    applied >= suggested ? "bg-emerald-200" :
+                    applied >= suggested * 0.9 ? "bg-amber-200" :
+                    "bg-red-200";
+                  return (
+                    <div
+                      key={r.date}
+                      className={`w-full aspect-square rounded-sm ${status}`}
+                      title={`${r.date}: Applied $${Math.round(applied)} vs Suggested $${Math.round(suggested)} vs Market $${Math.round(compMedianAdr)}`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex gap-3 mt-2 text-[10px] text-neutral-400">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-emerald-200" /> At/above suggested</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-amber-200" /> Slightly below</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-red-200" /> Significantly below</div>
+              </div>
             </div>
-            <div className="flex gap-3 mt-2 text-[10px] text-neutral-400">
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-emerald-200" /> At/above suggested</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-amber-200" /> Slightly below</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-red-200" /> Significantly below</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Comp Set */}
-      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-neutral-900">Comp Set ({comps.length} properties)</h2>
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-lg font-bold text-neutral-900">{comps.length} comparable properties</h2>
+            <p className="text-xs text-neutral-400">Similar properties ranked by relevance</p>
+          </div>
           <div className="flex bg-neutral-100 rounded-lg p-0.5">
             <button
               onClick={() => setCompView("table")}
@@ -483,6 +646,44 @@ export default function AnalyticsDashboard({
             </table>
           </div>
         )}
+      </div>
+
+      {/* 30-Day Demand Outlook */}
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+        <h2 className="text-lg font-bold text-neutral-900 mb-4">30-Day Demand Outlook</h2>
+        <div className="grid grid-cols-7 gap-1.5">
+          {/* Day-of-week headers */}
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} className="text-center text-[10px] font-medium text-neutral-400 pb-1">{d}</div>
+          ))}
+          {/* Calendar cells */}
+          {demandCalendarPadded.map((day, i) => {
+            if (day === null) {
+              return <div key={`pad-${i}`} />;
+            }
+            const bgClass =
+              day.demandLevel === "high"
+                ? "bg-brand-100"
+                : day.demandLevel === "moderate"
+                ? "bg-warning-light"
+                : "bg-danger-light";
+            return (
+              <div
+                key={day.date.toISOString()}
+                className={`${bgClass} rounded-md flex items-center justify-center aspect-square text-xs font-medium text-neutral-700`}
+                title={`${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.demandLevel} demand`}
+              >
+                {day.dayNum}
+              </div>
+            );
+          })}
+        </div>
+        {/* Legend */}
+        <div className="flex gap-4 mt-3 text-[10px] text-neutral-400">
+          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-brand-100" /> High demand</div>
+          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-warning-light" /> Moderate</div>
+          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-danger-light" /> Lower demand</div>
+        </div>
       </div>
     </div>
   );

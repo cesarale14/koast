@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { RefreshCw, Copy, ExternalLink, Sparkles } from "lucide-react";
 
 interface Task {
   id: string;
@@ -100,6 +101,55 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     setBackfilling(false);
   }, [toast]);
 
+  const copyCleanerLink = useCallback(async (taskId: string, token: string) => {
+    const url = `${window.location.origin}/clean/${taskId}/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Cleaner link copied to clipboard");
+    } catch {
+      toast("Failed to copy link", "error");
+    }
+  }, [toast]);
+
+  const openCleanerLink = useCallback((taskId: string, token: string) => {
+    const url = `${window.location.origin}/clean/${taskId}/${token}`;
+    window.open(url, "_blank");
+  }, []);
+
+  // Empty state: all columns empty
+  if (tasks.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Turnover Ops</h1>
+            <p className="text-neutral-500">Cleaning schedules and task management</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center max-w-sm">
+            <div className="mx-auto w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
+              <Sparkles className="w-8 h-8 text-neutral-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-neutral-800 mb-2">No upcoming turnovers</h2>
+            <p className="text-sm text-neutral-500 mb-6">
+              Cleaning tasks are automatically created when new bookings sync from your calendar.
+            </p>
+            <button
+              onClick={backfill}
+              disabled={backfilling}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
+              {backfilling ? "Creating..." : "Auto-Create Tasks"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -110,8 +160,9 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         <button
           onClick={backfill}
           disabled={backfilling}
-          className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
         >
+          <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
           {backfilling ? "Creating..." : "Auto-Create Tasks"}
         </button>
       </div>
@@ -198,7 +249,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       {selectedTaskData && (
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setSelectedTask(null)} />
-          <div className="fixed right-0 top-0 h-full w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
             <div className="sticky top-0 bg-neutral-0 border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-neutral-800">Task Details</h2>
               <button onClick={() => setSelectedTask(null)} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg">
@@ -265,13 +316,26 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 </div>
               )}
 
-              {/* Cleaner mobile link */}
+              {/* Cleaner action buttons */}
               {selectedTaskData.cleaner_token && (
-                <div className="bg-neutral-50 rounded-lg p-3">
-                  <p className="text-xs text-neutral-400 mb-1">Cleaner Mobile Link</p>
-                  <p className="text-xs text-brand-500 break-all font-mono">
-                    /clean/{selectedTaskData.id}/{selectedTaskData.cleaner_token}
-                  </p>
+                <div className="space-y-2">
+                  <p className="text-xs text-neutral-400">Cleaner Mobile Page</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => copyCleanerLink(selectedTaskData.id, selectedTaskData.cleaner_token!)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy Cleaner Link
+                    </button>
+                    <button
+                      onClick={() => openCleanerLink(selectedTaskData.id, selectedTaskData.cleaner_token!)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View Checklist
+                    </button>
+                  </div>
                 </div>
               )}
 
