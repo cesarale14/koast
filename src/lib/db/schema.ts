@@ -387,3 +387,47 @@ export const notifications = pgTable("notifications", {
   sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
+
+// ==================== Property Details ====================
+
+export const propertyDetails = pgTable("property_details", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull().unique(),
+  wifiNetwork: text("wifi_network"),
+  wifiPassword: text("wifi_password"),
+  doorCode: text("door_code"),
+  smartLockInstructions: text("smart_lock_instructions"),
+  checkinTime: time("checkin_time").default("15:00"),
+  checkoutTime: time("checkout_time").default("11:00"),
+  parkingInstructions: text("parking_instructions"),
+  houseRules: text("house_rules"),
+  localRecommendations: text("local_recommendations"),
+  emergencyContact: text("emergency_contact"),
+  specialInstructions: text("special_instructions"),
+  customFields: jsonb("custom_fields").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const propertyDetailsRelations = relations(propertyDetails, ({ one }) => ({
+  property: one(properties, { fields: [propertyDetails.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Message Templates ====================
+
+export const messageTemplates = pgTable("message_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  templateType: text("template_type").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  isActive: boolean("is_active").default(true),
+  triggerType: text("trigger_type").notNull(),
+  triggerDaysOffset: integer("trigger_days_offset").default(0),
+  triggerTime: time("trigger_time"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const messageTemplatesRelations = relations(messageTemplates, ({ one }) => ({
+  property: one(properties, { fields: [messageTemplates.propertyId], references: [properties.id] }),
+}));

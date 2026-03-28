@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DollarSign, Percent, TrendingUp, CalendarCheck } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import RevenueChart from "./RevenueChart";
@@ -53,6 +54,7 @@ interface DashboardData {
 }
 
 export default function DashboardClient() {
+  const router = useRouter();
   const [range, setRange] = useState<TimeRange>("next_30");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,26 +96,11 @@ export default function DashboardClient() {
   }
 
   if (!data) {
+    // Redirect new users to onboarding
+    router.push("/onboarding");
     return (
-      <div>
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Dashboard</h1>
-        <p className="text-neutral-500 mb-8">Overview of your properties and bookings</p>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
-          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-neutral-800 mb-2">No properties yet</h2>
-          <p className="text-neutral-500 mb-6 max-w-md mx-auto">
-            Add your first property to start tracking bookings, revenue, and occupancy.
-          </p>
-          <Link href="/properties"
-            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors">
-            Add Your First Property
-          </Link>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-neutral-400 text-sm">Redirecting to setup...</div>
       </div>
     );
   }
