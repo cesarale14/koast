@@ -13,8 +13,33 @@ export async function POST(
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { owned } = await verifyBookingOwnership(user.id, params.bookingId);
-    if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Debug: log ownership check details
+    const { owned, propertyId: ownershipPropertyId } = await verifyBookingOwnership(user.id, params.bookingId);
+    if (!owned) {
+      // Fetch booking and property for debug info
+      const [debugBooking] = await db
+        .select({ propertyId: bookings.propertyId })
+        .from(bookings)
+        .where(eq(bookings.id, params.bookingId))
+        .limit(1);
+      let debugPropertyUserId: string | null = null;
+      if (debugBooking) {
+        const [debugProp] = await db
+          .select({ userId: properties.userId })
+          .from(properties)
+          .where(eq(properties.id, debugBooking.propertyId))
+          .limit(1);
+        debugPropertyUserId = debugProp?.userId ?? null;
+      }
+      console.error("[reviews/generate] Ownership check FAILED", {
+        authenticatedUserId: user.id,
+        bookingId: params.bookingId,
+        bookingPropertyId: debugBooking?.propertyId ?? "booking not found",
+        propertyUserId: debugPropertyUserId,
+        match: user.id === debugPropertyUserId,
+      });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Fetch booking
     const [booking] = await db

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/pooled";
-import { bookings, guestReviews } from "@/lib/db/schema";
+import { bookings, guestReviews, properties } from "@/lib/db/schema";
 import { and, eq, lt, inArray, desc } from "drizzle-orm";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
@@ -11,7 +11,29 @@ export async function GET() {
 
     const today = new Date().toISOString().split("T")[0];
 
+    // Get all property IDs owned by this user
+    const userProperties = await db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(eq(properties.userId, user.id));
+
+    const userPropertyIds = userProperties.map((p) => p.id);
+
+    if (userPropertyIds.length === 0) {
+      return NextResponse.json({
+        needs_review: 0,
+        needs_approval: 0,
+        needs_response: 0,
+        scheduled: 0,
+        pending_bookings: [],
+        draft_reviews: [],
+        incoming_reviews: [],
+        scheduled_reviews: [],
+      });
+    }
+
     // Bookings needing outgoing reviews (checked out, no review exists)
+    // FILTERED by user's properties
     const allBookings = await db
       .select({
         id: bookings.id,
@@ -24,6 +46,7 @@ export async function GET() {
       .from(bookings)
       .where(
         and(
+          inArray(bookings.propertyId, userPropertyIds),
           lt(bookings.checkOut, today),
           inArray(bookings.status, ["confirmed", "completed"])
         )
@@ -44,7 +67,7 @@ export async function GET() {
     const reviewedIds = new Set(existingReviews.map((r) => r.bookingId));
     const pendingBookings = allBookings.filter((b) => !reviewedIds.has(b.id));
 
-    // Reviews needing approval
+    // Reviews needing approval — FILTERED by user's properties
     const drafts = await db
       .select({
         id: guestReviews.id,
@@ -57,10 +80,15 @@ export async function GET() {
         createdAt: guestReviews.createdAt,
       })
       .from(guestReviews)
-      .where(inArray(guestReviews.status, ["draft_generated", "bad_review_held"]))
+      .where(
+        and(
+          inArray(guestReviews.propertyId, userPropertyIds),
+          inArray(guestReviews.status, ["draft_generated", "bad_review_held"])
+        )
+      )
       .orderBy(desc(guestReviews.createdAt));
 
-    // Incoming reviews needing response
+    // Incoming reviews needing response — FILTERED by user's properties
     const incoming = await db
       .select({
         id: guestReviews.id,
@@ -76,13 +104,14 @@ export async function GET() {
       .from(guestReviews)
       .where(
         and(
+          inArray(guestReviews.propertyId, userPropertyIds),
           eq(guestReviews.direction, "incoming"),
           eq(guestReviews.responseSent, false)
         )
       )
       .orderBy(desc(guestReviews.incomingDate));
 
-    // Scheduled reviews
+    // Scheduled reviews — FILTERED by user's properties
     const scheduled = await db
       .select({
         id: guestReviews.id,
@@ -93,7 +122,12 @@ export async function GET() {
         status: guestReviews.status,
       })
       .from(guestReviews)
-      .where(eq(guestReviews.status, "scheduled"))
+      .where(
+        and(
+          inArray(guestReviews.propertyId, userPropertyIds),
+          eq(guestReviews.status, "scheduled")
+        )
+      )
       .orderBy(guestReviews.scheduledPublishAt);
 
     return NextResponse.json({

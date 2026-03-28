@@ -242,7 +242,7 @@ export const reviewRulesRelations = relations(reviewRules, ({ one }) => ({
 
 export const guestReviews = pgTable("guest_reviews", {
   id: uuid("id").primaryKey().defaultRandom(),
-  bookingId: uuid("booking_id").notNull().references(() => bookings.id),
+  bookingId: uuid("booking_id").notNull().references(() => bookings.id).unique(),
   propertyId: uuid("property_id").notNull().references(() => properties.id),
   direction: text("direction"),
   draftText: text("draft_text"),
