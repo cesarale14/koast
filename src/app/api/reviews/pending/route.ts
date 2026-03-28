@@ -34,13 +34,14 @@ export async function GET() {
 
     // Bookings needing outgoing reviews (checked out, no review exists)
     // FILTERED by user's properties
+    // Keys use snake_case to match frontend expectations
     const allBookings = await db
       .select({
         id: bookings.id,
-        propertyId: bookings.propertyId,
-        guestName: bookings.guestName,
-        checkIn: bookings.checkIn,
-        checkOut: bookings.checkOut,
+        property_id: bookings.propertyId,
+        guest_name: bookings.guestName,
+        check_in: bookings.checkIn,
+        check_out: bookings.checkOut,
         platform: bookings.platform,
       })
       .from(bookings)
@@ -59,25 +60,25 @@ export async function GET() {
 
     const existingReviews = bookingIds.length > 0
       ? await db
-          .select({ bookingId: guestReviews.bookingId })
+          .select({ booking_id: guestReviews.bookingId })
           .from(guestReviews)
           .where(inArray(guestReviews.bookingId, bookingIds))
       : [];
 
-    const reviewedIds = new Set(existingReviews.map((r) => r.bookingId));
+    const reviewedIds = new Set(existingReviews.map((r) => r.booking_id));
     const pendingBookings = allBookings.filter((b) => !reviewedIds.has(b.id));
 
     // Reviews needing approval — FILTERED by user's properties
     const drafts = await db
       .select({
         id: guestReviews.id,
-        bookingId: guestReviews.bookingId,
-        propertyId: guestReviews.propertyId,
-        draftText: guestReviews.draftText,
-        starRating: guestReviews.starRating,
+        booking_id: guestReviews.bookingId,
+        property_id: guestReviews.propertyId,
+        draft_text: guestReviews.draftText,
+        star_rating: guestReviews.starRating,
         status: guestReviews.status,
-        isBadReview: guestReviews.isBadReview,
-        createdAt: guestReviews.createdAt,
+        is_bad_review: guestReviews.isBadReview,
+        created_at: guestReviews.createdAt,
       })
       .from(guestReviews)
       .where(
@@ -92,13 +93,13 @@ export async function GET() {
     const incoming = await db
       .select({
         id: guestReviews.id,
-        bookingId: guestReviews.bookingId,
-        propertyId: guestReviews.propertyId,
-        incomingText: guestReviews.incomingText,
-        incomingRating: guestReviews.incomingRating,
-        incomingDate: guestReviews.incomingDate,
-        responseDraft: guestReviews.responseDraft,
-        responseSent: guestReviews.responseSent,
+        booking_id: guestReviews.bookingId,
+        property_id: guestReviews.propertyId,
+        incoming_text: guestReviews.incomingText,
+        incoming_rating: guestReviews.incomingRating,
+        incoming_date: guestReviews.incomingDate,
+        response_draft: guestReviews.responseDraft,
+        response_sent: guestReviews.responseSent,
         status: guestReviews.status,
       })
       .from(guestReviews)
@@ -115,10 +116,10 @@ export async function GET() {
     const scheduled = await db
       .select({
         id: guestReviews.id,
-        bookingId: guestReviews.bookingId,
-        propertyId: guestReviews.propertyId,
-        finalText: guestReviews.finalText,
-        scheduledPublishAt: guestReviews.scheduledPublishAt,
+        booking_id: guestReviews.bookingId,
+        property_id: guestReviews.propertyId,
+        final_text: guestReviews.finalText,
+        scheduled_publish_at: guestReviews.scheduledPublishAt,
         status: guestReviews.status,
       })
       .from(guestReviews)
