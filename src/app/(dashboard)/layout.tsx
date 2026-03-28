@@ -171,9 +171,9 @@ function SidebarContent({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">User</p>
           </div>
-          <button className="text-sidebar-text hover:text-white transition-colors duration-fast">
+          <Link href="/settings" onClick={onNavClick} className="text-sidebar-text hover:text-white transition-colors duration-fast">
             <Settings size={16} strokeWidth={1.5} />
-          </button>
+          </Link>
         </div>
       </div>
     </>
