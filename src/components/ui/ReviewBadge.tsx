@@ -24,7 +24,7 @@ export default function ReviewBadge() {
 
   return (
     <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-brand-500 text-white rounded-full font-medium">
-      {count}
+      {count > 9 ? "9+" : count}
     </span>
   );
 }

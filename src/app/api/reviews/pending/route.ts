@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/pooled";
 import { bookings, guestReviews, properties } from "@/lib/db/schema";
-import { and, eq, lt, inArray, desc } from "drizzle-orm";
+import { and, eq, ne, lt, inArray, desc } from "drizzle-orm";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function GET() {
@@ -49,7 +49,7 @@ export async function GET() {
         and(
           inArray(bookings.propertyId, userPropertyIds),
           lt(bookings.checkOut, today),
-          inArray(bookings.status, ["confirmed", "completed"])
+          ne(bookings.status, "cancelled")
         )
       )
       .orderBy(desc(bookings.checkOut))
@@ -62,7 +62,12 @@ export async function GET() {
       ? await db
           .select({ booking_id: guestReviews.bookingId })
           .from(guestReviews)
-          .where(inArray(guestReviews.bookingId, bookingIds))
+          .where(
+            and(
+              inArray(guestReviews.bookingId, bookingIds),
+              eq(guestReviews.direction, "outgoing")
+            )
+          )
       : [];
 
     const reviewedIds = new Set(existingReviews.map((r) => r.booking_id));
