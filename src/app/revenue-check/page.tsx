@@ -149,7 +149,7 @@ export default function RevenueCheckPage() {
               <button
                 onClick={analyze}
                 disabled={!form.current_rate || !form.city}
-                className="w-full py-4 bg-brand-500 text-white font-semibold rounded-lg shadow-md hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-lg mt-2"
+                className="revenue-check-cta w-full py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-lg mt-2"
               >
                 Analyze My Property
               </button>
@@ -222,7 +222,7 @@ export default function RevenueCheckPage() {
 
           {/* Revenue opportunity */}
           {result.annual_opportunity > 0 && (
-            <div className="bg-brand-50 border border-brand-200 rounded-lg p-8 mb-6 text-center">
+            <div className="card-elevated bg-brand-50 border border-brand-200 rounded-lg p-8 mb-6 text-center">
               <p className="text-sm text-brand-600 font-medium mb-2">ESTIMATED ANNUAL REVENUE OPPORTUNITY</p>
               <p className="text-4xl font-bold font-mono text-brand-500 mb-2">${result.annual_opportunity.toLocaleString()}</p>
               <p className="text-sm text-neutral-500">
@@ -239,7 +239,7 @@ export default function RevenueCheckPage() {
               { label: "Your Percentile", value: result.percentile <= 10 ? "Below avg" : result.percentile >= 75 ? "Top 25%" : `${result.percentile}th` },
               { label: "Active Listings", value: result.active_listings?.toLocaleString() ?? "---" },
             ].map((s) => (
-              <div key={s.label} className="bg-neutral-0 border border-[var(--border)] rounded-lg p-4 text-center">
+              <div key={s.label} className="stat-card relative bg-neutral-0 border border-[var(--border)] rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold font-mono text-neutral-900">{s.value}</p>
                 <p className="text-xs text-neutral-500 mt-1">{s.label}</p>
               </div>
@@ -308,7 +308,7 @@ export default function RevenueCheckPage() {
                 className="flex-1 px-4 py-3 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="you@email.com" />
               <button onClick={captureLead} disabled={!email}
-                className="px-6 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-40 transition-colors">
+                className="btn-primary-3d px-6 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-40">
                 Send Report
               </button>
             </div>
@@ -321,7 +321,7 @@ export default function RevenueCheckPage() {
               StayCommand automatically optimizes your pricing using AI, market data, and local events — so you earn more on every booking.
             </p>
             <Link href="/signup"
-              className="inline-flex px-8 py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 transition-all text-lg shadow-md">
+              className="revenue-check-cta inline-flex px-8 py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 text-lg">
               Start Free
             </Link>
             <div className="flex justify-center gap-8 mt-8 text-sm text-neutral-500">
@@ -348,7 +348,7 @@ export default function RevenueCheckPage() {
           </div>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">Check your email!</h2>
           <p className="text-neutral-500 mb-8">We&apos;ll send your full revenue report shortly.</p>
-          <Link href="/signup" className="inline-flex px-8 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 transition-colors">
+          <Link href="/signup" className="btn-primary-3d inline-flex px-8 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600">
             Create Your Free Account
           </Link>
         </div>

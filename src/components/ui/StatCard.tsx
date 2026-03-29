@@ -25,7 +25,7 @@ export default function StatCard({
         : "bg-neutral-50 text-neutral-400";
 
   return (
-    <div className="relative bg-neutral-0 border border-[var(--border)] rounded-lg p-4 md:p-5">
+    <div className="stat-card relative bg-neutral-0 border border-[var(--border)] rounded-lg p-4 md:p-5">
       {/* Icon */}
       {Icon && (
         <div className="absolute top-4 right-4 md:top-5 md:right-5 text-neutral-200">

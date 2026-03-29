@@ -390,7 +390,7 @@ export default function PricingDashboard({
         <button
           onClick={runEngine}
           disabled={loading === "engine"}
-          className="px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+          className="btn-primary-3d px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
         >
           {loading === "engine" ? "Running..." : "Run Pricing Engine"}
         </button>
@@ -398,7 +398,7 @@ export default function PricingDashboard({
           <button
             onClick={approveAll}
             disabled={loading === "approve"}
-            className="px-4 py-2 bg-neutral-0 text-brand-500 text-sm font-medium rounded-lg border border-brand-500 hover:bg-brand-50 disabled:opacity-50 transition-colors"
+            className="btn-secondary-3d px-4 py-2 bg-neutral-0 text-brand-500 text-sm font-medium rounded-lg border border-brand-500 hover:bg-brand-50 disabled:opacity-50"
           >
             {loading === "approve" ? "Approving..." : `Apply All Suggestions (${stats.needsApproval})`}
           </button>
@@ -407,7 +407,7 @@ export default function PricingDashboard({
           <button
             onClick={pushToOTAs}
             disabled={loading === "push" || isFreePlan}
-            className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-secondary-3d px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading === "push" ? "Pushing..." : "Push to OTAs"}
           </button>
@@ -522,7 +522,7 @@ export default function PricingDashboard({
         {/* Side panel: date detail / market context */}
         <div className="space-y-6">
           {/* Date detail panel */}
-          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+          <div className="card-elevated bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
             <h2 className="text-lg font-bold text-neutral-800 mb-4">
               {selectedDate ? formatDate(selectedDate) : "Select a Date"}
             </h2>
@@ -558,7 +558,7 @@ export default function PricingDashboard({
                         });
                         toast(`Accepted $${Math.round(selectedRateEntry.suggested_rate!)} for ${formatDate(selectedDate!)}`);
                       }}
-                      className="w-full py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
+                      className="btn-primary-3d w-full py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
                     >
                       Accept Suggestion
                     </button>

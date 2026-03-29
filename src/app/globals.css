@@ -171,3 +171,98 @@ body {
   animation: shimmer 1.5s infinite;
   border-radius: var(--radius-md);
 }
+
+/* ---------- 3D Depth System ---------- */
+
+/* Stat cards — elevated with layered shadows */
+.stat-card {
+  box-shadow:
+    0 1px 2px rgba(12,10,9,0.04),
+    0 4px 8px rgba(12,10,9,0.04),
+    0 8px 16px rgba(12,10,9,0.02);
+  transition: all var(--transition-base);
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(12,10,9,0.04),
+    0 8px 16px rgba(12,10,9,0.06),
+    0 16px 32px rgba(12,10,9,0.04);
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  pointer-events: none;
+}
+
+/* Key highlight cards — slightly more depth to draw the eye */
+.card-elevated {
+  box-shadow:
+    0 2px 4px rgba(12,10,9,0.04),
+    0 8px 24px rgba(12,10,9,0.06);
+  transition: all var(--transition-base);
+}
+
+/* Primary buttons — raised with press effect */
+.btn-primary-3d {
+  box-shadow:
+    0 1px 2px rgba(5,150,105,0.3),
+    0 2px 4px rgba(5,150,105,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: all var(--transition-fast);
+}
+.btn-primary-3d:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(5,150,105,0.3),
+    0 4px 8px rgba(5,150,105,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-primary-3d:active:not(:disabled) {
+  transform: translateY(0px);
+  box-shadow:
+    0 1px 2px rgba(5,150,105,0.2),
+    inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Secondary/outlined buttons */
+.btn-secondary-3d {
+  box-shadow: 0 1px 2px rgba(12,10,9,0.05);
+  transition: all var(--transition-fast);
+}
+.btn-secondary-3d:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(12,10,9,0.08);
+}
+.btn-secondary-3d:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(12,10,9,0.08);
+}
+
+/* Revenue check hero CTA — extra tactile */
+.revenue-check-cta {
+  box-shadow:
+    0 2px 4px rgba(5,150,105,0.3),
+    0 4px 12px rgba(5,150,105,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: all var(--transition-base);
+}
+.revenue-check-cta:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 8px rgba(5,150,105,0.3),
+    0 8px 24px rgba(5,150,105,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.revenue-check-cta:active:not(:disabled) {
+  transform: translateY(0px);
+  box-shadow:
+    0 1px 2px rgba(5,150,105,0.2),
+    inset 0 2px 4px rgba(0,0,0,0.1);
+}

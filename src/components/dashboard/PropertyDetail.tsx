@@ -360,7 +360,7 @@ export default function PropertyDetail({
                 <button
                   onClick={handleFullSync}
                   disabled={syncing}
-                  className="w-full px-4 py-2.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  className="btn-primary-3d w-full px-4 py-2.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {syncing ? (
                     <>
@@ -434,7 +434,7 @@ export default function PropertyDetail({
           <div className="flex justify-end">
             <button
               onClick={() => setShowAddBooking(!showAddBooking)}
-              className="px-4 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+              className="btn-primary-3d px-4 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600"
             >
               {showAddBooking ? "Cancel" : "Add Booking"}
             </button>
@@ -473,7 +473,7 @@ export default function PropertyDetail({
               </div>
               <div className="mt-4 flex gap-3">
                 <button onClick={handleAddBooking} disabled={addingBooking}
-                  className="px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+                  className="btn-primary-3d px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
                   {addingBooking ? "Creating..." : "Create Booking"}
                 </button>
                 {property.channex_property_id && (
@@ -543,7 +543,7 @@ export default function PropertyDetail({
                         </div>
                         <div className="flex gap-2">
                           <button onClick={handleEditBooking} disabled={savingBooking}
-                            className="px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
+                            className="btn-primary-3d px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
                             {savingBooking ? "Saving..." : "Save Changes"}
                           </button>
                           <button onClick={() => setEditingBooking(null)}
@@ -702,7 +702,7 @@ export default function PropertyDetail({
               </div>
               <div className="flex gap-3 pt-4">
                 <button onClick={handleSaveSettings} disabled={saving}
-                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+                  className="btn-primary-3d px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50">
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button onClick={() => setEditing(false)}
@@ -867,7 +867,7 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
               className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="Paste calendar export URL..." />
             <button onClick={addFeed} disabled={adding || !addUrl}
-              className="px-4 py-1.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
+              className="btn-primary-3d px-4 py-1.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
               {adding ? "Adding..." : "Add"}
             </button>
           </div>

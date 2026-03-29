@@ -312,7 +312,7 @@ export default function AnalyticsDashboard({
             <button
               onClick={refresh}
               disabled={!propertyLatLng}
-              className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-3d inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Analyze My Market
             </button>
@@ -349,25 +349,25 @@ export default function AnalyticsDashboard({
 
       {/* Market Overview Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+        <div className="stat-card relative bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
           <p className="text-xs text-neutral-400">Market ADR</p>
           <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             ${snapshot?.market_adr != null ? Math.round(snapshot.market_adr) : "—"}
           </p>
         </div>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+        <div className="stat-card relative bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
           <p className="text-xs text-neutral-400">Market Occupancy</p>
           <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             {snapshot?.market_occupancy != null ? `${snapshot.market_occupancy}%` : "—"}
           </p>
         </div>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
+        <div className="stat-card relative bg-neutral-0 rounded-lg border border-[var(--border)] p-5">
           <p className="text-xs text-neutral-400">Market RevPAR</p>
           <p className="text-2xl font-bold font-mono text-neutral-900 mt-1">
             ${snapshot?.market_revpar != null ? Math.round(snapshot.market_revpar) : "—"}
           </p>
         </div>
-        <div className={`rounded-lg border border-[var(--border)] p-5 ${demandBg(snapshot?.market_demand_score ?? null)}`}>
+        <div className={`stat-card relative rounded-lg border border-[var(--border)] p-5 ${demandBg(snapshot?.market_demand_score ?? null)}`}>
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-400">Demand Score</p>
             <button
@@ -388,7 +388,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Occupancy Comparison Highlight */}
-      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5 mb-6">
+      <div className="card-elevated bg-neutral-0 rounded-lg border border-[var(--border)] p-5 mb-6">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             <div>
