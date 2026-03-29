@@ -24,7 +24,7 @@ export default async function CalendarPage() {
     return (
       <div>
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Calendar</h1>
-        <p className="text-neutral-500 mb-8">Multi-property availability calendar</p>
+        <p className="text-sm text-neutral-500 mb-8">Multi-property availability calendar</p>
 
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -33,7 +33,7 @@ export default async function CalendarPage() {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-neutral-800 mb-2">No properties yet</h2>
-          <p className="text-neutral-500 mb-6 max-w-md mx-auto">
+          <p className="text-sm text-neutral-500 mb-6 max-w-md mx-auto">
             Add your first property to see the multi-property calendar view.
           </p>
           <Link
@@ -98,7 +98,7 @@ export default async function CalendarPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Calendar</h1>
-        <p className="text-neutral-500">Multi-property availability calendar</p>
+        <p className="text-sm text-neutral-500">Multi-property availability calendar</p>
       </div>
 
       <CalendarGrid

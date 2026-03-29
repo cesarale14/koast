@@ -61,7 +61,7 @@ export default function CalendarToolbar({
       <select
         value={selectedPropertyId ?? ""}
         onChange={(e) => onPropertyFilter(e.target.value || null)}
-        className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600"
+        className="h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
       >
         <option value="">All Properties</option>
         {properties.map((p) => (
