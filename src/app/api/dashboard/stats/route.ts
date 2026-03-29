@@ -179,7 +179,9 @@ export async function POST(request: NextRequest) {
       avgRate = totalNightsWithPrice > 0 ? Math.round(totalRevenueForRate / totalNightsWithPrice) : 0;
     }
     // Fallback to calendar_rates if no booking prices
+    let avgRateEstimated = false;
     if (avgRate === 0) {
+      avgRateEstimated = true;
       const { data: rates } = await supabase
         .from("calendar_rates")
         .select("applied_rate")
@@ -325,6 +327,7 @@ export async function POST(request: NextRequest) {
         propertiesWithBookings,
         totalProperties: props.length,
         avgRate,
+        avgRateEstimated,
         upcomingCheckIns,
       },
       todayCheckIns,

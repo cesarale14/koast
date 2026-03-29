@@ -37,6 +37,7 @@ interface DashboardData {
     propertiesWithBookings: number;
     totalProperties: number;
     avgRate: number;
+    avgRateEstimated: boolean;
     upcomingCheckIns: number;
   };
   todayCheckIns: { guest_name: string | null; property_id: string; platform: string; status: string }[];
@@ -58,15 +59,18 @@ export default function DashboardClient() {
   const [range, setRange] = useState<TimeRange>("next_30");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   const fetchData = useCallback(async (r: TimeRange) => {
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch("/api/dashboard/stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ range: r }),
       });
+      if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.empty) {
         setData(null);
@@ -74,7 +78,7 @@ export default function DashboardClient() {
         setData(json);
       }
     } catch {
-      // silent fail — keep current data
+      setFetchError(true);
     }
     setLoading(false);
   }, []);
@@ -107,6 +111,11 @@ export default function DashboardClient() {
 
   const { stats, todayCheckIns, todayCheckOuts, cleaningStatuses, unreadMsgCount, days, propertyWeeks, revenueData, properties } = data;
   const propMap = new Map(properties.map((p) => [p.id, p.name]));
+  const [showAllCheckIns, setShowAllCheckIns] = useState(false);
+  const [showAllCheckOuts, setShowAllCheckOuts] = useState(false);
+  const ACTIVITY_LIMIT = 10;
+  const visibleCheckIns = showAllCheckIns ? todayCheckIns : todayCheckIns.slice(0, ACTIVITY_LIMIT);
+  const visibleCheckOuts = showAllCheckOuts ? todayCheckOuts : todayCheckOuts.slice(0, ACTIVITY_LIMIT);
 
   return (
     <div>
@@ -133,6 +142,22 @@ export default function DashboardClient() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {fetchError && data && (
+        <div className="mb-4 flex items-center justify-between px-4 py-3 rounded-lg bg-warning-light border border-warning/20">
+          <p className="text-sm text-warning-dark font-medium" style={{ color: "#92400e" }}>
+            Unable to refresh data. Showing last available data.
+          </p>
+          <button
+            onClick={() => fetchData(range)}
+            className="text-sm font-medium px-3 py-1 rounded-md bg-warning/10 hover:bg-warning/20 transition-colors"
+            style={{ color: "#92400e" }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Loading overlay */}
       <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
 
@@ -158,8 +183,8 @@ export default function DashboardClient() {
         />
         <StatCard
           label="Avg Nightly Rate"
-          value={stats.avgRate > 0 ? formatCurrency(stats.avgRate) : "\u2014"}
-          change={rangeLabels[range]}
+          value={stats.avgRate > 0 ? `${formatCurrency(stats.avgRate)}${stats.avgRateEstimated ? " (estimated)" : ""}` : "\u2014"}
+          change={stats.avgRateEstimated ? "Based on calendar rates" : rangeLabels[range]}
           changeType="neutral"
           icon={TrendingUp}
         />
@@ -186,7 +211,7 @@ export default function DashboardClient() {
             <p className="text-neutral-400 text-sm">No check-ins today.</p>
           ) : (
             <div className="space-y-3">
-              {todayCheckIns.map((b, i) => (
+              {visibleCheckIns.map((b, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-neutral-800">{b.guest_name ?? "Unknown Guest"}</p>
@@ -195,6 +220,14 @@ export default function DashboardClient() {
                   <span className="text-xs px-2 py-0.5 rounded bg-neutral-100 text-neutral-500">{b.platform}</span>
                 </div>
               ))}
+              {todayCheckIns.length > ACTIVITY_LIMIT && !showAllCheckIns && (
+                <button
+                  onClick={() => setShowAllCheckIns(true)}
+                  className="text-sm text-brand-500 hover:text-brand-600 font-medium"
+                >
+                  +{todayCheckIns.length - ACTIVITY_LIMIT} more
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -219,7 +252,7 @@ export default function DashboardClient() {
             <p className="text-neutral-400 text-sm">No check-outs today.</p>
           ) : (
             <div className="space-y-3">
-              {todayCheckOuts.map((b, i) => {
+              {visibleCheckOuts.map((b, i) => {
                 const cleaningStatus = cleaningStatuses[b.id];
                 return (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
@@ -242,6 +275,14 @@ export default function DashboardClient() {
                   </div>
                 );
               })}
+              {todayCheckOuts.length > ACTIVITY_LIMIT && !showAllCheckOuts && (
+                <button
+                  onClick={() => setShowAllCheckOuts(true)}
+                  className="text-sm text-brand-500 hover:text-brand-600 font-medium"
+                >
+                  +{todayCheckOuts.length - ACTIVITY_LIMIT} more
+                </button>
+              )}
             </div>
           )}
         </div>

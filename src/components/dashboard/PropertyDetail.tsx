@@ -484,9 +484,11 @@ export default function PropertyDetail({
             ) : (
               <div className="divide-y divide-neutral-50">
                 {bookings.map((b) => {
-                  const nights = Math.round(
-                    (new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / 86400000
-                  );
+                  const nights = (() => {
+                    const ci = Date.UTC(+b.check_in.slice(0,4), +b.check_in.slice(5,7)-1, +b.check_in.slice(8,10));
+                    const co = Date.UTC(+b.check_out.slice(0,4), +b.check_out.slice(5,7)-1, +b.check_out.slice(8,10));
+                    return Math.round((co - ci) / 86400000);
+                  })();
                   const isEditing = editingBooking === b.id;
 
                   if (isEditing) {

@@ -26,9 +26,11 @@ interface BookingSidePanelProps {
 export default function BookingSidePanel({ booking, onClose }: BookingSidePanelProps) {
   if (!booking) return null;
 
-  const nights = Math.round(
-    (new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000
-  );
+  const nights = (() => {
+    const ci = Date.UTC(+booking.check_in.slice(0,4), +booking.check_in.slice(5,7)-1, +booking.check_in.slice(8,10));
+    const co = Date.UTC(+booking.check_out.slice(0,4), +booking.check_out.slice(5,7)-1, +booking.check_out.slice(8,10));
+    return Math.round((co - ci) / 86400000);
+  })();
 
   const formatDate = (d: string) =>
     new Date(d + "T00:00:00").toLocaleDateString("en-US", {

@@ -35,15 +35,18 @@ export default function PropertyRow({
   const visibleDates = dates.slice(visibleStart, visibleEnd);
 
   // Determine cell coverage for each visible date
-  const getCoverage = (date: string): "full" | "checkin" | "checkout" | "booked" => {
+  const getCoverage = (date: string): "full" | "checkin" | "checkout" | "turnover" | "booked" => {
+    let isCheckIn = false;
+    let isCheckOut = false;
     for (const b of bookings) {
       // Fully inside booking (not check-in or check-out day)
       if (date > b.check_in && date < b.check_out) return "booked";
-      // Check-in day: right half is booked (guest arrives PM)
-      if (date === b.check_in) return "checkin";
-      // Check-out day: left half is booked (guest departs AM)
-      if (date === b.check_out) return "checkout";
+      if (date === b.check_in) isCheckIn = true;
+      if (date === b.check_out) isCheckOut = true;
     }
+    if (isCheckIn && isCheckOut) return "turnover";
+    if (isCheckIn) return "checkin";
+    if (isCheckOut) return "checkout";
     return "full";
   };
 
@@ -63,6 +66,25 @@ export default function PropertyRow({
                 className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0"
                 style={{ position: "absolute", left: `${absIdx * 80}px` }}
               />
+            );
+          }
+
+          // Turnover day: checkout + checkin on same day — split visualization
+          if (coverage === "turnover") {
+            return (
+              <div
+                key={date}
+                className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0 relative overflow-hidden"
+                style={{ position: "absolute", left: `${absIdx * 80}px` }}
+              >
+                {/* Diagonal split line */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(135deg, transparent 48%, var(--neutral-300) 48%, var(--neutral-300) 52%, transparent 52%)",
+                  }}
+                />
+              </div>
             );
           }
 

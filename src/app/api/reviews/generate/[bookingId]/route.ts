@@ -137,7 +137,7 @@ export async function POST(
         tone: rule.tone,
         keywords: rule.targetKeywords,
         guest: booking.guestName,
-        nights: Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000),
+        nights: Math.round((new Date(booking.checkOut + "T00:00:00Z").getTime() - new Date(booking.checkIn + "T00:00:00Z").getTime()) / 86400000),
       },
     };
 

@@ -95,10 +95,10 @@ export default async function PropertiesPage() {
     const propBookings = monthBookings.filter((b) => b.property_id === propId);
     let nights = 0;
     for (const b of propBookings) {
-      const ci = new Date(b.check_in);
-      const co = new Date(b.check_out);
-      const ms = Math.max(ci.getTime(), new Date(monthStart).getTime());
-      const me = Math.min(co.getTime(), new Date(monthEnd).getTime() + 86400000);
+      const ci = new Date(b.check_in + "T00:00:00Z");
+      const co = new Date(b.check_out + "T00:00:00Z");
+      const ms = Math.max(ci.getTime(), new Date(monthStart + "T00:00:00Z").getTime());
+      const me = Math.min(co.getTime(), new Date(monthEnd + "T00:00:00Z").getTime() + 86400000);
       nights += Math.max(0, Math.ceil((me - ms) / 86400000));
     }
     occupancyByProp.set(propId, Math.round((nights / daysInMonth) * 100));

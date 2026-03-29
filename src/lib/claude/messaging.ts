@@ -46,7 +46,7 @@ export async function generateDraft(
 
   const numNights = booking
     ? Math.round(
-        (new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000
+        (new Date(booking.check_out + "T00:00:00Z").getTime() - new Date(booking.check_in + "T00:00:00Z").getTime()) / 86400000
       )
     : null;
 

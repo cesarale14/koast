@@ -30,7 +30,9 @@ interface ResponseResult {
 }
 
 function nights(checkIn: string, checkOut: string): number {
-  return Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000);
+  const ci = Date.UTC(+checkIn.slice(0,4), +checkIn.slice(5,7)-1, +checkIn.slice(8,10));
+  const co = Date.UTC(+checkOut.slice(0,4), +checkOut.slice(5,7)-1, +checkOut.slice(8,10));
+  return Math.round((co - ci) / 86400000);
 }
 
 function getClient(): Anthropic {

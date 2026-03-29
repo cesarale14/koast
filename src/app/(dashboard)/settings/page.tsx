@@ -26,17 +26,21 @@ interface ICalFeed {
 }
 
 interface NotificationPrefs {
-  newBookings: boolean;
-  guestMessages: boolean;
-  cleaningUpdates: boolean;
-  priceAlerts: boolean;
+  email_new_booking: boolean;
+  email_messages: boolean;
+  email_cleaning: boolean;
+  email_price_alerts: boolean;
+  sms_enabled: boolean;
+  push_enabled: boolean;
 }
 
 const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
-  newBookings: true,
-  guestMessages: true,
-  cleaningUpdates: true,
-  priceAlerts: false,
+  email_new_booking: true,
+  email_messages: true,
+  email_cleaning: true,
+  email_price_alerts: false,
+  sms_enabled: false,
+  push_enabled: false,
 };
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -130,20 +134,29 @@ export default function SettingsPage() {
         .from("ical_feeds")
         .select("id, platform, feed_url, last_synced, is_active");
       if (icalData) setFeeds(icalData);
+
+      // Load notification prefs from database
+      try {
+        const res = await fetch("/api/settings/preferences");
+        if (res.ok) {
+          const json = await res.json();
+          setNotifs(json.preferences);
+        }
+      } catch {}
     }
     load();
-
-    // Load notification prefs from localStorage
-    try {
-      const saved = localStorage.getItem("sc_notification_prefs");
-      if (saved) setNotifs(JSON.parse(saved));
-    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveNotifs = (updated: NotificationPrefs) => {
+  const saveNotifs = async (updated: NotificationPrefs) => {
     setNotifs(updated);
-    localStorage.setItem("sc_notification_prefs", JSON.stringify(updated));
+    try {
+      await fetch("/api/settings/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: updated }),
+      });
+    } catch {}
   };
 
   const handleSaveProfile = async () => {
@@ -347,10 +360,10 @@ export default function SettingsPage() {
       <SectionCard icon={Bell} title="Notifications" description="Choose what you get notified about.">
         <div className="space-y-3">
           {([
-            { key: "newBookings" as const, label: "New bookings" },
-            { key: "guestMessages" as const, label: "Guest messages" },
-            { key: "cleaningUpdates" as const, label: "Cleaning task updates" },
-            { key: "priceAlerts" as const, label: "Price alerts" },
+            { key: "email_new_booking" as const, label: "New bookings" },
+            { key: "email_messages" as const, label: "Guest messages" },
+            { key: "email_cleaning" as const, label: "Cleaning task updates" },
+            { key: "email_price_alerts" as const, label: "Price alerts" },
           ]).map((item) => (
             <div key={item.key} className="flex items-center justify-between py-1">
               <span className="text-sm text-neutral-700">{item.label}</span>
@@ -361,9 +374,12 @@ export default function SettingsPage() {
             </div>
           ))}
           <div className="border-t border-[var(--border)] pt-3 space-y-3">
-            {["SMS notifications", "Push notifications"].map((label) => (
-              <div key={label} className="flex items-center justify-between py-1 opacity-50">
-                <span className="text-sm text-neutral-400">{label}</span>
+            {([
+              { key: "sms_enabled" as const, label: "SMS notifications" },
+              { key: "push_enabled" as const, label: "Push notifications" },
+            ]).map((item) => (
+              <div key={item.key} className="flex items-center justify-between py-1 opacity-50">
+                <span className="text-sm text-neutral-400">{item.label}</span>
                 <span className="text-xs font-medium text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">
                   Coming Soon
                 </span>

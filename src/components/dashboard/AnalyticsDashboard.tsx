@@ -179,11 +179,18 @@ export default function AnalyticsDashboard({
     return last30;
   }, [rates, today]);
 
-  // Revenue opportunity
+  // Revenue opportunity — scoped to current month
+  const currentMonthName = new Date().toLocaleDateString("en-US", { month: "long" });
   const revenueStats = useMemo(() => {
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}-01`;
+
     let leftOnTable = 0;
     let opportunityForward = 0;
     for (const r of rates) {
+      if (r.date < monthStart || r.date >= monthEnd) continue;
       const applied = r.applied_rate ?? r.base_rate ?? 0;
       const suggested = r.suggested_rate ?? applied;
       if (suggested > applied) {
@@ -493,18 +500,18 @@ export default function AnalyticsDashboard({
 
         {/* Revenue opportunity */}
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-          <h2 className="text-lg font-bold text-neutral-900 mb-4">Revenue Opportunity</h2>
+          <h2 className="text-lg font-bold text-neutral-900 mb-4">Revenue Opportunity — {currentMonthName}</h2>
           {hasRevenueData ? (
             <div className="space-y-4">
               <div className="bg-danger-light rounded-lg p-4">
-                <p className="text-xs text-red-500 font-medium">Left on the Table (Past)</p>
+                <p className="text-xs text-red-500 font-medium">Left on the Table ({currentMonthName})</p>
                 <p className="text-3xl font-bold font-mono text-red-600 mt-1">${revenueStats.leftOnTable}</p>
                 <p className="text-xs text-red-400 mt-1">
                   Dates where applied rate was below engine suggestion
                 </p>
               </div>
               <div className="bg-success-light rounded-lg p-4">
-                <p className="text-xs text-emerald-500 font-medium">Potential Upside (Next 90 Days)</p>
+                <p className="text-xs text-emerald-500 font-medium">Potential Upside (Rest of {currentMonthName})</p>
                 <p className="text-3xl font-bold font-mono text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
                 <p className="text-xs text-emerald-400 mt-1">
                   If all pricing suggestions are accepted
