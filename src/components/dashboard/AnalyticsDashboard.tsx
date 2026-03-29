@@ -212,13 +212,16 @@ export default function AnalyticsDashboard({
     setRefreshing(true);
     try {
       const res = await fetch(`/api/market/refresh/${propertyId}`, { method: "POST" });
-      if (!res.ok) throw new Error("Refresh failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Refresh failed (${res.status})`);
+      }
       toast("Market data refreshed — loading results…");
       // Hand off loading state to isPending (from useTransition)
       setRefreshing(false);
       startTransition(() => { router.refresh(); });
-    } catch {
-      toast("Refresh failed", "error");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Refresh failed", "error");
       setRefreshing(false);
     }
   }, [propertyId, toast, router]);
@@ -292,10 +295,16 @@ export default function AnalyticsDashboard({
               ? "Finding comparable properties and pulling market data. This may take a moment."
               : "We\u2019ll find comparable properties, analyze market rates, and show you where you stand."}
           </p>
+          {!isLoading && !propertyLatLng && (
+            <p className="text-sm text-warning font-medium mb-4">
+              This property has no location coordinates. Add latitude and longitude in property settings to enable market analysis.
+            </p>
+          )}
           {!isLoading && (
             <button
               onClick={refresh}
-              className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"
+              disabled={!propertyLatLng}
+              className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Analyze My Market
             </button>
