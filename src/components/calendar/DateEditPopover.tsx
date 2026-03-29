@@ -29,8 +29,28 @@ export default function DateEditPopover({
   const [available, setAvailable] = useState(initialRate?.is_available !== false);
   const [minStay, setMinStay] = useState(initialRate?.min_stay ?? 1);
   const [saving, setSaving] = useState(false);
+  const [rateError, setRateError] = useState("");
+
+  const validateRate = (value: string): string => {
+    if (!value) return "";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "Must be a number";
+    if (num <= 0) return "Must be greater than 0";
+    if (num >= 10000) return "Must be less than $10,000";
+    return "";
+  };
+
+  const handleRateChange = (value: string) => {
+    setRate(value);
+    setRateError(validateRate(value));
+  };
 
   const handleSave = () => {
+    const error = validateRate(rate);
+    if (error) {
+      setRateError(error);
+      return;
+    }
     setSaving(true);
     onSave({
       dates,
@@ -75,12 +95,17 @@ export default function DateEditPopover({
             <input
               type="number"
               value={rate}
-              onChange={(e) => setRate(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm font-mono border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+              onChange={(e) => handleRateChange(e.target.value)}
+              className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none ${
+                rateError ? "border-red-400" : "border-[var(--border)]"
+              }`}
               placeholder="0"
               min="0"
               step="1"
             />
+            {rateError && (
+              <p className="text-xs text-red-500 mt-1">{rateError}</p>
+            )}
           </div>
 
           <div>
@@ -116,7 +141,7 @@ export default function DateEditPopover({
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !!rateError}
             className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving..." : "Save"}

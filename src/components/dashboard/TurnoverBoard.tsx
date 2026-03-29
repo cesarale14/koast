@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { RefreshCw, Copy, ExternalLink, Sparkles } from "lucide-react";
 
@@ -42,6 +43,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function TurnoverBoard({ tasks: initialTasks, properties, bookings }: TurnoverBoardProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
@@ -83,10 +85,11 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         t.id === taskId ? { ...t, status: newStatus, completed_at: newStatus === "completed" ? new Date().toISOString() : t.completed_at } : t
       ));
       toast(`Task updated to ${newStatus}`);
+      router.refresh();
     } catch {
       toast("Failed to update", "error");
     }
-  }, [tasks, toast]);
+  }, [tasks, toast, router]);
 
   const backfill = useCallback(async () => {
     setBackfilling(true);
@@ -94,12 +97,12 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       const res = await fetch("/api/turnover/auto-create", { method: "POST" });
       const data = await res.json();
       toast(`Created ${data.created} tasks, ${data.skipped} skipped`);
-      window.location.reload();
+      router.refresh();
     } catch {
       toast("Backfill failed", "error");
     }
     setBackfilling(false);
-  }, [toast]);
+  }, [toast, router]);
 
   const copyCleanerLink = useCallback(async (taskId: string, token: string) => {
     const url = `${window.location.origin}/clean/${taskId}/${token}`;

@@ -304,8 +304,21 @@ export default function CalendarGrid({
           setOffsetWeeks(0);
           if (scrollRef.current) scrollRef.current.scrollLeft = 0;
         }}
-        onPrev={() => setOffsetWeeks((w) => Math.max(0, w - 1))}
-        onNext={() => setOffsetWeeks((w) => Math.min(Math.ceil((totalDays - visibleDayCount) / 7), w + 1))}
+        onPrev={() => {
+          setOffsetWeeks((w) => {
+            const next = Math.max(0, w - 1);
+            if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
+            return next;
+          });
+        }}
+        onNext={() => {
+          setOffsetWeeks((w) => {
+            const maxOffset = Math.max(0, Math.ceil((totalDays - 7) / 7));
+            const next = Math.min(maxOffset, w + 1);
+            if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
+            return next;
+          });
+        }}
         onPropertyFilter={setSelectedPropertyId}
       />
 

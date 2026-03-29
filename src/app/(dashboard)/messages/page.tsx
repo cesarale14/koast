@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import UnifiedInbox from "@/components/dashboard/UnifiedInbox";
+import TemplateManager from "@/components/dashboard/TemplateManager";
+import MessagesPageTabs from "@/components/dashboard/MessagesPageTabs";
 
 export default async function MessagesPage() {
   const supabase = createClient();
@@ -39,13 +41,30 @@ export default async function MessagesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookings = (bookingsRes.data ?? []) as any[];
 
+  // Fetch templates scoped to user's properties
+  const templatesRes = propertyIds.length > 0
+    ? await supabase
+        .from("message_templates")
+        .select("id, property_id, template_type, subject, body, is_active, trigger_type, trigger_days_offset, trigger_time")
+        .in("property_id", propertyIds)
+    : { data: [] };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const templates = (templatesRes.data ?? []) as any[];
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Messages</h1>
-        <p className="text-neutral-500">Unified inbox across all platforms</p>
+        <p className="text-neutral-500">Unified inbox and message templates</p>
       </div>
-      <UnifiedInbox messages={messages} properties={properties} bookings={bookings} />
+      <MessagesPageTabs
+        inboxContent={
+          <UnifiedInbox messages={messages} properties={properties} bookings={bookings} />
+        }
+        templatesContent={
+          <TemplateManager templates={templates} properties={properties} />
+        }
+      />
     </div>
   );
 }

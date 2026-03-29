@@ -304,8 +304,10 @@ export default function OnboardingPage() {
           })) as any
         );
         if (error) throw error;
+        toast("Templates saved!");
+      } else {
+        toast("No templates activated — you can set these up later in Messages");
       }
-      toast("Templates saved!");
       setStep(5);
     } catch (err) {
       console.error(err);
@@ -1071,7 +1073,7 @@ export default function OnboardingPage() {
           Back
         </button>
         <div className="flex items-center gap-3">
-          {step === 2 && (
+          {step === 2 && path === "manual" && (
             <button
               onClick={() => setStep(3)}
               className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
