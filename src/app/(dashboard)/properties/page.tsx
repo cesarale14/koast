@@ -31,7 +31,7 @@ export default async function PropertiesPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-xl font-bold text-neutral-800 mb-1">Properties</h1>
-            <p className="text-neutral-500">Manage your vacation rental properties</p>
+            <p className="text-sm text-neutral-500">Manage your vacation rental properties</p>
           </div>
         </div>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
@@ -46,7 +46,7 @@ export default async function PropertiesPage() {
           </p>
           <Link
             href="/properties/new"
-            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"
           >
             Add Your First Property
           </Link>
@@ -136,11 +136,11 @@ export default async function PropertiesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-xl font-bold text-neutral-800 mb-1">Properties</h1>
-          <p className="text-neutral-500">{properties.length} propert{properties.length === 1 ? "y" : "ies"}</p>
+          <p className="text-sm text-neutral-500">{properties.length} propert{properties.length === 1 ? "y" : "ies"}</p>
         </div>
         <Link
           href="/properties/new"
-          className="px-4 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+          className="px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"
         >
           Add Property
         </Link>
