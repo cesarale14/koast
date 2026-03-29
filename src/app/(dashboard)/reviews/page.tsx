@@ -215,7 +215,7 @@ export default function ReviewsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-neutral-800 mb-1">Reviews</h1>
-          <p className="text-neutral-500">AI-powered review automation</p>
+          <p className="text-sm text-neutral-500">AI-powered review automation</p>
         </div>
         {data && (
           <div className="flex gap-3">
@@ -244,8 +244,8 @@ export default function ReviewsPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === key ? "border-brand-500 text-brand-500" : "border-transparent text-neutral-500 hover:text-neutral-700"
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === key ? "border-brand-500 text-brand-600" : "border-transparent text-neutral-500 hover:text-neutral-700"
             }`}
           >
             {label}
@@ -381,7 +381,7 @@ export default function ReviewsPage() {
                             <button
                               onClick={() => generateReview(b.id)}
                               disabled={generating === b.id}
-                              className="px-4 py-2 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50"
+                              className="px-4 py-2 bg-brand-500 text-white text-xs font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
                             >
                               {generating === b.id ? (
                                 <span className="flex items-center gap-2">
@@ -527,7 +527,7 @@ export default function ReviewsPage() {
                     {!r.response_sent && (
                       <button
                         onClick={() => respondToReview(r.id, !!r.response_draft)}
-                        className="px-4 py-2 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600"
+                        className="px-4 py-2 bg-brand-500 text-white text-xs font-semibold rounded-lg hover:bg-brand-600"
                       >
                         {r.response_draft ? "Approve Response" : "Generate Draft Response"}
                       </button>
@@ -598,7 +598,7 @@ export default function ReviewsPage() {
 
                 <button
                   onClick={() => saveRules(data?.pending_bookings?.[0]?.property_id ?? "")}
-                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
+                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
                 >
                   Save Rules
                 </button>

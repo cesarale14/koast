@@ -303,7 +303,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="h-9 px-4 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50"
+            className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50"
           >
             {savingProfile ? "Saving..." : "Save Profile"}
           </button>
@@ -345,7 +345,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <button
               disabled
-              className="h-9 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg opacity-50 cursor-not-allowed"
+              className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 rounded-lg opacity-50 cursor-not-allowed"
             >
               Upgrade to Pro &mdash; $29/mo
             </button>
