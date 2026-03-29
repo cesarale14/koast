@@ -76,7 +76,7 @@ const TRIGGER_LABELS: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 const inputClass =
-  "w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none text-sm";
+  "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -555,7 +555,7 @@ export default function OnboardingPage() {
           <select
             value={propertyType}
             onChange={(e) => setPropertyType(e.target.value)}
-            className={`${inputClass} bg-neutral-0`}
+            className={inputClass}
           >
             <option value="entire_home">Entire Home</option>
             <option value="private_room">Private Room</option>
