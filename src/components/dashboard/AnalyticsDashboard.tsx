@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useTransition } from "react";
 import dynamic from "next/dynamic";
 import {
   ScatterChart,
@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { useToast } from "@/components/ui/Toast";
+import { useRouter } from "next/navigation";
 import { BarChart3 } from "lucide-react";
 
 const CompMap = dynamic(() => import("./CompMap"), { ssr: false });
@@ -126,8 +127,10 @@ export default function AnalyticsDashboard({
   hasRevenueData,
 }: AnalyticsDashboardProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [propertyId, setPropertyId] = useState(initialPropertyId);
   const [refreshing, setRefreshing] = useState(false);
+  const [, startTransition] = useTransition();
   const [sortKey, setSortKey] = useState<SortKey>("comp_adr");
   const [sortAsc, setSortAsc] = useState(false);
   const [compView, setCompView] = useState<"table" | "map">("table");
@@ -197,10 +200,11 @@ export default function AnalyticsDashboard({
     setRefreshing(true);
     try {
       await fetch(`/api/market/refresh/${propertyId}`, { method: "POST" });
-      toast("Market data refreshed — reload to see updates");
+      toast("Market data refreshed");
+      startTransition(() => { router.refresh(); });
     } catch { toast("Refresh failed", "error"); }
     setRefreshing(false);
-  }, [propertyId, toast]);
+  }, [propertyId, toast, router]);
 
   // 30-day demand calendar data
   const demandCalendar = useMemo(() => {
