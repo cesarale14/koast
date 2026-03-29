@@ -60,6 +60,8 @@ export default function DashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [showAllCheckIns, setShowAllCheckIns] = useState(false);
+  const [showAllCheckOuts, setShowAllCheckOuts] = useState(false);
 
   const fetchData = useCallback(async (r: TimeRange) => {
     setLoading(true);
@@ -111,8 +113,6 @@ export default function DashboardClient() {
 
   const { stats, todayCheckIns, todayCheckOuts, cleaningStatuses, unreadMsgCount, days, propertyWeeks, revenueData, properties } = data;
   const propMap = new Map(properties.map((p) => [p.id, p.name]));
-  const [showAllCheckIns, setShowAllCheckIns] = useState(false);
-  const [showAllCheckOuts, setShowAllCheckOuts] = useState(false);
   const ACTIVITY_LIMIT = 10;
   const visibleCheckIns = showAllCheckIns ? todayCheckIns : todayCheckIns.slice(0, ACTIVITY_LIMIT);
   const visibleCheckOuts = showAllCheckOuts ? todayCheckOuts : todayCheckOuts.slice(0, ACTIVITY_LIMIT);
