@@ -390,7 +390,7 @@ export default function PricingDashboard({
         <button
           onClick={runEngine}
           disabled={loading === "engine"}
-          className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
         >
           {loading === "engine" ? "Running..." : "Run Pricing Engine"}
         </button>
@@ -558,7 +558,7 @@ export default function PricingDashboard({
                         });
                         toast(`Accepted $${Math.round(selectedRateEntry.suggested_rate!)} for ${formatDate(selectedDate!)}`);
                       }}
-                      className="w-full py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
+                      className="w-full py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
                     >
                       Accept Suggestion
                     </button>
