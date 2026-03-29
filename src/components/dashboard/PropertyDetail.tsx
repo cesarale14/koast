@@ -293,9 +293,9 @@ export default function PropertyDetail({
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t
-                ? "border-brand-500 text-brand-500"
+                ? "border-brand-500 text-brand-600"
                 : "border-transparent text-neutral-500 hover:text-neutral-700"
             }`}
           >
@@ -340,7 +340,7 @@ export default function PropertyDetail({
                 <button
                   onClick={handleFullSync}
                   disabled={syncing}
-                  className="w-full px-4 py-2.5 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
                   {syncing ? (
                     <>
@@ -414,7 +414,7 @@ export default function PropertyDetail({
           <div className="flex justify-end">
             <button
               onClick={() => setShowAddBooking(!showAddBooking)}
-              className="px-4 py-2 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+              className="px-4 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
             >
               {showAddBooking ? "Cancel" : "Add Booking"}
             </button>
@@ -428,32 +428,32 @@ export default function PropertyDetail({
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name *</label>
                   <input type="text" value={bookingForm.guest_name}
                     onChange={(e) => setBookingForm({ ...bookingForm, guest_name: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                     placeholder="John Smith" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
                   <input type="number" value={bookingForm.total_price}
                     onChange={(e) => setBookingForm({ ...bookingForm, total_price: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                     placeholder="500.00" min="0" step="0.01" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in *</label>
                   <input type="date" value={bookingForm.check_in}
                     onChange={(e) => setBookingForm({ ...bookingForm, check_in: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Check-out *</label>
                   <input type="date" value={bookingForm.check_out}
                     onChange={(e) => setBookingForm({ ...bookingForm, check_out: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
               </div>
               <div className="mt-4 flex gap-3">
                 <button onClick={handleAddBooking} disabled={addingBooking}
-                  className="px-5 py-2 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+                  className="px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
                   {addingBooking ? "Creating..." : "Create Booking"}
                 </button>
                 {property.channex_property_id && (
@@ -605,32 +605,32 @@ export default function PropertyDetail({
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Name</label>
                 <input type="text" value={editForm.name}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Address</label>
                 <input type="text" value={editForm.address}
                   onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                   <input type="text" value={editForm.city}
                     onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                   <input type="text" value={editForm.state}
                     onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                   <input type="text" value={editForm.zip}
                     onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -638,25 +638,25 @@ export default function PropertyDetail({
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                   <input type="number" value={editForm.bedrooms}
                     onChange={(e) => setEditForm({ ...editForm, bedrooms: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Bathrooms</label>
                   <input type="number" value={editForm.bathrooms}
                     onChange={(e) => setEditForm({ ...editForm, bathrooms: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" step="0.5" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" step="0.5" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Max Guests</label>
                   <input type="number" value={editForm.max_guests}
                     onChange={(e) => setEditForm({ ...editForm, max_guests: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="1" />
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="1" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
                   <select value={editForm.property_type}
                     onChange={(e) => setEditForm({ ...editForm, property_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none bg-neutral-0">
+                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors bg-neutral-0">
                     <option value="entire_home">Entire Home</option>
                     <option value="private_room">Private Room</option>
                     <option value="shared_room">Shared Room</option>
@@ -830,7 +830,7 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
               className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="Paste calendar export URL..." />
             <button onClick={addFeed} disabled={adding || !addUrl}
-              className="px-4 py-1.5 text-sm font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
+              className="px-4 py-1.5 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
               {adding ? "Adding..." : "Add"}
             </button>
           </div>
