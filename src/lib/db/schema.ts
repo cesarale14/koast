@@ -431,3 +431,11 @@ export const messageTemplates = pgTable("message_templates", {
 export const messageTemplatesRelations = relations(messageTemplates, ({ one }) => ({
   property: one(properties, { fields: [messageTemplates.propertyId], references: [properties.id] }),
 }));
+
+// ==================== User Preferences ====================
+
+export const userPreferences = pgTable("user_preferences", {
+  userId: uuid("user_id").primaryKey(),
+  preferences: jsonb("preferences").notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
