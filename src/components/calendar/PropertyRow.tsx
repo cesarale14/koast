@@ -34,12 +34,10 @@ export default function PropertyRow({
 }: PropertyRowProps) {
   const visibleDates = dates.slice(visibleStart, visibleEnd);
 
-  // Determine cell coverage for each visible date
   const getCoverage = (date: string): "full" | "checkin" | "checkout" | "turnover" | "booked" => {
     let isCheckIn = false;
     let isCheckOut = false;
     for (const b of bookings) {
-      // Fully inside booking (not check-in or check-out day)
       if (date > b.check_in && date < b.check_out) return "booked";
       if (date === b.check_in) isCheckIn = true;
       if (date === b.check_out) isCheckOut = true;
@@ -51,14 +49,13 @@ export default function PropertyRow({
   };
 
   return (
-    <div className="flex border-b border-neutral-100 h-10">
+    <div className="flex border-b border-neutral-100 h-16">
       <div className="relative flex" style={{ width: `${dates.length * 80}px` }}>
-        {/* Render date cells — visible range only */}
+        {/* Date cells — visible range only */}
         {visibleDates.map((date, i) => {
           const absIdx = visibleStart + i;
           const coverage = getCoverage(date);
 
-          // Fully booked dates: render empty cell (bar covers it)
           if (coverage === "booked") {
             return (
               <div
@@ -69,7 +66,6 @@ export default function PropertyRow({
             );
           }
 
-          // Turnover day: checkout + checkin on same day — split visualization
           if (coverage === "turnover") {
             return (
               <div
@@ -77,11 +73,11 @@ export default function PropertyRow({
                 className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0 relative overflow-hidden"
                 style={{ position: "absolute", left: `${absIdx * 80}px` }}
               >
-                {/* Diagonal split line */}
                 <div
                   className="absolute inset-0 pointer-events-none"
                   style={{
-                    background: "linear-gradient(135deg, transparent 48%, var(--neutral-300) 48%, var(--neutral-300) 52%, transparent 52%)",
+                    background:
+                      "linear-gradient(135deg, transparent 48%, var(--neutral-300) 48%, var(--neutral-300) 52%, transparent 52%)",
                   }}
                 />
               </div>
@@ -91,7 +87,12 @@ export default function PropertyRow({
           return (
             <div
               key={date}
-              style={{ position: "absolute", left: `${absIdx * 80}px`, width: "80px", height: "100%" }}
+              style={{
+                position: "absolute",
+                left: `${absIdx * 80}px`,
+                width: "80px",
+                height: "100%",
+              }}
             >
               <DateCell
                 date={date}
@@ -107,11 +108,11 @@ export default function PropertyRow({
           );
         })}
 
-        {/* Booking bars — positioned with Airbnb-style 50% offset */}
+        {/* Booking bars */}
         {bookings.map((booking) => {
           const startIdx = Math.max(
             0,
-            dates.findIndex((d) => d === booking.check_in)
+            dates.findIndex((d) => d === booking.check_in),
           );
           const endDate = booking.check_out;
           let endIdx = dates.findIndex((d) => d >= endDate);
@@ -119,7 +120,6 @@ export default function PropertyRow({
           const span = endIdx - startIdx;
 
           if (span <= 0) return null;
-          // Only render if booking overlaps visible range
           if (startIdx >= visibleEnd || startIdx + span <= visibleStart) return null;
 
           return (

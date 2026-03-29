@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import CalendarToolbar from "./CalendarToolbar";
 import PropertyRow from "./PropertyRow";
+import MonthlyView from "./MonthlyView";
 import BookingSidePanel from "./BookingSidePanel";
 import DateEditPopover from "./DateEditPopover";
 import type { BookingBarData } from "./BookingBar";
@@ -61,6 +62,26 @@ function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+// Simple hash for property avatar color
+function propColor(name: string): string {
+  const colors = [
+    "bg-brand-100 text-brand-700",
+    "bg-blue-100 text-blue-700",
+    "bg-amber-100 text-amber-700",
+    "bg-rose-100 text-rose-700",
+    "bg-violet-100 text-violet-700",
+    "bg-cyan-100 text-cyan-700",
+  ];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % colors.length;
+  return colors[h];
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 export default function CalendarGrid({
   properties,
   bookings,
@@ -71,8 +92,30 @@ export default function CalendarGrid({
   today.setHours(0, 0, 0, 0);
   const todayStr = getToday();
 
+  // ---------- View mode (persisted) ----------
+  const defaultView = properties.length === 1 ? "monthly" : "timeline";
+  const [viewMode, setViewMode] = useState<"timeline" | "monthly">(defaultView);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("calendar-view");
+    if (saved === "timeline" || saved === "monthly") setViewMode(saved);
+  }, []);
+
+  const handleViewChange = useCallback((mode: "timeline" | "monthly") => {
+    setViewMode(mode);
+    localStorage.setItem("calendar-view", mode);
+  }, []);
+
+  // ---------- Timeline state ----------
   const [offsetWeeks, setOffsetWeeks] = useState(0);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [timelinePropertyId, setTimelinePropertyId] = useState<string | null>(null);
+
+  // ---------- Monthly state ----------
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [monthlyPropertyId, setMonthlyPropertyId] = useState(properties[0]?.id ?? "");
+
+  // ---------- Common state ----------
   const [selectedBooking, setSelectedBooking] = useState<BookingBarData | null>(null);
   const [popover, setPopover] = useState<{
     propertyId: string;
@@ -81,22 +124,19 @@ export default function CalendarGrid({
     position: { top: number; left: number };
   } | null>(null);
 
-  // Drag selection state
+  // ---------- Drag selection (timeline) ----------
   const [dragPropertyId, setDragPropertyId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<string | null>(null);
   const [dragEnd, setDragEnd] = useState<string | null>(null);
   const isDragging = useRef(false);
 
-  // Rates state (mutable for inline edits)
+  // ---------- Rates ----------
   const [ratesState, setRatesState] = useState(initialRates);
 
-  // Build rate lookup: property_id -> date -> RateData
   const rateLookup = useMemo(() => {
     const map = new Map<string, Map<string, RateData>>();
     for (const r of ratesState) {
-      if (!map.has(r.property_id)) {
-        map.set(r.property_id, new Map());
-      }
+      if (!map.has(r.property_id)) map.set(r.property_id, new Map());
       map.get(r.property_id)!.set(r.date, {
         base_rate: r.base_rate,
         suggested_rate: r.suggested_rate,
@@ -109,53 +149,44 @@ export default function CalendarGrid({
     return map;
   }, [ratesState]);
 
-  // Build booking lookup: property_id -> BookingBarData[]
+  // ---------- Bookings ----------
   const bookingLookup = useMemo(() => {
     const map = new Map<string, BookingBarData[]>();
     for (const b of bookings) {
-      if (!map.has(b.property_id)) {
-        map.set(b.property_id, []);
-      }
+      if (!map.has(b.property_id)) map.set(b.property_id, []);
       map.get(b.property_id)!.push(b);
     }
     return map;
   }, [bookings]);
 
-  // Generate all dates
+  // ---------- Timeline dates ----------
   const allDates = generateDates(today, totalDays);
-
-  // Visible window based on scroll offset
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() + offsetWeeks * 7);
   const visibleDayCount = 30;
   const startIdx = Math.max(0, offsetWeeks * 7);
-
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() + startIdx + visibleDayCount - 1);
 
-  // Scrollable container ref
+  // ---------- Scroll ----------
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Virtual scroll tracking
   const [scrollLeft, setScrollLeft] = useState(0);
   const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-      setScrollLeft(scrollRef.current.scrollLeft);
-    }
+    if (scrollRef.current) setScrollLeft(scrollRef.current.scrollLeft);
   }, []);
 
   const visibleColStart = Math.floor(scrollLeft / 80);
   const visibleColEnd = Math.min(
     allDates.length,
-    visibleColStart + Math.ceil((scrollRef.current?.clientWidth ?? 1200) / 80) + 2
+    visibleColStart + Math.ceil((scrollRef.current?.clientWidth ?? 1200) / 80) + 2,
   );
 
-  // Filter properties
-  const filteredProperties = selectedPropertyId
-    ? properties.filter((p) => p.id === selectedPropertyId)
+  // ---------- Filtered properties (timeline) ----------
+  const filteredProperties = timelinePropertyId
+    ? properties.filter((p) => p.id === timelinePropertyId)
     : properties;
 
-  // Drag selection helpers
+  // ---------- Drag helpers ----------
   const getSelectedDates = useCallback((): Set<string> => {
     if (!dragStart || !dragEnd || !isDragging.current) return new Set();
     const start = dragStart < dragEnd ? dragStart : dragEnd;
@@ -169,28 +200,20 @@ export default function CalendarGrid({
 
   const handleDragStart = useCallback(
     (propertyId: string, date: string) => {
-      // Don't start drag on booked dates
       const propBookings = bookingLookup.get(propertyId) ?? [];
-      const isBooked = propBookings.some(
-        (b) => date >= b.check_in && date < b.check_out
-      );
+      const isBooked = propBookings.some((b) => date >= b.check_in && date < b.check_out);
       if (isBooked) return;
       isDragging.current = true;
       setDragPropertyId(propertyId);
       setDragStart(date);
       setDragEnd(date);
     },
-    [bookingLookup]
+    [bookingLookup],
   );
 
-  const handleDragEnter = useCallback(
-    (_propertyId: string, date: string) => {
-      if (isDragging.current) {
-        setDragEnd(date);
-      }
-    },
-    []
-  );
+  const handleDragEnter = useCallback((_propertyId: string, date: string) => {
+    if (isDragging.current) setDragEnd(date);
+  }, []);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -220,7 +243,7 @@ export default function CalendarGrid({
     return () => window.removeEventListener("mouseup", handleMouseUp);
   }, [dragPropertyId, dragStart, dragEnd, allDates, rateLookup]);
 
-  // Handlers
+  // ---------- Handlers ----------
   const handleDateClick = useCallback(
     (propertyId: string, date: string, rate: RateData | null) => {
       if (isDragging.current) return;
@@ -231,7 +254,7 @@ export default function CalendarGrid({
         position: { top: 100, left: 300 },
       });
     },
-    []
+    [],
   );
 
   const handleSaveRate = useCallback(
@@ -244,7 +267,6 @@ export default function CalendarGrid({
       if (!popover) return;
       const supabase = createClient();
 
-      // Upsert each date
       for (const date of updates.dates) {
         await supabase.from("calendar_rates").upsert(
           {
@@ -256,16 +278,15 @@ export default function CalendarGrid({
             rate_source: "manual",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
-          { onConflict: "property_id,date" }
+          { onConflict: "property_id,date" },
         );
       }
 
-      // Update local state
       setRatesState((prev) => {
         const next = [...prev];
         for (const date of updates.dates) {
           const idx = next.findIndex(
-            (r) => r.property_id === popover.propertyId && r.date === date
+            (r) => r.property_id === popover.propertyId && r.date === date,
           );
           const entry: CalendarRate = {
             property_id: popover.propertyId,
@@ -288,137 +309,199 @@ export default function CalendarGrid({
 
       setPopover(null);
     },
-    [popover]
+    [popover],
   );
 
+  // ---------- Month navigation ----------
+  const goToPrevMonth = useCallback(() => {
+    setCurrentMonth((m) => {
+      if (m === 0) {
+        setCurrentYear((y) => y - 1);
+        return 11;
+      }
+      return m - 1;
+    });
+  }, []);
+
+  const goToNextMonth = useCallback(() => {
+    setCurrentMonth((m) => {
+      if (m === 11) {
+        setCurrentYear((y) => y + 1);
+        return 0;
+      }
+      return m + 1;
+    });
+  }, []);
+
+  const goToTodayMonth = useCallback(() => {
+    setCurrentMonth(today.getMonth());
+    setCurrentYear(today.getFullYear());
+  }, [today]);
+
+  // ---------- Timeline navigation ----------
+  const goToTodayTimeline = useCallback(() => {
+    setOffsetWeeks(0);
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+  }, []);
+
+  const goToPrevWeek = useCallback(() => {
+    setOffsetWeeks((w) => {
+      const next = Math.max(0, w - 1);
+      if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
+      return next;
+    });
+  }, []);
+
+  const goToNextWeek = useCallback(() => {
+    setOffsetWeeks((w) => {
+      const maxOffset = Math.max(0, Math.ceil((totalDays - 7) / 7));
+      const next = Math.min(maxOffset, w + 1);
+      if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
+      return next;
+    });
+  }, [totalDays]);
+
   const selectedDates = getSelectedDates();
+  const monthLabel = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
 
   return (
     <div className="relative">
       <CalendarToolbar
+        viewMode={viewMode}
+        onViewChange={handleViewChange}
         startDate={new Date(today.getTime() + offsetWeeks * 7 * 86400000)}
         endDate={endDate}
+        monthLabel={monthLabel}
+        onToday={viewMode === "timeline" ? goToTodayTimeline : goToTodayMonth}
+        onPrev={viewMode === "timeline" ? goToPrevWeek : goToPrevMonth}
+        onNext={viewMode === "timeline" ? goToNextWeek : goToNextMonth}
         properties={properties}
-        selectedPropertyId={selectedPropertyId}
-        onToday={() => {
-          setOffsetWeeks(0);
-          if (scrollRef.current) scrollRef.current.scrollLeft = 0;
-        }}
-        onPrev={() => {
-          setOffsetWeeks((w) => {
-            const next = Math.max(0, w - 1);
-            if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
-            return next;
-          });
-        }}
-        onNext={() => {
-          setOffsetWeeks((w) => {
-            const maxOffset = Math.max(0, Math.ceil((totalDays - 7) / 7));
-            const next = Math.min(maxOffset, w + 1);
-            if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
-            return next;
-          });
-        }}
-        onPropertyFilter={setSelectedPropertyId}
+        selectedPropertyId={viewMode === "timeline" ? timelinePropertyId : monthlyPropertyId}
+        onPropertyChange={
+          viewMode === "timeline"
+            ? setTimelinePropertyId
+            : (id) => setMonthlyPropertyId(id ?? properties[0]?.id ?? "")
+        }
+        showAllOption={viewMode === "timeline"}
       />
 
-      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
-        {/* Header: date labels */}
-        <div className="flex border-b border-[var(--border)]">
-          {/* Sticky property name column header */}
-          <div className="w-[120px] md:w-44 min-w-[120px] md:min-w-[176px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
-            <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-              Property
-            </span>
-          </div>
-
-          {/* Scrollable date headers */}
-          <div
-            className="flex-1 overflow-x-auto"
-            ref={scrollRef}
-            onScroll={handleScroll}
-          >
-            <div className="flex" style={{ width: `${allDates.length * 80}px` }}>
-              {allDates.map((date, i) => {
-                if (i < visibleColStart - 1 || i > visibleColEnd + 1) {
-                  return <div key={date} className="w-[80px] flex-shrink-0" />;
-                }
-                const d = new Date(date + "T00:00:00");
-                const isToday = date === todayStr;
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                const isFirstOfMonth = d.getDate() === 1;
-                return (
-                  <div
-                    key={date}
-                    className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
-                      isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-50/50" : ""
-                    } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
-                  >
-                    <div className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}>
-                      {d.toLocaleDateString("en-US", { weekday: "short" })}
-                    </div>
-                    <div className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}>
-                      {d.getDate()}
-                    </div>
-                    {isFirstOfMonth && (
-                      <div className="text-[9px] text-neutral-400 font-medium">
-                        {d.toLocaleDateString("en-US", { month: "short" })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Property rows */}
-        {filteredProperties.map((prop) => (
-          <div key={prop.id} className="flex">
-            {/* Sticky property name */}
-            <div className="w-[120px] md:w-44 min-w-[120px] md:min-w-[176px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-4 flex items-center sticky left-0 z-20 border-b border-neutral-100">
-              <span className="text-sm font-medium text-neutral-700 truncate">
-                {prop.name}
+      {/* ============ TIMELINE VIEW ============ */}
+      {viewMode === "timeline" && (
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
+          {/* Header: date labels */}
+          <div className="flex border-b border-[var(--border)]">
+            <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
+              <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
+                Property
               </span>
             </div>
 
-            {/* Scrollable row content — synced with header scroll */}
             <div
-              className="flex-1 overflow-hidden"
+              className="flex-1 overflow-x-auto scroll-smooth"
+              ref={scrollRef}
+              onScroll={handleScroll}
             >
-              <div
-                style={{
-                  transform: `translateX(-${scrollLeft}px)`,
-                  width: `${allDates.length * 80}px`,
-                }}
-              >
-                <PropertyRow
-                  property={prop}
-                  dates={allDates}
-                  bookings={bookingLookup.get(prop.id) ?? []}
-                  rates={rateLookup.get(prop.id) ?? new Map()}
-                  todayStr={todayStr}
-                  visibleStart={visibleColStart}
-                  visibleEnd={visibleColEnd}
-                  selectedDates={
-                    dragPropertyId === prop.id ? selectedDates : new Set()
+              <div className="flex" style={{ width: `${allDates.length * 80}px` }}>
+                {allDates.map((date, i) => {
+                  if (i < visibleColStart - 1 || i > visibleColEnd + 1) {
+                    return <div key={date} className="w-[80px] flex-shrink-0" />;
                   }
-                  onBookingClick={setSelectedBooking}
-                  onDateClick={handleDateClick}
-                  onDragStart={handleDragStart}
-                  onDragEnter={handleDragEnter}
-                />
+                  const d = new Date(date + "T00:00:00");
+                  const isToday = date === todayStr;
+                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  const isFirstOfMonth = d.getDate() === 1;
+                  return (
+                    <div
+                      key={date}
+                      className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
+                        isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-25" : ""
+                      } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
+                    >
+                      {isFirstOfMonth && (
+                        <div className="text-[9px] text-brand-500 font-semibold uppercase tracking-wider mb-0.5">
+                          {d.toLocaleDateString("en-US", { month: "short" })}
+                        </div>
+                      )}
+                      <div
+                        className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}
+                      >
+                        {d.toLocaleDateString("en-US", { weekday: "short" })}
+                      </div>
+                      <div
+                        className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}
+                      >
+                        {d.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
-        ))}
 
-        {filteredProperties.length === 0 && (
-          <div className="p-12 text-center text-neutral-400 text-sm">
-            No properties to display.
-          </div>
-        )}
-      </div>
+          {/* Property rows */}
+          {filteredProperties.map((prop) => (
+            <div key={prop.id} className="flex">
+              {/* Sticky property name with avatar */}
+              <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${propColor(prop.name)}`}
+                >
+                  {prop.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-neutral-700 truncate">
+                  {prop.name}
+                </span>
+              </div>
+
+              {/* Scrollable row content */}
+              <div className="flex-1 overflow-hidden">
+                <div
+                  style={{
+                    transform: `translateX(-${scrollLeft}px)`,
+                    width: `${allDates.length * 80}px`,
+                  }}
+                >
+                  <PropertyRow
+                    property={prop}
+                    dates={allDates}
+                    bookings={bookingLookup.get(prop.id) ?? []}
+                    rates={rateLookup.get(prop.id) ?? new Map()}
+                    todayStr={todayStr}
+                    visibleStart={visibleColStart}
+                    visibleEnd={visibleColEnd}
+                    selectedDates={dragPropertyId === prop.id ? selectedDates : new Set()}
+                    onBookingClick={setSelectedBooking}
+                    onDateClick={handleDateClick}
+                    onDragStart={handleDragStart}
+                    onDragEnter={handleDragEnter}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {filteredProperties.length === 0 && (
+            <div className="p-12 text-center text-neutral-400 text-sm">
+              No properties to display.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============ MONTHLY VIEW ============ */}
+      {viewMode === "monthly" && (
+        <MonthlyView
+          propertyId={monthlyPropertyId}
+          year={currentYear}
+          month={currentMonth}
+          bookings={bookingLookup.get(monthlyPropertyId) ?? []}
+          rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
+          todayStr={todayStr}
+          onBookingClick={setSelectedBooking}
+          onDateClick={handleDateClick}
+        />
+      )}
 
       {/* Booking side panel */}
       <BookingSidePanel

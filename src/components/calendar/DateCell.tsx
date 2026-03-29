@@ -40,17 +40,16 @@ export default function DateCell({
         isSelected
           ? "bg-brand-50 ring-1 ring-inset ring-brand-300"
           : isAvailable
-          ? "bg-neutral-0 hover:bg-neutral-50"
-          : "bg-neutral-100"
+            ? "bg-neutral-0 hover:bg-neutral-50"
+            : "bg-neutral-100"
       } ${isToday ? "ring-1 ring-inset ring-brand-400" : ""}`}
       onClick={() => onClick(date, rate)}
       onMouseDown={() => onDragStart(date)}
       onMouseEnter={() => onDragEnter(date)}
     >
-      {/* Rate display positioned based on coverage */}
       {displayRate !== null && (
         <span
-          className={`absolute top-0.5 text-[10px] font-mono font-medium ${
+          className={`absolute top-1 text-[10px] font-mono font-medium ${
             isAvailable ? "text-neutral-500" : "text-neutral-400 line-through"
           } ${
             coverage === "checkout" ? "right-1" : coverage === "checkin" ? "left-1" : "right-1"

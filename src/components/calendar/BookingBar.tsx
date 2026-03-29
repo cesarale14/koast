@@ -33,25 +33,24 @@ interface BookingBarProps {
 export default function BookingBar({ booking, startCol, span, onClick }: BookingBarProps) {
   const color = platformColors[booking.platform] ?? "#6B7280";
   const nights = (() => {
-    const ci = Date.UTC(+booking.check_in.slice(0,4), +booking.check_in.slice(5,7)-1, +booking.check_in.slice(8,10));
-    const co = Date.UTC(+booking.check_out.slice(0,4), +booking.check_out.slice(5,7)-1, +booking.check_out.slice(8,10));
+    const ci = Date.UTC(+booking.check_in.slice(0, 4), +booking.check_in.slice(5, 7) - 1, +booking.check_in.slice(8, 10));
+    const co = Date.UTC(+booking.check_out.slice(0, 4), +booking.check_out.slice(5, 7) - 1, +booking.check_out.slice(8, 10));
     return Math.round((co - ci) / 86400000);
   })();
   const firstName = booking.guest_name?.split(" ")[0] ?? "Guest";
 
-  // Airbnb-style positioning:
-  // Start at 50% of check-in cell (afternoon arrival)
-  // End at 50% of check-out cell (morning departure)
   const cellWidth = 80;
   const barLeft = startCol * cellWidth + cellWidth / 2;
   const barWidth = span * cellWidth;
 
   return (
     <div
-      className="absolute top-1 bottom-1 cursor-pointer flex items-center gap-1.5 px-2.5 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md hover:brightness-110 transition-all overflow-hidden whitespace-nowrap z-10"
+      className="absolute cursor-pointer flex items-center gap-1.5 px-2.5 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md hover:brightness-110 transition-all overflow-hidden whitespace-nowrap z-10"
       style={{
         left: `${barLeft}px`,
         width: `${Math.max(barWidth - 2, 20)}px`,
+        top: "18px",
+        height: "28px",
         backgroundColor: color,
       }}
       onClick={(e) => {
