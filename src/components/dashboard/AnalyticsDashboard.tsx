@@ -129,6 +129,10 @@ export default function AnalyticsDashboard({
   const { toast } = useToast();
   const router = useRouter();
   const [propertyId, setPropertyId] = useState(initialPropertyId);
+  const handlePropertyChange = (newId: string) => {
+    setPropertyId(newId);
+    router.push(`/analytics?property=${newId}`);
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [, startTransition] = useTransition();
   const [sortKey, setSortKey] = useState<SortKey>("comp_adr");
@@ -250,7 +254,7 @@ export default function AnalyticsDashboard({
           {properties.length > 1 && (
             <select
               value={propertyId}
-              onChange={(e) => setPropertyId(e.target.value)}
+              onChange={(e) => handlePropertyChange(e.target.value)}
               className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
             >
               {properties.map((p) => (
@@ -292,7 +296,7 @@ export default function AnalyticsDashboard({
         {properties.length > 1 && (
           <select
             value={propertyId}
-            onChange={(e) => setPropertyId(e.target.value)}
+            onChange={(e) => handlePropertyChange(e.target.value)}
             className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
           >
             {properties.map((p) => (

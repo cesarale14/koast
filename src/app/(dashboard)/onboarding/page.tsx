@@ -181,6 +181,16 @@ export default function OnboardingPage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Check free tier limit (1 property)
+      const { count } = await supabase
+        .from("properties")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      if ((count ?? 0) >= 1) {
+        toast("Free plan limited to 1 property. Upgrade to Pro.", "error");
+        return false;
+      }
+
       const { data, error } = await supabase
         .from("properties")
         .insert({

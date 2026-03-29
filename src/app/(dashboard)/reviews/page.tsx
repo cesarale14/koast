@@ -143,15 +143,16 @@ export default function ReviewsPage() {
     setInlineDrafts(newDrafts);
   };
 
-  const respondToReview = async (reviewId: string) => {
+  const respondToReview = async (reviewId: string, hasDraft: boolean) => {
     try {
+      const action = hasDraft ? "approve" : "generate";
       const res = await fetch(`/api/reviews/respond/${reviewId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast("Response generated & saved!");
+      toast(hasDraft ? "Response approved & sent!" : "Draft generated — review before approving");
       fetchData();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
@@ -525,10 +526,10 @@ export default function ReviewsPage() {
                     )}
                     {!r.response_sent && (
                       <button
-                        onClick={() => respondToReview(r.id)}
+                        onClick={() => respondToReview(r.id, !!r.response_draft)}
                         className="px-4 py-2 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600"
                       >
-                        {r.response_draft ? "Approve Response" : "Generate & Send Response"}
+                        {r.response_draft ? "Approve Response" : "Generate Draft Response"}
                       </button>
                     )}
                   </div>

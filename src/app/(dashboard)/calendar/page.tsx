@@ -6,6 +6,8 @@ const TOTAL_DAYS = 60;
 
 export default async function CalendarPage() {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
   const today = new Date().toISOString().split("T")[0];
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + TOTAL_DAYS);
@@ -14,6 +16,7 @@ export default async function CalendarPage() {
   const propertiesRes = await supabase
     .from("properties")
     .select("id, name")
+    .eq("user_id", user.id)
     .order("name");
   const properties = (propertiesRes.data ?? []) as { id: string; name: string }[];
 
@@ -44,12 +47,14 @@ export default async function CalendarPage() {
     );
   }
 
-  // Fetch bookings and rates for next 60 days
+  // Fetch bookings and rates for next 60 days (scoped to user's properties)
+  const propertyIds = properties.map((p) => p.id);
   const bookingsRes = await supabase
     .from("bookings")
     .select(
       "id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes"
     )
+    .in("property_id", propertyIds)
     .lte("check_in", end)
     .gte("check_out", today)
     .in("status", ["confirmed", "completed", "pending"]);
@@ -59,6 +64,7 @@ export default async function CalendarPage() {
     .select(
       "property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
     )
+    .in("property_id", propertyIds)
     .gte("date", today)
     .lte("date", end);
 

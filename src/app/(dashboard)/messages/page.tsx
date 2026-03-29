@@ -3,28 +3,39 @@ import UnifiedInbox from "@/components/dashboard/UnifiedInbox";
 
 export default async function MessagesPage() {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  // Fetch all messages, properties, and bookings
-  const messagesRes = await supabase
-    .from("messages")
-    .select("id, property_id, booking_id, platform, direction, sender_name, content, ai_draft, ai_draft_status, created_at")
-    .order("created_at", { ascending: false })
-    .limit(500);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages = (messagesRes.data ?? []) as any[];
-
+  // Fetch user's properties first
   const propertiesRes = await supabase
     .from("properties")
     .select("id, name, city")
+    .eq("user_id", user.id)
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties = (propertiesRes.data ?? []) as any[];
+  const propertyIds = properties.map((p: { id: string }) => p.id);
 
-  const bookingsRes = await supabase
-    .from("bookings")
-    .select("id, guest_name, check_in, check_out, property_id")
-    .order("check_in", { ascending: false })
-    .limit(200);
+  // Fetch messages and bookings scoped to user's properties
+  const messagesRes = propertyIds.length > 0
+    ? await supabase
+        .from("messages")
+        .select("id, property_id, booking_id, platform, direction, sender_name, content, ai_draft, ai_draft_status, created_at")
+        .in("property_id", propertyIds)
+        .order("created_at", { ascending: false })
+        .limit(500)
+    : { data: [] };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages = (messagesRes.data ?? []) as any[];
+
+  const bookingsRes = propertyIds.length > 0
+    ? await supabase
+        .from("bookings")
+        .select("id, guest_name, check_in, check_out, property_id")
+        .in("property_id", propertyIds)
+        .order("check_in", { ascending: false })
+        .limit(200)
+    : { data: [] };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookings = (bookingsRes.data ?? []) as any[];
 

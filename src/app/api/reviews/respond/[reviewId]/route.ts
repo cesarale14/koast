@@ -15,6 +15,7 @@ export async function POST(
     if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await request.json().catch(() => ({}));
+    const action = body.action ?? "generate"; // "generate" or "approve"
     const supabase = createServiceClient();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,10 +28,25 @@ export async function POST(
     const review = ((reviews ?? []) as any[])[0];
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
+    if (action === "approve") {
+      // Approve: move draft (or edited text) to final
+      const finalText = body.response_text ?? review.response_draft;
+      if (!finalText) {
+        return NextResponse.json({ error: "No draft to approve. Generate a draft first." }, { status: 400 });
+      }
+      await reviewTable.update({
+        response_draft: finalText,
+        response_final: finalText,
+        response_sent: true,
+      }).eq("id", params.reviewId);
+
+      return NextResponse.json({ response_text: finalText, sent: true });
+    }
+
+    // Generate draft
     let responseText = body.response_text;
 
-    // Generate if not provided
-    if (!responseText && !review.response_draft) {
+    if (!responseText) {
       const { data: bookings } = await supabase
         .from("bookings")
         .select("guest_name, check_in, check_out, platform")
@@ -62,14 +78,16 @@ export async function POST(
       }
     }
 
-    responseText = responseText ?? review.response_draft;
+    if (!responseText) {
+      return NextResponse.json({ error: "Could not generate response" }, { status: 500 });
+    }
 
+    // Save as draft only
     await reviewTable.update({
-      response_final: responseText,
-      response_sent: true,
+      response_draft: responseText,
     }).eq("id", params.reviewId);
 
-    return NextResponse.json({ response_text: responseText, sent: true });
+    return NextResponse.json({ response_text: responseText, sent: false });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

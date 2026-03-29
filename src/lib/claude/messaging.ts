@@ -16,6 +16,17 @@ interface BookingContext {
   total_price: number | null;
 }
 
+interface PropertyDetailsContext {
+  wifi_network: string | null;
+  wifi_password: string | null;
+  door_code: string | null;
+  checkin_time: string | null;
+  checkout_time: string | null;
+  parking_instructions: string | null;
+  house_rules: string | null;
+  special_instructions: string | null;
+}
+
 interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
@@ -25,7 +36,8 @@ export async function generateDraft(
   property: PropertyContext,
   booking: BookingContext | null,
   conversationHistory: ConversationMessage[],
-  latestMessage: string
+  latestMessage: string,
+  details?: PropertyDetailsContext | null
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
@@ -38,9 +50,23 @@ export async function generateDraft(
       )
     : null;
 
+  const detailLines: string[] = [];
+  if (details) {
+    if (details.wifi_network) detailLines.push(`WiFi: ${details.wifi_network}${details.wifi_password ? ` / Password: ${details.wifi_password}` : ""}`);
+    if (details.door_code) detailLines.push(`Door code: ${details.door_code}`);
+    if (details.checkin_time) detailLines.push(`Check-in time: ${details.checkin_time}`);
+    if (details.checkout_time) detailLines.push(`Checkout time: ${details.checkout_time}`);
+    if (details.parking_instructions) detailLines.push(`Parking: ${details.parking_instructions}`);
+    if (details.house_rules) detailLines.push(`House rules: ${details.house_rules}`);
+    if (details.special_instructions) detailLines.push(`Special instructions: ${details.special_instructions}`);
+  }
+  const detailsBlock = detailLines.length > 0
+    ? `\n\nProperty information you KNOW and should share when asked:\n${detailLines.join("\n")}`
+    : "";
+
   const systemPrompt = `You are a friendly, professional short-term rental host assistant for ${property.name}${property.city ? ` in ${property.city}` : ""}. Property details: ${property.bedrooms ?? "?"} bed, ${property.bathrooms ?? "?"} bath, max ${property.max_guests ?? "?"} guests.
 
-${booking ? `Booking context: Guest ${booking.guest_name ?? "Guest"} is staying ${booking.check_in} to ${booking.check_out} (${numNights} nights)${booking.total_price ? ` for $${booking.total_price}` : ""}.` : "No active booking context."}
+${booking ? `Booking context: Guest ${booking.guest_name ?? "Guest"} is staying ${booking.check_in} to ${booking.check_out} (${numNights} nights)${booking.total_price ? ` for $${booking.total_price}` : ""}.` : "No active booking context."}${detailsBlock}
 
 Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include specific property details when relevant (check-in time, WiFi, parking, etc.). If you don't know something, say you'll check and get back to them. Never mention you are an AI.`;
 

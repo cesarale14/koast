@@ -4,13 +4,15 @@ import PricingDashboard from "@/components/dashboard/PricingDashboard";
 
 export default async function PricingPage() {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
   const today = new Date().toISOString().split("T")[0];
   const end90 = new Date();
   end90.setDate(end90.getDate() + 90);
   const endStr = end90.toISOString().split("T")[0];
 
   // Fetch properties
-  const propertiesRes = await supabase.from("properties").select("id, name").order("name");
+  const propertiesRes = await supabase.from("properties").select("id, name").eq("user_id", user.id).order("name");
   const properties = (propertiesRes.data ?? []) as { id: string; name: string }[];
 
   if (properties.length === 0) {

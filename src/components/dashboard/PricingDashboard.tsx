@@ -45,6 +45,7 @@ interface PricingDashboardProps {
   rates: RateEntry[];
   comps: CompEntry[];
   snapshot: MarketSnapshot | null;
+  isFreePlan?: boolean;
 }
 
 // ---------- Helpers ----------
@@ -97,6 +98,7 @@ export default function PricingDashboard({
   rates: initialRates,
   comps,
   snapshot,
+  isFreePlan = true,
 }: PricingDashboardProps) {
   const { toast } = useToast();
   const [propertyId, setPropertyId] = useState(initialPropertyId);
@@ -401,13 +403,20 @@ export default function PricingDashboard({
             {loading === "approve" ? "Approving..." : `Apply All Suggestions (${stats.needsApproval})`}
           </button>
         )}
-        <button
-          onClick={pushToOTAs}
-          disabled={loading === "push"}
-          className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
-        >
-          {loading === "push" ? "Pushing..." : "Push to OTAs"}
-        </button>
+        <div className="relative group">
+          <button
+            onClick={pushToOTAs}
+            disabled={loading === "push" || isFreePlan}
+            className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading === "push" ? "Pushing..." : "Push to OTAs"}
+          </button>
+          {isFreePlan && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-neutral-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+              Upgrade to Pro for automatic rate pushing
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

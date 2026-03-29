@@ -71,8 +71,17 @@ export async function POST(request: NextRequest) {
         content: m.content as string,
       }));
 
+    // Fetch property details (WiFi, door code, etc.)
+    const { data: detailsData } = await supabase
+      .from("property_details")
+      .select("wifi_network, wifi_password, door_code, checkin_time, checkout_time, parking_instructions, house_rules, special_instructions")
+      .eq("property_id", message.property_id)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const details = ((detailsData ?? []) as any[])[0] ?? null;
+
     // Generate draft
-    const draft = await generateDraft(property, booking, conversationHistory, message.content);
+    const draft = await generateDraft(property, booking, conversationHistory, message.content, details);
 
     // Save draft to message
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

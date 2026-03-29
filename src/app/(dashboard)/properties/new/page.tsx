@@ -111,6 +111,19 @@ export default function AddPropertyPage() {
     setSaving(true);
     try {
       const supabase = createClient();
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) { toast("Not authenticated", "error"); setSaving(false); return; }
+
+      // Check free tier limit (1 property)
+      const { count } = await supabase
+        .from("properties")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", currentUser.id);
+      if ((count ?? 0) >= 1) {
+        toast("Free plan limited to 1 property. Upgrade to Pro.", "error");
+        setSaving(false);
+        return;
+      }
 
       // Insert property
       const { data: property, error: propError } = await supabase

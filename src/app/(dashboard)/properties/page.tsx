@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function PropertiesPage() {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
   const today = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString()
@@ -15,6 +17,7 @@ export default async function PropertiesPage() {
   const propertiesRes = await supabase
     .from("properties")
     .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests, channex_property_id")
+    .eq("user_id", user.id)
     .order("name");
   const properties = (propertiesRes.data ?? []) as {
     id: string; name: string; address: string | null; city: string | null;

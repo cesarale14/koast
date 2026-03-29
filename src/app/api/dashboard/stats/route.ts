@@ -54,8 +54,12 @@ function getRevenueMonths(range: TimeRange): { offset: number; count: number } {
       return { offset: 0, count: 12 };
     case "next_90":
       return { offset: 0, count: 3 };
-    default:
-      return { offset: -5, count: 6 };
+    case "next_30":
+      return { offset: 0, count: 1 };
+    case "this_month":
+      return { offset: 0, count: 1 };
+    case "this_week":
+      return { offset: 0, count: 1 };
   }
 }
 

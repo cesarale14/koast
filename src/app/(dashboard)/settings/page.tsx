@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -81,6 +82,7 @@ function SectionCard({
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const supabase = createClient();
 
   // Profile
@@ -464,10 +466,26 @@ export default function SettingsPage() {
               </button>
               <button
                 disabled={deleteConfirm !== "DELETE"}
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteConfirm("");
-                  toast("Account deletion requested. We'll process this within 48 hours.");
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/settings/delete-account", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ confirmation: deleteConfirm }),
+                    });
+                    if (!res.ok) {
+                      const data = await res.json();
+                      toast(data.error ?? "Deletion failed", "error");
+                      return;
+                    }
+                    await supabase.auth.signOut();
+                    router.push("/login");
+                  } catch {
+                    toast("Deletion failed", "error");
+                  } finally {
+                    setShowDeleteModal(false);
+                    setDeleteConfirm("");
+                  }
                 }}
                 className="h-9 px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

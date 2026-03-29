@@ -305,7 +305,7 @@ export default function CalendarGrid({
           if (scrollRef.current) scrollRef.current.scrollLeft = 0;
         }}
         onPrev={() => setOffsetWeeks((w) => Math.max(0, w - 1))}
-        onNext={() => setOffsetWeeks((w) => Math.min(Math.floor(totalDays / 7) - 4, w + 1))}
+        onNext={() => setOffsetWeeks((w) => Math.min(Math.ceil((totalDays - visibleDayCount) / 7), w + 1))}
         onPropertyFilter={setSelectedPropertyId}
       />
 

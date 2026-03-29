@@ -2,8 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: { property?: string } }) {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
   const end90 = new Date();
   end90.setDate(end90.getDate() + 90);
   const endStr = end90.toISOString().split("T")[0];
@@ -14,7 +16,7 @@ export default async function AnalyticsPage() {
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
   // Fetch properties
-  const propertiesRes = await supabase.from("properties").select("id, name").order("name");
+  const propertiesRes = await supabase.from("properties").select("id, name").eq("user_id", user.id).order("name");
   const properties = (propertiesRes.data ?? []) as { id: string; name: string }[];
 
   if (properties.length === 0) {
@@ -38,7 +40,10 @@ export default async function AnalyticsPage() {
     );
   }
 
-  const propertyId = properties[0].id;
+  const selectedId = searchParams.property;
+  const propertyId = (selectedId && properties.some((p) => p.id === selectedId))
+    ? selectedId
+    : properties[0].id;
 
   // Fetch property lat/lng
   const propDetailRes = await supabase
@@ -112,6 +117,7 @@ export default async function AnalyticsPage() {
 
   return (
     <AnalyticsDashboard
+      key={propertyId}
       properties={properties}
       initialPropertyId={propertyId}
       snapshot={snapshot}
