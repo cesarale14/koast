@@ -267,7 +267,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search guests..."
-            className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           />
         </div>
 
@@ -462,7 +462,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                   value={composing}
                   onChange={(e) => setComposing(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg resize-none outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                  className="flex-1 px-3 py-2 text-sm border border-[var(--border)] rounded-lg resize-none outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                   rows={2}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -474,7 +474,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                 <button
                   onClick={() => sendMessage(composing)}
                   disabled={!composing.trim()}
-                  className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 self-end transition-colors"
+                  className="px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 self-end transition-colors"
                 >
                   Send
                 </button>
