@@ -306,7 +306,7 @@ export default function ReviewsPage() {
                               value={editDraftText}
                               onChange={(e) => setEditDraftText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 text-sm border border-warning/30 rounded-lg mb-4 bg-neutral-0 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                              className="w-full px-3 py-2 text-sm border border-warning/30 rounded-lg mb-4 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                             />
                           ) : (
                             <p className="text-sm text-neutral-700 mb-4 italic bg-neutral-0 rounded-lg p-3 border border-neutral-100">
@@ -418,7 +418,7 @@ export default function ReviewsPage() {
                                   setInlineDrafts(newDrafts);
                                 }}
                                 rows={4}
-                                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg mb-3 bg-neutral-0 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg mb-3 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                               />
 
                               <div className="flex items-center gap-4 mb-4">

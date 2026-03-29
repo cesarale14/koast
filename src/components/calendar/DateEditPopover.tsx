@@ -96,7 +96,7 @@ export default function DateEditPopover({
               type="number"
               value={rate}
               onChange={(e) => handleRateChange(e.target.value)}
-              className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none ${
+              className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 ${
                 rateError ? "border-red-400" : "border-[var(--border)]"
               }`}
               placeholder="0"
@@ -116,7 +116,7 @@ export default function DateEditPopover({
               type="number"
               value={minStay}
               onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+              className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
               min="1"
             />
           </div>

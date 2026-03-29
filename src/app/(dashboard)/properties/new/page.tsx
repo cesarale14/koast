@@ -257,7 +257,7 @@ export default function AddPropertyPage() {
                 type="text"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                 placeholder="e.g., Beachfront Villa"
               />
             </div>
@@ -279,39 +279,39 @@ export default function AddPropertyPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                 <input type="text" value={form.city} onChange={(e) => updateField("city", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                 <input type="text" value={form.state} onChange={(e) => updateField("state", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={(e) => updateField("zip", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
               </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                 <input type="number" value={form.bedrooms} onChange={(e) => updateField("bedrooms", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Bathrooms</label>
                 <input type="number" value={form.bathrooms} onChange={(e) => updateField("bathrooms", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="0" step="0.5" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" step="0.5" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Max Guests</label>
                 <input type="number" value={form.max_guests} onChange={(e) => updateField("max_guests", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none" min="1" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="1" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
                 <select value={form.property_type} onChange={(e) => updateField("property_type", e.target.value as PropertyType)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none bg-neutral-0">
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors bg-neutral-0">
                   <option value="entire_home">Entire Home</option>
                   <option value="private_room">Private Room</option>
                   <option value="shared_room">Shared Room</option>
@@ -362,7 +362,7 @@ export default function AddPropertyPage() {
                         <div className="flex gap-2">
                           <input type="url" value={data.icalUrl}
                             onChange={(e) => updatePlatform(platform, "icalUrl", e.target.value)}
-                            className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                            className="flex-1 h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                             placeholder="https://www.airbnb.com/calendar/ical/..." />
                           <button
                             type="button"
@@ -411,14 +411,14 @@ export default function AddPropertyPage() {
                           <label className="block text-xs text-neutral-500 mb-1">Channex Listing ID</label>
                           <input type="text" value={data.platform_listing_id}
                             onChange={(e) => updatePlatform(platform, "platform_listing_id", e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                             placeholder="Optional" />
                         </div>
                         <div>
                           <label className="block text-xs text-neutral-500 mb-1">Listing URL</label>
                           <input type="url" value={data.listing_url}
                             onChange={(e) => updatePlatform(platform, "listing_url", e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                             placeholder="https://..." />
                         </div>
                       </div>
@@ -436,7 +436,7 @@ export default function AddPropertyPage() {
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Default Nightly Rate ($) *</label>
               <input type="number" value={form.base_rate} onChange={(e) => updateField("base_rate", e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                 placeholder="150" min="0" step="1" />
               <p className="text-xs text-neutral-400 mt-1">This will be applied to all dates for the next 90 days.</p>
             </div>
@@ -444,20 +444,20 @@ export default function AddPropertyPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Min Rate ($)</label>
                 <input type="number" value={form.min_rate} onChange={(e) => updateField("min_rate", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                   placeholder="100" min="0" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Max Rate ($)</label>
                 <input type="number" value={form.max_rate} onChange={(e) => updateField("max_rate", e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                   placeholder="300" min="0" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Default Min Stay (nights)</label>
               <input type="number" value={form.min_stay} onChange={(e) => updateField("min_stay", e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                 min="1" />
             </div>
             <div>
