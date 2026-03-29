@@ -296,9 +296,17 @@ export default function AnalyticsDashboard({
               : "We\u2019ll find comparable properties, analyze market rates, and show you where you stand."}
           </p>
           {!isLoading && !propertyLatLng && (
-            <p className="text-sm text-warning font-medium mb-4">
-              This property has no location coordinates. Add latitude and longitude in property settings to enable market analysis.
-            </p>
+            <div className="mb-4">
+              <p className="text-sm text-warning font-medium mb-2">
+                We couldn&apos;t locate this property. Update the address in Property Settings to enable market analysis.
+              </p>
+              <a
+                href={`/properties/${propertyId}`}
+                className="text-sm text-brand-500 hover:underline font-medium"
+              >
+                Go to Property Settings
+              </a>
+            </div>
           )}
           {!isLoading && (
             <button

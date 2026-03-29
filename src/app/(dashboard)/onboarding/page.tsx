@@ -102,6 +102,8 @@ export default function OnboardingPage() {
   const [bathrooms, setBathrooms] = useState(1);
   const [maxGuests, setMaxGuests] = useState(4);
   const [propertyType, setPropertyType] = useState("entire_home");
+  const [latitude, setLatitude] = useState<string | null>(null);
+  const [longitude, setLongitude] = useState<string | null>(null);
 
   // --- iCal form ---
   const [icalPlatform, setIcalPlatform] = useState("airbnb");
@@ -199,6 +201,8 @@ export default function OnboardingPage() {
           city: city || null,
           state: state || null,
           zip: zip || null,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
           bedrooms,
           bathrooms,
           max_guests: maxGuests,
@@ -469,6 +473,8 @@ export default function OnboardingPage() {
             setCity(r.city);
             setState(r.state);
             setZip(r.zip);
+            setLatitude(r.latitude);
+            setLongitude(r.longitude);
           }}
           placeholder="Start typing an address..."
         />

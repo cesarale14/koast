@@ -27,6 +27,8 @@ interface FormData {
   city: string;
   state: string;
   zip: string;
+  latitude: string;
+  longitude: string;
   bedrooms: string;
   bathrooms: string;
   max_guests: string;
@@ -75,6 +77,8 @@ export default function AddPropertyPage() {
     city: "",
     state: "",
     zip: "",
+    latitude: "",
+    longitude: "",
     bedrooms: "",
     bathrooms: "",
     max_guests: "",
@@ -134,6 +138,8 @@ export default function AddPropertyPage() {
           city: form.city || null,
           state: form.state || null,
           zip: form.zip || null,
+          latitude: form.latitude ? parseFloat(form.latitude) : null,
+          longitude: form.longitude ? parseFloat(form.longitude) : null,
           bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
           bathrooms: form.bathrooms ? parseFloat(form.bathrooms) : null,
           max_guests: form.max_guests ? parseInt(form.max_guests) : null,
@@ -271,6 +277,8 @@ export default function AddPropertyPage() {
                   updateField("city", r.city);
                   updateField("state", r.state);
                   updateField("zip", r.zip);
+                  updateField("latitude", r.latitude);
+                  updateField("longitude", r.longitude);
                 }}
                 placeholder="Start typing an address..."
               />

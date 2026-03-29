@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
+import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 
 interface Booking {
   id: string;
@@ -84,14 +85,30 @@ export default function PropertyDetail({
     city: property.city ?? "",
     state: property.state ?? "",
     zip: property.zip ?? "",
+    latitude: "",
+    longitude: "",
     bedrooms: property.bedrooms?.toString() ?? "",
     bathrooms: property.bathrooms?.toString() ?? "",
     max_guests: property.max_guests?.toString() ?? "",
     property_type: property.property_type ?? "entire_home",
   });
+  const [locationFound, setLocationFound] = useState<string | null>(null);
 
   const handleSaveSettings = async () => {
     setSaving(true);
+
+    // Use lat/lng from AddressAutocomplete selection, or geocode from address
+    let lat: number | null = editForm.latitude ? parseFloat(editForm.latitude) : null;
+    let lng: number | null = editForm.longitude ? parseFloat(editForm.longitude) : null;
+
+    if (!lat && (editForm.address || editForm.city)) {
+      try {
+        const { geocodeAddress } = await import("@/lib/geocode");
+        const result = await geocodeAddress(editForm.address, editForm.city, editForm.state);
+        if (result) { lat = result.lat; lng = result.lng; }
+      } catch { /* geocode failed, save without coords */ }
+    }
+
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = supabase.from("properties") as any;
@@ -102,6 +119,8 @@ export default function PropertyDetail({
         city: editForm.city || null,
         state: editForm.state || null,
         zip: editForm.zip || null,
+        latitude: lat,
+        longitude: lng,
         bedrooms: editForm.bedrooms ? parseInt(editForm.bedrooms) : null,
         bathrooms: editForm.bathrooms ? parseFloat(editForm.bathrooms) : null,
         max_guests: editForm.max_guests ? parseInt(editForm.max_guests) : null,
@@ -113,7 +132,8 @@ export default function PropertyDetail({
     if (error) {
       toast("Failed to update property", "error");
     } else {
-      toast("Property updated successfully!");
+      const locMsg = lat ? ` Location: ${editForm.city || "found"}, ${editForm.state || ""}` : "";
+      toast(`Property updated!${locMsg}`);
       setEditing(false);
     }
   };
@@ -609,9 +629,26 @@ export default function PropertyDetail({
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Address</label>
-                <input type="text" value={editForm.address}
-                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+                <AddressAutocomplete
+                  value={editForm.address}
+                  onChange={(v) => setEditForm({ ...editForm, address: v })}
+                  onSelect={(r) => {
+                    setEditForm({
+                      ...editForm,
+                      address: r.address,
+                      city: r.city,
+                      state: r.state,
+                      zip: r.zip,
+                      latitude: r.latitude,
+                      longitude: r.longitude,
+                    });
+                    setLocationFound(`${r.city || "Location found"}, ${r.state || ""}`);
+                  }}
+                  placeholder="Start typing an address..."
+                />
+                {locationFound && (
+                  <p className="text-xs text-success mt-1 font-medium">Location found: {locationFound}</p>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
