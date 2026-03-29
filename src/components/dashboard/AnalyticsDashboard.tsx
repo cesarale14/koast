@@ -134,7 +134,8 @@ export default function AnalyticsDashboard({
     router.push(`/analytics?property=${newId}`);
   };
   const [refreshing, setRefreshing] = useState(false);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const isLoading = refreshing || isPending;
   const [sortKey, setSortKey] = useState<SortKey>("comp_adr");
   const [sortAsc, setSortAsc] = useState(false);
   const [compView, setCompView] = useState<"table" | "map">("table");
@@ -210,11 +211,16 @@ export default function AnalyticsDashboard({
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetch(`/api/market/refresh/${propertyId}`, { method: "POST" });
-      toast("Market data refreshed");
+      const res = await fetch(`/api/market/refresh/${propertyId}`, { method: "POST" });
+      if (!res.ok) throw new Error("Refresh failed");
+      toast("Market data refreshed — loading results…");
+      // Hand off loading state to isPending (from useTransition)
+      setRefreshing(false);
       startTransition(() => { router.refresh(); });
-    } catch { toast("Refresh failed", "error"); }
-    setRefreshing(false);
+    } catch {
+      toast("Refresh failed", "error");
+      setRefreshing(false);
+    }
   }, [propertyId, toast, router]);
 
   // 30-day demand calendar data
@@ -272,17 +278,28 @@ export default function AnalyticsDashboard({
         </div>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <BarChart3 className="w-8 h-8 text-brand-500" />
+            {isLoading ? (
+              <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+            ) : (
+              <BarChart3 className="w-8 h-8 text-brand-500" />
+            )}
           </div>
-          <h2 className="text-xl font-bold text-neutral-800 mb-2">Run your first market analysis to see how your property compares</h2>
-          <p className="text-neutral-500 mb-6">We&apos;ll find comparable properties, analyze market rates, and show you where you stand.</p>
-          <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
-          >
-            {refreshing ? "Analyzing..." : "Analyze My Market"}
-          </button>
+          <h2 className="text-xl font-bold text-neutral-800 mb-2">
+            {isLoading ? "Analyzing your market…" : "Run your first market analysis to see how your property compares"}
+          </h2>
+          <p className="text-neutral-500 mb-6">
+            {isLoading
+              ? "Finding comparable properties and pulling market data. This may take a moment."
+              : "We\u2019ll find comparable properties, analyze market rates, and show you where you stand."}
+          </p>
+          {!isLoading && (
+            <button
+              onClick={refresh}
+              className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"
+            >
+              Analyze My Market
+            </button>
+          )}
         </div>
       </div>
     );
@@ -338,10 +355,10 @@ export default function AnalyticsDashboard({
             <p className="text-xs text-neutral-400">Demand Score</p>
             <button
               onClick={refresh}
-              disabled={refreshing}
+              disabled={isLoading}
               className="text-[10px] text-brand-500 hover:underline disabled:opacity-50"
             >
-              {refreshing ? "..." : "Refresh"}
+              {isLoading ? "..." : "Refresh"}
             </button>
           </div>
           <p className={`text-2xl font-bold font-mono mt-1 ${demandColor(snapshot?.market_demand_score ?? null)}`}>

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
 
+export const dynamic = "force-dynamic";
+
 export default async function AnalyticsPage({ searchParams }: { searchParams: { property?: string } }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
