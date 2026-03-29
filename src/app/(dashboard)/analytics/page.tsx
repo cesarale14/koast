@@ -23,7 +23,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
     return (
       <div>
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
-        <p className="text-neutral-500 mb-8">Market analysis and performance metrics</p>
+        <p className="text-sm text-neutral-500 mb-8">Market analysis and performance metrics</p>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,8 +31,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
             </svg>
           </div>
           <h2 className="text-xl font-bold text-neutral-800 mb-2">No properties yet</h2>
-          <p className="text-neutral-500 mb-6">Add a property to see market analytics.</p>
-          <Link href="/properties" className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors">
+          <p className="text-sm text-neutral-500 mb-6">Add a property to see market analytics.</p>
+          <Link href="/properties" className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors">
             Add Property
           </Link>
         </div>

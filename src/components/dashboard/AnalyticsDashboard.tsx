@@ -279,7 +279,7 @@ export default function AnalyticsDashboard({
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
+            className="inline-flex px-6 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
           >
             {refreshing ? "Analyzing..." : "Analyze My Market"}
           </button>
