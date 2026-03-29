@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/pooled";
 import { bookings, guestReviews, properties } from "@/lib/db/schema";
-import { and, eq, ne, lt, inArray, desc } from "drizzle-orm";
+import { and, eq, ne, lt, gte, inArray, desc } from "drizzle-orm";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export async function GET() {
@@ -10,6 +10,11 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const today = new Date().toISOString().split("T")[0];
+
+    // Airbnb allows reviews up to 14 days after checkout
+    const reviewWindowStart = new Date();
+    reviewWindowStart.setDate(reviewWindowStart.getDate() - 14);
+    const reviewCutoff = reviewWindowStart.toISOString().split("T")[0];
 
     // Get all property IDs owned by this user
     const userProperties = await db
@@ -49,6 +54,7 @@ export async function GET() {
         and(
           inArray(bookings.propertyId, userPropertyIds),
           lt(bookings.checkOut, today),
+          gte(bookings.checkOut, reviewCutoff),
           ne(bookings.status, "cancelled")
         )
       )
