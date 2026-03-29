@@ -77,11 +77,6 @@ function propColor(name: string): string {
   return colors[h];
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 export default function CalendarGrid({
   properties,
   bookings,
@@ -111,9 +106,8 @@ export default function CalendarGrid({
   const [timelinePropertyId, setTimelinePropertyId] = useState<string | null>(null);
 
   // ---------- Monthly state ----------
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [monthlyPropertyId, setMonthlyPropertyId] = useState(properties[0]?.id ?? "");
+  const [monthlyTodayTrigger, setMonthlyTodayTrigger] = useState(0);
 
   // ---------- Common state ----------
   const [selectedBooking, setSelectedBooking] = useState<BookingBarData | null>(null);
@@ -312,32 +306,6 @@ export default function CalendarGrid({
     [popover],
   );
 
-  // ---------- Month navigation ----------
-  const goToPrevMonth = useCallback(() => {
-    setCurrentMonth((m) => {
-      if (m === 0) {
-        setCurrentYear((y) => y - 1);
-        return 11;
-      }
-      return m - 1;
-    });
-  }, []);
-
-  const goToNextMonth = useCallback(() => {
-    setCurrentMonth((m) => {
-      if (m === 11) {
-        setCurrentYear((y) => y + 1);
-        return 0;
-      }
-      return m + 1;
-    });
-  }, []);
-
-  const goToTodayMonth = useCallback(() => {
-    setCurrentMonth(today.getMonth());
-    setCurrentYear(today.getFullYear());
-  }, [today]);
-
   // ---------- Timeline navigation ----------
   const goToTodayTimeline = useCallback(() => {
     setOffsetWeeks(0);
@@ -362,7 +330,6 @@ export default function CalendarGrid({
   }, [totalDays]);
 
   const selectedDates = getSelectedDates();
-  const monthLabel = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
 
   return (
     <div className="relative">
@@ -371,10 +338,9 @@ export default function CalendarGrid({
         onViewChange={handleViewChange}
         startDate={new Date(today.getTime() + offsetWeeks * 7 * 86400000)}
         endDate={endDate}
-        monthLabel={monthLabel}
-        onToday={viewMode === "timeline" ? goToTodayTimeline : goToTodayMonth}
-        onPrev={viewMode === "timeline" ? goToPrevWeek : goToPrevMonth}
-        onNext={viewMode === "timeline" ? goToNextWeek : goToNextMonth}
+        onToday={viewMode === "timeline" ? goToTodayTimeline : () => setMonthlyTodayTrigger((t) => t + 1)}
+        onPrev={goToPrevWeek}
+        onNext={goToNextWeek}
         properties={properties}
         selectedPropertyId={viewMode === "timeline" ? timelinePropertyId : monthlyPropertyId}
         onPropertyChange={
@@ -493,11 +459,10 @@ export default function CalendarGrid({
       {viewMode === "monthly" && (
         <MonthlyView
           propertyId={monthlyPropertyId}
-          year={currentYear}
-          month={currentMonth}
           bookings={bookingLookup.get(monthlyPropertyId) ?? []}
           rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
           todayStr={todayStr}
+          todayTrigger={monthlyTodayTrigger}
           onBookingClick={setSelectedBooking}
           onDateClick={handleDateClick}
         />

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 
-const TOTAL_DAYS = 60;
+const TOTAL_DAYS = 730; // 24 months for continuous monthly scroll
 
 export default async function CalendarPage() {
   const supabase = createClient();

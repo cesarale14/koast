@@ -3,15 +3,11 @@
 interface CalendarToolbarProps {
   viewMode: "timeline" | "monthly";
   onViewChange: (mode: "timeline" | "monthly") => void;
-  // Timeline: date range; Monthly: month label
   startDate: Date;
   endDate: Date;
-  monthLabel: string;
-  // Navigation
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
-  // Properties
   properties: { id: string; name: string }[];
   selectedPropertyId: string | null;
   onPropertyChange: (id: string | null) => void;
@@ -29,7 +25,6 @@ export default function CalendarToolbar({
   onViewChange,
   startDate,
   endDate,
-  monthLabel,
   onToday,
   onPrev,
   onNext,
@@ -59,31 +54,37 @@ export default function CalendarToolbar({
 
       {/* Center: navigation */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={onPrev}
-          className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+        {viewMode === "timeline" && (
+          <button
+            onClick={onPrev}
+            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={onToday}
           className="px-3 py-1.5 text-sm font-medium text-neutral-600 bg-neutral-0 border border-[var(--border)] rounded-lg hover:bg-neutral-50 transition-colors"
         >
           Today
         </button>
-        <button
-          onClick={onNext}
-          className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium text-neutral-700 ml-1">
-          {viewMode === "timeline" ? formatRange(startDate, endDate) : monthLabel}
-        </span>
+        {viewMode === "timeline" && (
+          <>
+            <button
+              onClick={onNext}
+              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            <span className="text-sm font-medium text-neutral-700 ml-1">
+              {formatRange(startDate, endDate)}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Right: property selector */}
