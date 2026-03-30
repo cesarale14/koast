@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { BarChart3 } from "lucide-react";
 
 const CompMap = dynamic(() => import("./CompMap"), { ssr: false });
+const IntelMap = dynamic(() => import("./IntelMap"), { ssr: false });
 
 // ---------- Types ----------
 
@@ -722,6 +723,26 @@ export default function AnalyticsDashboard({
 
       {/* ========== Market Health Score ========== */}
       <MarketHealthCard snapshot={snapshot} />
+
+      {/* ========== Intelligence Map ========== */}
+      {propertyLatLng && (
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
+          <h2 className="text-lg font-bold text-neutral-900 mb-4">Market Intelligence Map</h2>
+          <IntelMap
+            properties={[{ id: propertyId, name: propertyName, lat: propertyLatLng.lat, lng: propertyLatLng.lng }]}
+            comps={comps.map((c) => ({
+              name: c.comp_name ?? "Listing",
+              adr: c.comp_adr ?? 0,
+              occupancy: c.comp_occupancy ?? 0,
+              revpar: c.comp_revpar ?? 0,
+              distanceKm: c.distance_km ?? 2,
+            }))}
+            center={propertyLatLng}
+            snapshot={snapshot ? { market_adr: snapshot.market_adr ?? undefined, market_occupancy: snapshot.market_occupancy ?? undefined, market_supply: snapshot.market_supply ?? undefined } : null}
+            propertyStats={propertyStats}
+          />
+        </div>
+      )}
 
       {/* ========== 90-Day Demand Forecast ========== */}
       <DemandForecastSection propertyId={propertyId} />
