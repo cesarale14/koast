@@ -149,18 +149,19 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
         </div>
       )}
     </aside>
-    {/* 3D toggle pill at sidebar edge — AirDNA style */}
+    {/* 3D toggle pill — centered on the sidebar's right border */}
     <button
       onClick={onToggle}
-      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 transition-all duration-200 ease-out"
+      className="hidden md:flex fixed z-40 items-center justify-center w-6 h-6 rounded-full bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 transition-[left] duration-200 ease-out"
       style={{
-        left: expanded ? 236 : 46,
-        top: 20,
+        left: (expanded ? 240 : 60) - 12,
+        top: "50%",
+        transform: "translateY(-50%)",
         boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
       }}
       title={expanded ? "Collapse sidebar" : "Expand sidebar"}
     >
-      <ChevronLeft size={14} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
+      <ChevronLeft size={13} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
     </button>
     </>
   );
