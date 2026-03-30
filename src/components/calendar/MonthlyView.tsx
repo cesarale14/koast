@@ -150,6 +150,35 @@ export default function MonthlyView({
     return () => obs.disconnect();
   }, []);
 
+  // Calendar intelligence — fetch events + cleaning tasks client-side
+  const [calEvents, setCalEvents] = useState<Map<string, { name: string; impact: number }>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [calClean, setCalClean] = useState<Map<string, string>>(new Map()); // date → status (future use)
+  useEffect(() => {
+    // Events
+    fetch(`/api/analytics/forecast/${propertyId}`).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (!d?.forecast) return;
+      const map = new Map<string, { name: string; impact: number }>();
+      for (const f of d.forecast as { date: string; demand_score: number; factors: string[] }[]) {
+        const eventFactor = f.factors.find((fac) => !fac.includes("season") && !fac.includes("DOW") && !fac.includes("Market") && !fac.includes("Supply") && !fac.includes("learned") && !fac.includes("default") && !fac.includes("Clear") && !fac.includes("Rain"));
+        if (eventFactor) map.set(f.date, { name: eventFactor, impact: f.demand_score / 100 });
+      }
+      setCalEvents(map);
+    }).catch(() => {});
+    // Cleaning tasks
+    fetch("/api/dashboard/actions", { method: "POST" }).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (!d?.actions) return;
+      const map = new Map<string, string>();
+      for (const a of d.actions as { id: string; type: string; description: string }[]) {
+        if (a.type === "cleaning") {
+          const status = a.description.includes("pending") ? "pending" : a.description.includes("assigned") ? "assigned" : "ok";
+          map.set(a.id, status);
+        }
+      }
+      setCalClean(map);
+    }).catch(() => {});
+  }, [propertyId]);
+
   const months = useMemo(() => {
     const result: MonthData[] = [];
     for (let i = 0; i < TOTAL_MONTHS; i++) {
@@ -265,16 +294,31 @@ export default function MonthlyView({
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
                     >
                       <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
-                        <div>
-                          {day.isToday ? (
-                            <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">{day.dayNum}</span>
-                          ) : (
-                            <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
-                          )}
+                        <div className="flex items-start justify-between">
+                          <div>
+                            {day.isToday ? (
+                              <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">{day.dayNum}</span>
+                            ) : (
+                              <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
+                            )}
+                          </div>
+                          {/* Event dot indicator */}
+                          {!day.isPast && calEvents.has(day.date) && (() => {
+                            const ev = calEvents.get(day.date)!;
+                            const dotColor = ev.impact > 0.6 ? "bg-red-400" : ev.impact > 0.3 ? "bg-amber-400" : "bg-neutral-300";
+                            return <span className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} title={ev.name} />;
+                          })()}
                         </div>
-                        {!isBooked && !day.isPast && rawRate !== null && isAvail && (
-                          <span className="self-end text-[10px] md:text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
-                        )}
+                        {/* Rate with comparison color */}
+                        {!isBooked && !day.isPast && rawRate !== null && isAvail && (() => {
+                          const applied = rate?.applied_rate;
+                          const suggested = rate?.suggested_rate;
+                          let rateColor = "text-[#999]";
+                          if (applied && suggested && Math.abs(suggested - applied) / applied > 0.08) {
+                            rateColor = suggested > applied ? "text-emerald-500" : "text-red-400";
+                          }
+                          return <span className={`self-end text-[10px] md:text-[11px] font-mono ${rateColor} leading-none`}>${rawRate}</span>;
+                        })()}
                       </div>
                     </div>
                   );
