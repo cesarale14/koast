@@ -90,7 +90,7 @@ export default function RevenueCheckPage() {
               <span className="text-brand-500"> leaving on the table?</span>
             </h1>
             <p className="text-lg text-neutral-500 max-w-2xl mx-auto">
-              Get a free AI-powered pricing analysis in 30 seconds. No signup required.
+              Get a free 9-signal AI pricing analysis in 30 seconds. No signup required.
             </p>
           </div>
 

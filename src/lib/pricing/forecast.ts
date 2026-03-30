@@ -91,6 +91,7 @@ export async function generateDemandForecast(supabase: any, propertyId: string, 
   const weatherDays = await fetchWeatherForecast(
     prop?.latitude ? parseFloat(prop.latitude) : null,
     prop?.longitude ? parseFloat(prop.longitude) : null,
+    supabase,
   );
   const weatherMap = new Map(weatherDays.map((w) => [w.date, w]));
 

@@ -149,7 +149,7 @@ export class PricingEngine {
     const lng = propRow?.longitude ? parseFloat(propRow.longitude) : null;
 
     // Weather forecast (cached daily)
-    const weatherForecast = await fetchWeatherForecast(lat, lng);
+    const weatherForecast = await fetchWeatherForecast(lat, lng, this.supabase);
 
     // Learned seasonality from pricing_outcomes (if 30+ data points)
     let learnedDow: LearnedDowRates | null = null;
