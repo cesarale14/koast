@@ -133,6 +133,23 @@ export default function MonthlyView({
   const thisYear = new Date().getFullYear();
   const thisMonth = new Date().getMonth();
 
+  // Measure actual cell height for bar row positioning (can't use % because
+  // --col is width-based but top needs height-based values)
+  const [cellH, setCellH] = useState(0);
+  const measureElRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const measure = () => {
+      const cell = measureElRef.current?.querySelector("[data-cell]");
+      if (cell) setCellH(cell.getBoundingClientRect().height);
+    };
+    measure();
+    const el = measureElRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(measure);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const months = useMemo(() => {
     const result: MonthData[] = [];
     for (let i = 0; i < TOTAL_MONTHS; i++) {
@@ -166,7 +183,7 @@ export default function MonthlyView({
     return set;
   }, [bookings]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [activeMonth, setActiveMonth] = useState(months[0]?.key ?? "");
 
@@ -204,7 +221,7 @@ export default function MonthlyView({
         ))}
       </div>
 
-      <div ref={containerRef} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
+      <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
         <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l, i) => (
@@ -236,6 +253,7 @@ export default function MonthlyView({
                   return (
                     <div
                       key={day.date}
+                      data-cell
                       className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
                         day.isPast ? "bg-[#f9f9f7]" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
                       }`}
@@ -276,8 +294,9 @@ export default function MonthlyView({
                   if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
                   const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
 
-                  // Position bar at bottom of its row: top = row bottom - 3px, then translateY(-100%)
-                  const top = `calc(var(--col) * ${seg.row} + var(--cell) - 3px)`;
+                  // Position bar at bottom of its row using measured cell height (px)
+                  const rowUnit = cellH + GAP;
+                  const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 3}px` : "0px";
 
                   const color = platformColors[seg.booking.platform] ?? "#333333";
                   const logo = platformLogos[seg.booking.platform] ?? null;
