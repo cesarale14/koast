@@ -16,6 +16,7 @@ const platformColors: Record<string, string> = {
 };
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LABELS_SHORT = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -155,7 +156,7 @@ export default function MonthlyView({
 
   const scrollToMonth = useCallback((key: string) => {
     const el = monthRefs.current.get(key);
-    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 30;
+    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 28;
   }, []);
 
   const scrollToToday = useCallback(() => {
@@ -171,7 +172,7 @@ export default function MonthlyView({
     if (!c) return;
     const obs = new IntersectionObserver(
       (entries) => { for (const e of entries) if (e.isIntersecting) { const k = e.target.getAttribute("data-month"); if (k) setActiveMonth(k); } },
-      { root: c, rootMargin: "-30px 0px -70% 0px", threshold: 0 },
+      { root: c, rootMargin: "-28px 0px -70% 0px", threshold: 0 },
     );
     monthRefs.current.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
@@ -179,8 +180,8 @@ export default function MonthlyView({
 
   return (
     <div className="bg-white flex flex-col flex-1 min-h-0">
-      {/* Month pills */}
-      <div className="flex gap-1.5 px-3 py-2 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
+      {/* Month pills — desktop only */}
+      <div className="hidden md:flex gap-1.5 px-3 py-2 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button
             key={m.key}
@@ -195,21 +196,24 @@ export default function MonthlyView({
       </div>
 
       {/* Scrollable calendar */}
-      <div ref={containerRef} className="overflow-y-auto flex-1 min-h-0 bg-white">
+      <div ref={containerRef} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day-of-week header */}
         <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
-          {DAY_LABELS.map((l) => (
-            <div key={l} className="py-1.5 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">{l}</div>
+          {DAY_LABELS.map((l, i) => (
+            <div key={`${l}-${i}`} className="py-1 md:py-1.5 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">
+              <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
+              <span className="hidden md:inline">{l}</span>
+            </div>
           ))}
         </div>
 
-        {/* All 24 month sections rendered continuously */}
+        {/* All 24 month sections */}
         {months.map((m) => {
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              <div className="sticky top-[29px] z-[9] bg-white px-1 pt-10 pb-2">
-                <span className="text-xl font-bold text-[#222]">{m.label}</span>
+              <div className="sticky top-[27px] md:top-[29px] z-[9] bg-white px-1 pt-6 md:pt-10 pb-1.5 md:pb-2">
+                <span className="text-lg md:text-xl font-bold text-[#222]">{m.label}</span>
               </div>
 
               {m.weeks.map((week, weekIdx) => {
@@ -230,7 +234,7 @@ export default function MonthlyView({
                       return (
                         <div
                           key={day.date}
-                          className={`relative rounded-[10px] cursor-pointer transition-colors flex flex-col justify-between ${
+                          className={`relative aspect-square md:aspect-auto cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
                             !day.isCurrentMonth
                               ? "bg-[#fafafa]"
                               : day.isPast
@@ -242,32 +246,35 @@ export default function MonthlyView({
                                     : "bg-white hover:bg-[#fafafa]"
                           }`}
                           style={{
-                            minHeight: "100px",
-                            padding: "6px",
+                            minHeight: undefined,
+                            padding: undefined,
                             border: "1px solid #e8e8e8",
                             ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                           }}
                           onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
                         >
-                          <div>
-                            {day.isToday ? (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-[13px] font-semibold leading-none">
-                                {day.dayNum}
-                              </span>
-                            ) : (
-                              <span className={`text-[13px] font-semibold leading-none ${
-                                !day.isCurrentMonth ? "text-[#ccc]"
-                                  : day.isPast ? "text-[#bbb]"
-                                  : "text-[#333]"
-                              }`}>
-                                {day.dayNum}
-                              </span>
+                          {/* Inner content with responsive padding */}
+                          <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
+                            <div>
+                              {day.isToday ? (
+                                <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">
+                                  {day.dayNum}
+                                </span>
+                              ) : (
+                                <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${
+                                  !day.isCurrentMonth ? "text-[#ccc]"
+                                    : day.isPast ? "text-[#bbb]"
+                                    : "text-[#333]"
+                                }`}>
+                                  {day.dayNum}
+                                </span>
+                              )}
+                            </div>
+                            {/* Rate: hide on mobile booked/past, show below date on mobile */}
+                            {!isBooked && !day.isPast && rawRate !== null && day.isCurrentMonth && isAvail && (
+                              <span className="self-end text-[10px] md:text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
                             )}
                           </div>
-                          {/* Rate: hide on booked dates and past dates */}
-                          {!isBooked && !day.isPast && rawRate !== null && day.isCurrentMonth && isAvail && (
-                            <span className="self-end text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
-                          )}
                         </div>
                       );
                     })}
@@ -292,7 +299,6 @@ export default function MonthlyView({
                       const effectiveSpan = span - startFrac - endFrac;
                       const showText = effectiveSpan >= 1.5;
 
-                      // Incoming bars cast a left-shadow onto the outgoing bar
                       const shadow = seg.isStart
                         ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
                         : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
@@ -300,16 +306,15 @@ export default function MonthlyView({
                       return (
                         <div
                           key={`${seg.booking.id}-${weekIdx}-${si}`}
-                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px"
+                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[22px] md:h-[24px]"
                           style={{
                             left, width,
-                            bottom: "4px",
-                            height: "24px",
+                            bottom: "3px",
                             backgroundColor: color,
-                            borderRadius: `${seg.isStart ? "12px" : "0"} ${seg.isEnd ? "12px" : "0"} ${seg.isEnd ? "12px" : "0"} ${seg.isStart ? "12px" : "0"}`,
+                            borderRadius: `${seg.isStart ? "11px" : "0"} ${seg.isEnd ? "11px" : "0"} ${seg.isEnd ? "11px" : "0"} ${seg.isStart ? "11px" : "0"}`,
                             zIndex: seg.isStart ? 2 : 1,
-                            paddingLeft: seg.isStart ? "10px" : "4px",
-                            paddingRight: seg.isEnd ? "10px" : "4px",
+                            paddingLeft: seg.isStart ? "8px" : "3px",
+                            paddingRight: seg.isEnd ? "8px" : "3px",
                             opacity: seg.isPast ? 0.7 : 1,
                             border: "1px solid rgba(0,0,0,0.15)",
                             borderTop: "1px solid rgba(255,255,255,0.1)",
@@ -321,7 +326,7 @@ export default function MonthlyView({
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
                           {showText && (
-                            <span className="truncate text-[11px] font-medium">{firstName} + {seg.nights}</span>
+                            <span className="truncate text-[10px] md:text-[11px] font-medium">{firstName} +{seg.nights}</span>
                           )}
                         </div>
                       );

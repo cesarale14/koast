@@ -35,8 +35,8 @@ export default function CalendarToolbar({
 }: CalendarToolbarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-      {/* Left: view toggle */}
-      <div className="flex bg-neutral-100 rounded-lg p-0.5">
+      {/* Left: view toggle — hidden on mobile (monthly only) */}
+      <div className="hidden md:flex bg-neutral-100 rounded-lg p-0.5">
         {(["timeline", "monthly"] as const).map((mode) => (
           <button
             key={mode}

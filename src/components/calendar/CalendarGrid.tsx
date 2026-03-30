@@ -490,8 +490,8 @@ export default function CalendarGrid({
       {/* ============ MONTHLY VIEW ============ */}
       {viewMode === "monthly" && (
         <div
-          className="flex rounded-xl border border-[#e8e8e8] overflow-hidden bg-white"
-          style={{ maxHeight: "calc(100vh - 190px)" }}
+          className="flex flex-col md:flex-row md:rounded-xl md:border md:border-[#e8e8e8] overflow-hidden bg-white"
+          style={{ maxHeight: "calc(100vh - 160px)" }}
         >
           {/* Left property panel — desktop only */}
           <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
