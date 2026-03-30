@@ -15,6 +15,14 @@ const platformColors: Record<string, string> = {
   direct: "#10B981",
 };
 
+const platformLogos: Record<string, string> = {
+  airbnb: "/logos/airbnb.svg",
+  vrbo: "/logos/vrbo.svg",
+  booking_com: "/logos/booking.svg",
+  booking: "/logos/booking.svg",
+  direct: "/logos/direct.svg",
+};
+
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_LABELS_SHORT = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTH_NAMES = [
@@ -279,7 +287,7 @@ export default function MonthlyView({
                       );
                     })}
 
-                    {/* Booking bars */}
+                    {/* Booking bars — 32px, platform logos */}
                     {rowSegs.map((seg, si) => {
                       const span = seg.endCol - seg.startCol + 1;
                       const startFrac = seg.isStart ? 0.3 : 0;
@@ -295,6 +303,7 @@ export default function MonthlyView({
                       const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
 
                       const color = platformColors[seg.booking.platform] ?? "#333333";
+                      const logo = platformLogos[seg.booking.platform] ?? null;
                       const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
                       const effectiveSpan = span - startFrac - endFrac;
                       const showText = effectiveSpan >= 1.5;
@@ -306,15 +315,15 @@ export default function MonthlyView({
                       return (
                         <div
                           key={`${seg.booking.id}-${weekIdx}-${si}`}
-                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[22px] md:h-[24px]"
+                          className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
                           style={{
                             left, width,
                             bottom: "3px",
                             backgroundColor: color,
-                            borderRadius: `${seg.isStart ? "11px" : "0"} ${seg.isEnd ? "11px" : "0"} ${seg.isEnd ? "11px" : "0"} ${seg.isStart ? "11px" : "0"}`,
+                            borderRadius: `${seg.isStart ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isStart ? "14px" : "0"}`,
                             zIndex: seg.isStart ? 2 : 1,
-                            paddingLeft: seg.isStart ? "8px" : "3px",
-                            paddingRight: seg.isEnd ? "8px" : "3px",
+                            paddingLeft: seg.isStart ? "3px" : "4px",
+                            paddingRight: seg.isEnd ? "10px" : "4px",
                             opacity: seg.isPast ? 0.7 : 1,
                             border: "1px solid rgba(0,0,0,0.15)",
                             borderTop: "1px solid rgba(255,255,255,0.1)",
@@ -325,8 +334,18 @@ export default function MonthlyView({
                           onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
+                          {/* Platform logo circle */}
+                          {seg.isStart && logo && (
+                            <div
+                              className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
+                              style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={logo} alt="" className="w-[14px] h-[14px] md:w-[16px] md:h-[16px]" />
+                            </div>
+                          )}
                           {showText && (
-                            <span className="truncate text-[10px] md:text-[11px] font-medium">{firstName} +{seg.nights}</span>
+                            <span className="truncate text-[11px] md:text-[12px] font-medium">{firstName} +{seg.nights}</span>
                           )}
                         </div>
                       );
