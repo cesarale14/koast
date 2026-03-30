@@ -73,21 +73,6 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
   );
 }
 
-function Breadcrumb() {
-  const pathname = usePathname();
-  const allItems = navGroups.flat();
-  const current = allItems.find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href));
-  const sectionIdx = navGroups.findIndex((g) => g.some((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href)));
-  const section = ["Main", "Revenue", "Operations"][sectionIdx] ?? "Main";
-  return (
-    <div className="hidden md:flex items-center gap-2 text-sm">
-      <span className="text-neutral-400">{section}</span>
-      <span className="text-neutral-300">/</span>
-      <span className="text-neutral-700 font-medium">{current?.name ?? "Overview"}</span>
-    </div>
-  );
-}
-
 /* ---- Desktop sidebar — toggleable collapsed/expanded ---- */
 function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; expanded: boolean; onToggle: () => void }) {
   return (
@@ -250,7 +235,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="md:hidden text-sm font-medium text-neutral-700">
                 {navGroups.flat().find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Overview"}
               </span>
-              {/* breadcrumb removed — cleaner topbar */}
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <button className="relative text-neutral-400 hover:text-neutral-600 transition-colors"><Bell size={18} strokeWidth={1.5} /></button>
