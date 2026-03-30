@@ -8,35 +8,31 @@ const TOTAL_MONTHS = 24;
 const GAP = 3;
 
 const platformColors: Record<string, string> = {
-  airbnb: "#333333",
-  vrbo: "#3B5998",
-  booking_com: "#003580",
-  booking: "#003580",
-  direct: "#10B981",
+  airbnb: "#333333", vrbo: "#3B5998", booking_com: "#003580", booking: "#003580", direct: "#10B981",
 };
-
 const platformLogos: Record<string, string> = {
-  airbnb: "/logos/airbnb.svg",
-  vrbo: "/logos/vrbo.svg",
-  booking_com: "/logos/booking.svg",
-  booking: "/logos/booking.svg",
-  direct: "/logos/direct.svg",
+  airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
 };
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_LABELS_SHORT = ["M", "T", "W", "T", "F", "S", "S"];
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-const MONTH_ABBRS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-interface DayInfo { date: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; isPast: boolean; }
-interface BookingSegment { booking: BookingBarData; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; row: number; nights: number; isPast: boolean; }
-interface MonthData { year: number; month: number; label: string; abbr: string; key: string; weeks: DayInfo[][]; }
+interface DayInfo { date: string; dayNum: number; isToday: boolean; isPast: boolean; gridCol: number; gridRow: number; }
+
+interface BarSegment {
+  booking: BookingBarData;
+  startCol: number; endCol: number; row: number;
+  isStart: boolean; isEnd: boolean; // actual checkin/checkout (gets offset)
+  capLeft: boolean; capRight: boolean; // rounded cap (month break or actual start/end)
+  nights: number; isPast: boolean;
+}
+
+interface MonthData {
+  year: number; month: number; label: string; abbr: string; key: string;
+  days: DayInfo[]; startDow: number; totalDays: number;
+}
 
 export interface MonthlyViewProps {
   propertyId: string;
@@ -55,67 +51,78 @@ function getNights(ci: string, co: string): number {
     Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10))) / 86400000);
 }
 
-function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[][] {
+function buildMonthDays(year: number, month: number, todayStr: string): { days: DayInfo[]; startDow: number; totalDays: number } {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-  let dow = first.getDay() - 1;
-  if (dow < 0) dow = 6;
-  const weeks: DayInfo[][] = [];
-  let week: DayInfo[] = [];
-  const prevLast = new Date(year, month, 0);
-  for (let i = dow - 1; i >= 0; i--) {
-    const d = prevLast.getDate() - i;
-    const date = toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d);
-    week.push({ date, dayNum: d, isCurrentMonth: false, isToday: false, isPast: date < todayStr });
-  }
-  for (let d = 1; d <= last.getDate(); d++) {
-    if (week.length === 7) { weeks.push(week); week = []; }
+  let startDow = first.getDay() - 1; // Mon=0 Sun=6
+  if (startDow < 0) startDow = 6;
+  const totalDays = last.getDate();
+  const days: DayInfo[] = [];
+  for (let d = 1; d <= totalDays; d++) {
     const date = toDateStr(year, month, d);
-    week.push({ date, dayNum: d, isCurrentMonth: true, isToday: date === todayStr, isPast: date < todayStr });
+    const gridPos = d - 1 + startDow;
+    days.push({ date, dayNum: d, isToday: date === todayStr, isPast: date < todayStr, gridCol: gridPos % 7, gridRow: Math.floor(gridPos / 7) });
   }
-  let nd = 1;
-  const nm = month === 11 ? 0 : month + 1;
-  const ny = month === 11 ? year + 1 : year;
-  while (week.length < 7) {
-    const date = toDateStr(ny, nm, nd);
-    week.push({ date, dayNum: nd, isCurrentMonth: false, isToday: date === todayStr, isPast: date < todayStr });
-    nd++;
-  }
-  weeks.push(week);
-  return weeks;
+  return { days, startDow, totalDays };
 }
 
-function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][], todayStr: string): BookingSegment[] {
-  const dateToPos = new Map<string, { row: number; col: number }>();
-  weeks.forEach((w, row) => w.forEach((d, col) => dateToPos.set(d.date, { row, col })));
-  const gridStart = weeks[0][0].date;
-  const gridEnd = weeks[weeks.length - 1][6].date;
-  const segments: BookingSegment[] = [];
+function buildBarSegments(bookings: BookingBarData[], year: number, month: number, startDow: number, totalDays: number, todayStr: string): BarSegment[] {
+  const monthStart = toDateStr(year, month, 1);
+  const monthEnd = toDateStr(year, month, totalDays);
+  const nm = month === 11 ? 0 : month + 1;
+  const ny = month === 11 ? year + 1 : year;
+  const nextFirst = toDateStr(ny, nm, 1);
+  const segments: BarSegment[] = [];
+
   for (const booking of bookings) {
-    const bStart = booking.check_in < gridStart ? gridStart : booking.check_in;
-    const bEnd = booking.check_out > gridEnd ? gridEnd : booking.check_out;
-    const startPos = dateToPos.get(bStart);
-    const endPos = dateToPos.get(bEnd);
-    if (!startPos || !endPos) continue;
-    const isActualStart = bStart === booking.check_in;
-    const isActualEnd = bEnd === booking.check_out;
+    if (booking.check_in >= nextFirst || booking.check_out <= monthStart) continue;
+
     const nights = getNights(booking.check_in, booking.check_out);
     const isPast = booking.check_out <= todayStr;
-    for (let row = startPos.row; row <= endPos.row; row++) {
+
+    // Bar start in this month
+    let barStartDay: number, isStart: boolean, capLeft: boolean;
+    if (booking.check_in < monthStart) {
+      barStartDay = 1; isStart = false; capLeft = true; // month-break cap
+    } else {
+      barStartDay = parseInt(booking.check_in.slice(8, 10));
+      isStart = true; capLeft = true;
+    }
+
+    // Bar end in this month
+    let barEndDay: number, isEnd: boolean, capRight: boolean;
+    if (booking.check_out > monthEnd) {
+      barEndDay = totalDays; isEnd = false; capRight = true; // month-break cap
+    } else {
+      barEndDay = parseInt(booking.check_out.slice(8, 10));
+      isEnd = true; capRight = true;
+    }
+
+    // Grid positions
+    const startGridPos = barStartDay - 1 + startDow;
+    const endGridPos = barEndDay - 1 + startDow;
+    const sRow = Math.floor(startGridPos / 7);
+    const sCol = startGridPos % 7;
+    const eRow = Math.floor(endGridPos / 7);
+    const eCol = endGridPos % 7;
+
+    for (let row = sRow; row <= eRow; row++) {
+      const sc = row === sRow ? sCol : 0;
+      const ec = row === eRow ? eCol : 6;
       segments.push({
-        booking,
-        startCol: row === startPos.row ? startPos.col : 0,
-        endCol: row === endPos.row ? endPos.col : 6,
-        isStart: row === startPos.row && isActualStart,
-        isEnd: row === endPos.row && isActualEnd,
-        row, nights, isPast,
+        booking, startCol: sc, endCol: ec, row,
+        isStart: row === sRow && isStart,
+        isEnd: row === eRow && isEnd,
+        capLeft: row === sRow ? capLeft : false,
+        capRight: row === eRow ? capRight : false,
+        nights, isPast,
       });
     }
   }
   return segments;
 }
 
-const rowVars = {
+const gridVars = {
   "--col": `calc((100% + ${GAP}px) / 7)`,
   "--cell": `calc((100% + ${GAP}px) / 7 - ${GAP}px)`,
 } as React.CSSProperties;
@@ -131,20 +138,21 @@ export default function MonthlyView({
     for (let i = 0; i < TOTAL_MONTHS; i++) {
       const m = (thisMonth + i) % 12;
       const y = thisYear + Math.floor((thisMonth + i) / 12);
+      const { days, startDow, totalDays } = buildMonthDays(y, m, todayStr);
       result.push({
         year: y, month: m,
         label: `${MONTH_NAMES[m]} ${y}`,
         abbr: y !== thisYear ? `${MONTH_ABBRS[m]} '${String(y).slice(2)}` : MONTH_ABBRS[m],
         key: `${y}-${pad2(m + 1)}`,
-        weeks: getMonthWeeks(y, m, todayStr),
+        days, startDow, totalDays,
       });
     }
     return result;
   }, [todayStr, thisYear, thisMonth]);
 
   const segmentsByMonth = useMemo(() => {
-    const map = new Map<string, BookingSegment[]>();
-    for (const m of months) map.set(m.key, getBookingSegments(bookings, m.weeks, todayStr));
+    const map = new Map<string, BarSegment[]>();
+    for (const m of months) map.set(m.key, buildBarSegments(bookings, m.year, m.month, m.startDow, m.totalDays, todayStr));
     return map;
   }, [months, bookings, todayStr]);
 
@@ -166,15 +174,13 @@ export default function MonthlyView({
     const el = monthRefs.current.get(key);
     if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 28;
   }, []);
-
   const scrollToToday = useCallback(() => {
-    const m = months.find((m) => m.weeks.some((w) => w.some((d) => d.isToday)));
+    const m = months.find((m) => m.days.some((d) => d.isToday));
     if (m) { scrollToMonth(m.key); setActiveMonth(m.key); }
   }, [months, scrollToMonth]);
 
   useEffect(() => { const t = setTimeout(scrollToToday, 80); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (todayTrigger > 0) scrollToToday(); }, [todayTrigger, scrollToToday]);
-
   useEffect(() => {
     const c = containerRef.current;
     if (!c) return;
@@ -191,21 +197,15 @@ export default function MonthlyView({
       {/* Month pills — desktop only */}
       <div className="hidden md:flex gap-1.5 px-3 py-2 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
-          <button
-            key={m.key}
-            onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
+          <button key={m.key} onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
             className={`px-2 py-0.5 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors flex-shrink-0 ${
               activeMonth === m.key ? "bg-[#222] text-white" : "text-[#999] hover:text-[#555] hover:bg-[#f5f5f5]"
-            }`}
-          >
-            {m.abbr}
-          </button>
+            }`}>{m.abbr}</button>
         ))}
       </div>
 
-      {/* Scrollable calendar */}
       <div ref={containerRef} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
-        {/* Sticky day-of-week header */}
+        {/* Sticky day header */}
         <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l, i) => (
             <div key={`${l}-${i}`} className="py-1 md:py-1.5 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">
@@ -215,7 +215,7 @@ export default function MonthlyView({
           ))}
         </div>
 
-        {/* All 24 month sections */}
+        {/* Month sections — only actual days, no padding cells */}
         {months.map((m) => {
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
@@ -224,135 +224,106 @@ export default function MonthlyView({
                 <span className="text-lg md:text-xl font-bold text-[#222]">{m.label}</span>
               </div>
 
-              {m.weeks.map((week, weekIdx) => {
-                const rowSegs = segments.filter((s) => s.row === weekIdx);
-                return (
-                  <div
-                    key={weekIdx}
-                    className="relative grid grid-cols-7"
-                    style={{ gap: `${GAP}px`, marginBottom: `${GAP}px`, overflow: "visible", ...rowVars }}
-                  >
-                    {week.map((day) => {
-                      const rate = rates.get(day.date);
-                      const isAvail = rate?.is_available !== false;
-                      const rawRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
-                      const isBooked = bookedDates.has(day.date);
-                      const isBlocked = !isAvail && !isBooked;
+              {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
+              <div className="relative grid grid-cols-7" style={{ gap: `${GAP}px`, overflow: "visible", ...gridVars }}>
+                {m.days.map((day, i) => {
+                  const rate = rates.get(day.date);
+                  const isAvail = rate?.is_available !== false;
+                  const rawRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
+                  const isBooked = bookedDates.has(day.date);
+                  const isBlocked = !isAvail && !isBooked;
 
-                      return (
-                        <div
-                          key={day.date}
-                          className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
-                            !day.isCurrentMonth
-                              ? "bg-[#fafafa]"
-                              : day.isPast
-                                ? "bg-[#f9f9f7]"
-                                : isBlocked
-                                  ? "bg-[#f5f5f5]"
-                                  : day.isToday
-                                    ? "bg-white"
-                                    : "bg-white hover:bg-[#fafafa]"
-                          }`}
-                          style={{
-                            minHeight: undefined,
-                            padding: undefined,
-                            border: "1px solid #e8e8e8",
-                            ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
-                          }}
-                          onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
-                        >
-                          {/* Inner content with responsive padding */}
-                          <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
-                            <div>
-                              {day.isToday ? (
-                                <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">
-                                  {day.dayNum}
-                                </span>
-                              ) : (
-                                <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${
-                                  !day.isCurrentMonth ? "text-[#ccc]"
-                                    : day.isPast ? "text-[#bbb]"
-                                    : "text-[#333]"
-                                }`}>
-                                  {day.dayNum}
-                                </span>
-                              )}
-                            </div>
-                            {/* Rate: hide on mobile booked/past, show below date on mobile */}
-                            {!isBooked && !day.isPast && rawRate !== null && day.isCurrentMonth && isAvail && (
-                              <span className="self-end text-[10px] md:text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Booking bars — 32px, platform logos */}
-                    {rowSegs.map((seg, si) => {
-                      const span = seg.endCol - seg.startCol + 1;
-                      const startFrac = seg.isStart ? 0.3 : 0;
-                      const endFrac = seg.isEnd ? 0.65 : 0;
-
-                      const left = startFrac > 0
-                        ? `calc(var(--col) * ${seg.startCol} + var(--cell) * ${startFrac})`
-                        : `calc(var(--col) * ${seg.startCol})`;
-
-                      const subs = [`${GAP}px`];
-                      if (startFrac > 0) subs.push(`var(--cell) * ${startFrac}`);
-                      if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
-                      const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
-
-                      const color = platformColors[seg.booking.platform] ?? "#333333";
-                      const logo = platformLogos[seg.booking.platform] ?? null;
-                      const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
-                      const effectiveSpan = span - startFrac - endFrac;
-                      const showText = effectiveSpan >= 1.5;
-
-                      const shadow = seg.isStart
-                        ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
-                        : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
-
-                      return (
-                        <div
-                          key={`${seg.booking.id}-${weekIdx}-${si}`}
-                          className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
-                          style={{
-                            left, width,
-                            bottom: "3px",
-                            backgroundColor: color,
-                            borderRadius: `${seg.isStart ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isStart ? "14px" : "0"}`,
-                            zIndex: seg.isStart ? 2 : 1,
-                            paddingLeft: seg.isStart ? "3px" : "4px",
-                            paddingRight: seg.isEnd ? "10px" : "4px",
-                            opacity: seg.isPast ? 0.7 : 1,
-                            border: "1px solid rgba(0,0,0,0.15)",
-                            borderTop: "1px solid rgba(255,255,255,0.1)",
-                            boxShadow: shadow,
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = shadow; }}
-                          onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
-                          title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
-                        >
-                          {/* Platform logo circle */}
-                          {seg.isStart && logo && (
-                            <div
-                              className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
-                              style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={logo} alt="" className="w-[14px] h-[14px] md:w-[16px] md:h-[16px]" />
-                            </div>
-                          )}
-                          {showText && (
-                            <span className="truncate text-[11px] md:text-[12px] font-medium">{firstName} +{seg.nights}</span>
+                  return (
+                    <div
+                      key={day.date}
+                      className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
+                        day.isPast ? "bg-[#f9f9f7]" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
+                      }`}
+                      style={{
+                        border: "1px solid #e8e8e8",
+                        ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
+                        ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
+                      }}
+                      onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
+                    >
+                      <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
+                        <div>
+                          {day.isToday ? (
+                            <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">{day.dayNum}</span>
+                          ) : (
+                            <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                        {!isBooked && !day.isPast && rawRate !== null && isAvail && (
+                          <span className="self-end text-[10px] md:text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Booking bars — positioned by grid row/col using calc with --col */}
+                {segments.map((seg, si) => {
+                  const span = seg.endCol - seg.startCol + 1;
+                  const startFrac = seg.isStart ? 0.3 : 0;
+                  const endFrac = seg.isEnd ? 0.65 : 0;
+
+                  const left = startFrac > 0
+                    ? `calc(var(--col) * ${seg.startCol} + var(--cell) * ${startFrac})`
+                    : `calc(var(--col) * ${seg.startCol})`;
+                  const subs = [`${GAP}px`];
+                  if (startFrac > 0) subs.push(`var(--cell) * ${startFrac}`);
+                  if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
+                  const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
+
+                  // Position bar at bottom of its row: top = row bottom - 3px, then translateY(-100%)
+                  const top = `calc(var(--col) * ${seg.row} + var(--cell) - 3px)`;
+
+                  const color = platformColors[seg.booking.platform] ?? "#333333";
+                  const logo = platformLogos[seg.booking.platform] ?? null;
+                  const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
+                  const effectiveSpan = span - startFrac - endFrac;
+                  const showText = effectiveSpan >= 1.5;
+
+                  const rL = seg.capLeft ? "14px" : "0";
+                  const rR = seg.capRight ? "14px" : "0";
+                  const shadow = seg.isStart
+                    ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
+                    : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+
+                  return (
+                    <div
+                      key={`${seg.booking.id}-${seg.row}-${si}`}
+                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
+                      style={{
+                        left, width, top, transform: "translateY(-100%)",
+                        backgroundColor: color,
+                        borderRadius: `${rL} ${rR} ${rR} ${rL}`,
+                        zIndex: seg.isStart ? 2 : 1,
+                        paddingLeft: seg.capLeft ? "3px" : "4px",
+                        paddingRight: seg.capRight ? "10px" : "4px",
+                        opacity: seg.isPast ? 0.7 : 1,
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        borderTop: "1px solid rgba(255,255,255,0.1)",
+                        boxShadow: shadow,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = shadow; }}
+                      onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
+                      title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
+                    >
+                      {seg.capLeft && logo && (
+                        <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
+                          style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={logo} alt="" className="w-[14px] h-[14px] md:w-[16px] md:h-[16px]" />
+                        </div>
+                      )}
+                      {showText && <span className="truncate text-[11px] md:text-[12px] font-medium">{firstName} +{seg.nights}</span>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
