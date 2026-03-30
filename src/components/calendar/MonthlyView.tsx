@@ -212,6 +212,28 @@ export default function MonthlyView({
     return set;
   }, [bookings]);
 
+  // Gap night detection — 1-2 available nights between bookings
+  const gapDates = useMemo(() => {
+    const gaps = new Set<string>();
+    const sorted = [...bookings]
+      .filter((b) => b.check_out >= todayStr)
+      .sort((a, b) => a.check_in.localeCompare(b.check_in));
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const co = sorted[i].check_out;
+      const ci = sorted[i + 1].check_in;
+      const gapNights = getNights(co, ci);
+      if (gapNights >= 1 && gapNights <= 2) {
+        const d = new Date(co + "T00:00:00");
+        const end = new Date(ci + "T00:00:00");
+        while (d < end) {
+          gaps.add(d.toISOString().split("T")[0]);
+          d.setDate(d.getDate() + 1);
+        }
+      }
+    }
+    return gaps;
+  }, [bookings, todayStr]);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [activeMonth, setActiveMonth] = useState(months[0]?.key ?? "");
@@ -278,13 +300,14 @@ export default function MonthlyView({
                   const rawRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
                   const isBooked = bookedDates.has(day.date);
                   const isBlocked = !isAvail && !isBooked;
+                  const isGap = gapDates.has(day.date);
 
                   return (
                     <div
                       key={day.date}
                       data-cell
                       className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
-                        day.isPast ? "bg-[#f9f9f7]" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
+                        day.isPast ? "bg-[#f9f9f7]" : isGap ? "bg-amber-50" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
                       }`}
                       style={{
                         border: "1px solid #e8e8e8",
@@ -308,6 +331,10 @@ export default function MonthlyView({
                             const dotColor = ev.impact > 0.6 ? "bg-red-400" : ev.impact > 0.3 ? "bg-amber-400" : "bg-neutral-300";
                             return <span className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} title={ev.name} />;
                           })()}
+                          {/* Gap night indicator */}
+                          {isGap && !day.isPast && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-200 flex-shrink-0" title="Gap night — hard to fill" />
+                          )}
                         </div>
                         {/* Rate with comparison color */}
                         {!isBooked && !day.isPast && rawRate !== null && isAvail && (() => {

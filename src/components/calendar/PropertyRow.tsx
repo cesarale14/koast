@@ -16,6 +16,8 @@ interface PropertyRowProps {
   onDateClick: (propertyId: string, date: string, rate: RateData | null) => void;
   onDragStart: (propertyId: string, date: string) => void;
   onDragEnter: (propertyId: string, date: string) => void;
+  events?: Map<string, { name: string; impact: number }>;
+  gaps?: Set<string>;
 }
 
 export default function PropertyRow({
@@ -31,6 +33,8 @@ export default function PropertyRow({
   onDateClick,
   onDragStart,
   onDragEnter,
+  events,
+  gaps,
 }: PropertyRowProps) {
   const visibleDates = dates.slice(visibleStart, visibleEnd);
 
@@ -103,6 +107,8 @@ export default function PropertyRow({
                 onDragStart={(d) => onDragStart(property.id, d)}
                 onDragEnter={(d) => onDragEnter(property.id, d)}
                 coverage={coverage}
+                event={events?.get(date) ?? null}
+                isGap={gaps?.has(date)}
               />
             </div>
           );

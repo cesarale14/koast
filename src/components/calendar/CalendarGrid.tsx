@@ -41,6 +41,11 @@ interface CalendarRate {
   rate_source: string;
 }
 
+interface CalendarEvent {
+  name: string;
+  impact: number;
+}
+
 interface CalendarGridProps {
   properties: CalendarProperty[];
   bookings: CalendarBooking[];
@@ -152,6 +157,58 @@ export default function CalendarGrid({
     }
     return map;
   }, [bookings]);
+
+  // ---------- Events (per property) ----------
+  const [eventLookup, setEventLookup] = useState<Map<string, Map<string, CalendarEvent>>>(new Map());
+  useEffect(() => {
+    const map = new Map<string, Map<string, CalendarEvent>>();
+    const fetches = properties.map((p) =>
+      fetch(`/api/analytics/forecast/${p.id}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => {
+          if (!d?.forecast) return;
+          const dateMap = new Map<string, CalendarEvent>();
+          for (const f of d.forecast as { date: string; demand_score: number; factors: string[] }[]) {
+            const eventFactor = f.factors.find((fac: string) =>
+              !fac.includes("season") && !fac.includes("DOW") && !fac.includes("Market") &&
+              !fac.includes("Supply") && !fac.includes("learned") && !fac.includes("default") &&
+              !fac.includes("Clear") && !fac.includes("Rain")
+            );
+            if (eventFactor) dateMap.set(f.date, { name: eventFactor, impact: f.demand_score / 100 });
+          }
+          map.set(p.id, dateMap);
+        })
+        .catch(() => {})
+    );
+    Promise.all(fetches).then(() => setEventLookup(new Map(map)));
+  }, [properties]);
+
+  // ---------- Gap nights (per property) ----------
+  const gapLookup = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const propId of Array.from(bookingLookup.keys())) {
+      const propBookings = bookingLookup.get(propId)!;
+      const gaps = new Set<string>();
+      const sorted = [...propBookings].sort((a, b) => a.check_in.localeCompare(b.check_in));
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const co = sorted[i].check_out;
+        const ci = sorted[i + 1].check_in;
+        const gapMs = Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10)) -
+                      Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10));
+        const gapNights = Math.round(gapMs / 86400000);
+        if (gapNights >= 1 && gapNights <= 2) {
+          const d = new Date(co + "T00:00:00");
+          const end = new Date(ci + "T00:00:00");
+          while (d < end) {
+            gaps.add(d.toISOString().split("T")[0]);
+            d.setDate(d.getDate() + 1);
+          }
+        }
+      }
+      map.set(propId, gaps);
+    }
+    return map;
+  }, [bookingLookup]);
 
   // ---------- Timeline dates ----------
   const allDates = generateDates(today, totalDays);
@@ -473,6 +530,8 @@ export default function CalendarGrid({
                     onDateClick={handleDateClick}
                     onDragStart={handleDragStart}
                     onDragEnter={handleDragEnter}
+                    events={eventLookup.get(prop.id) ?? new Map()}
+                    gaps={gapLookup.get(prop.id) ?? new Set()}
                   />
                 </div>
               </div>
