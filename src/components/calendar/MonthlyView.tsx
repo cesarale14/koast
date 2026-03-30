@@ -292,10 +292,15 @@ export default function MonthlyView({
                       const effectiveSpan = span - startFrac - endFrac;
                       const showText = effectiveSpan >= 1.5;
 
+                      // Incoming bars cast a left-shadow onto the outgoing bar
+                      const shadow = seg.isStart
+                        ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
+                        : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+
                       return (
                         <div
                           key={`${seg.booking.id}-${weekIdx}-${si}`}
-                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-125 transition-all"
+                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px"
                           style={{
                             left, width,
                             bottom: "4px",
@@ -306,7 +311,12 @@ export default function MonthlyView({
                             paddingLeft: seg.isStart ? "10px" : "4px",
                             paddingRight: seg.isEnd ? "10px" : "4px",
                             opacity: seg.isPast ? 0.7 : 1,
+                            border: "1px solid rgba(0,0,0,0.15)",
+                            borderTop: "1px solid rgba(255,255,255,0.1)",
+                            boxShadow: shadow,
                           }}
+                          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = shadow; }}
                           onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
