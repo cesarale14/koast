@@ -234,7 +234,7 @@ export default function MonthlyView({
                       return (
                         <div
                           key={day.date}
-                          className={`relative aspect-square md:aspect-auto cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
+                          className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
                             !day.isCurrentMonth
                               ? "bg-[#fafafa]"
                               : day.isPast
