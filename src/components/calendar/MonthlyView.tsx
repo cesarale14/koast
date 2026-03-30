@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 3; // px gap between cells
+const GAP = 3;
 
 const platformColors: Record<string, string> = {
   airbnb: "#333333",
@@ -25,33 +25,11 @@ const MONTH_ABBRS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-interface DayInfo {
-  date: string;
-  dayNum: number;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-}
+interface DayInfo { date: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; }
+interface BookingSegment { booking: BookingBarData; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; row: number; nights: number; }
+interface MonthData { year: number; month: number; label: string; abbr: string; key: string; weeks: DayInfo[][]; }
 
-interface BookingSegment {
-  booking: BookingBarData;
-  startCol: number;
-  endCol: number;
-  isStart: boolean;
-  isEnd: boolean;
-  row: number;
-  nights: number;
-}
-
-interface MonthData {
-  year: number;
-  month: number;
-  label: string;
-  abbr: string;
-  key: string;
-  weeks: DayInfo[][];
-}
-
-interface MonthlyViewProps {
+export interface MonthlyViewProps {
   propertyId: string;
   bookings: BookingBarData[];
   rates: Map<string, RateData>;
@@ -78,8 +56,7 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
   const prevLast = new Date(year, month, 0);
   for (let i = dow - 1; i >= 0; i--) {
     const d = prevLast.getDate() - i;
-    const date = toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d);
-    week.push({ date, dayNum: d, isCurrentMonth: false, isToday: date === todayStr });
+    week.push({ date: toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d), dayNum: d, isCurrentMonth: false, isToday: false });
   }
   for (let d = 1; d <= last.getDate(); d++) {
     if (week.length === 7) { weeks.push(week); week = []; }
@@ -126,9 +103,6 @@ function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): Boo
   return segments;
 }
 
-// CSS custom properties for gap-aware column math
-// --col = one column track + gap = (100% + gap) / 7
-// --cell = one column width without gap = --col - gap
 const rowVars = {
   "--col": `calc((100% + ${GAP}px) / 7)`,
   "--cell": `calc((100% + ${GAP}px) / 7 - ${GAP}px)`,
@@ -178,7 +152,7 @@ export default function MonthlyView({
 
   const scrollToMonth = useCallback((key: string) => {
     const el = monthRefs.current.get(key);
-    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 36;
+    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 34;
   }, []);
 
   const scrollToToday = useCallback(() => {
@@ -194,21 +168,21 @@ export default function MonthlyView({
     if (!c) return;
     const obs = new IntersectionObserver(
       (entries) => { for (const e of entries) if (e.isIntersecting) { const k = e.target.getAttribute("data-month"); if (k) setActiveMonth(k); } },
-      { root: c, rootMargin: "-36px 0px -70% 0px", threshold: 0 },
+      { root: c, rootMargin: "-34px 0px -70% 0px", threshold: 0 },
     );
     monthRefs.current.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
   }, [months]);
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 190px)" }}>
+    <div className="bg-white flex flex-col flex-1 min-h-0">
       {/* Month pills */}
-      <div className="flex gap-1.5 px-4 py-3 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
+      <div className="flex gap-1.5 px-3 py-2.5 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button
             key={m.key}
             onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
-            className={`px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors flex-shrink-0 ${
+            className={`px-2 py-0.5 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors flex-shrink-0 ${
               activeMonth === m.key ? "bg-[#222] text-white" : "text-[#999] hover:text-[#555] hover:bg-[#f5f5f5]"
             }`}
           >
@@ -220,9 +194,9 @@ export default function MonthlyView({
       {/* Scrollable calendar */}
       <div ref={containerRef} className="overflow-y-auto flex-1 bg-white">
         {/* Sticky day-of-week header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] pb-1 border-b border-[#e8e8e8]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l) => (
-            <div key={l} className="py-2 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">{l}</div>
+            <div key={l} className="py-1.5 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">{l}</div>
           ))}
         </div>
 
@@ -231,12 +205,10 @@ export default function MonthlyView({
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              {/* Month header */}
-              <div className="sticky top-[35px] z-[9] bg-white px-1 pt-10 pb-3">
+              <div className="sticky top-[31px] z-[9] bg-white px-1 pt-10 pb-2">
                 <span className="text-xl font-bold text-[#222]">{m.label}</span>
               </div>
 
-              {/* Week rows */}
               {m.weeks.map((week, weekIdx) => {
                 const rowSegs = segments.filter((s) => s.row === weekIdx);
                 return (
@@ -245,7 +217,6 @@ export default function MonthlyView({
                     className="relative grid grid-cols-7"
                     style={{ gap: `${GAP}px`, marginBottom: `${GAP}px`, overflow: "visible", ...rowVars }}
                   >
-                    {/* Cells */}
                     {week.map((day) => {
                       const rate = rates.get(day.date);
                       const isAvail = rate?.is_available !== false;
@@ -256,47 +227,46 @@ export default function MonthlyView({
                       return (
                         <div
                           key={day.date}
-                          className={`relative aspect-square rounded-[10px] p-2 flex flex-col justify-between cursor-pointer transition-colors ${
+                          className={`relative rounded-[10px] cursor-pointer transition-colors flex flex-col justify-between ${
                             !day.isCurrentMonth ? "bg-[#fafafa]" : isBlocked ? "bg-[#f5f5f5]" : "bg-white hover:bg-[#fafafa]"
                           }`}
                           style={{
+                            minHeight: "100px",
+                            padding: "6px",
                             border: "1px solid #e8e8e8",
                             ...(isBlocked ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                           }}
                           onClick={() => { if (!isBooked) onDateClick(propertyId, day.date, rate ?? null); }}
                         >
-                          {/* Date number */}
                           <div>
                             {day.isToday ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500 text-white text-[14px] font-semibold">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-[13px] font-semibold leading-none">
                                 {day.dayNum}
                               </span>
                             ) : (
-                              <span className={`text-[14px] font-semibold ${day.isCurrentMonth ? "text-[#333]" : "text-[#ccc]"}`}>
+                              <span className={`text-[13px] font-semibold leading-none ${day.isCurrentMonth ? "text-[#333]" : "text-[#ccc]"}`}>
                                 {day.dayNum}
                               </span>
                             )}
                           </div>
-                          {/* Rate — bottom right, only on available unbooked dates */}
                           {!isBooked && rawRate !== null && day.isCurrentMonth && isAvail && (
-                            <span className="self-end text-[12px] font-mono text-[#999]">${rawRate}</span>
+                            <span className="self-end text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
                           )}
                         </div>
                       );
                     })}
 
-                    {/* Booking bars — gap-aware absolute positioning */}
+                    {/* Booking bars */}
                     {rowSegs.map((seg, si) => {
                       const span = seg.endCol - seg.startCol + 1;
-                      const startFrac = seg.isStart ? 0.4 : 0;
-                      const endFrac = seg.isEnd ? 0.5 : 0;
+                      // Outgoing ends at 35% of cell → remove 65%; incoming starts at 30%
+                      const startFrac = seg.isStart ? 0.3 : 0;
+                      const endFrac = seg.isEnd ? 0.65 : 0;
 
-                      // left = col * startCol + cell * startFrac
                       const left = startFrac > 0
                         ? `calc(var(--col) * ${seg.startCol} + var(--cell) * ${startFrac})`
                         : `calc(var(--col) * ${seg.startCol})`;
 
-                      // width = col * span - gap - cell * startFrac - cell * endFrac
                       const subs = [`${GAP}px`];
                       if (startFrac > 0) subs.push(`var(--cell) * ${startFrac}`);
                       if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
@@ -305,7 +275,7 @@ export default function MonthlyView({
                       const color = platformColors[seg.booking.platform] ?? "#333333";
                       const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
                       const effectiveSpan = span - startFrac - endFrac;
-                      const showText = effectiveSpan >= 1.8;
+                      const showText = effectiveSpan >= 1.5;
 
                       return (
                         <div
@@ -325,9 +295,7 @@ export default function MonthlyView({
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
                           {showText && (
-                            <span className="truncate text-[11px] font-medium">
-                              {firstName} + {seg.nights}
-                            </span>
+                            <span className="truncate text-[11px] font-medium">{firstName} + {seg.nights}</span>
                           )}
                         </div>
                       );

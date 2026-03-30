@@ -331,6 +331,38 @@ export default function CalendarGrid({
 
   const selectedDates = getSelectedDates();
 
+  // ---------- Monthly property stats ----------
+  const monthlyStats = useMemo(() => {
+    if (!monthlyPropertyId) return { nextCheckIn: "—", occupancy: 0, avgRate: 0 };
+    const propBookings = bookingLookup.get(monthlyPropertyId) ?? [];
+    const propRates = rateLookup.get(monthlyPropertyId) ?? new Map<string, RateData>();
+
+    const upcoming = propBookings
+      .filter((b) => b.check_in >= todayStr)
+      .sort((a, b) => a.check_in.localeCompare(b.check_in));
+    const nextCheckIn = upcoming[0]
+      ? new Date(upcoming[0].check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : "—";
+
+    let bookedNights = 0;
+    const days = 30;
+    for (let i = 0; i < days; i++) {
+      const d = new Date(); d.setDate(d.getDate() + i);
+      const ds = d.toISOString().split("T")[0];
+      if (propBookings.some((b) => ds >= b.check_in && ds < b.check_out)) bookedNights++;
+    }
+    const occupancy = Math.round((bookedNights / days) * 100);
+
+    let rateSum = 0, rateCount = 0;
+    propRates.forEach((r) => {
+      const rate = r.applied_rate ?? r.suggested_rate ?? r.base_rate;
+      if (rate) { rateSum += rate; rateCount++; }
+    });
+    const avgRate = rateCount > 0 ? Math.round(rateSum / rateCount) : 0;
+
+    return { nextCheckIn, occupancy, avgRate };
+  }, [monthlyPropertyId, bookingLookup, rateLookup, todayStr]);
+
   return (
     <div className="relative">
       <CalendarToolbar
@@ -457,15 +489,83 @@ export default function CalendarGrid({
 
       {/* ============ MONTHLY VIEW ============ */}
       {viewMode === "monthly" && (
-        <MonthlyView
-          propertyId={monthlyPropertyId}
-          bookings={bookingLookup.get(monthlyPropertyId) ?? []}
-          rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
-          todayStr={todayStr}
-          todayTrigger={monthlyTodayTrigger}
-          onBookingClick={setSelectedBooking}
-          onDateClick={handleDateClick}
-        />
+        <div
+          className="flex rounded-xl border border-[#e8e8e8] overflow-hidden bg-white"
+          style={{ maxHeight: "calc(100vh - 190px)" }}
+        >
+          {/* Left property panel — desktop only */}
+          <aside className="hidden md:flex flex-col w-[280px] flex-shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+            <div className="p-4">
+              <h3 className="text-[11px] font-medium uppercase tracking-widest text-[#999] mb-3">
+                Properties
+              </h3>
+              <div className="space-y-0.5">
+                {properties.map((p) => {
+                  const isActive = monthlyPropertyId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setMonthlyPropertyId(p.id)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition-colors ${
+                        isActive
+                          ? "bg-[#f5f5f5]"
+                          : "hover:bg-[#fafafa]"
+                      }`}
+                      style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${propColor(p.name)}`}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span
+                        className={`text-sm truncate ${isActive ? "font-semibold text-[#222]" : "text-[#555]"}`}
+                      >
+                        {p.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick stats */}
+            <div className="border-t border-[#e8e8e8] p-4 mt-auto">
+              <h3 className="text-[11px] font-medium uppercase tracking-widest text-[#999] mb-3">
+                Quick Stats
+              </h3>
+              <div className="space-y-2.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#999]">Next check-in</span>
+                  <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#999]">Occupancy</span>
+                  <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#999]">Avg rate</span>
+                  <span className="font-mono font-medium text-[#333]">
+                    {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Calendar grid — constrained width */}
+          <div className="flex-1 min-w-0" style={{ maxWidth: "900px" }}>
+            <MonthlyView
+              propertyId={monthlyPropertyId}
+              bookings={bookingLookup.get(monthlyPropertyId) ?? []}
+              rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
+              todayStr={todayStr}
+              todayTrigger={monthlyTodayTrigger}
+              onBookingClick={setSelectedBooking}
+              onDateClick={handleDateClick}
+            />
+          </div>
+        </div>
       )}
 
       {/* Booking side panel */}
