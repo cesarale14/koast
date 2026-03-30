@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useToast } from "@/components/ui/Toast";
 import StatCard from "@/components/ui/StatCard";
+import EventBadge from "@/components/ui/EventBadge";
 
 // ---------- Types ----------
 
@@ -669,6 +670,38 @@ export default function PricingDashboard({
             </button>
           </div>
         </div>
+
+          {/* Events affecting rates */}
+          <UpcomingEventsPanel propertyId={propertyId} />
+      </div>
+    </div>
+  );
+}
+
+// ---------- Upcoming Events Panel ----------
+function UpcomingEventsPanel({ propertyId }: { propertyId: string }) {
+  const [events, setEvents] = useState<{ name: string; date: string; impact: number; venue?: string; attendance?: number }[]>([]);
+  useEffect(() => {
+    fetch(`/api/analytics/forecast/${propertyId}`).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (!d?.high_demand_periods) return;
+      const evs: typeof events = [];
+      for (const p of d.high_demand_periods.slice(0, 5) as { start: string; end: string; avgScore: number; factors: string[] }[]) {
+        const eventFactor = p.factors.find((f) => !f.includes("season") && !f.includes("DOW") && !f.includes("Market") && !f.includes("Supply"));
+        if (eventFactor) evs.push({ name: eventFactor.replace(/\s*\(\+\d+\)/, ""), date: p.start, impact: p.avgScore / 100 });
+      }
+      setEvents(evs);
+    }).catch(() => {});
+  }, [propertyId]);
+
+  if (events.length === 0) return null;
+
+  return (
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+      <h2 className="text-lg font-bold text-neutral-800 mb-3">Events Affecting Rates</h2>
+      <div className="space-y-2">
+        {events.map((e, i) => (
+          <EventBadge key={i} name={e.name} impact={e.impact} date={e.date} venue={e.venue} attendance={e.attendance} />
+        ))}
       </div>
     </div>
   );
