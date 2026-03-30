@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useTransition } from "react";
+import { useState, useMemo, useCallback, useTransition, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   ScatterChart,
@@ -701,38 +701,241 @@ export default function AnalyticsDashboard({
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
         <h2 className="text-lg font-bold text-neutral-900 mb-4">30-Day Demand Outlook</h2>
         <div className="grid grid-cols-7 gap-1.5">
-          {/* Day-of-week headers */}
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="text-center text-[10px] font-medium text-neutral-400 pb-1">{d}</div>
           ))}
-          {/* Calendar cells */}
           {demandCalendarPadded.map((day, i) => {
-            if (day === null) {
-              return <div key={`pad-${i}`} />;
-            }
-            const bgClass =
-              day.demandLevel === "high"
-                ? "bg-brand-100"
-                : day.demandLevel === "moderate"
-                ? "bg-warning-light"
-                : "bg-danger-light";
+            if (day === null) return <div key={`pad-${i}`} />;
+            const bgClass = day.demandLevel === "high" ? "bg-brand-100" : day.demandLevel === "moderate" ? "bg-warning-light" : "bg-danger-light";
             return (
-              <div
-                key={day.date.toISOString()}
-                className={`${bgClass} rounded-md flex items-center justify-center aspect-square text-xs font-medium text-neutral-700`}
-                title={`${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.demandLevel} demand`}
-              >
-                {day.dayNum}
-              </div>
+              <div key={day.date.toISOString()} className={`${bgClass} rounded-md flex items-center justify-center aspect-square text-xs font-medium text-neutral-700`}
+                title={`${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.demandLevel} demand`}>{day.dayNum}</div>
             );
           })}
         </div>
-        {/* Legend */}
         <div className="flex gap-4 mt-3 text-[10px] text-neutral-400">
           <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-brand-100" /> High demand</div>
           <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-warning-light" /> Moderate</div>
           <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-danger-light" /> Lower demand</div>
         </div>
+      </div>
+
+      {/* ========== Market Health Score ========== */}
+      <MarketHealthCard snapshot={snapshot} />
+
+      {/* ========== 90-Day Demand Forecast ========== */}
+      <DemandForecastSection propertyId={propertyId} />
+
+      {/* ========== Revenue Optimization Scenarios ========== */}
+      <RevenueScenariosSection propertyId={propertyId} />
+    </div>
+  );
+}
+
+// ---------- Market Health Score Card ----------
+
+function MarketHealthCard({ snapshot }: { snapshot: MarketSnapshot | null }) {
+  const score = useMemo(() => {
+    if (!snapshot) return { score: 0, grade: "N/A", summary: "No market data.", strengths: [] as string[], risks: [] as string[] };
+    const adr = snapshot.market_adr ?? 0;
+    const occ = snapshot.market_occupancy ?? 0;
+    const revpar = snapshot.market_revpar ?? 0;
+    const supply = snapshot.market_supply ?? 0;
+    let s = 0;
+    const str: string[] = [];
+    const rsk: string[] = [];
+    if (adr > 200) { s += 15; str.push(`High ADR ($${Math.round(adr)})`); } else if (adr >= 150) { s += 10; } else if (adr > 0) { s += 5; rsk.push(`Low ADR ($${Math.round(adr)})`); }
+    if (occ > 65) { s += 20; str.push(`Strong occupancy (${Math.round(occ)}%)`); } else if (occ >= 50) { s += 15; } else if (occ > 0) { s += 5; rsk.push(`Low occupancy (${Math.round(occ)}%)`); }
+    if (supply > 0 && supply < 500) { s += 15; str.push("Low competition"); } else if (supply <= 2000) { s += 10; } else { s += 5; rsk.push(`${supply.toLocaleString()} listings`); }
+    if (revpar > 130) { s += 20; str.push(`High RevPAR ($${Math.round(revpar)})`); } else if (revpar >= 80) { s += 15; } else if (revpar > 0) { s += 5; rsk.push(`Low RevPAR ($${Math.round(revpar)})`); }
+    s = Math.min(100, s);
+    const g = s >= 85 ? "A" : s >= 75 ? "B+" : s >= 65 ? "B" : s >= 55 ? "C+" : s >= 45 ? "C" : "D";
+    const sum = s >= 70 ? "Strong market for STR investment." : s >= 50 ? "Moderate market — smart pricing needed." : "Challenging market conditions.";
+    return { score: s, grade: g, summary: sum, strengths: str, risks: rsk };
+  }, [snapshot]);
+
+  if (!snapshot) return null;
+
+  const gradeColor = score.grade.startsWith("A") ? "text-emerald-600 bg-emerald-50"
+    : score.grade.startsWith("B") ? "text-blue-600 bg-blue-50"
+    : score.grade.startsWith("C") ? "text-amber-600 bg-amber-50"
+    : "text-red-600 bg-red-50";
+
+  return (
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
+      <div className="flex items-start gap-6">
+        <div className={`w-20 h-20 rounded-2xl ${gradeColor} flex items-center justify-center flex-shrink-0`}>
+          <span className="text-3xl font-bold">{score.grade}</span>
+        </div>
+        <div className="flex-1">
+          <h2 className="text-lg font-bold text-neutral-900 mb-1">Market Health Score</h2>
+          <p className="text-sm text-neutral-500 mb-3">{score.summary}</p>
+          <div className="flex flex-wrap gap-4">
+            {score.strengths.length > 0 && (
+              <div>
+                <p className="text-[10px] font-medium text-neutral-400 uppercase mb-1">Strengths</p>
+                <div className="flex flex-wrap gap-1">{score.strengths.map((s) => (
+                  <span key={s} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs rounded-full">{s}</span>
+                ))}</div>
+              </div>
+            )}
+            {score.risks.length > 0 && (
+              <div>
+                <p className="text-[10px] font-medium text-neutral-400 uppercase mb-1">Risks</p>
+                <div className="flex flex-wrap gap-1">{score.risks.map((r) => (
+                  <span key={r} className="px-2 py-0.5 bg-red-50 text-red-700 text-xs rounded-full">{r}</span>
+                ))}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 90-Day Demand Forecast Section ----------
+
+interface ForecastDay { date: string; demand_score: number; demand_level: string; factors: string[]; suggested_action: string; }
+interface ForecastData { forecast: ForecastDay[]; summary: { high: number; moderate: number; low: number }; high_demand_periods: { start: string; end: string; avgScore: number; factors: string[] }[]; }
+
+function DemandForecastSection({ propertyId }: { propertyId: string }) {
+  const [data, setData] = useState<ForecastData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/analytics/forecast/${propertyId}`);
+      if (res.ok) setData(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [propertyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6"><p className="text-sm text-neutral-400">Loading demand forecast...</p></div>;
+  if (!data) return null;
+
+  const barColor = (score: number) => score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-emerald-400" : score >= 30 ? "bg-amber-400" : "bg-red-400";
+
+  return (
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
+      <h2 className="text-lg font-bold text-neutral-900 mb-1">90-Day Demand Forecast</h2>
+      <p className="text-sm text-neutral-500 mb-4">
+        Next 30 days: <strong>{data.summary.high}</strong> high, <strong>{data.summary.moderate}</strong> moderate, <strong>{data.summary.low}</strong> low demand days
+      </p>
+
+      {/* Heatmap bar */}
+      <div className="flex gap-px mb-4 rounded-lg overflow-hidden">
+        {data.forecast.slice(0, 90).map((d) => (
+          <div
+            key={d.date}
+            className={`flex-1 h-8 ${barColor(d.demand_score)} min-w-0`}
+            title={`${d.date}: Score ${d.demand_score} (${d.demand_level})\n${d.factors.join(", ")}\n${d.suggested_action}`}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-neutral-400 mb-4">
+        <span>Today</span>
+        <span>30 days</span>
+        <span>60 days</span>
+        <span>90 days</span>
+      </div>
+      <div className="flex gap-3 text-[10px] text-neutral-400 mb-4">
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Very high</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" /> High</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> Moderate</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400" /> Low</span>
+      </div>
+
+      {/* High demand periods */}
+      {data.high_demand_periods.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-neutral-700 mb-2">High Demand Periods</h3>
+          <div className="space-y-2">
+            {data.high_demand_periods.slice(0, 5).map((p, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-neutral-800">
+                    {new Date(p.start + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} — {new Date(p.end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </p>
+                  <p className="text-xs text-neutral-400">{p.factors.slice(0, 2).join(", ")}</p>
+                </div>
+                <span className="text-sm font-bold font-mono text-emerald-600">Score {p.avgScore}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Revenue Optimization Scenarios ----------
+
+interface ScenarioItem { id: string; name: string; icon: string; current_state: string; recommendation: string; estimated_impact: number; confidence: string; details: string; }
+interface ScenariosData { scenarios: ScenarioItem[]; total_opportunity: number; }
+
+const scenarioIcons: Record<string, string> = {
+  calendar: "📅", trending_up: "📈", discount: "🏷️", refresh: "♻️", crown: "👑",
+};
+
+function RevenueScenariosSection({ propertyId }: { propertyId: string }) {
+  const [data, setData] = useState<ScenariosData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/analytics/scenarios/${propertyId}`);
+      if (res.ok) setData(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [propertyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6"><p className="text-sm text-neutral-400">Analyzing revenue opportunities...</p></div>;
+  if (!data || data.scenarios.length === 0) return null;
+
+  return (
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-neutral-900">Revenue Opportunities</h2>
+          <p className="text-sm text-neutral-500">What-if scenarios based on your data</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-neutral-400">Total potential</p>
+          <p className="text-2xl font-bold font-mono text-emerald-600">+${data.total_opportunity.toLocaleString()}<span className="text-sm font-normal text-neutral-400">/yr</span></p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {data.scenarios.map((sc) => (
+          <div key={sc.id} className="border border-[var(--border)] rounded-lg p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{scenarioIcons[sc.icon] ?? "💡"}</span>
+                <div>
+                  <h3 className="text-sm font-semibold text-neutral-800">{sc.name}</h3>
+                  <p className="text-xs text-neutral-400">{sc.current_state}</p>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-lg font-bold font-mono text-emerald-600">+${sc.estimated_impact.toLocaleString()}</p>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                  sc.confidence === "high" ? "bg-emerald-50 text-emerald-700"
+                  : sc.confidence === "medium" ? "bg-amber-50 text-amber-700"
+                  : "bg-neutral-100 text-neutral-500"
+                }`}>{sc.confidence} confidence</span>
+              </div>
+            </div>
+            <p className="text-sm text-neutral-600 mb-1">{sc.recommendation}</p>
+            <p className="text-xs text-neutral-400">{sc.details}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
