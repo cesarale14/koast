@@ -6,16 +6,21 @@ import {
   gapNightSignal,
   bookingPaceSignal,
   eventSignal,
+  weatherSignal,
+  supplySignal,
+  leadTimeSignal,
   type SignalResult,
+  type LearnedDowRates,
 } from "./signals";
 import { getEventsForDate } from "@/lib/events/cache";
+import { fetchWeatherForecast } from "./weather";
 
 export interface CalendarRateUpdate {
   property_id: string;
   date: string;
   base_rate: number;
   suggested_rate: number;
-  applied_rate: number | null; // only set in auto mode
+  applied_rate: number | null;
   rate_source: "engine";
   factors: Record<string, SignalResult>;
 }
@@ -24,7 +29,7 @@ export interface PricingConfig {
   base_rate: number;
   min_rate: number;
   max_rate: number;
-  max_adjustment: number; // default 0.60 = ±60%
+  max_adjustment: number;
   pricing_mode: "manual" | "review" | "auto";
 }
 
@@ -58,21 +63,22 @@ export class PricingEngine {
     const startStr = startDate.toISOString().split("T")[0];
     const endStr = endDate.toISOString().split("T")[0];
 
-    // Fetch market snapshot
-    const { data: snapshots, error: snapErr } = await this.supabase
+    // ---------- Pre-fetch data ----------
+
+    // Market snapshot (demand score)
+    const { data: snapshots } = await this.supabase
       .from("market_snapshots")
-      .select("market_demand_score")
+      .select("market_demand_score, market_supply, snapshot_date")
       .eq("property_id", propertyId)
       .order("snapshot_date", { ascending: false })
-      .limit(1);
+      .limit(2);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const snapshotRows = (snapshots ?? []) as any[];
-    if (snapErr) console.error("[PricingEngine] snapshot query error:", snapErr);
-    console.log(`[PricingEngine] market_snapshots rows: ${snapshotRows.length}`, snapshotRows[0] ?? "none");
     const demandScore = snapshotRows[0]?.market_demand_score ?? null;
-    console.log(`[PricingEngine] demandScore: ${demandScore}`);
+    const currentListings = snapshotRows[0]?.market_supply ?? null;
+    const previousListings = snapshotRows[1]?.market_supply ?? null;
 
-    // Fetch comp set
+    // Comp set
     const { data: comps } = await this.supabase
       .from("market_comps")
       .select("comp_adr, comp_occupancy")
@@ -81,8 +87,11 @@ export class PricingEngine {
     const compData = (comps ?? []) as any[];
     const compAdrs = compData.map((c) => c.comp_adr).filter((v: number) => v > 0);
     const compOccs = compData.map((c) => c.comp_occupancy).filter((v: number) => v > 0);
+    const compMedianAdr = compAdrs.length > 0
+      ? [...compAdrs].sort((a, b) => a - b)[Math.floor(compAdrs.length / 2)]
+      : null;
 
-    // Fetch bookings for the date range
+    // Bookings
     const { data: bookingsData } = await this.supabase
       .from("bookings")
       .select("check_in, check_out")
@@ -93,7 +102,7 @@ export class PricingEngine {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bookings = (bookingsData ?? []) as any[];
 
-    // Fetch existing applied_rates for smoothing
+    // Existing rates for smoothing
     const { data: existingRates } = await this.supabase
       .from("calendar_rates")
       .select("date, applied_rate")
@@ -106,13 +115,10 @@ export class PricingEngine {
       if (r.applied_rate != null) rateMap.set(r.date, r.applied_rate);
     }
 
-    // Fetch property occupancy (this month approximation)
-    const monthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-      .toISOString().split("T")[0];
-    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0)
-      .toISOString().split("T")[0];
+    // Property occupancy
+    const monthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1).toISOString().split("T")[0];
+    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).toISOString().split("T")[0];
     const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
-
     const { data: monthBookings } = await this.supabase
       .from("bookings")
       .select("check_in, check_out")
@@ -120,7 +126,6 @@ export class PricingEngine {
       .lte("check_in", monthEnd)
       .gte("check_out", monthStart)
       .in("status", ["confirmed", "completed"]);
-
     let bookedNights = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const b of (monthBookings ?? []) as any[]) {
@@ -132,7 +137,55 @@ export class PricingEngine {
     }
     const propertyOccupancy = daysInMonth > 0 ? (bookedNights / daysInMonth) * 100 : null;
 
-    // Generate rates for each date
+    // Property coordinates (for weather)
+    const { data: propData } = await this.supabase
+      .from("properties")
+      .select("latitude, longitude")
+      .eq("id", propertyId)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const propRow = ((propData ?? []) as any[])[0];
+    const lat = propRow?.latitude ? parseFloat(propRow.latitude) : null;
+    const lng = propRow?.longitude ? parseFloat(propRow.longitude) : null;
+
+    // Weather forecast (cached daily)
+    const weatherForecast = await fetchWeatherForecast(lat, lng);
+
+    // Learned seasonality from pricing_outcomes (if 30+ data points)
+    let learnedDow: LearnedDowRates | null = null;
+    let avgLeadTimeDays: number | null = null;
+    const { data: outcomes } = await this.supabase
+      .from("pricing_outcomes")
+      .select("date, was_booked, days_before_checkin")
+      .eq("property_id", propertyId)
+      .order("date", { ascending: false })
+      .limit(180);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const outcomeRows = (outcomes ?? []) as any[];
+    if (outcomeRows.length >= 30) {
+      // Learn day-of-week booking rates
+      const dowCounts: Record<number, { booked: number; total: number }> = {};
+      for (let d = 0; d < 7; d++) dowCounts[d] = { booked: 0, total: 0 };
+      for (const o of outcomeRows) {
+        const dow = new Date(o.date + "T00:00:00").getDay();
+        dowCounts[dow].total++;
+        if (o.was_booked) dowCounts[dow].booked++;
+      }
+      learnedDow = {} as LearnedDowRates;
+      for (let d = 0; d < 7; d++) {
+        learnedDow[d] = dowCounts[d].total > 0 ? dowCounts[d].booked / dowCounts[d].total : 0.5;
+      }
+
+      // Average lead time for booked dates
+      const bookedOutcomes = outcomeRows.filter((o) => o.was_booked && o.days_before_checkin != null);
+      if (bookedOutcomes.length >= 5) {
+        avgLeadTimeDays = Math.round(
+          bookedOutcomes.reduce((s, o) => s + o.days_before_checkin, 0) / bookedOutcomes.length
+        );
+      }
+    }
+
+    // ---------- Calculate rates per date ----------
     const results: CalendarRateUpdate[] = [];
     let prevSuggested = cfg.base_rate;
 
@@ -140,55 +193,42 @@ export class PricingEngine {
     while (current <= endDate) {
       const dateStr = current.toISOString().split("T")[0];
       const isBooked = bookings.some(
-        (b: { check_in: string; check_out: string }) =>
-          dateStr >= b.check_in && dateStr < b.check_out
+        (b: { check_in: string; check_out: string }) => dateStr >= b.check_in && dateStr < b.check_out
       );
 
-      // Fetch events for this date
       const dateEvents = await getEventsForDate(this.supabase, propertyId, dateStr);
+      const currentRate = rateMap.get(dateStr) ?? cfg.base_rate;
 
-      // Calculate all 6 signals
+      // All 9 signals
       const signals: Record<string, SignalResult> = {
         demand: demandSignal(demandScore),
-        seasonality: seasonalitySignal(current),
-        competitor: competitorSignal(
-          rateMap.get(dateStr) ?? cfg.base_rate,
-          propertyOccupancy,
-          compAdrs,
-          compOccs
-        ),
+        seasonality: seasonalitySignal(current, learnedDow),
+        competitor: competitorSignal(currentRate, propertyOccupancy, compAdrs, compOccs),
         event: eventSignal(dateEvents),
         gap_night: gapNightSignal(dateStr, bookings),
-        booking_pace: bookingPaceSignal(dateStr, todayStr, isBooked),
+        booking_pace: bookingPaceSignal(dateStr, todayStr, isBooked, avgLeadTimeDays),
+        weather: weatherSignal(dateStr, weatherForecast),
+        supply: supplySignal(currentListings, previousListings),
+        lead_time: leadTimeSignal(dateStr, todayStr, currentRate, compMedianAdr),
       };
 
-      // Weighted sum
       let weightedSum = 0;
       for (const s of Object.values(signals)) {
         weightedSum += s.score * s.weight;
       }
 
-      // Calculate suggested rate
       let suggested = cfg.base_rate * (1 + weightedSum * cfg.max_adjustment);
-
-      // Guardrail: clamp to min/max
       suggested = Math.max(cfg.min_rate, Math.min(cfg.max_rate, suggested));
 
-      // Guardrail: smooth — never change more than 15% from previous day's suggested rate
+      // Smooth: max 15% change from previous day
       const maxChange = prevSuggested * 0.15;
-      if (suggested > prevSuggested + maxChange) {
-        suggested = prevSuggested + maxChange;
-      } else if (suggested < prevSuggested - maxChange) {
-        suggested = prevSuggested - maxChange;
-      }
+      if (suggested > prevSuggested + maxChange) suggested = prevSuggested + maxChange;
+      else if (suggested < prevSuggested - maxChange) suggested = prevSuggested - maxChange;
 
-      // Round to nearest $5
       suggested = roundToNearest(suggested, 5);
-
-      // Re-clamp after rounding
       suggested = Math.max(cfg.min_rate, Math.min(cfg.max_rate, suggested));
 
-      const update: CalendarRateUpdate = {
+      results.push({
         property_id: propertyId,
         date: dateStr,
         base_rate: cfg.base_rate,
@@ -196,11 +236,9 @@ export class PricingEngine {
         applied_rate: cfg.pricing_mode === "auto" ? suggested : null,
         rate_source: "engine",
         factors: signals,
-      };
+      });
 
-      results.push(update);
       prevSuggested = suggested;
-
       current.setDate(current.getDate() + 1);
     }
 
@@ -219,34 +257,20 @@ export class PricingEngine {
         factors: rate.factors,
         base_rate: rate.base_rate,
       };
+      if (rate.applied_rate != null) updateData.applied_rate = rate.applied_rate;
 
-      if (rate.applied_rate != null) {
-        updateData.applied_rate = rate.applied_rate;
-      }
-
-      // Check if entry exists
       const { data: existing } = await table
-        .select("id")
-        .eq("property_id", rate.property_id)
-        .eq("date", rate.date)
-        .limit(1);
+        .select("id").eq("property_id", rate.property_id).eq("date", rate.date).limit(1);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (existing && (existing as any[]).length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await table.update(updateData).eq("id", (existing as any[])[0].id);
       } else {
-        await table.insert({
-          property_id: rate.property_id,
-          date: rate.date,
-          is_available: true,
-          min_stay: 1,
-          ...updateData,
-        });
+        await table.insert({ property_id: rate.property_id, date: rate.date, is_available: true, min_stay: 1, ...updateData });
       }
       updated++;
     }
-
     return updated;
   }
 
@@ -256,22 +280,14 @@ export class PricingEngine {
     const table = this.supabase.from("calendar_rates") as any;
 
     for (const date of dates) {
-      const { data } = await table
-        .select("id, suggested_rate")
-        .eq("property_id", propertyId)
-        .eq("date", date)
-        .limit(1);
-
+      const { data } = await table.select("id, suggested_rate").eq("property_id", propertyId).eq("date", date).limit(1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = (data ?? []) as any[];
       if (rows.length > 0 && rows[0].suggested_rate != null) {
-        await table
-          .update({ applied_rate: rows[0].suggested_rate })
-          .eq("id", rows[0].id);
+        await table.update({ applied_rate: rows[0].suggested_rate }).eq("id", rows[0].id);
         approved++;
       }
     }
-
     return approved;
   }
 }
