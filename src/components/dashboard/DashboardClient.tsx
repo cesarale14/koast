@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DollarSign, Percent, TrendingUp, CalendarCheck, X as XIcon } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
+import EventBadge from "@/components/ui/EventBadge";
 import RevenueChart from "./RevenueChart";
 import WeekCalendar from "./WeekCalendar";
 
@@ -297,6 +298,9 @@ export default function DashboardClient() {
         <WeekCalendar days={days} properties={propertyWeeks} />
       </div>
 
+      {/* Upcoming events */}
+      <UpcomingEvents />
+
       {/* Revenue chart */}
       <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
         <h2 className="text-lg font-bold text-neutral-800 mb-4">
@@ -375,6 +379,55 @@ function ActionCenter() {
               <XIcon size={14} />
             </button>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Upcoming Events ----------
+
+function UpcomingEvents() {
+  const [events, setEvents] = useState<{ name: string; date: string; impact: number; venue?: string; attendance?: number }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/dashboard/actions", { method: "POST" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d?.actions) { setLoaded(true); return; }
+        const evs: typeof events = [];
+        for (const a of d.actions as { type: string; title: string; description: string; id: string }[]) {
+          if (a.type === "event") {
+            const parts = a.title.split(" — ");
+            const name = parts[0] ?? a.title;
+            const datePart = parts[1] ?? "";
+            const attMatch = a.description.match(/(\d+)K attendees/);
+            const impactMatch = a.description.match(/demand impact: (\d+)%/);
+            const venueMatch = a.description.match(/at (.+?) —/);
+            evs.push({
+              name,
+              date: datePart,
+              impact: impactMatch ? parseInt(impactMatch[1]) / 100 : 0.3,
+              venue: venueMatch?.[1],
+              attendance: attMatch ? parseInt(attMatch[1]) * 1000 : undefined,
+            });
+          }
+        }
+        setEvents(evs);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  if (!loaded || events.length === 0) return null;
+
+  return (
+    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-8">
+      <h2 className="text-lg font-bold text-neutral-800 mb-3">Upcoming Local Events</h2>
+      <div className="space-y-2">
+        {events.map((e, i) => (
+          <EventBadge key={i} name={e.name} impact={e.impact} date={e.date} venue={e.venue} attendance={e.attendance} />
         ))}
       </div>
     </div>

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { BookingBarData } from "./BookingBar";
+import EventBadge from "@/components/ui/EventBadge";
 
 const platformColors: Record<string, string> = {
   airbnb: "bg-red-50 text-red-700",
@@ -136,6 +138,9 @@ export default function BookingSidePanel({ booking, onClose }: BookingSidePanelP
             </div>
           )}
 
+          {/* Nearby events */}
+          <NearbyEvents checkIn={booking.check_in} checkOut={booking.check_out} propertyId={booking.property_id} />
+
           {/* Actions */}
           <div className="space-y-2 pt-2">
             <Link
@@ -160,5 +165,42 @@ export default function BookingSidePanel({ booking, onClose }: BookingSidePanelP
         </div>
       </div>
     </>
+  );
+}
+
+function NearbyEvents({ checkIn, checkOut, propertyId }: { checkIn: string; checkOut: string; propertyId: string }) {
+  const [events, setEvents] = useState<{ name: string; date: string; impact: number; venue?: string; attendance?: number }[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/analytics/forecast/${propertyId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d?.forecast) return;
+        const evs: typeof events = [];
+        for (const f of d.forecast as { date: string; demand_score: number; factors: string[] }[]) {
+          if (f.date < checkIn || f.date >= checkOut) continue;
+          const eventFactor = f.factors.find((fac: string) =>
+            !fac.includes("season") && !fac.includes("DOW") && !fac.includes("Market") &&
+            !fac.includes("Supply") && !fac.includes("learned") && !fac.includes("default") &&
+            !fac.includes("Clear") && !fac.includes("Rain")
+          );
+          if (eventFactor) evs.push({ name: eventFactor, date: f.date, impact: f.demand_score / 100 });
+        }
+        setEvents(evs);
+      })
+      .catch(() => {});
+  }, [checkIn, checkOut, propertyId]);
+
+  if (events.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-2">Events During Stay</h3>
+      <div className="space-y-2">
+        {events.map((e, i) => (
+          <EventBadge key={i} name={e.name} impact={e.impact} date={e.date} venue={e.venue} attendance={e.attendance} compact />
+        ))}
+      </div>
+    </div>
   );
 }
