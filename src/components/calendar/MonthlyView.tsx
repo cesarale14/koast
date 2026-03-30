@@ -14,14 +14,6 @@ const platformColors: Record<string, string> = {
   direct: "#10B981",
 };
 
-const platformLabels: Record<string, string> = {
-  airbnb: "A",
-  vrbo: "V",
-  booking_com: "B",
-  booking: "B",
-  direct: "D",
-};
-
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -85,7 +77,6 @@ function getNights(checkIn: string, checkOut: string): number {
 function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[][] {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-
   let dow = first.getDay() - 1;
   if (dow < 0) dow = 6;
 
@@ -98,13 +89,11 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
     const date = toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d);
     week.push({ date, dayNum: d, isCurrentMonth: false, isToday: date === todayStr });
   }
-
   for (let d = 1; d <= last.getDate(); d++) {
     if (week.length === 7) { weeks.push(week); week = []; }
     const date = toDateStr(year, month, d);
     week.push({ date, dayNum: d, isCurrentMonth: true, isToday: date === todayStr });
   }
-
   let nd = 1;
   const nm = month === 11 ? 0 : month + 1;
   const ny = month === 11 ? year + 1 : year;
@@ -114,7 +103,6 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
     nd++;
   }
   weeks.push(week);
-
   return weeks;
 }
 
@@ -129,7 +117,6 @@ function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): Boo
   for (const booking of bookings) {
     const bStart = booking.check_in < gridStart ? gridStart : booking.check_in;
     const bEnd = booking.check_out > gridEnd ? gridEnd : booking.check_out;
-
     const startPos = dateToPos.get(bStart);
     const endPos = dateToPos.get(bEnd);
     if (!startPos || !endPos) continue;
@@ -171,8 +158,7 @@ export default function MonthlyView({
       const m = (thisMonth + i) % 12;
       const y = thisYear + Math.floor((thisMonth + i) / 12);
       result.push({
-        year: y,
-        month: m,
+        year: y, month: m,
         label: `${MONTH_NAMES[m]} ${y}`,
         abbr: y !== thisYear ? `${MONTH_ABBRS[m]} '${String(y).slice(2)}` : MONTH_ABBRS[m],
         key: `${y}-${pad2(m + 1)}`,
@@ -188,14 +174,25 @@ export default function MonthlyView({
     return map;
   }, [months, bookings]);
 
+  // Build set of booked dates for rate hiding
+  const bookedDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of bookings) {
+      // Mark check_in through check_out - 1 as booked
+      const ci = new Date(b.check_in + "T00:00:00");
+      const co = new Date(b.check_out + "T00:00:00");
+      const d = new Date(ci);
+      while (d < co) {
+        set.add(d.toISOString().split("T")[0]);
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    return set;
+  }, [bookings]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [activeMonth, setActiveMonth] = useState(months[0]?.key ?? "");
-
-  const isDateBooked = useCallback(
-    (date: string) => bookings.some((b) => date >= b.check_in && date < b.check_out),
-    [bookings],
-  );
 
   const scrollToMonth = useCallback((key: string) => {
     const el = monthRefs.current.get(key);
@@ -206,10 +203,7 @@ export default function MonthlyView({
 
   const scrollToToday = useCallback(() => {
     const todayMonth = months.find((m) => m.weeks.some((w) => w.some((d) => d.isToday)));
-    if (todayMonth) {
-      scrollToMonth(todayMonth.key);
-      setActiveMonth(todayMonth.key);
-    }
+    if (todayMonth) { scrollToMonth(todayMonth.key); setActiveMonth(todayMonth.key); }
   }, [months, scrollToMonth]);
 
   useEffect(() => {
@@ -241,7 +235,7 @@ export default function MonthlyView({
   }, [months]);
 
   return (
-    <div className="bg-neutral-0 rounded-lg border border-neutral-100 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 190px)" }}>
+    <div className="bg-neutral-0 rounded-xl border border-neutral-100 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 190px)" }}>
       {/* Quick scroll month pills */}
       <div className="flex gap-1.5 px-4 py-3 border-b border-neutral-100 overflow-x-auto flex-shrink-0">
         {months.map((m) => (
@@ -264,10 +258,7 @@ export default function MonthlyView({
         {/* Sticky day-of-week header */}
         <div className="sticky top-0 z-10 bg-neutral-0 grid grid-cols-7 border-b border-neutral-100">
           {DAY_LABELS.map((label) => (
-            <div
-              key={label}
-              className="py-2.5 text-center text-xs font-medium uppercase tracking-wider text-neutral-400"
-            >
+            <div key={label} className="py-2.5 text-center text-xs font-medium uppercase tracking-wider text-neutral-400">
               {label}
             </div>
           ))}
@@ -293,37 +284,36 @@ export default function MonthlyView({
                 const rowSegs = segments.filter((s) => s.row === weekIdx);
 
                 return (
-                  <div
-                    key={weekIdx}
-                    className="relative grid grid-cols-7 border-b border-neutral-100 last:border-b-0"
-                  >
+                  <div key={weekIdx} className="relative grid grid-cols-7" style={{ overflow: "visible" }}>
                     {/* Day cells */}
                     {week.map((day) => {
                       const rate = rates.get(day.date);
                       const isAvailable = rate?.is_available !== false;
                       const displayRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
                       const isEngineRate = rate?.suggested_rate != null && rate.rate_source !== "manual";
-                      const booked = isDateBooked(day.date);
-                      const isBlocked = !isAvailable && !booked;
+                      const isBooked = bookedDates.has(day.date);
+                      const isBlocked = !isAvailable && !isBooked;
 
                       return (
                         <div
                           key={day.date}
-                          className={`min-h-[90px] border-r border-neutral-100 last:border-r-0 p-2 cursor-pointer transition-colors ${
+                          className={`min-h-[90px] p-2 cursor-pointer transition-colors ${
                             !day.isCurrentMonth
                               ? "bg-neutral-50/40"
                               : isBlocked
                                 ? "bg-neutral-50"
                                 : "bg-neutral-0 hover:bg-neutral-50/50"
                           }`}
-                          onClick={() => {
-                            if (!booked) onDateClick(propertyId, day.date, rate ?? null);
-                          }}
-                          style={
-                            isBlocked
+                          style={{
+                            boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.07)",
+                            borderRadius: "8px",
+                            ...(isBlocked
                               ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.02) 4px, rgba(0,0,0,0.02) 5px)" }
-                              : undefined
-                          }
+                              : {}),
+                          }}
+                          onClick={() => {
+                            if (!isBooked) onDateClick(propertyId, day.date, rate ?? null);
+                          }}
                         >
                           <div className="flex items-start justify-between">
                             <span
@@ -331,14 +321,15 @@ export default function MonthlyView({
                                 day.isToday
                                   ? "w-6 h-6 flex items-center justify-center rounded-full ring-2 ring-brand-500 text-brand-600 font-bold"
                                   : day.isCurrentMonth
-                                    ? "font-semibold text-neutral-800"
+                                    ? "font-semibold text-neutral-700"
                                     : "font-medium text-neutral-300"
                               }`}
                             >
                               {day.dayNum}
                             </span>
-                            {displayRate !== null && day.isCurrentMonth && (
-                              <span className={`text-sm font-mono leading-none ${isAvailable ? "text-neutral-400" : "text-neutral-300 line-through"}`}>
+                            {/* Only show rate on available, non-booked dates */}
+                            {!isBooked && displayRate !== null && day.isCurrentMonth && (
+                              <span className={`text-[13px] font-mono leading-none ${isAvailable ? "text-neutral-400" : "text-neutral-300 line-through"}`}>
                                 ${displayRate}
                                 {isEngineRate && <span className="text-[9px] ml-0.5">&#8599;</span>}
                               </span>
@@ -348,47 +339,61 @@ export default function MonthlyView({
                       );
                     })}
 
-                    {/* Booking bars — bottom-aligned, 24px, 30/70 overlap */}
+                    {/* Booking bars — pill-shaped, bottom-aligned, overlapping */}
                     {rowSegs.map((seg, segIdx) => {
                       const cellPct = 100 / 7;
                       let left = seg.startCol * cellPct;
                       let width = (seg.endCol - seg.startCol + 1) * cellPct;
 
-                      // 30/70 overlap: incoming bar starts at 30%, outgoing ends at 30%
-                      if (seg.isStart) { left += cellPct * 0.3; width -= cellPct * 0.3; }
-                      if (seg.isEnd) { width -= cellPct * 0.7; }
-                      if (width <= 0) return null;
+                      // Airbnb overlap: outgoing ends at 55%, incoming starts at 45%
+                      // Creates a 10% overlap zone where incoming bar is on top
+                      if (seg.isStart) {
+                        left += cellPct * 0.45;
+                        width -= cellPct * 0.45;
+                      }
+                      if (seg.isEnd) {
+                        width -= cellPct * 0.45;
+                      }
+                      if (width <= 0.5) return null;
 
                       const color = platformColors[seg.booking.platform] ?? "#6B7280";
-                      const platformLetter = platformLabels[seg.booking.platform] ?? "";
                       const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
-                      // Show text only if bar is wide enough (3+ nights in this row segment)
+                      const initial = firstName.charAt(0).toUpperCase();
+                      // Show text if bar spans 3+ cells, or 2 cells without start/end offsets
                       const spanCells = seg.endCol - seg.startCol + 1;
-                      const showText = spanCells >= 3 || (spanCells >= 2 && !seg.isStart && !seg.isEnd);
+                      const effectiveSpan = spanCells - (seg.isStart ? 0.45 : 0) - (seg.isEnd ? 0.45 : 0);
+                      const showText = effectiveSpan >= 2;
+
+                      // Incoming bars (isStart) render on top of outgoing (isEnd) in the overlap
+                      const zIdx = seg.isStart ? 6 : 5;
 
                       return (
                         <div
                           key={`${seg.booking.id}-${seg.row}-${segIdx}`}
-                          className="absolute flex items-center gap-1 px-1.5 text-white text-xs font-medium overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-125 transition-all z-[5]"
+                          className="absolute flex items-center text-white text-xs font-medium overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-125 transition-all"
                           style={{
                             left: `${left}%`,
                             width: `${width}%`,
-                            bottom: "3px",
-                            height: "24px",
+                            bottom: "6px",
+                            height: "28px",
                             backgroundColor: color,
-                            borderRadius: `${seg.isStart ? "6px" : "0"} ${seg.isEnd ? "6px" : "0"} ${seg.isEnd ? "6px" : "0"} ${seg.isStart ? "6px" : "0"}`,
+                            borderRadius: `${seg.isStart ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isStart ? "14px" : "0"}`,
+                            zIndex: zIdx,
                           }}
                           onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
-                          {/* Platform badge */}
-                          {seg.isStart && platformLetter && (
-                            <span className="w-[18px] h-[18px] rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                              {platformLetter}
-                            </span>
+                          {/* Guest avatar */}
+                          {seg.isStart && (
+                            <div
+                              className="flex-shrink-0 rounded-full bg-neutral-600 flex items-center justify-center text-[11px] font-bold text-white"
+                              style={{ width: "26px", height: "26px", marginLeft: "-1px" }}
+                            >
+                              {initial}
+                            </div>
                           )}
                           {showText && (
-                            <span className="truncate">
+                            <span className="truncate ml-1.5 mr-1">
                               {firstName} + {seg.nights}
                             </span>
                           )}
