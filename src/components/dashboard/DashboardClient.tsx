@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DollarSign, Percent, TrendingUp, CalendarCheck } from "lucide-react";
+import { DollarSign, Percent, TrendingUp, CalendarCheck, X as XIcon } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import RevenueChart from "./RevenueChart";
 import WeekCalendar from "./WeekCalendar";
@@ -197,6 +197,9 @@ export default function DashboardClient() {
         />
       </div>
 
+      {/* Action Center */}
+      <ActionCenter />
+
       {/* Today's activity + Messages */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Check-ins today */}
@@ -304,6 +307,75 @@ export default function DashboardClient() {
         <RevenueChart data={revenueData} />
       </div>
 
+      </div>
+    </div>
+  );
+}
+
+// ---------- Action Center ----------
+
+interface ActionItem {
+  id: string; type: string; icon: string; title: string; description: string;
+  action?: { label: string; href: string };
+}
+
+function ActionCenter() {
+  const [actions, setActions] = useState<ActionItem[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("dismissed-actions");
+    if (saved) try { setDismissed(new Set(JSON.parse(saved))); } catch { /* ignore */ }
+
+    fetch("/api/dashboard/actions", { method: "POST" })
+      .then((r) => r.json())
+      .then((d) => { setActions(d.actions ?? []); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const dismiss = (id: string) => {
+    const next = new Set(dismissed);
+    next.add(id);
+    setDismissed(next);
+    localStorage.setItem("dismissed-actions", JSON.stringify(Array.from(next)));
+  };
+
+  const visible = actions.filter((a) => !dismissed.has(a.id));
+
+  if (!loaded || visible.length === 0) {
+    if (loaded && actions.length === 0) return null;
+    if (loaded && visible.length === 0) {
+      return (
+        <div className="mb-8 p-4 rounded-xl bg-brand-50/50 text-center">
+          <p className="text-sm font-medium text-brand-600">You&apos;re all caught up!</p>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className="mb-8">
+      <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">Needs Your Attention</h2>
+      <div className="space-y-2">
+        {visible.slice(0, 5).map((a) => (
+          <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-0 shadow-sm group">
+            <span className="text-lg flex-shrink-0 mt-0.5">{a.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-neutral-800">{a.title}</p>
+              <p className="text-xs text-neutral-400 mt-0.5">{a.description}</p>
+            </div>
+            {a.action && (
+              <Link href={a.action.href} className="flex-shrink-0 px-3 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
+                {a.action.label}
+              </Link>
+            )}
+            <button onClick={() => dismiss(a.id)} className="flex-shrink-0 p-1 text-neutral-300 hover:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+              <XIcon size={14} />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
