@@ -5,9 +5,10 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
+const GAP = 3; // px gap between cells
 
 const platformColors: Record<string, string> = {
-  airbnb: "#222222",
+  airbnb: "#333333",
   vrbo: "#3B5998",
   booking_com: "#003580",
   booking: "#003580",
@@ -60,18 +61,11 @@ interface MonthlyViewProps {
   onDateClick: (propertyId: string, date: string, rate: RateData | null) => void;
 }
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function toDateStr(y: number, m: number, d: number): string {
-  return `${y}-${pad2(m + 1)}-${pad2(d)}`;
-}
-
-function getNights(checkIn: string, checkOut: string): number {
-  const ci = Date.UTC(+checkIn.slice(0, 4), +checkIn.slice(5, 7) - 1, +checkIn.slice(8, 10));
-  const co = Date.UTC(+checkOut.slice(0, 4), +checkOut.slice(5, 7) - 1, +checkOut.slice(8, 10));
-  return Math.round((co - ci) / 86400000);
+function pad2(n: number): string { return String(n).padStart(2, "0"); }
+function toDateStr(y: number, m: number, d: number): string { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+function getNights(ci: string, co: string): number {
+  return Math.round((Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10)) -
+    Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10))) / 86400000);
 }
 
 function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[][] {
@@ -79,10 +73,8 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
   const last = new Date(year, month + 1, 0);
   let dow = first.getDay() - 1;
   if (dow < 0) dow = 6;
-
   const weeks: DayInfo[][] = [];
   let week: DayInfo[] = [];
-
   const prevLast = new Date(year, month, 0);
   for (let i = dow - 1; i >= 0; i--) {
     const d = prevLast.getDate() - i;
@@ -98,9 +90,8 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
   const nm = month === 11 ? 0 : month + 1;
   const ny = month === 11 ? year + 1 : year;
   while (week.length < 7) {
-    const date = toDateStr(ny, nm, nd);
-    week.push({ date, dayNum: nd, isCurrentMonth: false, isToday: date === todayStr });
-    nd++;
+    const date = toDateStr(ny, nm, nd++);
+    week.push({ date, dayNum: nd - 1, isCurrentMonth: false, isToday: date === todayStr });
   }
   weeks.push(week);
   return weeks;
@@ -109,22 +100,18 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
 function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): BookingSegment[] {
   const dateToPos = new Map<string, { row: number; col: number }>();
   weeks.forEach((w, row) => w.forEach((d, col) => dateToPos.set(d.date, { row, col })));
-
   const gridStart = weeks[0][0].date;
   const gridEnd = weeks[weeks.length - 1][6].date;
   const segments: BookingSegment[] = [];
-
   for (const booking of bookings) {
     const bStart = booking.check_in < gridStart ? gridStart : booking.check_in;
     const bEnd = booking.check_out > gridEnd ? gridEnd : booking.check_out;
     const startPos = dateToPos.get(bStart);
     const endPos = dateToPos.get(bEnd);
     if (!startPos || !endPos) continue;
-
     const isActualStart = bStart === booking.check_in;
     const isActualEnd = bEnd === booking.check_out;
     const nights = getNights(booking.check_in, booking.check_out);
-
     for (let row = startPos.row; row <= endPos.row; row++) {
       segments.push({
         booking,
@@ -132,22 +119,23 @@ function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): Boo
         endCol: row === endPos.row ? endPos.col : 6,
         isStart: row === startPos.row && isActualStart,
         isEnd: row === endPos.row && isActualEnd,
-        row,
-        nights,
+        row, nights,
       });
     }
   }
   return segments;
 }
 
+// CSS custom properties for gap-aware column math
+// --col = one column track + gap = (100% + gap) / 7
+// --cell = one column width without gap = --col - gap
+const rowVars = {
+  "--col": `calc((100% + ${GAP}px) / 7)`,
+  "--cell": `calc((100% + ${GAP}px) / 7 - ${GAP}px)`,
+} as React.CSSProperties;
+
 export default function MonthlyView({
-  propertyId,
-  bookings,
-  rates,
-  todayStr,
-  todayTrigger,
-  onBookingClick,
-  onDateClick,
+  propertyId, bookings, rates, todayStr, todayTrigger, onBookingClick, onDateClick,
 }: MonthlyViewProps) {
   const thisYear = new Date().getFullYear();
   const thisMonth = new Date().getMonth();
@@ -174,18 +162,12 @@ export default function MonthlyView({
     return map;
   }, [months, bookings]);
 
-  // Build set of booked dates for rate hiding
   const bookedDates = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookings) {
-      // Mark check_in through check_out - 1 as booked
-      const ci = new Date(b.check_in + "T00:00:00");
+      const d = new Date(b.check_in + "T00:00:00");
       const co = new Date(b.check_out + "T00:00:00");
-      const d = new Date(ci);
-      while (d < co) {
-        set.add(d.toISOString().split("T")[0]);
-        d.setDate(d.getDate() + 1);
-      }
+      while (d < co) { set.add(d.toISOString().split("T")[0]); d.setDate(d.getDate() + 1); }
     }
     return set;
   }, [bookings]);
@@ -196,56 +178,38 @@ export default function MonthlyView({
 
   const scrollToMonth = useCallback((key: string) => {
     const el = monthRefs.current.get(key);
-    if (el && containerRef.current) {
-      containerRef.current.scrollTop = el.offsetTop - 38;
-    }
+    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 36;
   }, []);
 
   const scrollToToday = useCallback(() => {
-    const todayMonth = months.find((m) => m.weeks.some((w) => w.some((d) => d.isToday)));
-    if (todayMonth) { scrollToMonth(todayMonth.key); setActiveMonth(todayMonth.key); }
+    const m = months.find((m) => m.weeks.some((w) => w.some((d) => d.isToday)));
+    if (m) { scrollToMonth(m.key); setActiveMonth(m.key); }
   }, [months, scrollToMonth]);
 
-  useEffect(() => {
-    const t = setTimeout(scrollToToday, 50);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { const t = setTimeout(scrollToToday, 50); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (todayTrigger > 0) scrollToToday(); }, [todayTrigger, scrollToToday]);
 
   useEffect(() => {
-    if (todayTrigger > 0) scrollToToday();
-  }, [todayTrigger, scrollToToday]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const key = entry.target.getAttribute("data-month");
-            if (key) setActiveMonth(key);
-          }
-        }
-      },
-      { root: container, rootMargin: "-40px 0px -70% 0px", threshold: 0 },
+    const c = containerRef.current;
+    if (!c) return;
+    const obs = new IntersectionObserver(
+      (entries) => { for (const e of entries) if (e.isIntersecting) { const k = e.target.getAttribute("data-month"); if (k) setActiveMonth(k); } },
+      { root: c, rootMargin: "-36px 0px -70% 0px", threshold: 0 },
     );
-    monthRefs.current.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    monthRefs.current.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
   }, [months]);
 
   return (
-    <div className="bg-neutral-0 rounded-xl border border-neutral-100 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 190px)" }}>
-      {/* Quick scroll month pills */}
-      <div className="flex gap-1.5 px-4 py-3 border-b border-neutral-100 overflow-x-auto flex-shrink-0">
+    <div className="bg-white rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 190px)" }}>
+      {/* Month pills */}
+      <div className="flex gap-1.5 px-4 py-3 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button
             key={m.key}
             onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
             className={`px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors flex-shrink-0 ${
-              activeMonth === m.key
-                ? "bg-neutral-800 text-white"
-                : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50"
+              activeMonth === m.key ? "bg-[#222] text-white" : "text-[#999] hover:text-[#555] hover:bg-[#f5f5f5]"
             }`}
           >
             {m.abbr}
@@ -254,146 +218,114 @@ export default function MonthlyView({
       </div>
 
       {/* Scrollable calendar */}
-      <div ref={containerRef} className="overflow-y-auto flex-1">
+      <div ref={containerRef} className="overflow-y-auto flex-1 bg-white">
         {/* Sticky day-of-week header */}
-        <div className="sticky top-0 z-10 bg-neutral-0 grid grid-cols-7 border-b border-neutral-100">
-          {DAY_LABELS.map((label) => (
-            <div key={label} className="py-2.5 text-center text-xs font-medium uppercase tracking-wider text-neutral-400">
-              {label}
-            </div>
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] pb-1 border-b border-[#e8e8e8]">
+          {DAY_LABELS.map((l) => (
+            <div key={l} className="py-2 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">{l}</div>
           ))}
         </div>
 
         {/* Month sections */}
         {months.map((m) => {
           const segments = segmentsByMonth.get(m.key) ?? [];
-
           return (
-            <div
-              key={m.key}
-              ref={(el) => { if (el) monthRefs.current.set(m.key, el); }}
-              data-month={m.key}
-            >
-              {/* Sticky month header */}
-              <div className="sticky top-[37px] z-[9] bg-neutral-0 border-b border-neutral-100 px-4 pt-8 pb-3">
-                <span className="text-xl font-bold text-neutral-800">{m.label}</span>
+            <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
+              {/* Month header */}
+              <div className="sticky top-[35px] z-[9] bg-white px-1 pt-10 pb-3">
+                <span className="text-xl font-bold text-[#222]">{m.label}</span>
               </div>
 
               {/* Week rows */}
               {m.weeks.map((week, weekIdx) => {
                 const rowSegs = segments.filter((s) => s.row === weekIdx);
-
                 return (
-                  <div key={weekIdx} className="relative grid grid-cols-7" style={{ overflow: "visible" }}>
-                    {/* Day cells */}
+                  <div
+                    key={weekIdx}
+                    className="relative grid grid-cols-7"
+                    style={{ gap: `${GAP}px`, marginBottom: `${GAP}px`, overflow: "visible", ...rowVars }}
+                  >
+                    {/* Cells */}
                     {week.map((day) => {
                       const rate = rates.get(day.date);
-                      const isAvailable = rate?.is_available !== false;
-                      const displayRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
-                      const isEngineRate = rate?.suggested_rate != null && rate.rate_source !== "manual";
+                      const isAvail = rate?.is_available !== false;
+                      const rawRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
                       const isBooked = bookedDates.has(day.date);
-                      const isBlocked = !isAvailable && !isBooked;
+                      const isBlocked = !isAvail && !isBooked;
 
                       return (
                         <div
                           key={day.date}
-                          className={`min-h-[90px] p-2 cursor-pointer transition-colors ${
-                            !day.isCurrentMonth
-                              ? "bg-neutral-50/40"
-                              : isBlocked
-                                ? "bg-neutral-50"
-                                : "bg-neutral-0 hover:bg-neutral-50/50"
+                          className={`relative aspect-square rounded-[10px] p-2 flex flex-col justify-between cursor-pointer transition-colors ${
+                            !day.isCurrentMonth ? "bg-[#fafafa]" : isBlocked ? "bg-[#f5f5f5]" : "bg-white hover:bg-[#fafafa]"
                           }`}
                           style={{
-                            boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.07)",
-                            borderRadius: "8px",
-                            ...(isBlocked
-                              ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.02) 4px, rgba(0,0,0,0.02) 5px)" }
-                              : {}),
+                            border: "1px solid #e8e8e8",
+                            ...(isBlocked ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                           }}
-                          onClick={() => {
-                            if (!isBooked) onDateClick(propertyId, day.date, rate ?? null);
-                          }}
+                          onClick={() => { if (!isBooked) onDateClick(propertyId, day.date, rate ?? null); }}
                         >
-                          <div className="flex items-start justify-between">
-                            <span
-                              className={`text-sm leading-none ${
-                                day.isToday
-                                  ? "w-6 h-6 flex items-center justify-center rounded-full ring-2 ring-brand-500 text-brand-600 font-bold"
-                                  : day.isCurrentMonth
-                                    ? "font-semibold text-neutral-700"
-                                    : "font-medium text-neutral-300"
-                              }`}
-                            >
-                              {day.dayNum}
-                            </span>
-                            {/* Only show rate on available, non-booked dates */}
-                            {!isBooked && displayRate !== null && day.isCurrentMonth && (
-                              <span className={`text-[13px] font-mono leading-none ${isAvailable ? "text-neutral-400" : "text-neutral-300 line-through"}`}>
-                                ${displayRate}
-                                {isEngineRate && <span className="text-[9px] ml-0.5">&#8599;</span>}
+                          {/* Date number */}
+                          <div>
+                            {day.isToday ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500 text-white text-[14px] font-semibold">
+                                {day.dayNum}
+                              </span>
+                            ) : (
+                              <span className={`text-[14px] font-semibold ${day.isCurrentMonth ? "text-[#333]" : "text-[#ccc]"}`}>
+                                {day.dayNum}
                               </span>
                             )}
                           </div>
+                          {/* Rate — bottom right, only on available unbooked dates */}
+                          {!isBooked && rawRate !== null && day.isCurrentMonth && isAvail && (
+                            <span className="self-end text-[12px] font-mono text-[#999]">${rawRate}</span>
+                          )}
                         </div>
                       );
                     })}
 
-                    {/* Booking bars — pill-shaped, bottom-aligned, overlapping */}
-                    {rowSegs.map((seg, segIdx) => {
-                      const cellPct = 100 / 7;
-                      let left = seg.startCol * cellPct;
-                      let width = (seg.endCol - seg.startCol + 1) * cellPct;
+                    {/* Booking bars — gap-aware absolute positioning */}
+                    {rowSegs.map((seg, si) => {
+                      const span = seg.endCol - seg.startCol + 1;
+                      const startFrac = seg.isStart ? 0.4 : 0;
+                      const endFrac = seg.isEnd ? 0.5 : 0;
 
-                      // Airbnb overlap: outgoing ends at 55%, incoming starts at 45%
-                      // Creates a 10% overlap zone where incoming bar is on top
-                      if (seg.isStart) {
-                        left += cellPct * 0.45;
-                        width -= cellPct * 0.45;
-                      }
-                      if (seg.isEnd) {
-                        width -= cellPct * 0.45;
-                      }
-                      if (width <= 0.5) return null;
+                      // left = col * startCol + cell * startFrac
+                      const left = startFrac > 0
+                        ? `calc(var(--col) * ${seg.startCol} + var(--cell) * ${startFrac})`
+                        : `calc(var(--col) * ${seg.startCol})`;
 
-                      const color = platformColors[seg.booking.platform] ?? "#6B7280";
+                      // width = col * span - gap - cell * startFrac - cell * endFrac
+                      const subs = [`${GAP}px`];
+                      if (startFrac > 0) subs.push(`var(--cell) * ${startFrac}`);
+                      if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
+                      const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
+
+                      const color = platformColors[seg.booking.platform] ?? "#333333";
                       const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
-                      const initial = firstName.charAt(0).toUpperCase();
-                      // Show text if bar spans 3+ cells, or 2 cells without start/end offsets
-                      const spanCells = seg.endCol - seg.startCol + 1;
-                      const effectiveSpan = spanCells - (seg.isStart ? 0.45 : 0) - (seg.isEnd ? 0.45 : 0);
-                      const showText = effectiveSpan >= 2;
-
-                      // Incoming bars (isStart) render on top of outgoing (isEnd) in the overlap
-                      const zIdx = seg.isStart ? 6 : 5;
+                      const effectiveSpan = span - startFrac - endFrac;
+                      const showText = effectiveSpan >= 1.8;
 
                       return (
                         <div
-                          key={`${seg.booking.id}-${seg.row}-${segIdx}`}
-                          className="absolute flex items-center text-white text-xs font-medium overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-125 transition-all"
+                          key={`${seg.booking.id}-${weekIdx}-${si}`}
+                          className="absolute flex items-center text-white overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-125 transition-all"
                           style={{
-                            left: `${left}%`,
-                            width: `${width}%`,
-                            bottom: "6px",
-                            height: "28px",
+                            left, width,
+                            bottom: "4px",
+                            height: "24px",
                             backgroundColor: color,
-                            borderRadius: `${seg.isStart ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isEnd ? "14px" : "0"} ${seg.isStart ? "14px" : "0"}`,
-                            zIndex: zIdx,
+                            borderRadius: `${seg.isStart ? "12px" : "0"} ${seg.isEnd ? "12px" : "0"} ${seg.isEnd ? "12px" : "0"} ${seg.isStart ? "12px" : "0"}`,
+                            zIndex: seg.isStart ? 2 : 1,
+                            paddingLeft: seg.isStart ? "10px" : "4px",
+                            paddingRight: seg.isEnd ? "10px" : "4px",
                           }}
                           onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
                         >
-                          {/* Guest avatar */}
-                          {seg.isStart && (
-                            <div
-                              className="flex-shrink-0 rounded-full bg-neutral-600 flex items-center justify-center text-[11px] font-bold text-white"
-                              style={{ width: "26px", height: "26px", marginLeft: "-1px" }}
-                            >
-                              {initial}
-                            </div>
-                          )}
                           {showText && (
-                            <span className="truncate ml-1.5 mr-1">
+                            <span className="truncate text-[11px] font-medium">
                               {firstName} + {seg.nights}
                             </span>
                           )}
