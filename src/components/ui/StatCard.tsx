@@ -25,16 +25,16 @@ export default function StatCard({
         : "bg-neutral-50 text-neutral-400";
 
   return (
-    <div className="stat-card relative bg-neutral-0 border border-[var(--border)] rounded-lg p-4 md:p-5">
+    <div className="stat-card relative bg-neutral-0 rounded-xl p-5 md:p-6">
       {/* Icon */}
       {Icon && (
-        <div className="absolute top-4 right-4 md:top-5 md:right-5 text-neutral-200">
-          <Icon size={18} strokeWidth={1.5} />
+        <div className="absolute top-5 right-5 md:top-6 md:right-6 text-neutral-200">
+          <Icon size={20} strokeWidth={1.5} />
         </div>
       )}
 
       {/* Label */}
-      <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">
+      <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2.5">
         {label}
       </p>
 
