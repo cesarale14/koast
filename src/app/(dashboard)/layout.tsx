@@ -155,8 +155,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
       className="hidden md:flex fixed z-40 items-center justify-center w-6 h-6 rounded-full bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 transition-[left] duration-200 ease-out"
       style={{
         left: (expanded ? 240 : 60) - 12,
-        top: "50%",
-        transform: "translateY(-50%)",
+        top: 20,
         boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
       }}
       title={expanded ? "Collapse sidebar" : "Expand sidebar"}
@@ -251,7 +250,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="md:hidden text-sm font-medium text-neutral-700">
                 {navGroups.flat().find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Overview"}
               </span>
-              <Breadcrumb />
+              {/* breadcrumb removed — cleaner topbar */}
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <button className="relative text-neutral-400 hover:text-neutral-600 transition-colors"><Bell size={18} strokeWidth={1.5} /></button>
