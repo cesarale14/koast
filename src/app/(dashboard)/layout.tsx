@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -32,20 +32,27 @@ const navGroups: NavItem[][] = [
   ],
 ];
 
-/* ---- Collapsed nav link with delayed tooltip ---- */
+/* ---- Collapsed nav link with tooltip ---- */
 function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon;
+  const [showTip, setShowTip] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   return (
     <Link href={item.href}
-      className={`group/tip relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 ${
+      onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
+      onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
+      className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 ${
         isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
       }`}>
       {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-brand-400" />}
       <Icon size={20} strokeWidth={1.5} />
       {item.badge && <span className="absolute top-1 right-1"><ReviewBadge /></span>}
-      <span className="absolute left-full ml-3 px-2.5 py-1 rounded-md bg-neutral-800 text-white text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-150 delay-300 z-50">
-        {item.name}
-      </span>
+      {showTip && (
+        <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
+          style={{ backgroundColor: "#1c1917", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
+          {item.name}
+        </span>
+      )}
     </Link>
   );
 }
@@ -84,6 +91,7 @@ function Breadcrumb() {
 /* ---- Desktop sidebar — toggleable collapsed/expanded ---- */
 function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; expanded: boolean; onToggle: () => void }) {
   return (
+    <>
     <aside
       className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out"
       style={{ background: "var(--sidebar-bg)", width: expanded ? 240 : 60 }}
@@ -91,14 +99,11 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
       {expanded ? (
         /* ---- EXPANDED ---- */
         <>
-          <div className="px-4 h-14 flex items-center justify-between">
+          <div className="px-4 h-14 flex items-center">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-brand-400" />
               <span className="text-white font-semibold text-md tracking-tight">StayCommand</span>
             </div>
-            <button onClick={onToggle} className="text-sidebar-text hover:text-white transition-colors p-1">
-              <ChevronLeft size={16} strokeWidth={1.5} />
-            </button>
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
             {navGroups.map((group, gi) => (
@@ -144,6 +149,20 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
         </div>
       )}
     </aside>
+    {/* 3D toggle pill at sidebar edge — AirDNA style */}
+    <button
+      onClick={onToggle}
+      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 transition-all duration-200 ease-out"
+      style={{
+        left: expanded ? 236 : 46,
+        top: 20,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
+      }}
+      title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+    >
+      <ChevronLeft size={14} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
+    </button>
+    </>
   );
 }
 
@@ -221,12 +240,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Topbar */}
           <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-neutral-0" style={{ borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}>
             <div className="flex items-center gap-3">
-              {/* Mobile: hamburger; Desktop: toggle */}
+              {/* Mobile hamburger */}
               <button
-                className="text-neutral-500 hover:text-neutral-700 transition-colors"
-                onClick={() => { if (window.innerWidth < 768) setMobileOpen(true); else toggleSidebar(); }}
+                className="md:hidden text-neutral-500 hover:text-neutral-700 transition-colors"
+                onClick={() => setMobileOpen(true)}
               >
-                {sidebarExpanded ? <ChevronLeft size={20} strokeWidth={1.5} className="hidden md:block" /> : <Menu size={20} strokeWidth={1.5} />}
+                <Menu size={20} strokeWidth={1.5} />
               </button>
               <span className="md:hidden text-sm font-medium text-neutral-700">
                 {navGroups.flat().find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Overview"}
