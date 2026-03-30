@@ -33,6 +33,7 @@ export const properties = pgTable("properties", {
   amenities: jsonb("amenities").default([]),
   photos: jsonb("photos").default([]),
   channexPropertyId: text("channex_property_id"),
+  defaultCleanerId: uuid("default_cleaner_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
@@ -208,6 +209,7 @@ export const cleaningTasks = pgTable("cleaning_tasks", {
   notes: text("notes"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   cleanerToken: text("cleaner_token"),
+  reminderSent: boolean("reminder_sent").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_cleaning_tasks_property_date").on(t.propertyId, t.scheduledDate),
@@ -375,6 +377,37 @@ export const icalFeeds = pgTable("ical_feeds", {
 export const icalFeedsRelations = relations(icalFeeds, ({ one }) => ({
   property: one(properties, { fields: [icalFeeds.propertyId], references: [properties.id] }),
 }));
+
+// ==================== Cleaners ====================
+
+export const cleaners = pgTable("cleaners", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_cleaners_user").on(t.userId),
+]);
+
+// ==================== SMS Log ====================
+
+export const smsLog = pgTable("sms_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id"),
+  cleanerId: uuid("cleaner_id"),
+  cleaningTaskId: uuid("cleaning_task_id"),
+  phoneTo: text("phone_to").notNull(),
+  messageBody: text("message_body").notNull(),
+  twilioSid: text("twilio_sid"),
+  status: text("status").default("sent"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_sms_log_user").on(t.userId),
+  index("idx_sms_log_task").on(t.cleaningTaskId),
+]);
 
 // ==================== Notifications ====================
 

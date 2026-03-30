@@ -37,11 +37,21 @@ export default async function TurnoverPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allBookings = (bookings ?? []) as any[];
 
+  // Fetch cleaners
+  const { data: cleanerData } = await supabase
+    .from("cleaners")
+    .select("id, name, phone, email, is_active")
+    .eq("user_id", user.id)
+    .order("name");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allCleaners = (cleanerData ?? []) as any[];
+
   return (
     <TurnoverBoard
       tasks={allTasks}
       properties={properties}
       bookings={allBookings}
+      cleaners={allCleaners}
     />
   );
 }

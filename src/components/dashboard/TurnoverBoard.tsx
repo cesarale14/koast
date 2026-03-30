@@ -20,10 +20,19 @@ interface Task {
   cleaner_id: string | null;
 }
 
+interface Cleaner {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  is_active: boolean;
+}
+
 interface TurnoverBoardProps {
   tasks: Task[];
   properties: { id: string; name: string }[];
   bookings: { id: string; guest_name: string | null; check_in: string; check_out: string }[];
+  cleaners?: Cleaner[];
 }
 
 const COLUMNS = [
@@ -42,14 +51,20 @@ const statusColors: Record<string, string> = {
   issue: "bg-danger-light text-danger",
 };
 
-export default function TurnoverBoard({ tasks: initialTasks, properties, bookings }: TurnoverBoardProps) {
+export default function TurnoverBoard({ tasks: initialTasks, properties, bookings, cleaners: initialCleaners = [] }: TurnoverBoardProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [cleaners, setCleaners] = useState(initialCleaners);
+  const [showCleaners, setShowCleaners] = useState(false);
+  const [newCleanerName, setNewCleanerName] = useState("");
+  const [newCleanerPhone, setNewCleanerPhone] = useState("");
+  const [addingCleaner, setAddingCleaner] = useState(false);
 
   const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p.name])), [properties]);
+  const cleanerMap = useMemo(() => new Map(cleaners.map((c) => [c.id, c])), [cleaners]);
   const bookingMap = useMemo(() => new Map(bookings.map((b) => [b.id, b])), [bookings]);
   const today = new Date().toISOString().split("T")[0];
 
@@ -103,6 +118,63 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     }
     setBackfilling(false);
   }, [toast, router]);
+
+  const addCleaner = useCallback(async () => {
+    if (!newCleanerName || !newCleanerPhone) return;
+    setAddingCleaner(true);
+    try {
+      const res = await fetch("/api/cleaners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCleanerName, phone: newCleanerPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCleaners((prev) => [...prev, data]);
+      setNewCleanerName("");
+      setNewCleanerPhone("");
+      toast(`Added ${data.name}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    }
+    setAddingCleaner(false);
+  }, [newCleanerName, newCleanerPhone, toast]);
+
+  const testSMS = useCallback(async (phone: string) => {
+    try {
+      const res = await fetch("/api/cleaners", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      toast(data.success ? "Test SMS sent!" : "SMS failed", data.success ? undefined : "error");
+    } catch { toast("SMS failed", "error"); }
+  }, [toast]);
+
+  const removeCleaner = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/cleaners?id=${id}`, { method: "DELETE" });
+      setCleaners((prev) => prev.filter((c) => c.id !== id));
+      toast("Cleaner removed");
+    } catch { toast("Failed", "error"); }
+  }, [toast]);
+
+  const assignCleaner = useCallback(async (taskId: string, cleanerId: string) => {
+    try {
+      const res = await fetch("/api/turnover/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, cleanerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, cleaner_id: cleanerId, status: "assigned" } : t));
+      toast(`Assigned to ${data.cleanerName} — SMS sent`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to assign", "error");
+    }
+  }, [toast]);
 
   const copyCleanerLink = useCallback(async (taskId: string, token: string) => {
     const url = `${window.location.origin}/clean/${taskId}/${token}`;
@@ -160,15 +232,53 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
           <h1 className="text-xl font-bold text-neutral-800 mb-1">Turnover Ops</h1>
           <p className="text-neutral-500">Cleaning schedules and task management</p>
         </div>
-        <button
-          onClick={backfill}
-          disabled={backfilling}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
-          {backfilling ? "Creating..." : "Auto-Create Tasks"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCleaners(!showCleaners)}
+            className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 transition-colors"
+          >
+            Cleaners ({cleaners.length})
+          </button>
+          <button
+            onClick={backfill}
+            disabled={backfilling}
+            className="btn-primary-3d inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
+            {backfilling ? "Creating..." : "Auto-Create Tasks"}
+          </button>
+        </div>
       </div>
+
+      {/* Cleaners management panel */}
+      {showCleaners && (
+        <div className="mb-6 bg-neutral-0 rounded-lg border border-[var(--border)] p-4">
+          <h3 className="text-sm font-semibold text-neutral-700 mb-3">Manage Cleaners</h3>
+          <div className="space-y-2 mb-4">
+            {cleaners.map((c) => (
+              <div key={c.id} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-neutral-800">{c.name}</p>
+                  <p className="text-xs text-neutral-400">{c.phone}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => testSMS(c.phone)} className="text-xs text-brand-500 hover:text-brand-600 font-medium">Test SMS</button>
+                  <button onClick={() => removeCleaner(c.id)} className="text-xs text-danger hover:text-danger/80 font-medium">Remove</button>
+                </div>
+              </div>
+            ))}
+            {cleaners.length === 0 && <p className="text-sm text-neutral-400">No cleaners added yet.</p>}
+          </div>
+          <div className="flex gap-2">
+            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg" />
+            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg" />
+            <button onClick={addCleaner} disabled={addingCleaner || !newCleanerName || !newCleanerPhone}
+              className="btn-primary-3d px-4 py-1.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50">
+              {addingCleaner ? "..." : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {
@@ -223,6 +333,9 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                           <p className="text-xs text-brand-500 mt-0.5">
                             In: {nextBooking.guest_name ?? "Guest"} ({nextBooking.check_in})
                           </p>
+                        )}
+                        {task.cleaner_id && cleanerMap.get(task.cleaner_id) && (
+                          <p className="text-xs text-info mt-0.5">Cleaner: {cleanerMap.get(task.cleaner_id)!.name}</p>
                         )}
                         {/* Checklist progress */}
                         {totalCount > 0 && (
@@ -339,6 +452,26 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       View Checklist
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Assign cleaner */}
+              {cleaners.length > 0 && (
+                <div>
+                  <p className="text-xs text-neutral-400 mb-1">Assign Cleaner</p>
+                  <select
+                    value={selectedTaskData.cleaner_id ?? ""}
+                    onChange={(e) => { if (e.target.value) assignCleaner(selectedTaskData.id, e.target.value); }}
+                    className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
+                  >
+                    <option value="">Select cleaner...</option>
+                    {cleaners.filter((c) => c.is_active).map((c) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                    ))}
+                  </select>
+                  {selectedTaskData.cleaner_id && cleanerMap.get(selectedTaskData.cleaner_id) && (
+                    <p className="text-xs text-brand-500 mt-1">Assigned: {cleanerMap.get(selectedTaskData.cleaner_id)!.name}</p>
+                  )}
                 </div>
               )}
 

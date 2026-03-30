@@ -47,11 +47,21 @@ export async function createCleaningTask(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nextBooking = ((nextBookings ?? []) as any[])[0] ?? null;
 
+  // Check for default cleaner on this property
+  const { data: propRow } = await supabase
+    .from("properties")
+    .select("default_cleaner_id")
+    .eq("id", booking.property_id)
+    .limit(1);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const defaultCleanerId = ((propRow ?? []) as any[])[0]?.default_cleaner_id ?? null;
+
   const taskData = {
     property_id: booking.property_id,
     booking_id: booking.id,
     next_booking_id: nextBooking?.id ?? null,
-    status: "pending",
+    status: defaultCleanerId ? "assigned" : "pending",
+    cleaner_id: defaultCleanerId,
     scheduled_date: booking.check_out,
     scheduled_time: "11:30:00", // checkout 11am + 30min buffer
     checklist: DEFAULT_CHECKLIST,
@@ -61,12 +71,34 @@ export async function createCleaningTask(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from("cleaning_tasks") as any)
     .insert(taskData)
-    .select("id")
+    .select("id, cleaner_token")
     .single();
 
   if (error) {
     console.error("[turnover/auto-create] Insert error:", error);
     return null;
+  }
+
+  // Auto-send SMS to default cleaner
+  if (defaultCleanerId && data) {
+    try {
+      const { notifyCleanerAssigned } = await import("@/lib/notifications");
+      const { data: cleanerRows } = await supabase
+        .from("cleaners").select("id, name, phone").eq("id", defaultCleanerId).limit(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cleaner = ((cleanerRows ?? []) as any[])[0];
+      const { data: propInfo } = await supabase
+        .from("properties").select("name").eq("id", booking.property_id).limit(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const propName = ((propInfo ?? []) as any[])[0]?.name ?? "Property";
+      if (cleaner) {
+        await notifyCleanerAssigned(supabase,
+          { id: data.id, scheduled_date: booking.check_out, cleaner_token: data.cleaner_token },
+          propName, cleaner);
+      }
+    } catch (err) {
+      console.error("[turnover/auto-create] SMS notification failed:", err);
+    }
   }
 
   return data?.id ?? null;
