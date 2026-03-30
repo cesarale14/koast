@@ -494,11 +494,8 @@ export default function CalendarGrid({
           style={{ maxHeight: "calc(100vh - 190px)" }}
         >
           {/* Left property panel — desktop only */}
-          <aside className="hidden md:flex flex-col w-[280px] flex-shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+          <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
             <div className="p-4">
-              <h3 className="text-[11px] font-medium uppercase tracking-widest text-[#999] mb-3">
-                Properties
-              </h3>
               <div className="space-y-0.5">
                 {properties.map((p) => {
                   const isActive = monthlyPropertyId === p.id;
@@ -506,21 +503,12 @@ export default function CalendarGrid({
                     <button
                       key={p.id}
                       onClick={() => setMonthlyPropertyId(p.id)}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition-colors ${
-                        isActive
-                          ? "bg-[#f5f5f5]"
-                          : "hover:bg-[#fafafa]"
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        isActive ? "bg-[#f5f5f5]" : "hover:bg-[#fafafa]"
                       }`}
                       style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
                     >
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${propColor(p.name)}`}
-                      >
-                        {p.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span
-                        className={`text-sm truncate ${isActive ? "font-semibold text-[#222]" : "text-[#555]"}`}
-                      >
+                      <span className={`text-sm truncate block ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
                         {p.name}
                       </span>
                     </button>
@@ -553,8 +541,8 @@ export default function CalendarGrid({
             </div>
           </aside>
 
-          {/* Calendar grid — constrained width */}
-          <div className="flex-1 min-w-0" style={{ maxWidth: "900px" }}>
+          {/* Calendar grid — flex-col so MonthlyView can fill height */}
+          <div className="flex-1 min-w-0 flex flex-col" style={{ maxWidth: "900px" }}>
             <MonthlyView
               propertyId={monthlyPropertyId}
               bookings={bookingLookup.get(monthlyPropertyId) ?? []}

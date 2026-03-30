@@ -25,8 +25,8 @@ const MONTH_ABBRS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-interface DayInfo { date: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; }
-interface BookingSegment { booking: BookingBarData; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; row: number; nights: number; }
+interface DayInfo { date: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; isPast: boolean; }
+interface BookingSegment { booking: BookingBarData; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; row: number; nights: number; isPast: boolean; }
 interface MonthData { year: number; month: number; label: string; abbr: string; key: string; weeks: DayInfo[][]; }
 
 export interface MonthlyViewProps {
@@ -56,25 +56,27 @@ function getMonthWeeks(year: number, month: number, todayStr: string): DayInfo[]
   const prevLast = new Date(year, month, 0);
   for (let i = dow - 1; i >= 0; i--) {
     const d = prevLast.getDate() - i;
-    week.push({ date: toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d), dayNum: d, isCurrentMonth: false, isToday: false });
+    const date = toDateStr(prevLast.getFullYear(), prevLast.getMonth(), d);
+    week.push({ date, dayNum: d, isCurrentMonth: false, isToday: false, isPast: date < todayStr });
   }
   for (let d = 1; d <= last.getDate(); d++) {
     if (week.length === 7) { weeks.push(week); week = []; }
     const date = toDateStr(year, month, d);
-    week.push({ date, dayNum: d, isCurrentMonth: true, isToday: date === todayStr });
+    week.push({ date, dayNum: d, isCurrentMonth: true, isToday: date === todayStr, isPast: date < todayStr });
   }
   let nd = 1;
   const nm = month === 11 ? 0 : month + 1;
   const ny = month === 11 ? year + 1 : year;
   while (week.length < 7) {
-    const date = toDateStr(ny, nm, nd++);
-    week.push({ date, dayNum: nd - 1, isCurrentMonth: false, isToday: date === todayStr });
+    const date = toDateStr(ny, nm, nd);
+    week.push({ date, dayNum: nd, isCurrentMonth: false, isToday: date === todayStr, isPast: date < todayStr });
+    nd++;
   }
   weeks.push(week);
   return weeks;
 }
 
-function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): BookingSegment[] {
+function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][], todayStr: string): BookingSegment[] {
   const dateToPos = new Map<string, { row: number; col: number }>();
   weeks.forEach((w, row) => w.forEach((d, col) => dateToPos.set(d.date, { row, col })));
   const gridStart = weeks[0][0].date;
@@ -89,6 +91,7 @@ function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): Boo
     const isActualStart = bStart === booking.check_in;
     const isActualEnd = bEnd === booking.check_out;
     const nights = getNights(booking.check_in, booking.check_out);
+    const isPast = booking.check_out <= todayStr;
     for (let row = startPos.row; row <= endPos.row; row++) {
       segments.push({
         booking,
@@ -96,7 +99,7 @@ function getBookingSegments(bookings: BookingBarData[], weeks: DayInfo[][]): Boo
         endCol: row === endPos.row ? endPos.col : 6,
         isStart: row === startPos.row && isActualStart,
         isEnd: row === endPos.row && isActualEnd,
-        row, nights,
+        row, nights, isPast,
       });
     }
   }
@@ -132,9 +135,9 @@ export default function MonthlyView({
 
   const segmentsByMonth = useMemo(() => {
     const map = new Map<string, BookingSegment[]>();
-    for (const m of months) map.set(m.key, getBookingSegments(bookings, m.weeks));
+    for (const m of months) map.set(m.key, getBookingSegments(bookings, m.weeks, todayStr));
     return map;
-  }, [months, bookings]);
+  }, [months, bookings, todayStr]);
 
   const bookedDates = useMemo(() => {
     const set = new Set<string>();
@@ -152,7 +155,7 @@ export default function MonthlyView({
 
   const scrollToMonth = useCallback((key: string) => {
     const el = monthRefs.current.get(key);
-    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 34;
+    if (el && containerRef.current) containerRef.current.scrollTop = el.offsetTop - 30;
   }, []);
 
   const scrollToToday = useCallback(() => {
@@ -160,7 +163,7 @@ export default function MonthlyView({
     if (m) { scrollToMonth(m.key); setActiveMonth(m.key); }
   }, [months, scrollToMonth]);
 
-  useEffect(() => { const t = setTimeout(scrollToToday, 50); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const t = setTimeout(scrollToToday, 80); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (todayTrigger > 0) scrollToToday(); }, [todayTrigger, scrollToToday]);
 
   useEffect(() => {
@@ -168,7 +171,7 @@ export default function MonthlyView({
     if (!c) return;
     const obs = new IntersectionObserver(
       (entries) => { for (const e of entries) if (e.isIntersecting) { const k = e.target.getAttribute("data-month"); if (k) setActiveMonth(k); } },
-      { root: c, rootMargin: "-34px 0px -70% 0px", threshold: 0 },
+      { root: c, rootMargin: "-30px 0px -70% 0px", threshold: 0 },
     );
     monthRefs.current.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
@@ -177,7 +180,7 @@ export default function MonthlyView({
   return (
     <div className="bg-white flex flex-col flex-1 min-h-0">
       {/* Month pills */}
-      <div className="flex gap-1.5 px-3 py-2.5 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
+      <div className="flex gap-1.5 px-3 py-2 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button
             key={m.key}
@@ -192,7 +195,7 @@ export default function MonthlyView({
       </div>
 
       {/* Scrollable calendar */}
-      <div ref={containerRef} className="overflow-y-auto flex-1 bg-white">
+      <div ref={containerRef} className="overflow-y-auto flex-1 min-h-0 bg-white">
         {/* Sticky day-of-week header */}
         <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l) => (
@@ -200,12 +203,12 @@ export default function MonthlyView({
           ))}
         </div>
 
-        {/* Month sections */}
+        {/* All 24 month sections rendered continuously */}
         {months.map((m) => {
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              <div className="sticky top-[31px] z-[9] bg-white px-1 pt-10 pb-2">
+              <div className="sticky top-[29px] z-[9] bg-white px-1 pt-10 pb-2">
                 <span className="text-xl font-bold text-[#222]">{m.label}</span>
               </div>
 
@@ -228,15 +231,23 @@ export default function MonthlyView({
                         <div
                           key={day.date}
                           className={`relative rounded-[10px] cursor-pointer transition-colors flex flex-col justify-between ${
-                            !day.isCurrentMonth ? "bg-[#fafafa]" : isBlocked ? "bg-[#f5f5f5]" : "bg-white hover:bg-[#fafafa]"
+                            !day.isCurrentMonth
+                              ? "bg-[#fafafa]"
+                              : day.isPast
+                                ? "bg-[#f9f9f7]"
+                                : isBlocked
+                                  ? "bg-[#f5f5f5]"
+                                  : day.isToday
+                                    ? "bg-white"
+                                    : "bg-white hover:bg-[#fafafa]"
                           }`}
                           style={{
                             minHeight: "100px",
                             padding: "6px",
                             border: "1px solid #e8e8e8",
-                            ...(isBlocked ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
+                            ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                           }}
-                          onClick={() => { if (!isBooked) onDateClick(propertyId, day.date, rate ?? null); }}
+                          onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
                         >
                           <div>
                             {day.isToday ? (
@@ -244,12 +255,17 @@ export default function MonthlyView({
                                 {day.dayNum}
                               </span>
                             ) : (
-                              <span className={`text-[13px] font-semibold leading-none ${day.isCurrentMonth ? "text-[#333]" : "text-[#ccc]"}`}>
+                              <span className={`text-[13px] font-semibold leading-none ${
+                                !day.isCurrentMonth ? "text-[#ccc]"
+                                  : day.isPast ? "text-[#bbb]"
+                                  : "text-[#333]"
+                              }`}>
                                 {day.dayNum}
                               </span>
                             )}
                           </div>
-                          {!isBooked && rawRate !== null && day.isCurrentMonth && isAvail && (
+                          {/* Rate: hide on booked dates and past dates */}
+                          {!isBooked && !day.isPast && rawRate !== null && day.isCurrentMonth && isAvail && (
                             <span className="self-end text-[11px] font-mono text-[#999] leading-none">${rawRate}</span>
                           )}
                         </div>
@@ -259,7 +275,6 @@ export default function MonthlyView({
                     {/* Booking bars */}
                     {rowSegs.map((seg, si) => {
                       const span = seg.endCol - seg.startCol + 1;
-                      // Outgoing ends at 35% of cell → remove 65%; incoming starts at 30%
                       const startFrac = seg.isStart ? 0.3 : 0;
                       const endFrac = seg.isEnd ? 0.65 : 0;
 
@@ -290,6 +305,7 @@ export default function MonthlyView({
                             zIndex: seg.isStart ? 2 : 1,
                             paddingLeft: seg.isStart ? "10px" : "4px",
                             paddingRight: seg.isEnd ? "10px" : "4px",
+                            opacity: seg.isPast ? 0.7 : 1,
                           }}
                           onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
                           title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}

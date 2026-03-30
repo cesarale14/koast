@@ -87,11 +87,13 @@ export default function CalendarToolbar({
         )}
       </div>
 
-      {/* Right: property selector */}
+      {/* Right: property selector — hidden on desktop for monthly (panel handles it) */}
       <select
         value={selectedPropertyId ?? ""}
         onChange={(e) => onPropertyChange(e.target.value || null)}
-        className="h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+        className={`h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors ${
+          !showAllOption ? "md:hidden" : ""
+        }`}
       >
         {showAllOption && <option value="">All Properties</option>}
         {properties.map((p) => (
