@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import ReviewBadge from "@/components/ui/ReviewBadge";
+import Logo from "@/components/ui/Logo";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
@@ -99,11 +100,8 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
       {expanded ? (
         /* ---- EXPANDED ---- */
         <>
-          <div className="px-4 h-14 flex items-center">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-brand-400" />
-              <span className="text-white font-semibold text-md tracking-tight">StayCommand</span>
-            </div>
+          <div className="px-3 h-14 flex items-center">
+            <Logo variant="full" size={28} className="[&_span]:!text-white" />
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
             {navGroups.map((group, gi) => (
@@ -131,8 +129,8 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
       ) : (
         /* ---- COLLAPSED ---- */
         <div className="flex flex-col items-center py-3 h-full">
-          <Link href="/" className="w-8 h-8 rounded-lg bg-brand-500/20 flex items-center justify-center mb-6">
-            <span className="w-2.5 h-2.5 rounded-full bg-brand-400" />
+          <Link href="/" className="mb-6">
+            <Logo variant="icon" size={28} />
           </Link>
           <nav className="flex-1 flex flex-col items-center gap-1 overflow-y-auto">
             {navGroups.map((group, gi) => (
@@ -175,11 +173,8 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
     <>
       <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
       <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left" style={{ background: "var(--sidebar-bg)" }}>
-        <div className="px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-brand-400" />
-            <span className="text-white font-semibold text-md tracking-tight">StayCommand</span>
-          </div>
+        <div className="px-4 h-14 flex items-center justify-between">
+          <Logo variant="full" size={28} className="[&_span]:!text-white" />
           <button onClick={onClose} className="text-sidebar-text hover:text-white transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
         </div>
         <nav className="flex-1 px-3 overflow-y-auto">

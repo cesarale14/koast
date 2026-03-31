@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import Logo from "@/components/ui/Logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -32,9 +33,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-25 px-4">
       <div className="w-full max-w-md p-8 bg-neutral-0 rounded-lg shadow-lg border border-[var(--border)]">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="w-3 h-3 rounded-full bg-brand-500" />
-          <h1 className="text-2xl font-bold text-neutral-800">StayCommand</h1>
+        <div className="mb-2">
+          <Logo variant="full" size={40} />
         </div>
         <p className="text-sm text-neutral-500 mb-8">Sign in to your account</p>
 

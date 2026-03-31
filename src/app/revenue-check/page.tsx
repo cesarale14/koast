@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
+import Logo from "@/components/ui/Logo";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyData = any;
@@ -72,10 +73,7 @@ export default function RevenueCheckPage() {
     <div className="min-h-screen bg-neutral-0">
       {/* Nav */}
       <nav className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-brand-400" />
-          <span className="text-xl font-bold text-neutral-900">StayCommand</span>
-        </div>
+        <Logo variant="full" size={32} />
         <Link href="/login" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors">
           Sign In
         </Link>

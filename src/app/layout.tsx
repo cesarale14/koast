@@ -7,7 +7,10 @@ export const metadata: Metadata = {
   title: "StayCommand",
   description: "Property management for short-term rentals",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
     apple: "/apple-icon.png",
   },
 };
