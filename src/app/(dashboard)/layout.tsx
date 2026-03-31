@@ -6,30 +6,49 @@ import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import ReviewBadge from "@/components/ui/ReviewBadge";
 import {
-  LayoutGrid, Building2, CalendarDays, ClipboardList,
-  DollarSign, BarChart3, Star, MessageSquare, RefreshCw,
+  LayoutDashboard, CalendarDays, MessageCircle,
+  Home, BookOpen,
+  DollarSign, Globe, MapPin, GitCompare, Search,
+  Star, Sparkles,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; badge?: boolean; }
+interface NavItem { name: string; href: string; icon: LucideIcon; badge?: boolean; external?: boolean; }
+interface NavGroup { label?: string; items: NavItem[]; }
 
-const navGroups: NavItem[][] = [
-  [
-    { name: "Overview", href: "/", icon: LayoutGrid },
-    { name: "Properties", href: "/properties", icon: Building2 },
-    { name: "Calendar", href: "/calendar", icon: CalendarDays },
-    { name: "Bookings", href: "/bookings", icon: ClipboardList },
-  ],
-  [
-    { name: "Pricing", href: "/pricing", icon: DollarSign },
-    { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "Reviews", href: "/reviews", icon: Star, badge: true },
-  ],
-  [
-    { name: "Messages", href: "/messages", icon: MessageSquare },
-    { name: "Turnover", href: "/turnover", icon: RefreshCw },
-  ],
+const navGroups: NavGroup[] = [
+  {
+    items: [
+      { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "Calendar", href: "/calendar", icon: CalendarDays },
+      { name: "Inbox", href: "/messages", icon: MessageCircle },
+    ],
+  },
+  {
+    label: "MANAGE",
+    items: [
+      { name: "Properties", href: "/properties", icon: Home },
+      { name: "Bookings", href: "/bookings", icon: BookOpen },
+    ],
+  },
+  {
+    label: "INTELLIGENCE",
+    items: [
+      { name: "Pricing", href: "/pricing", icon: DollarSign },
+      { name: "Market Explorer", href: "/market-explorer", icon: Globe },
+      { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
+      { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
+      { name: "Revenue Check", href: "/revenue-check", icon: Search, external: true },
+    ],
+  },
+  {
+    label: "OPERATIONS",
+    items: [
+      { name: "Reviews", href: "/reviews", icon: Star, badge: true },
+      { name: "Turnover", href: "/turnover", icon: Sparkles },
+    ],
+  },
 ];
 
 /* ---- Collapsed nav link with tooltip ---- */
@@ -60,8 +79,9 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
 /* ---- Expanded nav link ---- */
 function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive: boolean; onClick?: () => void }) {
   const Icon = item.icon;
+  const linkProps = item.external ? { target: "_blank" as const, rel: "noopener noreferrer" } : {};
   return (
-    <Link href={item.href} onClick={onClick}
+    <Link href={item.href} onClick={onClick} {...linkProps}
       className={`relative flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-md transition-all duration-150 ${
         isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
       }`}>
@@ -69,6 +89,7 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
       <span className="truncate">{item.name}</span>
       {item.badge && <ReviewBadge />}
+      {item.external && <span className="text-sidebar-text/40 text-[10px] ml-auto">↗</span>}
     </Link>
   );
 }
@@ -92,9 +113,12 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-5 pt-5 border-t border-sidebar-border" : ""}>
+              <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
+                {group.label && (
+                  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{group.label}</p>
+                )}
                 <div className="space-y-0.5">
-                  {group.map((item) => {
+                  {group.items.map((item) => {
                     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                     return <NavLinkExpanded key={item.name} item={item} isActive={isActive} />;
                   })}
@@ -120,7 +144,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
             {navGroups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-sidebar-border w-8" : ""}>
                 <div className="flex flex-col items-center gap-1">
-                  {group.map((item) => {
+                  {group.items.map((item) => {
                     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                     return <NavLinkCollapsed key={item.name} item={item} isActive={isActive} />;
                   })}
@@ -166,9 +190,12 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
         </div>
         <nav className="flex-1 px-3 overflow-y-auto">
           {navGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-5 pt-5 border-t border-sidebar-border" : ""}>
+            <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
+              {group.label && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{group.label}</p>
+              )}
               <div className="space-y-0.5">
-                {group.map((item) => {
+                {group.items.map((item) => {
                   const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                   return <NavLinkExpanded key={item.name} item={item} isActive={isActive} onClick={onClose} />;
                 })}
@@ -233,7 +260,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Menu size={20} strokeWidth={1.5} />
               </button>
               <span className="md:hidden text-sm font-medium text-neutral-700">
-                {navGroups.flat().find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Overview"}
+                {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
