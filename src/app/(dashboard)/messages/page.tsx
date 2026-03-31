@@ -54,7 +54,7 @@ export default async function MessagesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Messages</h1>
+        <h1 className="text-xl font-bold text-neutral-800 mb-1">Inbox</h1>
         <p className="text-neutral-500">Unified inbox and message templates</p>
       </div>
       <MessagesPageTabs
