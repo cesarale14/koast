@@ -69,20 +69,6 @@ function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-// Simple hash for property avatar color
-function propColor(name: string): string {
-  const colors = [
-    "bg-brand-100 text-brand-700",
-    "bg-blue-100 text-blue-700",
-    "bg-amber-100 text-amber-700",
-    "bg-rose-100 text-rose-700",
-    "bg-violet-100 text-violet-700",
-    "bg-cyan-100 text-cyan-700",
-  ];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % colors.length;
-  return colors[h];
-}
 
 export default function CalendarGrid({
   properties,
