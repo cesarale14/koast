@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
+import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import { RefreshCw, Copy, ExternalLink, Sparkles } from "lucide-react";
 
 interface Task {
@@ -30,7 +31,7 @@ interface Cleaner {
 
 interface TurnoverBoardProps {
   tasks: Task[];
-  properties: { id: string; name: string }[];
+  properties: { id: string; name: string; cover_photo_url?: string | null }[];
   bookings: { id: string; guest_name: string | null; check_in: string; check_out: string }[];
   cleaners?: Cleaner[];
 }
@@ -63,7 +64,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
   const [newCleanerPhone, setNewCleanerPhone] = useState("");
   const [addingCleaner, setAddingCleaner] = useState(false);
 
-  const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p.name])), [properties]);
+  const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p])), [properties]);
   const cleanerMap = useMemo(() => new Map(cleaners.map((c) => [c.id, c])), [cleaners]);
   const bookingMap = useMemo(() => new Map(bookings.map((b) => [b.id, b])), [bookings]);
   const today = new Date().toISOString().split("T")[0];
@@ -297,7 +298,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                   <p className="text-xs text-neutral-400 text-center py-8">No tasks</p>
                 ) : (
                   colTasks.map((task) => {
-                    const propName = propMap.get(task.property_id) ?? "Property";
+                    const prop = propMap.get(task.property_id);
+                    const propName = prop?.name ?? "Property";
                     const checkoutBooking = task.booking_id ? bookingMap.get(task.booking_id) : null;
                     const nextBooking = task.next_booking_id ? bookingMap.get(task.next_booking_id) : null;
                     const doneCount = (task.checklist ?? []).filter((i) => i.done).length;
@@ -315,7 +317,10 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                         } ${selectedTask === task.id ? "ring-2 ring-brand-400" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-1">
-                          <p className="text-sm font-medium text-neutral-900 truncate">{propName}</p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={24} />
+                            <p className="text-sm font-medium text-neutral-900 truncate">{propName}</p>
+                          </div>
                           {isUrgent && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-danger-light text-danger rounded">URGENT</span>
                           )}
@@ -378,7 +383,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             <div className="p-6 space-y-6">
               <div>
                 <p className="text-xs text-neutral-400">Property</p>
-                <p className="text-lg font-semibold text-neutral-800">{propMap.get(selectedTaskData.property_id) ?? "Property"}</p>
+                <p className="text-lg font-semibold text-neutral-800">{propMap.get(selectedTaskData.property_id)?.name ?? "Property"}</p>
               </div>
 
               <div className="flex items-center gap-2">

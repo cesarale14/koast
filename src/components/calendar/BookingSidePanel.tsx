@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { BookingBarData } from "./BookingBar";
 import EventBadge from "@/components/ui/EventBadge";
+import PropertyAvatar from "@/components/ui/PropertyAvatar";
 
 const platformColors: Record<string, string> = {
   airbnb: "bg-red-50 text-red-700",
@@ -23,9 +24,10 @@ const statusColors: Record<string, string> = {
 interface BookingSidePanelProps {
   booking: BookingBarData | null;
   onClose: () => void;
+  propertyMap?: Map<string, { name: string; cover_photo_url?: string | null }>;
 }
 
-export default function BookingSidePanel({ booking, onClose }: BookingSidePanelProps) {
+export default function BookingSidePanel({ booking, onClose, propertyMap }: BookingSidePanelProps) {
   if (!booking) return null;
 
   const nights = (() => {
@@ -66,6 +68,18 @@ export default function BookingSidePanel({ booking, onClose }: BookingSidePanelP
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Property info */}
+          {propertyMap && (() => {
+            const prop = propertyMap.get(booking.property_id);
+            if (!prop) return null;
+            return (
+              <div className="flex items-center gap-3">
+                <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={40} />
+                <p className="text-sm font-medium text-neutral-700">{prop.name}</p>
+              </div>
+            );
+          })()}
+
           {/* Guest info */}
           <div>
             <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-3">Guest</h3>

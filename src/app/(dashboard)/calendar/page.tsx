@@ -15,10 +15,10 @@ export default async function CalendarPage() {
 
   const propertiesRes = await supabase
     .from("properties")
-    .select("id, name")
+    .select("id, name, cover_photo_url")
     .eq("user_id", user.id)
     .order("name");
-  const properties = (propertiesRes.data ?? []) as { id: string; name: string }[];
+  const properties = (propertiesRes.data ?? []) as { id: string; name: string; cover_photo_url: string | null }[];
 
   if (properties.length === 0) {
     return (

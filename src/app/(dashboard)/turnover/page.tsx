@@ -9,7 +9,7 @@ export default async function TurnoverPage() {
   // Fetch user's properties first
   const { data: props } = await supabase
     .from("properties")
-    .select("id, name")
+    .select("id, name, cover_photo_url")
     .eq("user_id", user.id)
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

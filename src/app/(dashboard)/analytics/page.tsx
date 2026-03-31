@@ -18,8 +18,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
   // Fetch properties
-  const propertiesRes = await supabase.from("properties").select("id, name").eq("user_id", user.id).order("name");
-  const properties = (propertiesRes.data ?? []) as { id: string; name: string }[];
+  const propertiesRes = await supabase.from("properties").select("id, name, cover_photo_url").eq("user_id", user.id).order("name");
+  const properties = (propertiesRes.data ?? []) as { id: string; name: string; cover_photo_url: string | null }[];
 
   if (properties.length === 0) {
     return (

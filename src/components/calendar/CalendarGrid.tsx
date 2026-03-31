@@ -6,6 +6,7 @@ import PropertyRow from "./PropertyRow";
 import MonthlyView from "./MonthlyView";
 import BookingSidePanel from "./BookingSidePanel";
 import DateEditPopover from "./DateEditPopover";
+import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 import { createClient } from "@/lib/supabase/client";
@@ -13,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 interface CalendarProperty {
   id: string;
   name: string;
+  cover_photo_url?: string | null;
 }
 
 interface CalendarBooking {
@@ -499,11 +501,7 @@ export default function CalendarGrid({
             <div key={prop.id} className="flex">
               {/* Sticky property name with avatar */}
               <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${propColor(prop.name)}`}
-                >
-                  {prop.name.charAt(0).toUpperCase()}
-                </div>
+                <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={32} />
                 <span className="text-sm font-medium text-neutral-700 truncate">
                   {prop.name}
                 </span>
@@ -562,12 +560,13 @@ export default function CalendarGrid({
                     <button
                       key={p.id}
                       onClick={() => setMonthlyPropertyId(p.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2.5 ${
                         isActive ? "bg-[#f5f5f5]" : "hover:bg-[#fafafa]"
                       }`}
                       style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
                     >
-                      <span className={`text-sm truncate block ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
+                      <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={28} />
+                      <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
                         {p.name}
                       </span>
                     </button>
@@ -619,6 +618,7 @@ export default function CalendarGrid({
       <BookingSidePanel
         booking={selectedBooking}
         onClose={() => setSelectedBooking(null)}
+        propertyMap={new Map(properties.map((p) => [p.id, { name: p.name, cover_photo_url: p.cover_photo_url }]))}
       />
 
       {/* Date edit popover */}
