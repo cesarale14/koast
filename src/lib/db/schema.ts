@@ -139,6 +139,9 @@ export const marketComps = pgTable("market_comps", {
   compOccupancy: decimal("comp_occupancy", { precision: 5, scale: 2 }),
   compRevpar: decimal("comp_revpar", { precision: 10, scale: 2 }),
   distanceKm: decimal("distance_km", { precision: 5, scale: 2 }),
+  photoUrl: text("photo_url"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
   lastSynced: timestamp("last_synced", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_market_comps_property").on(t.propertyId),

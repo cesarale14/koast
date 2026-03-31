@@ -20,6 +20,9 @@ interface CompSetResult {
     occupancy: number;
     revpar: number;
     distance_km: number | null;
+    photo_url: string | null;
+    latitude: number;
+    longitude: number;
   }[];
   summary: {
     median_adr: number;
@@ -70,6 +73,9 @@ function mapListing(
     occupancy: Math.round(pm.ttm_occupancy * 10000) / 100, // as percentage
     revpar: Math.round(pm.ttm_revpar * 100) / 100,
     distance_km: distance,
+    photo_url: listing.listing_info.cover_photo_url || null,
+    latitude: loc.latitude,
+    longitude: loc.longitude,
   };
 }
 
@@ -131,6 +137,9 @@ export async function storeCompSet(
       comp_occupancy: c.occupancy,
       comp_revpar: c.revpar,
       distance_km: c.distance_km,
+      photo_url: c.photo_url,
+      latitude: c.latitude,
+      longitude: c.longitude,
     }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("market_comps") as any).insert(rows);

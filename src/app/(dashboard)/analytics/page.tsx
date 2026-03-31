@@ -72,7 +72,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
   // Fetch comps
   const compsRes = await supabase
     .from("market_comps")
-    .select("comp_listing_id, comp_name, comp_bedrooms, comp_adr, comp_occupancy, comp_revpar, distance_km")
+    .select("comp_listing_id, comp_name, comp_bedrooms, comp_adr, comp_occupancy, comp_revpar, distance_km, photo_url")
     .eq("property_id", propertyId)
     .order("comp_adr", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

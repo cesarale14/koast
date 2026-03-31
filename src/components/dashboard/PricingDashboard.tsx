@@ -25,6 +25,7 @@ interface CompEntry {
   comp_revpar: number | null;
   comp_bedrooms: number | null;
   distance_km: number | null;
+  photo_url: string | null;
 }
 
 interface MarketSnapshot {
@@ -637,14 +638,22 @@ export default function PricingDashboard({
                 <h3 className="text-sm font-bold text-neutral-700 mb-3">Comp Set ({comps.length})</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {comps.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-neutral-50 last:border-0">
-                      <div className="min-w-0">
+                    <div key={i} className="flex items-center gap-2.5 py-1.5 border-b border-neutral-50 last:border-0">
+                      {c.photo_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={c.photo_url} alt="" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-neutral-400 text-xs">🏠</span>
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium text-neutral-700 truncate">{c.comp_name ?? "Listing"}</p>
                         <p className="text-[10px] text-neutral-400">
                           {c.comp_bedrooms ?? "?"}BR &middot; {c.distance_km != null ? `${c.distance_km}km` : "\u2014"}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0">
                         <p className="text-xs font-bold font-mono text-neutral-800">${Math.round(c.comp_adr ?? 0)}</p>
                         <p className="text-[10px] text-neutral-400">{c.comp_occupancy ?? 0}% occ</p>
                       </div>

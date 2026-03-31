@@ -55,7 +55,7 @@ export default async function PricingPage() {
   // Fetch comps
   const compsRes = await supabase
     .from("market_comps")
-    .select("comp_name, comp_adr, comp_occupancy, comp_revpar, comp_bedrooms, distance_km")
+    .select("comp_name, comp_adr, comp_occupancy, comp_revpar, comp_bedrooms, distance_km, photo_url")
     .eq("property_id", propertyId)
     .order("comp_adr", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
