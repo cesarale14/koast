@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { parseICalFeed, validateICalUrl } from "@/lib/ical/parser";
 import { syncICalFeeds } from "@/lib/ical/sync";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { fetchPropertyPhoto } from "@/lib/photos/fetcher";
+import { createServiceClient } from "@/lib/supabase/service";
 
 function detectPlatform(url: string): string {
   const lower = url.toLowerCase();
@@ -54,17 +56,37 @@ export async function POST(request: NextRequest) {
       .where(and(eq(icalFeeds.propertyId, property_id), eq(icalFeeds.platform, detectedPlatform)))
       .limit(1);
 
+    // Extract listing ID and fetch cover photo (non-blocking)
+    const { listingId, photoUrl } = await fetchPropertyPhoto(feed_url, detectedPlatform);
+
     if (existing) {
       await db.update(icalFeeds)
-        .set({ feedUrl: feed_url, isActive: true, lastError: null })
+        .set({ feedUrl: feed_url, isActive: true, lastError: null, platformListingId: listingId })
         .where(eq(icalFeeds.id, existing.id));
     } else {
       await db.insert(icalFeeds).values({
         propertyId: property_id,
         platform: detectedPlatform,
         feedUrl: feed_url,
+        platformListingId: listingId,
         isActive: true,
       });
+    }
+
+    // Store cover photo on property if found and property has no photo yet
+    if (photoUrl) {
+      const supabase = createServiceClient();
+      const { data: prop } = await supabase
+        .from("properties")
+        .select("cover_photo_url")
+        .eq("id", property_id)
+        .single();
+      if (!prop?.cover_photo_url) {
+        await supabase
+          .from("properties")
+          .update({ cover_photo_url: photoUrl })
+          .eq("id", property_id);
+      }
     }
 
     // Run initial sync
@@ -76,6 +98,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       platform: detectedPlatform,
+      listing_id: listingId,
+      cover_photo_url: photoUrl,
       bookings_found: bookingsCount,
       blocked_dates: blockedCount,
       sync_results: syncResults,

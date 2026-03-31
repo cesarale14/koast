@@ -16,13 +16,14 @@ export default async function PropertiesPage() {
 
   const propertiesRes = await supabase
     .from("properties")
-    .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests, channex_property_id")
+    .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests, channex_property_id, cover_photo_url")
     .eq("user_id", user.id)
     .order("name");
   const properties = (propertiesRes.data ?? []) as {
     id: string; name: string; address: string | null; city: string | null;
     state: string | null; property_type: string | null; bedrooms: number | null;
     bathrooms: number | null; max_guests: number | null; channex_property_id: string | null;
+    cover_photo_url: string | null;
   }[];
 
   if (properties.length === 0) {
@@ -158,12 +159,23 @@ export default async function PropertiesPage() {
               href={`/properties/${prop.id}`}
               className="bg-neutral-0 rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-all group"
             >
-              {/* Photo placeholder */}
-              <div className="h-40 bg-neutral-100 rounded-t-lg flex items-center justify-center">
-                <svg className="w-12 h-12 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
+              {/* Property photo */}
+              {prop.cover_photo_url ? (
+                <div className="h-40 rounded-t-lg overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={prop.cover_photo_url}
+                    alt={prop.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ) : (
+                <div className="h-40 bg-neutral-100 rounded-t-lg flex items-center justify-center">
+                  <svg className="w-12 h-12 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              )}
 
               <div className="p-5">
                 <h3 className="text-lg font-semibold text-neutral-800 group-hover:text-brand-500 transition-colors">
