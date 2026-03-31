@@ -1,41 +1,41 @@
-export default function BookingsPage() {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Bookings</h1>
-          <p className="text-neutral-500">All reservations across your properties</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600">
-            <option>All Properties</option>
-          </select>
-          <select className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600">
-            <option>All Statuses</option>
-            <option>Confirmed</option>
-            <option>Pending</option>
-            <option>Cancelled</option>
-          </select>
-        </div>
-      </div>
+import { createClient } from "@/lib/supabase/server";
+import BookingsClient from "./BookingsClient";
 
-      <div className="bg-neutral-0 rounded-lg border border-[var(--border)]">
-        <div className="px-6 py-4 border-b border-neutral-100">
-          <div className="grid grid-cols-6 text-xs font-medium text-neutral-400 uppercase tracking-wider">
-            <span>Guest</span>
-            <span>Property</span>
-            <span>Check-in</span>
-            <span>Check-out</span>
-            <span>Source</span>
-            <span>Status</span>
-          </div>
-        </div>
-        <div className="p-12 text-center">
-          <p className="text-neutral-400 text-sm">
-            No bookings yet. They will appear here once synced from Channex.
-          </p>
+export const dynamic = "force-dynamic";
+
+export default async function BookingsPage() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: props } = await supabase
+    .from("properties")
+    .select("id, name, cover_photo_url")
+    .eq("user_id", user.id)
+    .order("name");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const properties = (props ?? []) as any[];
+  const propertyIds = properties.map((p: { id: string }) => p.id);
+
+  if (propertyIds.length === 0) {
+    return (
+      <div>
+        <h1 className="text-xl font-bold text-neutral-800 mb-1">Bookings</h1>
+        <p className="text-sm text-neutral-500 mb-8">All reservations across your properties</p>
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
+          <p className="text-neutral-400">Add a property first to see bookings.</p>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes")
+    .in("property_id", propertyIds)
+    .order("check_in", { ascending: false });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allBookings = (bookings ?? []) as any[];
+
+  return <BookingsClient bookings={allBookings} properties={properties} />;
 }
