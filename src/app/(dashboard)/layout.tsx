@@ -7,9 +7,8 @@ import { ToastProvider } from "@/components/ui/Toast";
 import ReviewBadge from "@/components/ui/ReviewBadge";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
-  Home, BookOpen,
-  DollarSign, Globe, MapPin, GitCompare, Search,
-  Star, Sparkles,
+  Home, DollarSign, Star, Sparkles,
+  Globe, Map, MapPin, GitCompare, Search,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -29,24 +28,19 @@ const navGroups: NavGroup[] = [
     label: "MANAGE",
     items: [
       { name: "Properties", href: "/properties", icon: Home },
-      { name: "Bookings", href: "/bookings", icon: BookOpen },
+      { name: "Pricing", href: "/pricing", icon: DollarSign },
+      { name: "Reviews", href: "/reviews", icon: Star, badge: true },
+      { name: "Turnover", href: "/turnover", icon: Sparkles },
     ],
   },
   {
-    label: "INTELLIGENCE",
+    label: "GROW",
     items: [
-      { name: "Pricing", href: "/pricing", icon: DollarSign },
-      { name: "Market Explorer", href: "/market-explorer", icon: Globe },
+      { name: "Frontdesk", href: "/frontdesk", icon: Globe },
+      { name: "Market Explorer", href: "/market-explorer", icon: Map },
       { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
       { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
       { name: "Revenue Check", href: "/revenue-check", icon: Search, external: true },
-    ],
-  },
-  {
-    label: "OPERATIONS",
-    items: [
-      { name: "Reviews", href: "/reviews", icon: Star, badge: true },
-      { name: "Turnover", href: "/turnover", icon: Sparkles },
     ],
   },
 ];
