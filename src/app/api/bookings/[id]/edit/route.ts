@@ -41,9 +41,11 @@ export async function PUT(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Drizzle may return Date objects for date columns — normalize to YYYY-MM-DD strings
-    const oldCheckIn = typeof existing.checkIn === "string" ? existing.checkIn.split("T")[0] : new Date(existing.checkIn as unknown as string).toISOString().split("T")[0];
-    const oldCheckOut = typeof existing.checkOut === "string" ? existing.checkOut.split("T")[0] : new Date(existing.checkOut as unknown as string).toISOString().split("T")[0];
+    // postgres.js returns date columns as Date objects — normalize to YYYY-MM-DD strings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toDateStr = (v: any): string => (v instanceof Date ? v.toISOString() : String(v)).split("T")[0];
+    const oldCheckIn = toDateStr(existing.checkIn);
+    const oldCheckOut = toDateStr(existing.checkOut);
 
     // Update booking
     const updateData: Record<string, unknown> = {
@@ -92,8 +94,8 @@ export async function PUT(
         id: updated.id,
         guest_name: updated.guestName,
         platform: updated.platform,
-        check_in: updated.checkIn,
-        check_out: updated.checkOut,
+        check_in: toDateStr(updated.checkIn),
+        check_out: toDateStr(updated.checkOut),
         total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
         status: updated.status,
       },

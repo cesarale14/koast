@@ -76,8 +76,10 @@ export async function POST(request: NextRequest) {
         id: booking.id,
         guest_name: booking.guestName,
         platform: booking.platform,
-        check_in: booking.checkIn,
-        check_out: booking.checkOut,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        check_in: ((v: any) => (v instanceof Date ? v.toISOString() : String(v)).split("T")[0])(booking.checkIn),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        check_out: ((v: any) => (v instanceof Date ? v.toISOString() : String(v)).split("T")[0])(booking.checkOut),
         total_price: booking.totalPrice ? Number(booking.totalPrice) : null,
         status: booking.status,
       },

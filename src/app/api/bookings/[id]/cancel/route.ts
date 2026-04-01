@@ -33,9 +33,11 @@ export async function POST(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Normalize dates from Drizzle (may be Date objects at runtime)
-    const ciStr = typeof existing.checkIn === "string" ? existing.checkIn.split("T")[0] : new Date(existing.checkIn as unknown as string).toISOString().split("T")[0];
-    const coStr = typeof existing.checkOut === "string" ? existing.checkOut.split("T")[0] : new Date(existing.checkOut as unknown as string).toISOString().split("T")[0];
+    // postgres.js returns date columns as Date objects — normalize to YYYY-MM-DD strings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toDateStr = (v: any): string => (v instanceof Date ? v.toISOString() : String(v)).split("T")[0];
+    const ciStr = toDateStr(existing.checkIn);
+    const coStr = toDateStr(existing.checkOut);
 
     if (existing.status === "cancelled") {
       return NextResponse.json({ error: "Booking is already cancelled" }, { status: 400 });
@@ -82,8 +84,8 @@ export async function POST(
         id: updated.id,
         guest_name: updated.guestName,
         platform: updated.platform,
-        check_in: updated.checkIn,
-        check_out: updated.checkOut,
+        check_in: toDateStr(updated.checkIn),
+        check_out: toDateStr(updated.checkOut),
         total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
         status: updated.status,
       },
