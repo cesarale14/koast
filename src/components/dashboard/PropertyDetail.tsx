@@ -70,6 +70,8 @@ export default function PropertyDetail({
   const [bookingForm, setBookingForm] = useState({
     guest_name: "", check_in: "", check_out: "", total_price: "",
   });
+  const [rateBreakdown, setRateBreakdown] = useState<{ date: string; rate: number }[]>([]);
+  const [priceAutoFilled, setPriceAutoFilled] = useState(false);
 
   // Scenario 3: Edit/Cancel Booking state
   const [editingBooking, setEditingBooking] = useState<string | null>(null);
@@ -78,6 +80,40 @@ export default function PropertyDetail({
   });
   const [savingBooking, setSavingBooking] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<string | null>(null);
+
+  // Auto-fill total price when dates change
+  useEffect(() => {
+    if (!bookingForm.check_in || !bookingForm.check_out || bookingForm.check_in >= bookingForm.check_out) {
+      setRateBreakdown([]);
+      return;
+    }
+    const supabase = createClient();
+    // Generate all dates between check_in and check_out (exclusive)
+    const dates: string[] = [];
+    const ci = new Date(bookingForm.check_in + "T00:00:00");
+    const co = new Date(bookingForm.check_out + "T00:00:00");
+    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split("T")[0]);
+    }
+    supabase
+      .from("calendar_rates")
+      .select("date, applied_rate, suggested_rate, base_rate")
+      .eq("property_id", property.id)
+      .in("date", dates)
+      .then(({ data }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rateMap = new Map((data ?? []).map((r: any) => [r.date, Number(r.applied_rate ?? r.suggested_rate ?? r.base_rate ?? 0)]));
+        const breakdown = dates.map((d) => ({ date: d, rate: rateMap.get(d) ?? 0 }));
+        setRateBreakdown(breakdown);
+        const total = breakdown.reduce((s, b) => s + b.rate, 0);
+        if (total > 0) {
+          setBookingForm((prev) => ({ ...prev, total_price: total.toFixed(2) }));
+          setPriceAutoFilled(true);
+        } else {
+          setPriceAutoFilled(false);
+        }
+      });
+  }, [bookingForm.check_in, bookingForm.check_out, property.id]);
 
   const [editForm, setEditForm] = useState({
     name: property.name,
@@ -452,11 +488,19 @@ export default function PropertyDetail({
                     placeholder="John Smith" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">
+                    Total Price ($)
+                    {bookingForm.check_in && bookingForm.check_out && bookingForm.check_in < bookingForm.check_out && (
+                      <span className="text-neutral-400 font-normal ml-1">
+                        ({Math.round((new Date(bookingForm.check_out + "T00:00:00").getTime() - new Date(bookingForm.check_in + "T00:00:00").getTime()) / 86400000)} nights)
+                      </span>
+                    )}
+                  </label>
                   <input type="number" value={bookingForm.total_price}
-                    onChange={(e) => setBookingForm({ ...bookingForm, total_price: e.target.value })}
+                    onChange={(e) => { setBookingForm({ ...bookingForm, total_price: e.target.value }); setPriceAutoFilled(false); }}
                     className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                     placeholder="500.00" min="0" step="0.01" />
+                  {priceAutoFilled && <p className="text-[10px] text-brand-500 mt-1">Auto-calculated from calendar rates</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in *</label>
@@ -471,7 +515,27 @@ export default function PropertyDetail({
                     className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
                 </div>
               </div>
-              <div className="mt-4 flex gap-3">
+              {/* Rate breakdown */}
+              {rateBreakdown.length > 0 && rateBreakdown.some((r) => r.rate > 0) && (
+                <div className="col-span-2 mt-1 px-3 py-2 bg-neutral-50 rounded-lg">
+                  <div className="flex flex-wrap gap-x-1 text-[11px] text-neutral-500">
+                    {rateBreakdown.map((r, i) => (
+                      <span key={r.date}>
+                        {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}: <span className="font-mono font-medium text-neutral-700">${Math.round(r.rate)}</span>
+                        {i < rateBreakdown.length - 1 && <span className="text-neutral-300 mx-0.5">|</span>}
+                      </span>
+                    ))}
+                    <span className="ml-1 font-medium text-neutral-700">
+                      = ${Math.round(rateBreakdown.reduce((s, r) => s + r.rate, 0))} ({rateBreakdown.length} night{rateBreakdown.length !== 1 ? "s" : ""})
+                    </span>
+                  </div>
+                </div>
+              )}
+              {rateBreakdown.length > 0 && !rateBreakdown.some((r) => r.rate > 0) && (
+                <p className="col-span-2 text-[11px] text-neutral-400 mt-1">No rates set for these dates</p>
+              )}
+
+              <div className="col-span-2 mt-3 flex gap-3">
                 <button onClick={handleAddBooking} disabled={addingBooking}
                   className="btn-primary-3d px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
                   {addingBooking ? "Creating..." : "Create Booking"}
