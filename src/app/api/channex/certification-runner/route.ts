@@ -17,9 +17,7 @@ const STANDARD_BAR = "d4dc52ea-672f-4f3c-8c85-525be07d0ee2";
 const STANDARD_BNB = "1ac4b701-ca7e-439a-afcb-a71e53bddc2b";
 const PREMIUM_BAR = "236ab9fd-9997-4b42-89be-5ae5fe776471";
 const PREMIUM_BNB = "6ab14f1b-d1c8-48a5-af82-d449470caf86";
-// Aliases for test readability (Standard = "Twin" equivalent, Premium = "Double" equivalent)
-const TWIN = STANDARD_ROOM;
-const DOUBLE = PREMIUM_ROOM;
+// Aliases for test readability (Standard = "Twin", Premium = "Double" in cert spec)
 const TWIN_BAR = STANDARD_BAR;
 const TWIN_BNB = STANDARD_BNB;
 const DOUBLE_BAR = PREMIUM_BAR;
