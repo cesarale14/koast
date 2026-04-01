@@ -76,9 +76,34 @@ export default function CertificationPage() {
 
   const runAll = async () => {
     setRunningAll(true);
+    // Run tests 1-10, then re-run Test 1 to restore realistic data
     for (let i = 1; i <= 10; i++) {
       await runTest(i);
     }
+    // Final reset: re-run Test 1 to overwrite flat test values with realistic data
+    setRunning(-1); // -1 = reset indicator
+    try {
+      const res = await fetch("/api/channex/certification-runner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: 1 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Reset failed");
+      setResults((prev) => ({
+        ...prev,
+        [-1]: { ...data, test: -1, details: "Reset: " + data.details },
+      }));
+    } catch (err) {
+      setResults((prev) => ({
+        ...prev,
+        [-1]: {
+          test: -1, success: false, taskIds: [], apiCalls: 0,
+          details: "", error: err instanceof Error ? err.message : String(err),
+        },
+      }));
+    }
+    setRunning(null);
     setRunningAll(false);
   };
 
@@ -113,7 +138,7 @@ export default function CertificationPage() {
             disabled={runningAll || running !== null}
             className="px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
           >
-            {runningAll ? "Running..." : "Run All (1-10)"}
+            {runningAll ? "Running..." : "Run All (1-10 + Reset)"}
           </button>
         </div>
       </div>
@@ -229,6 +254,46 @@ export default function CertificationPage() {
           );
         })}
       </div>
+
+      {/* Reset card (shows after Run All) */}
+      {results[-1] && (() => {
+        const r = results[-1];
+        const isResetting = running === -1;
+        const passed = r.success && !r.error;
+        return (
+          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-emerald-200 bg-emerald-50/30" : "border-[var(--border)]"}`}>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                {isResetting ? (
+                  <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+                ) : passed ? (
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white">R</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-neutral-800">Test 1 (Reset) — Restoring realistic data</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Re-runs full sync to overwrite flat test values from Tests 2-10 with realistic seasonal rates and real booking availability.</p>
+                {r.details && <p className="text-xs text-neutral-600 mt-1">{r.details}</p>}
+                {r.taskIds.length > 0 && (
+                  <div className="mt-1">
+                    {r.taskIds.map((tid: string, i: number) => (
+                      <code key={i} className="text-[11px] font-mono bg-neutral-100 px-2 py-0.5 rounded text-neutral-700 mr-2">{tid}</code>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Test 11: Webhook Log Viewer */}
       <WebhookLogViewer />
