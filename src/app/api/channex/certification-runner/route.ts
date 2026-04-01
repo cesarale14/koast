@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const maxDuration = 60;
+
+const VILLA_JAMAICA_DB_ID = "9a564a82-2677-4931-bcea-30976d958121";
 
 // ====== Villa Jamaica — Channex IDs ======
 const PROP = "cf4a8bc4-956a-4c89-a40a-14c2e56ebd96";
@@ -34,19 +37,10 @@ function dateHash(s: string): number {
   return Math.abs(h);
 }
 
-function genAvailability(date: Date): number {
-  const m = date.getMonth();
-  const dow = date.getDay();
-  const isWeekend = dow === 0 || dow === 5 || dow === 6;
-  const h = dateHash(fmt(date));
-  // Vacation rental: 1 unit, so availability is 0 or 1
-  // But for Channex certification, show varied availability (as if multi-unit)
-  // High season (Jun, Jul, Dec): 0-1 (almost always booked)
-  if (m === 5 || m === 6 || m === 11) return isWeekend ? 0 : (h % 2);
-  // Shoulder (Mar-May, Aug, Nov): 0-1
-  if (m === 2 || m === 3 || m === 4 || m === 7 || m === 10) return isWeekend ? (h % 2) : 1;
-  // Low (Jan, Feb, Sep, Oct): mostly available
-  return 1;
+// Vacation rental: availability is always 0 (booked) or 1 (available)
+// bookedDates is populated from real bookings in test1
+function genAvailability(date: Date, bookedDates: Set<string>): number {
+  return bookedDates.has(fmt(date)) ? 0 : 1;
 }
 
 function genRate(date: Date, isPremium: boolean, isBnb: boolean): number {
@@ -100,7 +94,28 @@ async function test1_fullSync(): Promise<TaskResult> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Generate per-day availability for both room types
+  // Fetch real bookings from Villa Jamaica to set booked dates
+  const supabase = createServiceClient();
+  const endDate = fmt(new Date(today.getTime() + 499 * 86400000));
+  const { data: bookingRows } = await supabase
+    .from("bookings")
+    .select("check_in, check_out")
+    .eq("property_id", VILLA_JAMAICA_DB_ID)
+    .in("status", ["confirmed", "completed"])
+    .lte("check_in", endDate)
+    .gte("check_out", fmt(today));
+
+  const bookedDates = new Set<string>();
+  for (const b of (bookingRows ?? []) as { check_in: string; check_out: string }[]) {
+    const ci = new Date(b.check_in + "T00:00:00Z");
+    const co = new Date(b.check_out + "T00:00:00Z");
+    for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
+      bookedDates.add(d.toISOString().split("T")[0]);
+    }
+  }
+  console.log(`[cert] Test 1: ${bookedDates.size} booked dates from ${(bookingRows ?? []).length} bookings`);
+
+  // Generate per-day availability and rates for both room types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const availValues: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +125,7 @@ async function test1_fullSync(): Promise<TaskResult> {
     const d = new Date(today);
     d.setDate(d.getDate() + i);
     const ds = fmt(d);
-    const avail = genAvailability(d);
+    const avail = genAvailability(d, bookedDates);
     const minStay = genMinStay(d);
 
     // Availability: both room types
@@ -148,7 +163,7 @@ async function test1_fullSync(): Promise<TaskResult> {
   const taskIds = [...extractTaskIds(availResult), ...extractTaskIds(restrictResult)];
   return {
     taskIds,
-    details: `Villa Jamaica full sync: ${availValues.length} availability + ${restrictValues.length} restriction entries over 500 days. Standard rates $155-260, Premium $180-285, B&B +$25. Weekend +25%, Summer +20%, Dec +30%. Min stay 1-3 by season.`,
+    details: `Villa Jamaica full sync: ${availValues.length} avail + ${restrictValues.length} restrict over 500 days. ${bookedDates.size} booked dates from real bookings (avail=0), rest available (avail=1). Rates $155-260 with seasonal/weekend variation.`,
     apiCalls: 2,
   };
 }
@@ -282,26 +297,28 @@ async function test8_halfYear(): Promise<TaskResult> {
 
 async function test9_singleAvailability(): Promise<TaskResult> {
   const channex = createChannexClient();
+  // Vacation rental: simulate booking by setting availability to 0
   const result = await channex.updateAvailability([
-    { property_id: PROP, room_type_id: TWIN, date_from: "2026-11-21", date_to: "2026-11-21", availability: 7 },
-    { property_id: PROP, room_type_id: DOUBLE, date_from: "2026-11-25", date_to: "2026-11-25", availability: 0 },
+    { property_id: PROP, room_type_id: STANDARD_ROOM, date_from: "2026-11-21", date_to: "2026-11-21", availability: 0 },
+    { property_id: PROP, room_type_id: PREMIUM_ROOM, date_from: "2026-11-25", date_to: "2026-11-25", availability: 0 },
   ]);
   return {
     taskIds: extractTaskIds(result),
-    details: "Twin Nov 21: avail=7, Double Nov 25: avail=0 (simulated booking)",
+    details: "Standard Nov 21: avail=0 (booked), Premium Nov 25: avail=0 (booked)",
     apiCalls: 1,
   };
 }
 
 async function test10_multipleAvailability(): Promise<TaskResult> {
   const channex = createChannexClient();
+  // Vacation rental: simulate booked weeks
   const result = await channex.updateAvailability([
-    { property_id: PROP, room_type_id: TWIN, date_from: "2026-11-10", date_to: "2026-11-16", availability: 3 },
-    { property_id: PROP, room_type_id: DOUBLE, date_from: "2026-11-17", date_to: "2026-11-24", availability: 4 },
+    { property_id: PROP, room_type_id: STANDARD_ROOM, date_from: "2026-11-10", date_to: "2026-11-16", availability: 0 },
+    { property_id: PROP, room_type_id: PREMIUM_ROOM, date_from: "2026-11-17", date_to: "2026-11-24", availability: 0 },
   ]);
   return {
     taskIds: extractTaskIds(result),
-    details: "Twin Nov 10-16: avail=3, Double Nov 17-24: avail=4",
+    details: "Standard Nov 10-16: avail=0 (booked week), Premium Nov 17-24: avail=0 (booked week)",
     apiCalls: 1,
   };
 }
