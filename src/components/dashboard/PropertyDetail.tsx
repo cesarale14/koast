@@ -460,7 +460,7 @@ export default function PropertyDetail({
           properties={[{ id: property.id, name: property.name }]}
           bookings={calendarBookings}
           rates={calendarRates}
-          totalDays={60}
+          totalDays={730}
         />
       )}
 
@@ -479,72 +479,80 @@ export default function PropertyDetail({
           {showAddBooking && (
             <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
               <h3 className="text-sm font-semibold text-neutral-800 mb-4">New Booking</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Date range calendar */}
                 <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name *</label>
-                  <input type="text" value={bookingForm.guest_name}
-                    onChange={(e) => setBookingForm({ ...bookingForm, guest_name: e.target.value })}
-                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-                    placeholder="John Smith" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">
-                    Total Price ($)
-                    {bookingForm.check_in && bookingForm.check_out && bookingForm.check_in < bookingForm.check_out && (
+                  <label className="block text-xs font-medium text-neutral-600 mb-2">
+                    Select Dates *
+                    {bookingForm.check_in && bookingForm.check_out && (
                       <span className="text-neutral-400 font-normal ml-1">
-                        ({Math.round((new Date(bookingForm.check_out + "T00:00:00").getTime() - new Date(bookingForm.check_in + "T00:00:00").getTime()) / 86400000)} nights)
+                        {new Date(bookingForm.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(bookingForm.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {" "}({Math.round((new Date(bookingForm.check_out + "T00:00:00").getTime() - new Date(bookingForm.check_in + "T00:00:00").getTime()) / 86400000)} nights)
                       </span>
                     )}
+                    {bookingForm.check_in && !bookingForm.check_out && (
+                      <span className="text-brand-500 font-normal ml-1">Select check-out date</span>
+                    )}
                   </label>
-                  <input type="number" value={bookingForm.total_price}
-                    onChange={(e) => { setBookingForm({ ...bookingForm, total_price: e.target.value }); setPriceAutoFilled(false); }}
-                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-                    placeholder="500.00" min="0" step="0.01" />
-                  {priceAutoFilled && <p className="text-[10px] text-brand-500 mt-1">Auto-calculated from calendar rates</p>}
+                  <DateRangeCalendar
+                    checkIn={bookingForm.check_in}
+                    checkOut={bookingForm.check_out}
+                    onSelect={(ci, co) => setBookingForm({ ...bookingForm, check_in: ci, check_out: co })}
+                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in *</label>
-                  <input type="date" value={bookingForm.check_in}
-                    onChange={(e) => setBookingForm({ ...bookingForm, check_in: e.target.value })}
-                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Check-out *</label>
-                  <input type="date" value={bookingForm.check_out}
-                    onChange={(e) => setBookingForm({ ...bookingForm, check_out: e.target.value })}
-                    className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
-                </div>
-              </div>
-              {/* Rate breakdown */}
-              {rateBreakdown.length > 0 && rateBreakdown.some((r) => r.rate > 0) && (
-                <div className="col-span-2 mt-1 px-3 py-2 bg-neutral-50 rounded-lg">
-                  <div className="flex flex-wrap gap-x-1 text-[11px] text-neutral-500">
-                    {rateBreakdown.map((r, i) => (
-                      <span key={r.date}>
-                        {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}: <span className="font-mono font-medium text-neutral-700">${Math.round(r.rate)}</span>
-                        {i < rateBreakdown.length - 1 && <span className="text-neutral-300 mx-0.5">|</span>}
+
+                {/* Right: Guest info + price */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name *</label>
+                    <input type="text" value={bookingForm.guest_name}
+                      onChange={(e) => setBookingForm({ ...bookingForm, guest_name: e.target.value })}
+                      className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                      placeholder="John Smith" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">
+                      Total Price ($)
+                    </label>
+                    <input type="number" value={bookingForm.total_price}
+                      onChange={(e) => { setBookingForm({ ...bookingForm, total_price: e.target.value }); setPriceAutoFilled(false); }}
+                      className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                      placeholder="500.00" min="0" step="0.01" />
+                    {priceAutoFilled && <p className="text-[10px] text-brand-500 mt-1">Auto-calculated from calendar rates</p>}
+                  </div>
+
+                  {/* Rate breakdown */}
+                  {rateBreakdown.length > 0 && rateBreakdown.some((r) => r.rate > 0) && (
+                    <div className="px-3 py-2 bg-neutral-50 rounded-lg">
+                      <div className="flex flex-wrap gap-x-1 text-[11px] text-neutral-500">
+                        {rateBreakdown.map((r, i) => (
+                          <span key={r.date}>
+                            {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}: <span className="font-mono font-medium text-neutral-700">${Math.round(r.rate)}</span>
+                            {i < rateBreakdown.length - 1 && <span className="text-neutral-300 mx-0.5">|</span>}
+                          </span>
+                        ))}
+                        <span className="ml-1 font-medium text-neutral-700">
+                          = ${Math.round(rateBreakdown.reduce((s, r) => s + r.rate, 0))} ({rateBreakdown.length} night{rateBreakdown.length !== 1 ? "s" : ""})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {rateBreakdown.length > 0 && !rateBreakdown.some((r) => r.rate > 0) && (
+                    <p className="text-[11px] text-neutral-400">No rates set for these dates</p>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={handleAddBooking} disabled={addingBooking}
+                      className="btn-primary-3d px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
+                      {addingBooking ? "Creating..." : "Create Booking"}
+                    </button>
+                    {property.channex_property_id && (
+                      <span className="text-xs text-neutral-400 self-center">
+                        Channex availability will be automatically updated
                       </span>
-                    ))}
-                    <span className="ml-1 font-medium text-neutral-700">
-                      = ${Math.round(rateBreakdown.reduce((s, r) => s + r.rate, 0))} ({rateBreakdown.length} night{rateBreakdown.length !== 1 ? "s" : ""})
-                    </span>
+                    )}
                   </div>
                 </div>
-              )}
-              {rateBreakdown.length > 0 && !rateBreakdown.some((r) => r.rate > 0) && (
-                <p className="col-span-2 text-[11px] text-neutral-400 mt-1">No rates set for these dates</p>
-              )}
-
-              <div className="col-span-2 mt-3 flex gap-3">
-                <button onClick={handleAddBooking} disabled={addingBooking}
-                  className="btn-primary-3d px-5 py-2 text-sm font-semibold bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
-                  {addingBooking ? "Creating..." : "Create Booking"}
-                </button>
-                {property.channex_property_id && (
-                  <span className="text-xs text-neutral-400 self-center">
-                    Channex availability will be automatically updated
-                  </span>
-                )}
               </div>
             </div>
           )}
@@ -945,6 +953,112 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ====== Date Range Calendar ======
+
+function DateRangeCalendar({
+  checkIn,
+  checkOut,
+  onSelect,
+}: {
+  checkIn: string;
+  checkOut: string;
+  onSelect: (checkIn: string, checkOut: string) => void;
+}) {
+  const [viewMonth, setViewMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split("T")[0];
+
+  const handleDayClick = (dateStr: string) => {
+    if (dateStr < todayStr) return;
+    if (!checkIn || (checkIn && checkOut)) {
+      onSelect(dateStr, "");
+    } else {
+      if (dateStr <= checkIn) {
+        onSelect(dateStr, "");
+      } else {
+        onSelect(checkIn, dateStr);
+      }
+    }
+  };
+
+  const renderMonth = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDow = firstDay.getDay();
+    const monthLabel = firstDay.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    const cells: (number | null)[] = Array(startDow).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    return (
+      <div className="flex-1 min-w-[220px]">
+        <p className="text-sm font-semibold text-neutral-800 text-center mb-2">{monthLabel}</p>
+        <div className="grid grid-cols-7 gap-0">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div key={d} className="text-center text-[10px] font-medium text-neutral-400 py-1">{d}</div>
+          ))}
+          {cells.map((day, i) => {
+            if (day === null) return <div key={`e-${i}`} />;
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const isPast = dateStr < todayStr;
+            const isCheckIn = dateStr === checkIn;
+            const isCheckOut = dateStr === checkOut;
+            const isInRange = !!(checkIn && checkOut && dateStr > checkIn && dateStr < checkOut);
+            const isToday = dateStr === todayStr;
+
+            let bg = "hover:bg-neutral-100 text-neutral-700";
+            if (isCheckIn || isCheckOut) bg = "bg-brand-500 text-white font-bold";
+            else if (isInRange) bg = "bg-brand-50 text-brand-700";
+            else if (isPast) bg = "text-neutral-200 cursor-default";
+
+            return (
+              <button
+                key={dateStr}
+                onClick={() => !isPast && handleDayClick(dateStr)}
+                disabled={isPast}
+                className={`h-8 text-xs rounded-md transition-colors ${bg} ${isToday && !isCheckIn ? "ring-1 ring-brand-300" : ""}`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const prevMonth = () => {
+    setViewMonth((v) => v.month === 0 ? { year: v.year - 1, month: 11 } : { year: v.year, month: v.month - 1 });
+  };
+  const nextMonth = () => {
+    setViewMonth((v) => v.month === 11 ? { year: v.year + 1, month: 0 } : { year: v.year, month: v.month + 1 });
+  };
+  const m2 = viewMonth.month === 11 ? { year: viewMonth.year + 1, month: 0 } : { year: viewMonth.year, month: viewMonth.month + 1 };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={prevMonth} className="p-1 text-neutral-400 hover:text-neutral-600 rounded">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <button onClick={nextMonth} className="p-1 text-neutral-400 hover:text-neutral-600 rounded">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+      <div className="flex gap-4">
+        {renderMonth(viewMonth.year, viewMonth.month)}
+        {renderMonth(m2.year, m2.month)}
+      </div>
     </div>
   );
 }

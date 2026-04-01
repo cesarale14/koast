@@ -16,9 +16,9 @@ export default async function PropertyDetailPage({
     .toISOString()
     .split("T")[0];
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const endDate60 = new Date();
-  endDate60.setDate(endDate60.getDate() + 60);
-  const end60 = endDate60.toISOString().split("T")[0];
+  const endDate730 = new Date();
+  endDate730.setDate(endDate730.getDate() + 730);
+  const end60 = endDate730.toISOString().split("T")[0]; // 24 months for calendar
 
   // Fetch property
   const propRes = await supabase
