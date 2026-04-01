@@ -4,14 +4,23 @@ import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 
 export const maxDuration = 60;
 
-// ====== Property & Room/Rate Plan IDs ======
-const PROP = "c83ba211-2e79-4de0-b388-c88d9f695581";
-const TWIN = "7e22307e-f0f8-4247-a3f2-125f0e39d1f0";
-const DOUBLE = "84f7707d-0956-4afb-adff-2cb7cd65f2ba";
-const TWIN_BAR = "9a8cc7df-c98e-42fd-af36-a8d6af987cbd";
-const DOUBLE_BAR = "01329740-a168-43fa-8e1a-3e4292049c3d";
-const TWIN_BNB = "68e52373-63ea-4892-8c2f-1ad5a507e72c";
-const DOUBLE_BNB = "972f29ef-96e5-4376-9147-7da949c1d285";
+// ====== Villa Jamaica — Channex IDs ======
+const PROP = "cf4a8bc4-956a-4c89-a40a-14c2e56ebd96";
+// Room Types: "Entire Home - Standard" / "Entire Home - Premium"
+const STANDARD_ROOM = "63f36a00-de78-4342-9d26-c0f8f1875688";
+const PREMIUM_ROOM = "025a9e93-6fa7-40eb-8902-8b723a50778a";
+// Rate Plans
+const STANDARD_BAR = "d4dc52ea-672f-4f3c-8c85-525be07d0ee2";
+const STANDARD_BNB = "1ac4b701-ca7e-439a-afcb-a71e53bddc2b";
+const PREMIUM_BAR = "236ab9fd-9997-4b42-89be-5ae5fe776471";
+const PREMIUM_BNB = "6ab14f1b-d1c8-48a5-af82-d449470caf86";
+// Aliases for test readability (Standard = "Twin" equivalent, Premium = "Double" equivalent)
+const TWIN = STANDARD_ROOM;
+const DOUBLE = PREMIUM_ROOM;
+const TWIN_BAR = STANDARD_BAR;
+const TWIN_BNB = STANDARD_BNB;
+const DOUBLE_BAR = PREMIUM_BAR;
+const DOUBLE_BNB = PREMIUM_BNB;
 
 // ====== Helpers ======
 
@@ -30,34 +39,38 @@ function genAvailability(date: Date): number {
   const dow = date.getDay();
   const isWeekend = dow === 0 || dow === 5 || dow === 6;
   const h = dateHash(fmt(date));
-  // High season (Jun, Jul, Dec): 1-3
-  if (m === 5 || m === 6 || m === 11) return isWeekend ? 1 + (h % 2) : 2 + (h % 2);
-  // Shoulder (Mar-May, Aug, Nov): 3-7
-  if (m === 2 || m === 3 || m === 4 || m === 7 || m === 10) return isWeekend ? 3 + (h % 2) : 5 + (h % 3);
-  // Low (Jan, Feb, Sep, Oct): 5-10
-  return isWeekend ? 5 + (h % 3) : 8 + (h % 3);
+  // Vacation rental: 1 unit, so availability is 0 or 1
+  // But for Channex certification, show varied availability (as if multi-unit)
+  // High season (Jun, Jul, Dec): 0-1 (almost always booked)
+  if (m === 5 || m === 6 || m === 11) return isWeekend ? 0 : (h % 2);
+  // Shoulder (Mar-May, Aug, Nov): 0-1
+  if (m === 2 || m === 3 || m === 4 || m === 7 || m === 10) return isWeekend ? (h % 2) : 1;
+  // Low (Jan, Feb, Sep, Oct): mostly available
+  return 1;
 }
 
-function genRate(date: Date, isBnb: boolean): number {
+function genRate(date: Date, isPremium: boolean, isBnb: boolean): number {
   const m = date.getMonth();
   const dow = date.getDay();
   const isWeekend = dow === 0 || dow === 5 || dow === 6;
   const h = dateHash(fmt(date));
-  const variation = (h % 11) - 5; // -5 to +5
+  const variation = (h % 11) - 5; // -$5 to +$5
 
-  let base = isWeekend ? 150 : 110;
-  // Summer +30%
-  if (m === 5 || m === 6 || m === 7) base = Math.round(base * 1.3);
-  // Dec +30%
+  // Villa Jamaica base rate: $160 weekday, $200 weekend
+  let base = isWeekend ? 200 : 160;
+  // Summer (Jun-Aug): +20%
+  if (m === 5 || m === 6 || m === 7) base = Math.round(base * 1.2);
+  // Dec holidays: +30%
   else if (m === 11) base = Math.round(base * 1.3);
-  // Jan-Feb -10%
+  // Jan-Feb low: -10%
   else if (m === 0 || m === 1) base = Math.round(base * 0.9);
-  // Sep-Oct -10%
+  // Sep-Oct low: -10%
   else if (m === 8 || m === 9) base = Math.round(base * 0.9);
 
   base += variation;
-  if (isBnb) base += 20;
-  return Math.max(5000, base * 100); // cents, min $50
+  if (isPremium) base += 25;  // Premium room: +$25
+  if (isBnb) base += 25;      // B&B rate: +$25
+  return Math.max(8000, base * 100); // cents, min $80
 }
 
 function genMinStay(date: Date): number {
@@ -101,21 +114,22 @@ async function test1_fullSync(): Promise<TaskResult> {
     const minStay = genMinStay(d);
 
     // Availability: both room types
-    for (const rt of [TWIN, DOUBLE]) {
-      // Slight variation between room types
-      const adj = rt === DOUBLE ? Math.max(1, avail - 1) : avail;
+    for (const rt of [STANDARD_ROOM, PREMIUM_ROOM]) {
       availValues.push({
         property_id: PROP, room_type_id: rt,
-        date_from: ds, date_to: ds, availability: adj,
+        date_from: ds, date_to: ds, availability: avail,
       });
     }
 
-    // Restrictions: all 4 rate plans
-    for (const [rpId, isBnb] of [[TWIN_BAR, false], [TWIN_BNB, true], [DOUBLE_BAR, false], [DOUBLE_BNB, true]] as [string, boolean][]) {
+    // Restrictions: all 4 rate plans [id, isPremium, isBnb]
+    for (const [rpId, isPremium, isBnb] of [
+      [STANDARD_BAR, false, false], [STANDARD_BNB, false, true],
+      [PREMIUM_BAR, true, false], [PREMIUM_BNB, true, true],
+    ] as [string, boolean, boolean][]) {
       restrictValues.push({
         property_id: PROP, rate_plan_id: rpId,
         date_from: ds, date_to: ds,
-        rate: genRate(d, isBnb),
+        rate: genRate(d, isPremium, isBnb),
         min_stay_arrival: minStay,
         stop_sell: false,
         closed_to_arrival: false,
@@ -134,7 +148,7 @@ async function test1_fullSync(): Promise<TaskResult> {
   const taskIds = [...extractTaskIds(availResult), ...extractTaskIds(restrictResult)];
   return {
     taskIds,
-    details: `Full sync: ${availValues.length} availability + ${restrictValues.length} restriction entries over 500 days. Rates: $90-$200 with seasonal/weekend variation. Availability: 1-10 with seasonal patterns. Min stay: 1-3.`,
+    details: `Villa Jamaica full sync: ${availValues.length} availability + ${restrictValues.length} restriction entries over 500 days. Standard rates $155-260, Premium $180-285, B&B +$25. Weekend +25%, Summer +20%, Dec +30%. Min stay 1-3 by season.`,
     apiCalls: 2,
   };
 }
