@@ -49,57 +49,28 @@ export async function POST(request: NextRequest) {
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
     const booking = insertedData;
 
-    // Push booking to Channex CRS if connected
+    // Push availability to Channex (block booked dates) — do NOT push CRS booking
+    // CRS booking push was resetting Channex restriction rates
     let channexResponse = null;
     if (prop.channex_property_id) {
       try {
         const channex = createChannexClient();
         const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
-        const ratePlans = await channex.getRatePlans(prop.channex_property_id);
 
-        if (roomTypes.length > 0 && ratePlans.length > 0) {
-          // Build per-night rates from calendar_rates
-          const days = buildDaysMap(check_in, check_out);
-          const { data: rateData } = await supabase
-            .from("calendar_rates")
-            .select("date, applied_rate")
-            .eq("property_id", property_id)
-            .in("date", Object.keys(days));
-
-          for (const r of (rateData ?? []) as { date: string; applied_rate: number | null }[]) {
-            if (r.applied_rate) days[r.date] = Number(r.applied_rate).toFixed(2);
-          }
-
-          const nameParts = (guest_name || "Guest").split(" ");
-          const firstName = nameParts[0];
-          const lastName = nameParts.slice(1).join(" ") || "Guest";
-
-          // Create booking in Channex CRS with per-night rates
-          const crsResult = await channex.createBooking({
+        if (roomTypes.length > 0) {
+          const values = roomTypes.map((rt) => ({
             property_id: prop.channex_property_id,
-            room_type_id: roomTypes[0].id,
-            rate_plan_id: ratePlans[0].id,
-            arrival_date: check_in,
-            departure_date: check_out,
-            guest_name: `${firstName} ${lastName}`,
-            guest_email: "guest@staycommand.com",
-            days, // pass pre-built per-night rates directly
-            currency: "USD",
-          });
-
-          const channexBookingId = crsResult?.data?.id;
-          if (channexBookingId) {
-            // Store channex_booking_id on our booking
-            await supabase
-              .from("bookings")
-              .update({ channex_booking_id: channexBookingId })
-              .eq("id", booking.id);
-            console.log(`[bookings/create] Channex CRS booking created: ${channexBookingId}`);
-          }
-          channexResponse = { id: channexBookingId, synced: true };
+            room_type_id: rt.id,
+            date_from: check_in,
+            date_to: check_out,
+            availability: 0,
+          }));
+          await channex.updateAvailability(values);
+          console.log(`[bookings/create] Channex availability blocked: ${check_in} to ${check_out} (${roomTypes.length} room types)`);
+          channexResponse = { synced: true };
         }
       } catch (err) {
-        console.error("[bookings/create] Channex CRS failed:", err);
+        console.error("[bookings/create] Channex update failed:", err);
         channexResponse = { error: err instanceof Error ? err.message : String(err) };
       }
     }
@@ -121,17 +92,4 @@ export async function POST(request: NextRequest) {
     console.error("[bookings/create] Error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-function buildDaysMap(checkIn: string, checkOut: string): Record<string, string> {
-  const days: Record<string, string> = {};
-  const ci = new Date(checkIn + "T00:00:00Z");
-  const co = new Date(checkOut + "T00:00:00Z");
-  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    days[`${y}-${m}-${day}`] = "160.00"; // default rate, overridden from DB
-  }
-  return days;
 }

@@ -52,23 +52,7 @@ export async function POST(
         const channex = createChannexClient();
         const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
 
-        // Cancel CRS booking if we have a channex_booking_id
-        if (existing.channex_booking_id && roomTypes.length > 0) {
-          const ratePlans = await channex.getRatePlans(prop.channex_property_id);
-          if (ratePlans.length > 0) {
-            await channex.cancelBooking(existing.channex_booking_id, {
-              property_id: prop.channex_property_id,
-              room_type_id: roomTypes[0].id,
-              rate_plan_id: ratePlans[0].id,
-              guest_name: existing.guest_name || "Guest",
-              arrival_date: existing.check_in,
-              departure_date: existing.check_out,
-            });
-            console.log(`[bookings/cancel] Channex CRS booking cancelled: ${existing.channex_booking_id}`);
-          }
-        }
-
-        // Restore availability for all room types
+        // Restore availability only for all room types
         if (roomTypes.length > 0) {
           const values = roomTypes.map((rt) => ({
             property_id: prop.channex_property_id,
@@ -78,7 +62,7 @@ export async function POST(
             availability: 1,
           }));
           await channex.updateAvailability(values);
-          console.log(`[bookings/cancel] Channex availability restored: ${existing.check_in} to ${existing.check_out}`);
+          console.log(`[bookings/cancel] Channex availability restored: ${existing.check_in} to ${existing.check_out} (${roomTypes.length} room types)`);
         }
         channexResponse = { synced: true };
       } catch (err) {

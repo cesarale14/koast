@@ -65,41 +65,15 @@ export async function PUT(
       try {
         const channex = createChannexClient();
         const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
-        const ratePlans = await channex.getRatePlans(prop.channex_property_id);
 
-        // Modify CRS booking if we have a channex_booking_id
-        if (existing.channex_booking_id && roomTypes.length > 0 && ratePlans.length > 0) {
-          const days = buildDaysMap(check_in, check_out);
-          const { data: rateData } = await supabase
-            .from("calendar_rates")
-            .select("date, applied_rate")
-            .eq("property_id", propertyId)
-            .in("date", Object.keys(days));
-          for (const r of (rateData ?? []) as { date: string; applied_rate: number | null }[]) {
-            if (r.applied_rate) days[r.date] = Number(r.applied_rate).toFixed(2);
-          }
-
-          const gName = guest_name || updatedData.guest_name || "Guest";
-          await channex.modifyBooking(existing.channex_booking_id, {
-            property_id: prop.channex_property_id,
-            room_type_id: roomTypes[0].id,
-            rate_plan_id: ratePlans[0].id,
-            guest_name: gName,
-            arrival_date: check_in,
-            departure_date: check_out,
-            days, // pass pre-built per-night rates
-          });
-          console.log(`[bookings/edit] Channex CRS booking modified: ${existing.channex_booking_id}`);
-        }
-
-        // Update availability: restore old dates, block new dates
+        // Update availability only: restore old dates, block new dates
         if (roomTypes.length > 0) {
           const values = roomTypes.flatMap((rt) => [
             { property_id: prop.channex_property_id, room_type_id: rt.id, date_from: oldCheckIn, date_to: oldCheckOut, availability: 1 },
             { property_id: prop.channex_property_id, room_type_id: rt.id, date_from: check_in, date_to: check_out, availability: 0 },
           ]);
           await channex.updateAvailability(values);
-          console.log(`[bookings/edit] Channex availability updated: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out}`);
+          console.log(`[bookings/edit] Channex availability: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out} (${roomTypes.length} room types)`);
         }
         channexResponse = { synced: true };
       } catch (err) {
@@ -125,17 +99,4 @@ export async function PUT(
     console.error("[bookings/edit] Error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-function buildDaysMap(checkIn: string, checkOut: string): Record<string, string> {
-  const days: Record<string, string> = {};
-  const ci = new Date(checkIn + "T00:00:00Z");
-  const co = new Date(checkOut + "T00:00:00Z");
-  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    days[`${y}-${m}-${day}`] = "160.00";
-  }
-  return days;
 }
