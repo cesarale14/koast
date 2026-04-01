@@ -223,7 +223,7 @@ class ChannexClient {
       body: JSON.stringify({
         booking: {
           status: "new",
-          ota_name: "BookingCRS",
+          ota_name: "Offline",
           ota_reservation_code: `SC-${Date.now()}`,
           currency: data.currency ?? "USD",
           arrival_date: data.arrival_date,
@@ -283,7 +283,7 @@ class ChannexClient {
       body: JSON.stringify({
         booking: {
           status: "modified",
-          ota_name: "BookingCRS",
+          ota_name: "Offline",
           ota_reservation_code: `SC-${Date.now()}`,
           currency: originalData.currency ?? "USD",
           arrival_date: originalData.arrival_date,
@@ -340,7 +340,7 @@ class ChannexClient {
       body: JSON.stringify({
         booking: {
           status: "cancelled",
-          ota_name: "BookingCRS",
+          ota_name: "Offline",
           ota_reservation_code: `SC-${Date.now()}`,
           currency: originalData.currency ?? "USD",
           arrival_date: originalData.arrival_date,
