@@ -78,7 +78,15 @@ export async function POST(
     }
 
     return NextResponse.json({
-      booking: updated,
+      booking: {
+        id: updated.id,
+        guest_name: updated.guestName,
+        platform: updated.platform,
+        check_in: updated.checkIn,
+        check_out: updated.checkOut,
+        total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
+        status: updated.status,
+      },
       channex: channexResponse,
     });
   } catch (err) {

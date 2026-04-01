@@ -72,7 +72,15 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      booking,
+      booking: {
+        id: booking.id,
+        guest_name: booking.guestName,
+        platform: booking.platform,
+        check_in: booking.checkIn,
+        check_out: booking.checkOut,
+        total_price: booking.totalPrice ? Number(booking.totalPrice) : null,
+        status: booking.status,
+      },
       channex: channexResponse,
     });
   } catch (err) {
