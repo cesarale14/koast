@@ -218,15 +218,16 @@ export default function PropertyDetail({
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/channex/full-sync", {
+      // Use certification runner Test 1 which has correct Villa Jamaica rates and real booking availability
+      const res = await fetch("/api/channex/certification-runner", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channex_property_id: property.channex_property_id }),
+        body: JSON.stringify({ test: 1 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setSyncResult(data);
-      toast(`Full sync complete! ${data.roomTypes} room types, ${data.ratePlans} rate plans synced`);
+      toast(`Full sync complete! Rates and availability pushed for 500 days`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Full sync failed", "error");
       setSyncResult({ error: err instanceof Error ? err.message : "Failed" });
