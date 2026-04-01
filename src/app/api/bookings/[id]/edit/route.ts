@@ -41,10 +41,21 @@ export async function PUT(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // postgres.js returns date columns as Date objects — normalize to YYYY-MM-DD strings
-    // Note: instanceof Date fails across VM contexts in serverless, so use new Date() universally
+    // postgres.js returns date columns as Date objects. Extract YYYY-MM-DD safely
+    // without .toISOString() (fails across VM contexts) or instanceof (unreliable in serverless)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toDateStr = (v: any): string => new Date(v).toISOString().split("T")[0];
+    const toDateStr = (v: any): string => {
+      if (!v) return "";
+      // Duck-type check: if it has getUTCFullYear, it's a Date-like object
+      if (typeof v.getUTCFullYear === "function") {
+        const y = v.getUTCFullYear();
+        const m = String(v.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(v.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+      // Otherwise it's a string — extract YYYY-MM-DD
+      return String(v).split("T")[0];
+    };
     const oldCheckIn = toDateStr(existing.checkIn);
     const oldCheckOut = toDateStr(existing.checkOut);
 
@@ -95,8 +106,8 @@ export async function PUT(
         id: updated.id,
         guest_name: updated.guestName,
         platform: updated.platform,
-        check_in: toDateStr(updated.checkIn),
-        check_out: toDateStr(updated.checkOut),
+        check_in: toDateStr(updated.checkIn) || check_in,
+        check_out: toDateStr(updated.checkOut) || check_out,
         total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
         status: updated.status,
       },
@@ -120,20 +131,12 @@ function buildAvailabilityValues(
   checkOut: string,
   availability: number
 ) {
-  const values: { property_id: string; room_type_id: string; date_from: string; date_to: string; availability: number }[] = [];
-  const ci = new Date(checkIn + "T00:00:00Z");
-  const co = new Date(checkOut + "T00:00:00Z");
-
-  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
-    const dateStr = d.toISOString().split("T")[0];
-    values.push({
-      property_id: propertyId,
-      room_type_id: roomTypeId,
-      date_from: dateStr,
-      date_to: dateStr,
-      availability,
-    });
-  }
-
-  return values;
+  // Use date range as single entry instead of per-day to avoid Date object issues
+  return [{
+    property_id: propertyId,
+    room_type_id: roomTypeId,
+    date_from: checkIn,
+    date_to: checkOut, // Channex handles ranges — checkout date excluded by convention
+    availability,
+  }];
 }

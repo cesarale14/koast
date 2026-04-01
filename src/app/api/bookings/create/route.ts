@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
         id: booking.id,
         guest_name: booking.guestName,
         platform: booking.platform,
-        check_in: new Date(booking.checkIn).toISOString().split("T")[0],
-        check_out: new Date(booking.checkOut).toISOString().split("T")[0],
+        check_in: check_in,  // use the original string from request body
+        check_out: check_out,
         total_price: booking.totalPrice ? Number(booking.totalPrice) : null,
         status: booking.status,
       },
@@ -97,21 +97,12 @@ function buildAvailabilityValues(
   checkOut: string,
   availability: number
 ) {
-  // Create one entry per date from check-in to check-out (exclusive of checkout)
-  const values: { property_id: string; room_type_id: string; date_from: string; date_to: string; availability: number }[] = [];
-  const ci = new Date(checkIn + "T00:00:00Z");
-  const co = new Date(checkOut + "T00:00:00Z");
-
-  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
-    const dateStr = d.toISOString().split("T")[0];
-    values.push({
-      property_id: propertyId,
-      room_type_id: roomTypeId,
-      date_from: dateStr,
-      date_to: dateStr,
-      availability,
-    });
-  }
-
-  return values;
+  // Use date range instead of per-day entries
+  return [{
+    property_id: propertyId,
+    room_type_id: roomTypeId,
+    date_from: checkIn,
+    date_to: checkOut,
+    availability,
+  }];
 }
