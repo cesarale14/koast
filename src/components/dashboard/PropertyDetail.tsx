@@ -80,6 +80,8 @@ export default function PropertyDetail({
   });
   const [savingBooking, setSavingBooking] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<string | null>(null);
+  const [editRateBreakdown, setEditRateBreakdown] = useState<{ date: string; rate: number }[]>([]);
+  const [editPriceAutoFilled, setEditPriceAutoFilled] = useState(false);
 
   // Auto-fill total price when dates change
   useEffect(() => {
@@ -114,6 +116,39 @@ export default function PropertyDetail({
         }
       });
   }, [bookingForm.check_in, bookingForm.check_out, property.id]);
+
+  // Auto-fill total price when edit form dates change
+  useEffect(() => {
+    if (!editBookingForm.check_in || !editBookingForm.check_out || editBookingForm.check_in >= editBookingForm.check_out) {
+      setEditRateBreakdown([]);
+      return;
+    }
+    const supabase = createClient();
+    const dates: string[] = [];
+    const ci = new Date(editBookingForm.check_in + "T00:00:00");
+    const co = new Date(editBookingForm.check_out + "T00:00:00");
+    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split("T")[0]);
+    }
+    supabase
+      .from("calendar_rates")
+      .select("date, applied_rate, suggested_rate, base_rate")
+      .eq("property_id", property.id)
+      .in("date", dates)
+      .then(({ data }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rateMap = new Map((data ?? []).map((r: any) => [r.date, Number(r.applied_rate ?? r.suggested_rate ?? r.base_rate ?? 0)]));
+        const breakdown = dates.map((d) => ({ date: d, rate: rateMap.get(d) ?? 0 }));
+        setEditRateBreakdown(breakdown);
+        const total = breakdown.reduce((s, b) => s + b.rate, 0);
+        if (total > 0) {
+          setEditBookingForm((prev) => ({ ...prev, total_price: total.toFixed(2) }));
+          setEditPriceAutoFilled(true);
+        } else {
+          setEditPriceAutoFilled(false);
+        }
+      });
+  }, [editBookingForm.check_in, editBookingForm.check_out, property.id]);
 
   const [editForm, setEditForm] = useState({
     name: property.name,
@@ -585,48 +620,71 @@ export default function PropertyDetail({
 
                   if (isEditing) {
                     return (
-                      <div key={b.id} className="px-6 py-3 bg-brand-50 border-l-4 border-brand-500">
-                        <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div key={b.id} className="px-6 py-4 bg-brand-50 border-l-4 border-brand-500">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">
+                          {/* Left: Calendar */}
                           <div>
-                            <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name</label>
-                            <input type="text" value={editBookingForm.guest_name}
-                              onChange={(e) => setEditBookingForm({ ...editBookingForm, guest_name: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
+                            <label className="block text-xs font-medium text-neutral-600 mb-2">
+                              Dates
+                              {editBookingForm.check_in && editBookingForm.check_out && (
+                                <span className="text-neutral-400 font-normal ml-1">
+                                  {new Date(editBookingForm.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(editBookingForm.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                  {" "}({Math.round((new Date(editBookingForm.check_out + "T00:00:00").getTime() - new Date(editBookingForm.check_in + "T00:00:00").getTime()) / 86400000)} nights)
+                                </span>
+                              )}
+                            </label>
+                            <DateRangeCalendar
+                              checkIn={editBookingForm.check_in}
+                              checkOut={editBookingForm.check_out}
+                              onSelect={(ci, co) => setEditBookingForm({ ...editBookingForm, check_in: ci, check_out: co })}
+                            />
                           </div>
-                          <div>
-                            <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
-                            <input type="number" value={editBookingForm.total_price}
-                              onChange={(e) => setEditBookingForm({ ...editBookingForm, total_price: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
-                              min="0" step="0.01" />
+                          {/* Right: Guest + Price */}
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name</label>
+                              <input type="text" value={editBookingForm.guest_name}
+                                onChange={(e) => setEditBookingForm({ ...editBookingForm, guest_name: e.target.value })}
+                                className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
+                              <input type="number" value={editBookingForm.total_price}
+                                onChange={(e) => { setEditBookingForm({ ...editBookingForm, total_price: e.target.value }); setEditPriceAutoFilled(false); }}
+                                className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
+                                min="0" step="0.01" />
+                              {editPriceAutoFilled && <p className="text-[10px] text-brand-500 mt-1">Recalculated from calendar rates</p>}
+                            </div>
+                            {/* Rate breakdown */}
+                            {editRateBreakdown.length > 0 && editRateBreakdown.some((r) => r.rate > 0) && (
+                              <div className="px-3 py-2 bg-white/60 rounded-lg">
+                                <div className="flex flex-wrap gap-x-1 text-[11px] text-neutral-500">
+                                  {editRateBreakdown.map((r, i) => (
+                                    <span key={r.date}>
+                                      {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}: <span className="font-mono font-medium text-neutral-700">${Math.round(r.rate)}</span>
+                                      {i < editRateBreakdown.length - 1 && <span className="text-neutral-300 mx-0.5">|</span>}
+                                    </span>
+                                  ))}
+                                  <span className="ml-1 font-medium text-neutral-700">
+                                    = ${Math.round(editRateBreakdown.reduce((s, r) => s + r.rate, 0))} ({editRateBreakdown.length}n)
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-1">
+                              <button onClick={handleEditBooking} disabled={savingBooking}
+                                className="btn-primary-3d px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
+                                {savingBooking ? "Saving..." : "Save Changes"}
+                              </button>
+                              <button onClick={() => setEditingBooking(null)}
+                                className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-800">
+                                Cancel
+                              </button>
+                            </div>
+                            {property.channex_property_id && (
+                              <p className="text-[10px] text-neutral-400">Channex availability will be updated automatically</p>
+                            )}
                           </div>
-                          <div>
-                            <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in</label>
-                            <input type="date" value={editBookingForm.check_in}
-                              onChange={(e) => setEditBookingForm({ ...editBookingForm, check_in: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-neutral-600 mb-1">Check-out</label>
-                            <input type="date" value={editBookingForm.check_out}
-                              onChange={(e) => setEditBookingForm({ ...editBookingForm, check_out: e.target.value })}
-                              className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={handleEditBooking} disabled={savingBooking}
-                            className="btn-primary-3d px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50">
-                            {savingBooking ? "Saving..." : "Save Changes"}
-                          </button>
-                          <button onClick={() => setEditingBooking(null)}
-                            className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-800">
-                            Cancel
-                          </button>
-                          {property.channex_property_id && (
-                            <span className="text-[10px] text-neutral-400 self-center ml-2">
-                              Old dates restored + new dates blocked in Channex
-                            </span>
-                          )}
                         </div>
                       </div>
                     );
