@@ -65,12 +65,8 @@ function genRate(date: Date, isPremium: boolean, isBnb: boolean): number {
   return Math.max(8000, base * 100); // cents, min $80
 }
 
-function genMinStay(date: Date): number {
-  const m = date.getMonth();
-  const dow = date.getDay();
-  const isWeekend = dow === 5 || dow === 6;
-  if (m === 5 || m === 6 || m === 7 || m === 11) return isWeekend ? 3 : 2;
-  if (isWeekend) return 2;
+function genMinStay(): number {
+  // Villa Jamaica allows 1-night stays
   return 1;
 }
 
@@ -124,7 +120,7 @@ async function test1_fullSync(): Promise<TaskResult> {
     d.setDate(d.getDate() + i);
     const ds = fmt(d);
     const avail = genAvailability(d, bookedDates);
-    const minStay = genMinStay(d);
+    const minStay = genMinStay();
 
     // Availability: both room types
     for (const rt of [STANDARD_ROOM, PREMIUM_ROOM]) {
