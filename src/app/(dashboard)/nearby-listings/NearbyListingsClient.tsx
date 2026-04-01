@@ -3,14 +3,6 @@
 import { useState, useCallback, useMemo } from "react";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 
-const BG_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
-function letterBg(name: string | null): string {
-  const s = name ?? "L";
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
-  return BG_COLORS[Math.abs(hash) % BG_COLORS.length];
-}
-
 interface Comp {
   comp_listing_id: string;
   comp_name: string | null;
