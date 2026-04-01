@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
           const firstName = nameParts[0];
           const lastName = nameParts.slice(1).join(" ") || "Guest";
 
-          // Create booking in Channex CRS
+          // Create booking in Channex CRS with per-night rates
           const crsResult = await channex.createBooking({
             property_id: prop.channex_property_id,
             room_type_id: roomTypes[0].id,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
             departure_date: check_out,
             guest_name: `${firstName} ${lastName}`,
             guest_email: "guest@staycommand.com",
-            amount: Object.values(days).reduce((s, v) => s + parseFloat(v) * 100, 0),
+            days, // pass pre-built per-night rates directly
             currency: "USD",
           });
 

@@ -87,7 +87,7 @@ export async function PUT(
             guest_name: gName,
             arrival_date: check_in,
             departure_date: check_out,
-            amount: Object.values(days).reduce((s, v) => s + parseFloat(v) * 100, 0),
+            days, // pass pre-built per-night rates
           });
           console.log(`[bookings/edit] Channex CRS booking modified: ${existing.channex_booking_id}`);
         }

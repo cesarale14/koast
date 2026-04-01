@@ -206,16 +206,25 @@ class ChannexClient {
     guest_name: string;
     guest_email?: string;
     occupancy?: { adults: number; children: number; infants: number };
-    amount?: number; // in cents
+    days?: Record<string, string>; // pre-built per-night rates
+    amount?: number; // fallback: total in cents, divided evenly
     currency?: string;
   }): Promise<AnyResponse> {
-    // Build per-day rates
-    const days: Record<string, string> = {};
-    const ci = new Date(data.arrival_date);
-    const co = new Date(data.departure_date);
-    const nightRate = data.amount ? (data.amount / 100).toFixed(2) : "100.00";
-    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
-      days[d.toISOString().split("T")[0]] = nightRate;
+    // Use pre-built days map if provided, otherwise calculate from amount
+    let days = data.days;
+    if (!days) {
+      days = {};
+      const ci = new Date(data.arrival_date + "T00:00:00Z");
+      const co = new Date(data.departure_date + "T00:00:00Z");
+      const nights = Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000));
+      const nightRate = data.amount ? (data.amount / 100 / nights).toFixed(2) : "160.00";
+      for (let i = 0; i < nights; i++) {
+        const d = new Date(ci.getTime() + i * 86400000);
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        days[`${y}-${m}-${day}`] = nightRate;
+      }
     }
 
     const res = await this.request("/bookings", {
@@ -266,16 +275,23 @@ class ChannexClient {
       arrival_date: string;
       departure_date: string;
       currency?: string;
-      amount?: number;
+      days?: Record<string, string>; // pre-built per-night rates
     }
   ): Promise<AnyResponse> {
-    // CRS modify requires full booking body with status: "modified"
-    const days: Record<string, string> = {};
-    const ci = new Date(originalData.arrival_date);
-    const co = new Date(originalData.departure_date);
-    const nightRate = originalData.amount ? (originalData.amount / 100).toFixed(2) : "100.00";
-    for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
-      days[d.toISOString().split("T")[0]] = nightRate;
+    // Use pre-built days map or generate default
+    let days = originalData.days;
+    if (!days) {
+      days = {};
+      const ci = new Date(originalData.arrival_date + "T00:00:00Z");
+      const co = new Date(originalData.departure_date + "T00:00:00Z");
+      const nights = Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000));
+      for (let i = 0; i < nights; i++) {
+        const d = new Date(ci.getTime() + i * 86400000);
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        days[`${y}-${m}-${day}`] = "160.00";
+      }
     }
 
     const res = await this.request(`/bookings/${bookingId}`, {
