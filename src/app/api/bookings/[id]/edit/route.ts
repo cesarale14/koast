@@ -72,16 +72,13 @@ export async function PUT(
         const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
 
         if (roomTypes.length > 0) {
-          const rtId = roomTypes[0].id;
-          const values = [
-            // Restore availability on OLD dates (set to 1 = available)
-            ...buildAvailabilityValues(prop.channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1),
-            // Decrease availability on NEW dates (set to 0 = booked)
-            ...buildAvailabilityValues(prop.channexPropertyId, rtId, check_in, check_out, 0),
-          ];
-
+          // Update ALL room types: restore old dates, block new dates
+          const values = roomTypes.flatMap((rt) => [
+            ...buildAvailabilityValues(prop.channexPropertyId!, rt.id, oldCheckIn, oldCheckOut, 1),
+            ...buildAvailabilityValues(prop.channexPropertyId!, rt.id, check_in, check_out, 0),
+          ]);
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/edit] Channex availability updated: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out}`);
+          console.log(`[bookings/edit] Channex availability updated: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out} (${roomTypes.length} room types)`);
         }
       } catch (err) {
         console.error("[bookings/edit] Channex update failed:", err);

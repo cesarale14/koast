@@ -136,34 +136,34 @@ export async function POST(request: NextRequest) {
       else console.log(`[webhook] Inserted new booking ${bookingId}`);
     }
 
-    // Update Channex availability based on action
+    // Update Channex availability based on action — push for ALL room types
     let availUpdated = false;
     try {
       const roomTypes = await channex.getRoomTypes(channexPropertyId);
       if (roomTypes.length > 0) {
-        const rtId = roomTypes[0].id;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const availValues: any[] = [];
 
-        if (action === "cancelled" && oldCheckIn && oldCheckOut) {
-          // Restore availability on all booked dates
-          availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
-          console.log(`[webhook] Restoring availability ${oldCheckIn} to ${oldCheckOut}`);
-        } else if (action === "modified" && oldCheckIn && oldCheckOut) {
-          // Restore old dates, block new dates
-          availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
-          availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
-          console.log(`[webhook] Updating availability: restore ${oldCheckIn}-${oldCheckOut}, block ${ba.arrival_date}-${ba.departure_date}`);
-        } else if (action === "created") {
-          // Block new booking dates
-          availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
-          console.log(`[webhook] Blocking availability ${ba.arrival_date} to ${ba.departure_date}`);
+        for (const rt of roomTypes) {
+          const rtId = rt.id;
+          if (action === "cancelled" && oldCheckIn && oldCheckOut) {
+            availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
+          } else if (action === "modified" && oldCheckIn && oldCheckOut) {
+            availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
+            availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
+          } else if (action === "created") {
+            availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
+          }
         }
+
+        if (action === "cancelled") console.log(`[webhook] Restoring availability ${oldCheckIn} to ${oldCheckOut} for ${roomTypes.length} room types`);
+        else if (action === "modified") console.log(`[webhook] Availability: restore ${oldCheckIn}-${oldCheckOut}, block ${ba.arrival_date}-${ba.departure_date} for ${roomTypes.length} room types`);
+        else if (action === "created") console.log(`[webhook] Blocking availability ${ba.arrival_date} to ${ba.departure_date} for ${roomTypes.length} room types`);
 
         if (availValues.length > 0) {
           await channex.updateAvailability(availValues);
           availUpdated = true;
-          console.log(`[webhook] Availability updated (${availValues.length} entries)`);
+          console.log(`[webhook] Availability updated (${availValues.length} entries across ${roomTypes.length} room types)`);
         }
       }
     } catch (err) {

@@ -53,17 +53,12 @@ export async function POST(request: NextRequest) {
         const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
 
         if (roomTypes.length > 0) {
-          // Build per-date availability updates (decrease by 1 for each booked date)
-          const values = buildAvailabilityValues(
-            prop.channexPropertyId,
-            roomTypes[0].id,
-            check_in,
-            check_out,
-            0 // set to 0 (booked)
+          // Block availability for ALL room types (vacation rental = 0 when booked)
+          const values = roomTypes.flatMap((rt) =>
+            buildAvailabilityValues(prop.channexPropertyId!, rt.id, check_in, check_out, 0)
           );
-
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/create] Channex availability updated for ${check_in} to ${check_out}`);
+          console.log(`[bookings/create] Channex availability updated for ${check_in} to ${check_out} (${roomTypes.length} room types)`);
         }
       } catch (err) {
         console.error("[bookings/create] Channex update failed:", err);
