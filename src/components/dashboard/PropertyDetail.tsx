@@ -283,9 +283,12 @@ export default function PropertyDetail({
   };
 
   const handleEditBooking = async () => {
-    console.log("[edit] handleEditBooking called, editingBooking:", editingBooking, "form:", editBookingForm);
     if (!editingBooking) {
-      console.warn("[edit] editingBooking is null, returning early");
+      alert("Error: no booking selected to edit");
+      return;
+    }
+    if (!editBookingForm.check_in || !editBookingForm.check_out) {
+      toast("Please select check-in and check-out dates", "error");
       return;
     }
     setSavingBooking(true);
@@ -301,18 +304,21 @@ export default function PropertyDetail({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Save failed");
 
       const channexMsg = data.channex?.error
-        ? ` (Channex: ${data.channex.error})`
+        ? ` — Channex sync failed`
         : data.channex
-          ? " + Channex availability updated"
+          ? " — Channex availability synced"
           : "";
       toast(`Booking updated${channexMsg}`);
-      setBookings(bookings.map((b) => b.id === editingBooking ? data.booking : b));
+      setBookings((prev) => prev.map((b) => b.id === editingBooking ? data.booking : b));
       setEditingBooking(null);
+      setEditRateBreakdown([]);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to update booking", "error");
+      const msg = err instanceof Error ? err.message : "Failed to update booking";
+      toast(msg, "error");
+      alert(`Save error: ${msg}`);
     }
     setSavingBooking(false);
   };
