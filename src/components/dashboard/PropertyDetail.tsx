@@ -283,7 +283,11 @@ export default function PropertyDetail({
   };
 
   const handleEditBooking = async () => {
-    if (!editingBooking) return;
+    console.log("[edit] handleEditBooking called, editingBooking:", editingBooking, "form:", editBookingForm);
+    if (!editingBooking) {
+      console.warn("[edit] editingBooking is null, returning early");
+      return;
+    }
     setSavingBooking(true);
     try {
       const res = await fetch(`/api/bookings/${editingBooking}/edit`, {
@@ -532,7 +536,7 @@ export default function PropertyDetail({
                   <DateRangeCalendar
                     checkIn={bookingForm.check_in}
                     checkOut={bookingForm.check_out}
-                    onSelect={(ci, co) => setBookingForm({ ...bookingForm, check_in: ci, check_out: co })}
+                    onSelect={(ci, co) => setBookingForm((prev) => ({ ...prev, check_in: ci, check_out: co }))}
                   />
                 </div>
 
@@ -636,7 +640,7 @@ export default function PropertyDetail({
                             <DateRangeCalendar
                               checkIn={editBookingForm.check_in}
                               checkOut={editBookingForm.check_out}
-                              onSelect={(ci, co) => setEditBookingForm({ ...editBookingForm, check_in: ci, check_out: co })}
+                              onSelect={(ci, co) => setEditBookingForm((prev) => ({ ...prev, check_in: ci, check_out: co }))}
                             />
                           </div>
                           {/* Right: Guest + Price */}
@@ -644,13 +648,13 @@ export default function PropertyDetail({
                             <div>
                               <label className="block text-xs font-medium text-neutral-600 mb-1">Guest Name</label>
                               <input type="text" value={editBookingForm.guest_name}
-                                onChange={(e) => setEditBookingForm({ ...editBookingForm, guest_name: e.target.value })}
+                                onChange={(e) => { const v = e.target.value; setEditBookingForm((prev) => ({ ...prev, guest_name: v })); }}
                                 className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500" />
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-neutral-600 mb-1">Total Price ($)</label>
                               <input type="number" value={editBookingForm.total_price}
-                                onChange={(e) => { setEditBookingForm({ ...editBookingForm, total_price: e.target.value }); setEditPriceAutoFilled(false); }}
+                                onChange={(e) => { const v = e.target.value; setEditBookingForm((prev) => ({ ...prev, total_price: v })); setEditPriceAutoFilled(false); }}
                                 className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
                                 min="0" step="0.01" />
                               {editPriceAutoFilled && <p className="text-[10px] text-brand-500 mt-1">Recalculated from calendar rates</p>}
