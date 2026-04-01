@@ -3,6 +3,14 @@
 import { useState, useCallback, useMemo } from "react";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 
+const BG_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
+function letterBg(name: string | null): string {
+  const s = name ?? "L";
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  return BG_COLORS[Math.abs(hash) % BG_COLORS.length];
+}
+
 interface Comp {
   comp_listing_id: string;
   comp_name: string | null;
@@ -35,11 +43,25 @@ export default function NearbyListingsClient({
   const [propertyId, setPropertyId] = useState(initialPropertyId);
   const [comps, setComps] = useState(initialComps);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bedroomFilter, setBedroomFilter] = useState<string>("all");
   const [, setCenter] = useState<{ lat: number; lng: number } | null>(
     propertyLat && propertyLng ? { lat: propertyLat, lng: propertyLng } : null
   );
+
+  const refreshMarketData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/market/refresh/${propertyId}`, { method: "POST" });
+      if (!res.ok) throw new Error("Refresh failed");
+      // Re-fetch comps after refresh
+      const compsRes = await fetch(`/api/market/comps/${propertyId}`);
+      const data = await compsRes.json();
+      setComps(data.comps ?? []);
+    } catch { /* ignore */ }
+    setRefreshing(false);
+  }, [propertyId]);
 
   const switchProperty = useCallback(async (id: string) => {
     setPropertyId(id);
@@ -96,6 +118,13 @@ export default function NearbyListingsClient({
               <option key={n} value={n}>{n} BR</option>
             ))}
           </select>
+          <button
+            onClick={refreshMarketData}
+            disabled={refreshing}
+            className="px-3 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "Refresh Market Data"}
+          </button>
         </div>
       </div>
 
@@ -128,10 +157,12 @@ export default function NearbyListingsClient({
                 {/* Photo */}
                 {comp.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={comp.photo_url} alt="" className="w-full h-36 object-cover" />
+                  <img src={comp.photo_url} alt={comp.comp_name ?? ""} className="w-full h-40 object-cover rounded-t-xl" />
                 ) : (
-                  <div className="w-full h-36 bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                    <span className="text-3xl text-neutral-300">🏠</span>
+                  <div className="w-full h-40 rounded-t-xl bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                    <span className="text-5xl font-bold text-neutral-300">
+                      {(comp.comp_name ?? "L").charAt(0).toUpperCase()}
+                    </span>
                   </div>
                 )}
 

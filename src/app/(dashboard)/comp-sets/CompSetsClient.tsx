@@ -22,6 +22,14 @@ interface Props {
   propertyAvgRate: number;
 }
 
+const BG_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
+function letterBg(name: string | null): string {
+  const s = name ?? "L";
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  return BG_COLORS[Math.abs(hash) % BG_COLORS.length];
+}
+
 function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -168,10 +176,10 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
                       <div className="flex items-center gap-2.5">
                         {comp.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={comp.photo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                          <img src={comp.photo_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs text-neutral-400">🏠</span>
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${letterBg(comp.comp_name)}`}>
+                            <span className="text-sm font-bold text-white">{(comp.comp_name ?? "L").charAt(0).toUpperCase()}</span>
                           </div>
                         )}
                         <p className="font-medium text-neutral-800 truncate max-w-[200px]">{comp.comp_name ?? "Listing"}</p>

@@ -133,7 +133,7 @@ export default function AnalyticsDashboard({
   const [propertyId, setPropertyId] = useState(initialPropertyId);
   const handlePropertyChange = (newId: string) => {
     setPropertyId(newId);
-    router.push(`/analytics?property=${newId}`);
+    router.push(`/market-explorer?property=${newId}`);
   };
   const [refreshing, setRefreshing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -252,21 +252,13 @@ export default function AnalyticsDashboard({
     return days;
   }, [snapshot]);
 
-  // Pad demand calendar so first day aligns to its day-of-week column
-  const demandCalendarPadded = useMemo(() => {
-    if (demandCalendar.length === 0) return [];
-    const firstDow = demandCalendar[0].dow;
-    const padding: (null)[] = Array(firstDow).fill(null);
-    return [...padding, ...demandCalendar];
-  }, [demandCalendar]);
-
   // Empty state: no snapshot AND no comps
   if (!snapshot && comps.length === 0) {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Explorer</h1>
             <p className="text-neutral-500">Market analysis and performance metrics</p>
           </div>
           {properties.length > 1 && (
@@ -330,7 +322,7 @@ export default function AnalyticsDashboard({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Analytics</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Explorer</h1>
           <p className="text-neutral-500">
             Market analysis and performance metrics
             {lastUpdated && <span className="text-xs text-neutral-400 ml-2">Last updated: {timeAgo(lastUpdated)}</span>}
@@ -705,26 +697,29 @@ export default function AnalyticsDashboard({
         )}
       </div>
 
-      {/* 30-Day Demand Outlook */}
-      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
-        <h2 className="text-lg font-bold text-neutral-900 mb-4">30-Day Demand Outlook</h2>
-        <div className="grid grid-cols-7 gap-1.5">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d} className="text-center text-[10px] font-medium text-neutral-400 pb-1">{d}</div>
-          ))}
-          {demandCalendarPadded.map((day, i) => {
-            if (day === null) return <div key={`pad-${i}`} />;
-            const bgClass = day.demandLevel === "high" ? "bg-brand-100" : day.demandLevel === "moderate" ? "bg-warning-light" : "bg-danger-light";
+      {/* 30-Day Demand Outlook — compact strip */}
+      <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 mb-6">
+        <h2 className="text-sm font-bold text-neutral-900 mb-2">30-Day Demand Outlook</h2>
+        <div className="flex gap-px rounded-lg overflow-hidden h-10">
+          {demandCalendar.map((day) => {
+            const bg = day.demandLevel === "high" ? "bg-emerald-500" : day.demandLevel === "moderate" ? "bg-amber-400" : "bg-red-300";
             return (
-              <div key={day.date.toISOString()} className={`${bgClass} rounded-md flex items-center justify-center aspect-square text-xs font-medium text-neutral-700`}
-                title={`${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.demandLevel} demand`}>{day.dayNum}</div>
+              <div
+                key={day.date.toISOString()}
+                className={`flex-1 ${bg} min-w-0`}
+                title={`${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.demandLevel} demand`}
+              />
             );
           })}
         </div>
-        <div className="flex gap-4 mt-3 text-[10px] text-neutral-400">
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-brand-100" /> High demand</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-warning-light" /> Moderate</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-danger-light" /> Lower demand</div>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[10px] text-neutral-400">Today</span>
+          <span className="text-[10px] text-neutral-400">+30d</span>
+        </div>
+        <div className="flex gap-3 mt-1 text-[10px] text-neutral-400">
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> High</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> Moderate</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-300" /> Low</span>
         </div>
       </div>
 
