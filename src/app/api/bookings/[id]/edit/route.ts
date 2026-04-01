@@ -42,8 +42,9 @@ export async function PUT(
     }
 
     // postgres.js returns date columns as Date objects — normalize to YYYY-MM-DD strings
+    // Note: instanceof Date fails across VM contexts in serverless, so use new Date() universally
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toDateStr = (v: any): string => (v instanceof Date ? v.toISOString() : String(v)).split("T")[0];
+    const toDateStr = (v: any): string => new Date(v).toISOString().split("T")[0];
     const oldCheckIn = toDateStr(existing.checkIn);
     const oldCheckOut = toDateStr(existing.checkOut);
 
