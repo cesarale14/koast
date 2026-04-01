@@ -1,6 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+interface WebhookLog {
+  id: string;
+  event_type: string;
+  booking_id: string;
+  guest_name: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  action_taken: string;
+  ack_sent: boolean;
+  ack_response: string | null;
+  created_at: string;
+}
 
 interface TestResult {
   test: number;
@@ -217,6 +230,9 @@ export default function CertificationPage() {
         })}
       </div>
 
+      {/* Test 11: Webhook Log Viewer */}
+      <WebhookLogViewer />
+
       {/* Summary */}
       {allTaskIds.length > 0 && (
         <div className="mt-6 bg-neutral-0 rounded-xl border border-[var(--border)] p-5">
@@ -245,6 +261,116 @@ export default function CertificationPage() {
           >
             {copied && copied.includes("Test") ? "Copied!" : "Copy Summary"}
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ====== Webhook Log Viewer (Test 11) ======
+
+function WebhookLogViewer() {
+  const [logs, setLogs] = useState<WebhookLog[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/channex/webhook-logs");
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs ?? []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 5000); // poll every 5s
+    return () => clearInterval(interval);
+  }, [fetchLogs]);
+
+  const actionIcon = (action: string) => {
+    switch (action) {
+      case "created": return { emoji: "📥", color: "text-blue-600 bg-blue-50" };
+      case "modified": return { emoji: "✏️", color: "text-amber-600 bg-amber-50" };
+      case "cancelled": return { emoji: "❌", color: "text-red-600 bg-red-50" };
+      default: return { emoji: "❓", color: "text-neutral-600 bg-neutral-50" };
+    }
+  };
+
+  const hasAll3 = logs.some((l) => l.action_taken === "created")
+    && logs.some((l) => l.action_taken === "modified")
+    && logs.some((l) => l.action_taken === "cancelled");
+
+  return (
+    <div className="mt-6 bg-neutral-0 rounded-xl border border-[var(--border)] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold text-neutral-800">
+            Test 11: Booking Webhook Events
+          </h2>
+          {hasAll3 && (
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded-full">
+              ALL 3 RECEIVED
+            </span>
+          )}
+        </div>
+        <button
+          onClick={fetchLogs}
+          disabled={loading}
+          className="text-xs text-brand-500 hover:text-brand-600 font-medium disabled:opacity-50"
+        >
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
+
+      <p className="text-xs text-neutral-500 mb-4">
+        Create a booking in Channex Booking CRS app, then modify it, then cancel it. All 3 events should appear below.
+        Auto-refreshing every 5 seconds.
+      </p>
+
+      {logs.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="w-8 h-8 border-2 border-neutral-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-neutral-400">Waiting for webhook events...</p>
+          <p className="text-xs text-neutral-300 mt-1">
+            Webhook URL: staycommand.vercel.app/api/webhooks/channex
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log) => {
+            const { emoji, color } = actionIcon(log.action_taken);
+            const timeStr = new Date(log.created_at).toLocaleString("en-US", {
+              month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit",
+            });
+            return (
+              <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-neutral-50">
+                <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm ${color}`}>
+                  {emoji}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-neutral-800 capitalize">{log.action_taken}</span>
+                    <span className="text-[10px] text-neutral-400 font-mono">{log.event_type}</span>
+                  </div>
+                  <p className="text-xs text-neutral-600 mt-0.5">
+                    {log.guest_name || "Unknown guest"}
+                    {log.check_in && log.check_out && ` \u2022 ${log.check_in} \u2192 ${log.check_out}`}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[10px] text-neutral-400">{timeStr}</span>
+                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-emerald-600" : "text-red-500"}`}>
+                      {log.ack_sent ? "ACK sent" : "ACK pending"}
+                    </span>
+                    <code className="text-[10px] text-neutral-400 font-mono">{log.booking_id?.substring(0, 8)}...</code>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

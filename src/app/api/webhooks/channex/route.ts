@@ -5,17 +5,14 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
+  const supabase = createServiceClient();
 
   try {
     const payload: ChannexWebhookPayload = await request.json();
 
-    // Validate required webhook fields
     if (!payload.event || !payload.payload) {
-      console.warn(`[webhook] Rejected malformed payload from ${sourceIp}: missing event or payload`);
-      return NextResponse.json(
-        { status: "error", message: "Missing required fields: event, payload" },
-        { status: 400 }
-      );
+      console.warn(`[webhook] Rejected malformed payload from ${sourceIp}`);
+      return NextResponse.json({ status: "error", message: "Missing required fields" }, { status: 400 });
     }
 
     const event = payload.event;
@@ -23,58 +20,56 @@ export async function POST(request: NextRequest) {
     const revisionId = payload.payload?.revision_id;
     const channexPropertyId = payload.property_id;
 
-    console.log(`[webhook] ${new Date().toISOString()} | Event: ${event}, booking: ${bookingId}, revision: ${revisionId}, property: ${channexPropertyId}, ip: ${sourceIp}`);
+    console.log(`[webhook] ━━━ INCOMING ━━━`);
+    console.log(`[webhook] Event: ${event}`);
+    console.log(`[webhook] Booking ID: ${bookingId}`);
+    console.log(`[webhook] Revision ID: ${revisionId}`);
+    console.log(`[webhook] Property: ${channexPropertyId}`);
+    console.log(`[webhook] Source IP: ${sourceIp}`);
+    console.log(`[webhook] Payload: ${JSON.stringify(payload).substring(0, 500)}`);
 
     if (!bookingId) {
       return NextResponse.json({ status: "ok", message: "No booking_id, skipping" });
     }
 
-    // Handle all booking events
+    // Only handle booking events
     const bookingEvents = [
       "booking", "booking_new", "booking_modification", "booking_cancellation",
       "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
     ];
     if (!bookingEvents.includes(event)) {
-      console.log(`[webhook] ${new Date().toISOString()} | Event ${event} not a booking event, skipping, ip: ${sourceIp}`);
+      console.log(`[webhook] Event ${event} not a booking event, skipping`);
       return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
     }
 
-    // Validate property_id is present in the payload
     if (!channexPropertyId) {
-      console.warn(`[webhook] ${new Date().toISOString()} | Rejected: missing property_id in payload, ip: ${sourceIp}`);
-      return NextResponse.json(
-        { status: "error", message: "Missing property_id in webhook payload" },
-        { status: 400 }
-      );
+      console.warn(`[webhook] Rejected: missing property_id`);
+      return NextResponse.json({ status: "error", message: "Missing property_id" }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    // Verify the property exists in our database before fetching from Channex API
-    const propCheck = await supabase
+    // Verify property exists in our DB
+    const { data: propData } = await supabase
       .from("properties")
-      .select("id")
+      .select("id, channex_property_id")
       .eq("channex_property_id", channexPropertyId)
       .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const verifiedProps = (propCheck.data ?? []) as any[];
-    if (verifiedProps.length === 0) {
-      console.warn(`[webhook] ${new Date().toISOString()} | Rejected: property ${channexPropertyId} not found in DB, ip: ${sourceIp}`);
-      return NextResponse.json(
-        { status: "error", message: `Property ${channexPropertyId} not found` },
-        { status: 404 }
-      );
+    const prop = ((propData ?? []) as any[])[0];
+    if (!prop) {
+      console.warn(`[webhook] Property ${channexPropertyId} not found in DB`);
+      return NextResponse.json({ status: "error", message: "Property not found" }, { status: 404 });
     }
+    const propertyId: string = prop.id;
 
+    // Fetch full booking details from Channex
     const channex = createChannexClient();
-
-    // Fetch full booking from Channex API
-    console.log(`[webhook] Fetching booking ${bookingId} from Channex...`);
+    console.log(`[webhook] Fetching booking ${bookingId} from Channex API...`);
     const booking = await channex.getBooking(bookingId);
     const ba = booking.attributes;
 
-    const propertyId = verifiedProps[0].id;
+    console.log(`[webhook] Booking details: status=${ba.status}, arrival=${ba.arrival_date}, departure=${ba.departure_date}, guest=${ba.customer?.name} ${ba.customer?.surname}, ota=${ba.ota_name}`);
 
+    // Parse guest and platform
     const guestName = ba.customer
       ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ")
       : null;
@@ -85,14 +80,36 @@ export async function POST(request: NextRequest) {
     else if (otaLower.includes("vrbo") || otaLower.includes("homeaway")) platform = "vrbo";
     else if (otaLower.includes("booking")) platform = "booking_com";
 
-    let status = "confirmed";
-    if (ba.status === "cancelled") status = "cancelled";
-    if (event.includes("modification")) status = "confirmed"; // modified bookings are still active
+    // Determine action from event type AND booking status
+    let action: "created" | "modified" | "cancelled";
+    let bookingStatus: string;
 
-    // Upsert booking
+    if (ba.status === "cancelled" || event.includes("cancellation") || event.includes("cancelled")) {
+      action = "cancelled";
+      bookingStatus = "cancelled";
+    } else if (event.includes("modification") || event.includes("modified") || ba.status === "modified") {
+      action = "modified";
+      bookingStatus = "confirmed";
+    } else {
+      action = "created";
+      bookingStatus = "confirmed";
+    }
+
+    console.log(`[webhook] Action: ${action}, DB status: ${bookingStatus}`);
+
+    // Check for existing booking in our DB
+    const { data: existingData } = await supabase
+      .from("bookings")
+      .select("id, check_in, check_out")
+      .eq("channex_booking_id", bookingId)
+      .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bookTable = supabase.from("bookings") as any;
-    const bookingData = {
+    const existingBooking = ((existingData ?? []) as any[])[0];
+    const oldCheckIn = existingBooking?.check_in;
+    const oldCheckOut = existingBooking?.check_out;
+
+    // Build booking record
+    const bookingRecord = {
       property_id: propertyId,
       platform,
       channex_booking_id: bookingId,
@@ -103,45 +120,104 @@ export async function POST(request: NextRequest) {
       check_out: ba.departure_date,
       total_price: ba.amount ? parseFloat(ba.amount) : null,
       currency: ba.currency || "USD",
-      status,
+      status: bookingStatus,
       platform_booking_id: ba.ota_reservation_code || null,
       notes: ba.notes || null,
+      updated_at: new Date().toISOString(),
     };
 
-    // Check if booking exists
-    const { data: existing } = await bookTable
-      .select("id")
-      .eq("channex_booking_id", bookingId)
-      .limit(1);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (existing && (existing as any[]).length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await bookTable.update(bookingData).eq("id", (existing as any[])[0].id);
-      console.log(`[webhook] Updated booking ${bookingId} (${event})`);
+    // Upsert booking
+    if (existingBooking) {
+      await supabase.from("bookings").update(bookingRecord).eq("id", existingBooking.id);
+      console.log(`[webhook] Updated existing booking ${bookingId} (action: ${action})`);
     } else {
-      const { error: insertErr } = await bookTable.insert(bookingData);
+      const { error: insertErr } = await supabase.from("bookings").insert(bookingRecord);
       if (insertErr) console.error(`[webhook] Insert error:`, insertErr);
       else console.log(`[webhook] Inserted new booking ${bookingId}`);
     }
 
+    // Update Channex availability based on action
+    let availUpdated = false;
+    try {
+      const roomTypes = await channex.getRoomTypes(channexPropertyId);
+      if (roomTypes.length > 0) {
+        const rtId = roomTypes[0].id;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const availValues: any[] = [];
+
+        if (action === "cancelled" && oldCheckIn && oldCheckOut) {
+          // Restore availability on all booked dates
+          availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
+          console.log(`[webhook] Restoring availability ${oldCheckIn} to ${oldCheckOut}`);
+        } else if (action === "modified" && oldCheckIn && oldCheckOut) {
+          // Restore old dates, block new dates
+          availValues.push(...buildAvailRange(channexPropertyId, rtId, oldCheckIn, oldCheckOut, 1));
+          availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
+          console.log(`[webhook] Updating availability: restore ${oldCheckIn}-${oldCheckOut}, block ${ba.arrival_date}-${ba.departure_date}`);
+        } else if (action === "created") {
+          // Block new booking dates
+          availValues.push(...buildAvailRange(channexPropertyId, rtId, ba.arrival_date, ba.departure_date, 0));
+          console.log(`[webhook] Blocking availability ${ba.arrival_date} to ${ba.departure_date}`);
+        }
+
+        if (availValues.length > 0) {
+          await channex.updateAvailability(availValues);
+          availUpdated = true;
+          console.log(`[webhook] Availability updated (${availValues.length} entries)`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[webhook] Availability update failed:`, err instanceof Error ? err.message : err);
+    }
+
     // Acknowledge the booking revision
+    let ackSent = false;
+    let ackResponse = "";
     if (revisionId) {
       try {
         await channex.acknowledgeBookingRevision(revisionId);
-        console.log(`[webhook] Acknowledged revision ${revisionId}`);
+        ackSent = true;
+        ackResponse = "OK";
+        console.log(`[webhook] ✓ Acknowledged revision ${revisionId}`);
       } catch (e) {
-        console.warn(`[webhook] Failed to ack revision ${revisionId}:`, e);
+        ackResponse = e instanceof Error ? e.message : String(e);
+        console.warn(`[webhook] ✗ Failed to acknowledge revision ${revisionId}: ${ackResponse}`);
       }
+    } else {
+      console.log(`[webhook] No revision_id to acknowledge`);
     }
+
+    // Log to channex_webhook_log table
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        booking_id: bookingId,
+        channex_property_id: channexPropertyId,
+        guest_name: guestName,
+        check_in: ba.arrival_date,
+        check_out: ba.departure_date,
+        payload: payload as unknown as Record<string, unknown>,
+        action_taken: action,
+        ack_sent: ackSent,
+        ack_response: ackResponse,
+      });
+    } catch (logErr) {
+      console.warn(`[webhook] Failed to write log:`, logErr);
+    }
+
+    console.log(`[webhook] ━━━ COMPLETE ━━━ Action: ${action}, Ack: ${ackSent}, Avail: ${availUpdated}`);
 
     return NextResponse.json({
       status: "ok",
       event,
       booking_id: bookingId,
       revision_id: revisionId,
-      action: status === "cancelled" ? "cancelled" : event.includes("modification") ? "modified" : "created",
-      acknowledged: !!revisionId,
+      action,
+      guest_name: guestName,
+      check_in: ba.arrival_date,
+      check_out: ba.departure_date,
+      acknowledged: ackSent,
+      availability_updated: availUpdated,
     });
   } catch (err) {
     console.error("[webhook] Error:", err);
@@ -150,4 +226,21 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function buildAvailRange(
+  propertyId: string,
+  roomTypeId: string,
+  checkIn: string,
+  checkOut: string,
+  availability: number
+) {
+  const values: { property_id: string; room_type_id: string; date_from: string; date_to: string; availability: number }[] = [];
+  const ci = new Date(checkIn + "T00:00:00Z");
+  const co = new Date(checkOut + "T00:00:00Z");
+  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
+    const ds = d.toISOString().split("T")[0];
+    values.push({ property_id: propertyId, room_type_id: roomTypeId, date_from: ds, date_to: ds, availability });
+  }
+  return values;
 }
