@@ -10,6 +10,7 @@ import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
 
 interface CalendarProperty {
   id: string;
@@ -76,6 +77,7 @@ export default function CalendarGrid({
   rates: initialRates,
   totalDays,
 }: CalendarGridProps) {
+  const { toast } = useToast();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = getToday();
@@ -346,9 +348,24 @@ export default function CalendarGrid({
         return next;
       });
 
+      // Push to Channex if connected
+      try {
+        const syncRes = await fetch(`/api/pricing/sync-channex/${popover.propertyId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dates: updates.dates }),
+        });
+        const syncData = await syncRes.json();
+        if (syncData.synced) {
+          toast(`Rate updated and synced to Channex for ${updates.dates.length} date${updates.dates.length > 1 ? "s" : ""}`);
+        }
+      } catch {
+        // Channex sync is best-effort — rate is already saved to DB
+      }
+
       setPopover(null);
     },
-    [popover],
+    [popover, toast],
   );
 
   // ---------- Timeline navigation ----------

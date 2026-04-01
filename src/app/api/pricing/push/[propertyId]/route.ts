@@ -67,23 +67,23 @@ export async function POST(
       );
     }
 
-    const ratePlanId = ratePlans[0].id;
+    // Push rates for ALL rate plans
+    const restrictionValues = rates.flatMap((r) =>
+      ratePlans.map((rp) => ({
+        property_id: property.channex_property_id,
+        rate_plan_id: rp.id,
+        date_from: r.date,
+        date_to: r.date,
+        rate: Math.round(r.applied_rate * 100), // Channex uses cents
+        min_stay_arrival: r.min_stay ?? 1,
+        stop_sell: !r.is_available,
+      }))
+    );
 
-    // Push rates in batches (Channex accepts arrays)
-    const restrictionValues = rates.map((r) => ({
-      property_id: property.channex_property_id,
-      rate_plan_id: ratePlanId,
-      date_from: r.date,
-      date_to: r.date,
-      rate: Math.round(r.applied_rate * 100), // Channex uses cents
-      min_stay_arrival: r.min_stay ?? 1,
-      stop_sell: !r.is_available,
-    }));
-
-    // Push in batches of 50
+    // Push in batches of 200
     let pushed = 0;
-    for (let i = 0; i < restrictionValues.length; i += 50) {
-      const batch = restrictionValues.slice(i, i + 50);
+    for (let i = 0; i < restrictionValues.length; i += 200) {
+      const batch = restrictionValues.slice(i, i + 200);
       await channex.updateRestrictions(batch);
       pushed += batch.length;
     }
@@ -91,7 +91,7 @@ export async function POST(
     return NextResponse.json({
       pushed,
       channex_property_id: property.channex_property_id,
-      rate_plan_id: ratePlanId,
+      ratePlans: ratePlans.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
