@@ -33,6 +33,10 @@ export async function POST(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
+    // Normalize dates from Drizzle (may be Date objects at runtime)
+    const ciStr = typeof existing.checkIn === "string" ? existing.checkIn.split("T")[0] : new Date(existing.checkIn as unknown as string).toISOString().split("T")[0];
+    const coStr = typeof existing.checkOut === "string" ? existing.checkOut.split("T")[0] : new Date(existing.checkOut as unknown as string).toISOString().split("T")[0];
+
     if (existing.status === "cancelled") {
       return NextResponse.json({ error: "Booking is already cancelled" }, { status: 400 });
     }
@@ -62,10 +66,10 @@ export async function POST(
         if (roomTypes.length > 0) {
           // Restore ALL room types to available
           const values = roomTypes.flatMap((rt) =>
-            buildAvailabilityValues(prop.channexPropertyId!, rt.id, existing.checkIn, existing.checkOut, 1)
+            buildAvailabilityValues(prop.channexPropertyId!, rt.id, ciStr, coStr, 1)
           );
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/cancel] Channex availability restored for ${existing.checkIn} to ${existing.checkOut} (${roomTypes.length} room types)`);
+          console.log(`[bookings/cancel] Channex availability restored for ${ciStr} to ${coStr} (${roomTypes.length} room types)`);
         }
       } catch (err) {
         console.error("[bookings/cancel] Channex update failed:", err);

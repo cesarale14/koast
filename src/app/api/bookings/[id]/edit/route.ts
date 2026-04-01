@@ -41,8 +41,9 @@ export async function PUT(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    const oldCheckIn = existing.checkIn;
-    const oldCheckOut = existing.checkOut;
+    // Drizzle may return Date objects for date columns — normalize to YYYY-MM-DD strings
+    const oldCheckIn = typeof existing.checkIn === "string" ? existing.checkIn.split("T")[0] : new Date(existing.checkIn as unknown as string).toISOString().split("T")[0];
+    const oldCheckOut = typeof existing.checkOut === "string" ? existing.checkOut.split("T")[0] : new Date(existing.checkOut as unknown as string).toISOString().split("T")[0];
 
     // Update booking
     const updateData: Record<string, unknown> = {
