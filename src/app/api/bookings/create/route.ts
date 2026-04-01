@@ -47,23 +47,28 @@ export async function POST(request: NextRequest) {
 
     // Update Channex availability if connected
     let channexResponse = null;
+    console.log(`[bookings/create] Property ${property_id}: channex_id=${prop.channexPropertyId ?? "NONE"}`);
     if (prop.channexPropertyId) {
       try {
         const channex = createChannexClient();
         const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
+        console.log(`[bookings/create] Found ${roomTypes.length} room types: ${roomTypes.map(r => r.id).join(", ")}`);
 
         if (roomTypes.length > 0) {
           // Block availability for ALL room types (vacation rental = 0 when booked)
           const values = roomTypes.flatMap((rt) =>
             buildAvailabilityValues(prop.channexPropertyId!, rt.id, check_in, check_out, 0)
           );
+          console.log(`[bookings/create] Pushing ${values.length} availability entries (avail=0) for ${check_in} to ${check_out}`);
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/create] Channex availability updated for ${check_in} to ${check_out} (${roomTypes.length} room types)`);
+          console.log(`[bookings/create] Channex response: ${JSON.stringify(channexResponse).substring(0, 200)}`);
         }
       } catch (err) {
         console.error("[bookings/create] Channex update failed:", err);
         channexResponse = { error: err instanceof Error ? err.message : String(err) };
       }
+    } else {
+      console.log(`[bookings/create] No Channex connection — skipping availability push`);
     }
 
     return NextResponse.json({

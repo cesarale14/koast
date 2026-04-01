@@ -348,21 +348,7 @@ export default function CalendarGrid({
         return next;
       });
 
-      // Push to Channex if connected
-      try {
-        const syncRes = await fetch(`/api/pricing/sync-channex/${popover.propertyId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dates: updates.dates }),
-        });
-        const syncData = await syncRes.json();
-        if (syncData.synced) {
-          toast(`Rate updated and synced to Channex for ${updates.dates.length} date${updates.dates.length > 1 ? "s" : ""}`);
-        }
-      } catch {
-        // Channex sync is best-effort — rate is already saved to DB
-      }
-
+      toast(`Rate saved for ${updates.dates.length} date${updates.dates.length > 1 ? "s" : ""}. Use "Push to OTAs" on the Pricing page to sync to Channex.`);
       setPopover(null);
     },
     [popover, toast],
