@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db/pooled";
-import { properties, bookings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,65 +18,100 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Get property with Channex ID
-    const [prop] = await db
-      .select({ id: properties.id, channexPropertyId: properties.channexPropertyId })
-      .from(properties)
-      .where(eq(properties.id, property_id));
+    const supabase = createServiceClient();
 
-    if (!prop) {
-      return NextResponse.json({ error: "Property not found" }, { status: 404 });
-    }
+    // Get property with Channex ID
+    const { data: propData } = await supabase
+      .from("properties")
+      .select("id, channex_property_id")
+      .eq("id", property_id)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = ((propData ?? []) as any[])[0];
+    if (!prop) return NextResponse.json({ error: "Property not found" }, { status: 404 });
 
     // Insert booking
-    const [booking] = await db
-      .insert(bookings)
-      .values({
-        propertyId: property_id,
-        guestName: guest_name,
-        checkIn: check_in,
-        checkOut: check_out,
-        totalPrice: total_price || null,
+    const { data: insertedData, error: insertErr } = await supabase
+      .from("bookings")
+      .insert({
+        property_id,
+        guest_name,
+        check_in,
+        check_out,
+        total_price: total_price || null,
         platform: "direct",
         status: "confirmed",
         currency: "USD",
       })
-      .returning();
+      .select("id, guest_name, platform, check_in, check_out, total_price, status")
+      .single();
 
-    // Update Channex availability if connected
+    if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    const booking = insertedData;
+
+    // Push booking to Channex CRS if connected
     let channexResponse = null;
-    console.log(`[bookings/create] Property ${property_id}: channex_id=${prop.channexPropertyId ?? "NONE"}`);
-    if (prop.channexPropertyId) {
+    if (prop.channex_property_id) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
-        console.log(`[bookings/create] Found ${roomTypes.length} room types: ${roomTypes.map(r => r.id).join(", ")}`);
+        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
+        const ratePlans = await channex.getRatePlans(prop.channex_property_id);
 
-        if (roomTypes.length > 0) {
-          // Block availability for ALL room types (vacation rental = 0 when booked)
-          const values = roomTypes.flatMap((rt) =>
-            buildAvailabilityValues(prop.channexPropertyId!, rt.id, check_in, check_out, 0)
-          );
-          console.log(`[bookings/create] Pushing ${values.length} availability entries (avail=0) for ${check_in} to ${check_out}`);
-          channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/create] Channex response: ${JSON.stringify(channexResponse).substring(0, 200)}`);
+        if (roomTypes.length > 0 && ratePlans.length > 0) {
+          // Build per-night rates from calendar_rates
+          const days = buildDaysMap(check_in, check_out);
+          const { data: rateData } = await supabase
+            .from("calendar_rates")
+            .select("date, applied_rate")
+            .eq("property_id", property_id)
+            .in("date", Object.keys(days));
+
+          for (const r of (rateData ?? []) as { date: string; applied_rate: number | null }[]) {
+            if (r.applied_rate) days[r.date] = Number(r.applied_rate).toFixed(2);
+          }
+
+          const nameParts = (guest_name || "Guest").split(" ");
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(" ") || "Guest";
+
+          // Create booking in Channex CRS
+          const crsResult = await channex.createBooking({
+            property_id: prop.channex_property_id,
+            room_type_id: roomTypes[0].id,
+            rate_plan_id: ratePlans[0].id,
+            arrival_date: check_in,
+            departure_date: check_out,
+            guest_name: `${firstName} ${lastName}`,
+            guest_email: "guest@staycommand.com",
+            amount: Object.values(days).reduce((s, v) => s + parseFloat(v) * 100, 0),
+            currency: "USD",
+          });
+
+          const channexBookingId = crsResult?.data?.id;
+          if (channexBookingId) {
+            // Store channex_booking_id on our booking
+            await supabase
+              .from("bookings")
+              .update({ channex_booking_id: channexBookingId })
+              .eq("id", booking.id);
+            console.log(`[bookings/create] Channex CRS booking created: ${channexBookingId}`);
+          }
+          channexResponse = { id: channexBookingId, synced: true };
         }
       } catch (err) {
-        console.error("[bookings/create] Channex update failed:", err);
+        console.error("[bookings/create] Channex CRS failed:", err);
         channexResponse = { error: err instanceof Error ? err.message : String(err) };
       }
-    } else {
-      console.log(`[bookings/create] No Channex connection — skipping availability push`);
     }
 
     return NextResponse.json({
       booking: {
         id: booking.id,
-        guest_name: booking.guestName,
+        guest_name: booking.guest_name,
         platform: booking.platform,
-        check_in: check_in,  // use the original string from request body
-        check_out: check_out,
-        total_price: booking.totalPrice ? Number(booking.totalPrice) : null,
+        check_in: booking.check_in,
+        check_out: booking.check_out,
+        total_price: booking.total_price ? Number(booking.total_price) : null,
         status: booking.status,
       },
       channex: channexResponse,
@@ -90,19 +123,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function buildAvailabilityValues(
-  propertyId: string,
-  roomTypeId: string,
-  checkIn: string,
-  checkOut: string,
-  availability: number
-) {
-  // Use date range instead of per-day entries
-  return [{
-    property_id: propertyId,
-    room_type_id: roomTypeId,
-    date_from: checkIn,
-    date_to: checkOut,
-    availability,
-  }];
+function buildDaysMap(checkIn: string, checkOut: string): Record<string, string> {
+  const days: Record<string, string> = {};
+  const ci = new Date(checkIn + "T00:00:00Z");
+  const co = new Date(checkOut + "T00:00:00Z");
+  for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    days[`${y}-${m}-${day}`] = "160.00"; // default rate, overridden from DB
+  }
+  return days;
 }

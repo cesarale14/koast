@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db/pooled";
-import { bookings, properties } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(
   _request: NextRequest,
@@ -13,74 +11,76 @@ export async function POST(
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { owned } = await verifyBookingOwnership(user.id, params.id);
+    const { owned, propertyId } = await verifyBookingOwnership(user.id, params.id);
     if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+    const supabase = createServiceClient();
+
     // Get existing booking
-    const [existing] = await db
-      .select({
-        id: bookings.id,
-        propertyId: bookings.propertyId,
-        checkIn: bookings.checkIn,
-        checkOut: bookings.checkOut,
-        guestName: bookings.guestName,
-        status: bookings.status,
-      })
-      .from(bookings)
-      .where(eq(bookings.id, params.id));
-
-    if (!existing) {
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-    }
-
+    const { data: existingData } = await supabase
+      .from("bookings")
+      .select("id, property_id, check_in, check_out, guest_name, status, channex_booking_id")
+      .eq("id", params.id)
+      .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toDateStr = (v: any): string => {
-      if (!v) return "";
-      if (typeof v.getUTCFullYear === "function") {
-        const y = v.getUTCFullYear();
-        const m = String(v.getUTCMonth() + 1).padStart(2, "0");
-        const d = String(v.getUTCDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
-      }
-      return String(v).split("T")[0];
-    };
-    const ciStr = toDateStr(existing.checkIn);
-    const coStr = toDateStr(existing.checkOut);
+    const existing = ((existingData ?? []) as any[])[0];
+    if (!existing) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    if (existing.status === "cancelled") return NextResponse.json({ error: "Already cancelled" }, { status: 400 });
 
-    if (existing.status === "cancelled") {
-      return NextResponse.json({ error: "Booking is already cancelled" }, { status: 400 });
-    }
+    // Cancel in DB
+    const { data: updatedData, error: updateError } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("id", params.id)
+      .select("id, guest_name, platform, check_in, check_out, total_price, status")
+      .single();
 
-    // Update booking status to cancelled
-    const [updated] = await db
-      .update(bookings)
-      .set({
-        status: "cancelled",
-        updatedAt: new Date(),
-      })
-      .where(eq(bookings.id, params.id))
-      .returning();
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
-    // Restore Channex availability on all booked dates
+    // Push to Channex: cancel CRS booking + restore availability
     let channexResponse = null;
-    const [prop] = await db
-      .select({ channexPropertyId: properties.channexPropertyId })
-      .from(properties)
-      .where(eq(properties.id, existing.propertyId));
+    const { data: propData } = await supabase
+      .from("properties")
+      .select("channex_property_id")
+      .eq("id", propertyId)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = ((propData ?? []) as any[])[0];
 
-    if (prop?.channexPropertyId) {
+    if (prop?.channex_property_id) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
+        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
 
-        if (roomTypes.length > 0) {
-          // Restore ALL room types to available
-          const values = roomTypes.flatMap((rt) =>
-            buildAvailabilityValues(prop.channexPropertyId!, rt.id, ciStr, coStr, 1)
-          );
-          channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/cancel] Channex availability restored for ${ciStr} to ${coStr} (${roomTypes.length} room types)`);
+        // Cancel CRS booking if we have a channex_booking_id
+        if (existing.channex_booking_id && roomTypes.length > 0) {
+          const ratePlans = await channex.getRatePlans(prop.channex_property_id);
+          if (ratePlans.length > 0) {
+            await channex.cancelBooking(existing.channex_booking_id, {
+              property_id: prop.channex_property_id,
+              room_type_id: roomTypes[0].id,
+              rate_plan_id: ratePlans[0].id,
+              guest_name: existing.guest_name || "Guest",
+              arrival_date: existing.check_in,
+              departure_date: existing.check_out,
+            });
+            console.log(`[bookings/cancel] Channex CRS booking cancelled: ${existing.channex_booking_id}`);
+          }
         }
+
+        // Restore availability for all room types
+        if (roomTypes.length > 0) {
+          const values = roomTypes.map((rt) => ({
+            property_id: prop.channex_property_id,
+            room_type_id: rt.id,
+            date_from: existing.check_in,
+            date_to: existing.check_out,
+            availability: 1,
+          }));
+          await channex.updateAvailability(values);
+          console.log(`[bookings/cancel] Channex availability restored: ${existing.check_in} to ${existing.check_out}`);
+        }
+        channexResponse = { synced: true };
       } catch (err) {
         console.error("[bookings/cancel] Channex update failed:", err);
         channexResponse = { error: err instanceof Error ? err.message : String(err) };
@@ -89,13 +89,13 @@ export async function POST(
 
     return NextResponse.json({
       booking: {
-        id: updated.id,
-        guest_name: updated.guestName,
-        platform: updated.platform,
-        check_in: toDateStr(updated.checkIn) || ciStr,
-        check_out: toDateStr(updated.checkOut) || coStr,
-        total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
-        status: updated.status,
+        id: updatedData.id,
+        guest_name: updatedData.guest_name,
+        platform: updatedData.platform,
+        check_in: updatedData.check_in,
+        check_out: updatedData.check_out,
+        total_price: updatedData.total_price ? Number(updatedData.total_price) : null,
+        status: updatedData.status,
       },
       channex: channexResponse,
     });
@@ -104,20 +104,4 @@ export async function POST(
     console.error("[bookings/cancel] Error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-function buildAvailabilityValues(
-  propertyId: string,
-  roomTypeId: string,
-  checkIn: string,
-  checkOut: string,
-  availability: number
-) {
-  return [{
-    property_id: propertyId,
-    room_type_id: roomTypeId,
-    date_from: checkIn,
-    date_to: checkOut,
-    availability,
-  }];
 }

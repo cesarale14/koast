@@ -67,7 +67,27 @@ export async function POST(request: NextRequest) {
     const booking = await channex.getBooking(bookingId);
     const ba = booking.attributes;
 
-    console.log(`[webhook] Booking details: status=${ba.status}, arrival=${ba.arrival_date}, departure=${ba.departure_date}, guest=${ba.customer?.name} ${ba.customer?.surname}, ota=${ba.ota_name}`);
+    console.log(`[webhook] Booking details: status=${ba.status}, arrival=${ba.arrival_date}, departure=${ba.departure_date}, guest=${ba.customer?.name} ${ba.customer?.surname}, ota=${ba.ota_name}, ota_code=${ba.ota_reservation_code}`);
+
+    // Check if this booking was created by our PMS (prevent webhook loop)
+    const otaCode = ba.ota_reservation_code ?? "";
+    if (otaCode.startsWith("SC-") && ba.ota_name === "Offline") {
+      // This booking was pushed from StayCommand — just ACK, don't re-process
+      console.log(`[webhook] Skipping self-originated booking (ota_code=${otaCode})`);
+      if (revisionId) {
+        try { await channex.acknowledgeBookingRevision(revisionId); } catch { /* ignore */ }
+      }
+      // Log it but skip DB changes
+      try {
+        await supabase.from("channex_webhook_log").insert({
+          event_type: event, booking_id: bookingId, channex_property_id: channexPropertyId,
+          guest_name: ba.customer ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ") : null,
+          check_in: ba.arrival_date, check_out: ba.departure_date,
+          action_taken: "skipped_self", ack_sent: true, ack_response: "self-originated",
+        });
+      } catch { /* ignore */ }
+      return NextResponse.json({ status: "ok", action: "skipped_self", booking_id: bookingId });
+    }
 
     // Parse guest and platform
     const guestName = ba.customer
