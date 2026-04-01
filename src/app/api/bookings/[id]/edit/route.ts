@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db/pooled";
-import { bookings, properties } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createServiceClient } from "@/lib/supabase/service";
+
+const API_VERSION = "v5-supabase";
 
 export async function PUT(
   request: NextRequest,
@@ -11,89 +11,79 @@ export async function PUT(
 ) {
   try {
     const { user } = await getAuthenticatedUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return NextResponse.json({ error: "Unauthorized", v: API_VERSION }, { status: 401 });
 
-    const { owned } = await verifyBookingOwnership(user.id, params.id);
-    if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { owned, propertyId } = await verifyBookingOwnership(user.id, params.id);
+    if (!owned) return NextResponse.json({ error: "Forbidden", v: API_VERSION }, { status: 403 });
 
     const body = await request.json();
     const { check_in, check_out, guest_name, total_price } = body;
 
     if (!check_in || !check_out) {
-      return NextResponse.json({ error: "check_in and check_out required" }, { status: 400 });
+      return NextResponse.json({ error: "check_in and check_out required", v: API_VERSION }, { status: 400 });
     }
 
-    // Get existing booking with old dates
-    const [existing] = await db
-      .select({
-        id: bookings.id,
-        propertyId: bookings.propertyId,
-        checkIn: bookings.checkIn,
-        checkOut: bookings.checkOut,
-        guestName: bookings.guestName,
-        totalPrice: bookings.totalPrice,
-        status: bookings.status,
-      })
-      .from(bookings)
-      .where(eq(bookings.id, params.id));
+    const supabase = createServiceClient();
+
+    // Get existing booking (Supabase returns plain strings, no Date objects)
+    const { data: existingData } = await supabase
+      .from("bookings")
+      .select("id, property_id, check_in, check_out, guest_name, total_price, status")
+      .eq("id", params.id)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existing = ((existingData ?? []) as any[])[0];
 
     if (!existing) {
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+      return NextResponse.json({ error: "Booking not found", v: API_VERSION }, { status: 404 });
     }
 
-    // postgres.js returns date columns as Date objects. Extract YYYY-MM-DD safely
-    // without .toISOString() (fails across VM contexts) or instanceof (unreliable in serverless)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toDateStr = (v: any): string => {
-      if (!v) return "";
-      // Duck-type check: if it has getUTCFullYear, it's a Date-like object
-      if (typeof v.getUTCFullYear === "function") {
-        const y = v.getUTCFullYear();
-        const m = String(v.getUTCMonth() + 1).padStart(2, "0");
-        const d = String(v.getUTCDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
-      }
-      // Otherwise it's a string — extract YYYY-MM-DD
-      return String(v).split("T")[0];
-    };
-    const oldCheckIn = toDateStr(existing.checkIn);
-    const oldCheckOut = toDateStr(existing.checkOut);
+    const oldCheckIn = existing.check_in;
+    const oldCheckOut = existing.check_out;
 
     // Update booking
-    const updateData: Record<string, unknown> = {
-      checkIn: check_in,
-      checkOut: check_out,
-      updatedAt: new Date().toISOString(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateFields: any = {
+      check_in,
+      check_out,
+      updated_at: new Date().toISOString(),
     };
-    if (guest_name !== undefined) updateData.guestName = guest_name;
-    if (total_price !== undefined) updateData.totalPrice = total_price;
+    if (guest_name !== undefined) updateFields.guest_name = guest_name;
+    if (total_price !== undefined) updateFields.total_price = total_price;
 
-    const [updated] = await db
-      .update(bookings)
-      .set(updateData)
-      .where(eq(bookings.id, params.id))
-      .returning();
+    const { data: updatedData, error: updateError } = await supabase
+      .from("bookings")
+      .update(updateFields)
+      .eq("id", params.id)
+      .select("id, guest_name, platform, check_in, check_out, total_price, status")
+      .single();
 
-    // Update Channex availability: restore old dates, decrease new dates
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message, v: API_VERSION }, { status: 500 });
+    }
+
+    // Update Channex availability: restore old dates, block new dates
     let channexResponse = null;
-    const [prop] = await db
-      .select({ channexPropertyId: properties.channexPropertyId })
-      .from(properties)
-      .where(eq(properties.id, existing.propertyId));
+    const { data: propData } = await supabase
+      .from("properties")
+      .select("channex_property_id")
+      .eq("id", propertyId)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = ((propData ?? []) as any[])[0];
 
-    if (prop?.channexPropertyId) {
+    if (prop?.channex_property_id) {
       try {
         const channex = createChannexClient();
-        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
+        const roomTypes = await channex.getRoomTypes(prop.channex_property_id);
 
         if (roomTypes.length > 0) {
-          // Update ALL room types: restore old dates, block new dates
           const values = roomTypes.flatMap((rt) => [
-            ...buildAvailabilityValues(prop.channexPropertyId!, rt.id, oldCheckIn, oldCheckOut, 1),
-            ...buildAvailabilityValues(prop.channexPropertyId!, rt.id, check_in, check_out, 0),
+            { property_id: prop.channex_property_id, room_type_id: rt.id, date_from: oldCheckIn, date_to: oldCheckOut, availability: 1 },
+            { property_id: prop.channex_property_id, room_type_id: rt.id, date_from: check_in, date_to: check_out, availability: 0 },
           ]);
           channexResponse = await channex.updateAvailability(values);
-          console.log(`[bookings/edit] Channex availability updated: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out} (${roomTypes.length} room types)`);
+          console.log(`[bookings/edit] Channex updated: restored ${oldCheckIn}-${oldCheckOut}, blocked ${check_in}-${check_out} (${roomTypes.length} room types)`);
         }
       } catch (err) {
         console.error("[bookings/edit] Channex update failed:", err);
@@ -103,40 +93,20 @@ export async function PUT(
 
     return NextResponse.json({
       booking: {
-        id: updated.id,
-        guest_name: updated.guestName,
-        platform: updated.platform,
-        check_in: toDateStr(updated.checkIn) || check_in,
-        check_out: toDateStr(updated.checkOut) || check_out,
-        total_price: updated.totalPrice ? Number(updated.totalPrice) : null,
-        status: updated.status,
+        id: updatedData.id,
+        guest_name: updatedData.guest_name,
+        platform: updatedData.platform,
+        check_in: updatedData.check_in,
+        check_out: updatedData.check_out,
+        total_price: updatedData.total_price ? Number(updatedData.total_price) : null,
+        status: updatedData.status,
       },
       channex: channexResponse,
-      changes: {
-        old_dates: { check_in: oldCheckIn, check_out: oldCheckOut },
-        new_dates: { check_in, check_out },
-      },
+      v: API_VERSION,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[bookings/edit] Error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: `[${API_VERSION}] ${msg}` }, { status: 500 });
   }
-}
-
-function buildAvailabilityValues(
-  propertyId: string,
-  roomTypeId: string,
-  checkIn: string,
-  checkOut: string,
-  availability: number
-) {
-  // Use date range as single entry instead of per-day to avoid Date object issues
-  return [{
-    property_id: propertyId,
-    room_type_id: roomTypeId,
-    date_from: checkIn,
-    date_to: checkOut, // Channex handles ranges — checkout date excluded by convention
-    availability,
-  }];
 }
