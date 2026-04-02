@@ -263,20 +263,19 @@ export default function PricingDashboard({
     if (dates.length === 0) return;
     setLoading("bulk");
     try {
-      // Update each date via Supabase directly through a simple API
-      for (const date of dates) {
-        await fetch(`/api/pricing/approve/${propertyId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dates: [date] }),
-        });
-      }
+      const res = await fetch(`/api/pricing/override/${propertyId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dates, rate }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setRates((prev) =>
         prev.map((r) =>
           dates.includes(r.date) ? { ...r, applied_rate: rate, rate_source: "override" } : r
         )
       );
-      toast(`Set $${rate} for ${dates.length} dates`);
+      toast(`Set $${rate} for ${data.updated} dates`);
       setSelectedDates(new Set());
       setBulkRate("");
     } catch (err) {

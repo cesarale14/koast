@@ -1,15 +1,8 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  demandSignal,
-  seasonalitySignal,
-  competitorSignal,
-  gapNightSignal,
-  bookingPaceSignal,
-  eventSignal,
-  weatherSignal,
-  supplySignal,
-  leadTimeSignal,
+  runAllSignals,
   type SignalResult,
+  type SignalContext,
   type LearnedDowRates,
 } from "./signals";
 import { getEventsForDate } from "@/lib/events/cache";
@@ -199,18 +192,27 @@ export class PricingEngine {
       const dateEvents = await getEventsForDate(this.supabase, propertyId, dateStr);
       const currentRate = rateMap.get(dateStr) ?? cfg.base_rate;
 
-      // All 9 signals
-      const signals: Record<string, SignalResult> = {
-        demand: demandSignal(demandScore),
-        seasonality: seasonalitySignal(current, learnedDow),
-        competitor: competitorSignal(currentRate, propertyOccupancy, compAdrs, compOccs),
-        event: eventSignal(dateEvents),
-        gap_night: gapNightSignal(dateStr, bookings),
-        booking_pace: bookingPaceSignal(dateStr, todayStr, isBooked, avgLeadTimeDays),
-        weather: weatherSignal(dateStr, weatherForecast),
-        supply: supplySignal(currentListings, previousListings),
-        lead_time: leadTimeSignal(dateStr, todayStr, currentRate, compMedianAdr),
+      // Build context and run all registered signals
+      const ctx: SignalContext = {
+        dateStr,
+        date: new Date(current),
+        todayStr,
+        demandScore,
+        learnedDow,
+        currentRate,
+        propertyOccupancy,
+        compAdrs,
+        compOccs,
+        events: dateEvents,
+        bookings,
+        isBooked,
+        avgLeadTimeDays,
+        weatherForecast,
+        currentListings,
+        previousListings,
+        compMedianAdr,
       };
+      const signals: Record<string, SignalResult> = runAllSignals(ctx);
 
       let weightedSum = 0;
       for (const s of Object.values(signals)) {
@@ -246,48 +248,92 @@ export class PricingEngine {
   }
 
   async applyRates(rates: CalendarRateUpdate[]): Promise<number> {
-    let updated = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const table = this.supabase.from("calendar_rates") as any;
+    if (rates.length === 0) return 0;
 
-    for (const rate of rates) {
-      const updateData: Record<string, unknown> = {
+    const rows = rates.map((rate) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row: Record<string, any> = {
+        property_id: rate.property_id,
+        date: rate.date,
         suggested_rate: rate.suggested_rate,
         rate_source: rate.rate_source,
         factors: rate.factors,
         base_rate: rate.base_rate,
+        is_available: true,
+        min_stay: 1,
       };
-      if (rate.applied_rate != null) updateData.applied_rate = rate.applied_rate;
+      if (rate.applied_rate != null) row.applied_rate = rate.applied_rate;
+      return row;
+    });
 
-      const { data: existing } = await table
-        .select("id").eq("property_id", rate.property_id).eq("date", rate.date).limit(1);
+    // Single upsert — existing rows update, new rows insert
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (this.supabase.from("calendar_rates") as any).upsert(rows, {
+      onConflict: "property_id,date",
+    });
+    if (error) throw new Error(`applyRates upsert failed: ${error.message}`);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (existing && (existing as any[]).length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await table.update(updateData).eq("id", (existing as any[])[0].id);
-      } else {
-        await table.insert({ property_id: rate.property_id, date: rate.date, is_available: true, min_stay: 1, ...updateData });
-      }
-      updated++;
-    }
-    return updated;
+    return rates.length;
   }
 
   async approveRates(propertyId: string, dates: string[]): Promise<number> {
-    let approved = 0;
+    if (dates.length === 0) return 0;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = this.supabase.from("calendar_rates") as any;
 
-    for (const date of dates) {
-      const { data } = await table.select("id, suggested_rate").eq("property_id", propertyId).eq("date", date).limit(1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = (data ?? []) as any[];
-      if (rows.length > 0 && rows[0].suggested_rate != null) {
-        await table.update({ applied_rate: rows[0].suggested_rate }).eq("id", rows[0].id);
-        approved++;
-      }
-    }
-    return approved;
+    // Fetch all matching rows in one query
+    const { data } = await table
+      .select("id, date, suggested_rate")
+      .eq("property_id", propertyId)
+      .in("date", dates);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = ((data ?? []) as any[]).filter((r: any) => r.suggested_rate != null);
+    if (rows.length === 0) return 0;
+
+    // Build upsert rows that copy suggested_rate → applied_rate
+    const updates = rows.map((r: { id: string; date: string; suggested_rate: number }) => ({
+      id: r.id,
+      property_id: propertyId,
+      date: r.date,
+      applied_rate: r.suggested_rate,
+    }));
+
+    const { error } = await table.upsert(updates, { onConflict: "id" });
+    if (error) throw new Error(`approveRates upsert failed: ${error.message}`);
+
+    return rows.length;
+  }
+
+  async overrideRates(propertyId: string, dates: string[], rate: number): Promise<number> {
+    if (dates.length === 0) return 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const table = this.supabase.from("calendar_rates") as any;
+
+    const { data, error: fetchError } = await table
+      .select("id, date")
+      .eq("property_id", propertyId)
+      .in("date", dates);
+
+    if (fetchError) throw new Error(`overrideRates fetch failed: ${fetchError.message}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (data ?? []) as any[];
+    if (rows.length === 0) return 0;
+
+    const updates = rows.map((r: { id: string; date: string }) => ({
+      id: r.id,
+      property_id: propertyId,
+      date: r.date,
+      applied_rate: rate,
+      rate_source: "override",
+    }));
+
+    const { error } = await table.upsert(updates, { onConflict: "id" });
+    if (error) throw new Error(`overrideRates upsert failed: ${error.message}`);
+
+    return rows.length;
   }
 }
