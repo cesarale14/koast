@@ -80,7 +80,8 @@ export async function POST(request: NextRequest) {
       // Log it but skip DB changes
       try {
         await supabase.from("channex_webhook_log").insert({
-          event_type: event, booking_id: bookingId, channex_property_id: channexPropertyId,
+          event_type: event, booking_id: bookingId, revision_id: revisionId ?? null,
+          channex_property_id: channexPropertyId,
           guest_name: ba.customer ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ") : null,
           check_in: ba.arrival_date, check_out: ba.departure_date,
           action_taken: "skipped_self", ack_sent: true, ack_response: "self-originated",
@@ -212,6 +213,7 @@ export async function POST(request: NextRequest) {
       await supabase.from("channex_webhook_log").insert({
         event_type: event,
         booking_id: bookingId,
+        revision_id: revisionId ?? null,
         channex_property_id: channexPropertyId,
         guest_name: guestName,
         check_in: ba.arrival_date,
