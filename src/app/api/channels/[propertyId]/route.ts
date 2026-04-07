@@ -30,80 +30,116 @@ export async function GET(
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    // Check local cache
-    const { data: cachedChannels } = await supabase
-      .from("property_channels")
-      .select("*")
-      .eq("property_id", params.propertyId)
-      .order("channel_name", { ascending: true });
+    // Fetch cached data from local tables
+    const [channelsRes, roomTypesRes, ratePlansRes] = await Promise.all([
+      supabase.from("property_channels").select("*").eq("property_id", params.propertyId).order("channel_name"),
+      supabase.from("channex_room_types").select("*").eq("property_id", params.propertyId).order("title"),
+      supabase.from("channex_rate_plans").select("*").eq("property_id", params.propertyId).order("title"),
+    ]);
 
-    const channels = (cachedChannels ?? []) as Record<string, unknown>[];
+    const channels = (channelsRes.data ?? []) as Record<string, unknown>[];
+    const roomTypes = (roomTypesRes.data ?? []) as Record<string, unknown>[];
+    const ratePlans = (ratePlansRes.data ?? []) as Record<string, unknown>[];
 
-    // Determine if data is stale
-    const isStale =
-      channels.length === 0 ||
-      channels.some((ch) => {
-        const syncAt = ch.last_sync_at as string | null;
-        if (!syncAt) return true;
-        const age = Date.now() - new Date(syncAt).getTime();
-        return age > STALE_MINUTES * 60 * 1000;
-      });
+    // Determine if local cache is stale — check room_types cache age (channels can legitimately be 0)
+    const isStale = roomTypes.length === 0 && !!property.channex_property_id;
+    const isExpired = roomTypes.some((rt) => {
+      const cachedAt = rt.cached_at as string | null;
+      if (!cachedAt) return true;
+      return Date.now() - new Date(cachedAt).getTime() > STALE_MINUTES * 60 * 1000;
+    });
 
     // If stale and property has channex_property_id, refresh from Channex
-    if (isStale && property.channex_property_id) {
+    if ((isStale || isExpired) && property.channex_property_id) {
       try {
         const channex = createChannexClient();
-        const channexData = await channex.getChannels(property.channex_property_id);
-        const channexChannels = Array.isArray(channexData.data) ? channexData.data : [];
-
         const now = new Date().toISOString();
+        const channexPropId = property.channex_property_id;
+
+        // Fetch channels, room types, rate plans in parallel
+        const [channexChannelsRes, channexRoomTypes, channexRatePlans] = await Promise.all([
+          channex.getChannels(channexPropId).catch(() => ({ data: [] })),
+          channex.getRoomTypes(channexPropId),
+          channex.getRatePlans(channexPropId),
+        ]);
+
+        // Upsert channels (may be empty — that's OK)
+        const channexChannels = Array.isArray(channexChannelsRes.data) ? channexChannelsRes.data : [];
         for (const ch of channexChannels) {
           const attrs = ch.attributes ?? {};
-          await supabase
-            .from("property_channels")
-            .upsert(
-              {
-                property_id: params.propertyId,
-                channex_channel_id: ch.id,
-                channel_code: attrs.channel_code ?? attrs.id ?? "unknown",
-                channel_name: attrs.title ?? attrs.channel_name ?? "Unknown",
-                status: attrs.is_active === false ? "inactive" : "active",
-                last_sync_at: now,
-                settings: attrs.settings ?? {},
-                updated_at: now,
-              },
-              { onConflict: "property_id,channex_channel_id" }
-            );
+          await supabase.from("property_channels").upsert({
+            property_id: params.propertyId,
+            channex_channel_id: ch.id,
+            channel_code: attrs.channel_code ?? "unknown",
+            channel_name: attrs.title ?? "Unknown",
+            status: attrs.is_active === false ? "inactive" : "active",
+            last_sync_at: now,
+            settings: attrs.settings ?? {},
+            updated_at: now,
+          }, { onConflict: "property_id,channex_channel_id" });
         }
 
-        // Re-fetch from DB after upsert
-        const { data: refreshed } = await supabase
-          .from("property_channels")
-          .select("*")
-          .eq("property_id", params.propertyId)
-          .order("channel_name", { ascending: true });
+        // Upsert room types
+        if (channexRoomTypes.length > 0) {
+          await supabase.from("channex_room_types").delete().eq("property_id", params.propertyId);
+          await supabase.from("channex_room_types").upsert(
+            channexRoomTypes.map((rt) => ({
+              id: rt.id,
+              property_id: params.propertyId,
+              channex_property_id: channexPropId,
+              title: rt.attributes.title,
+              count_of_rooms: rt.attributes.count_of_rooms ?? 1,
+              occ_adults: rt.attributes.occ_adults ?? 2,
+              occ_children: rt.attributes.occ_children ?? 0,
+              cached_at: now,
+            })),
+            { onConflict: "id" }
+          );
+        }
+
+        // Upsert rate plans
+        if (channexRatePlans.length > 0) {
+          await supabase.from("channex_rate_plans").delete().eq("property_id", params.propertyId);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await supabase.from("channex_rate_plans").upsert(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            channexRatePlans.map((rp: any) => ({
+              id: rp.id,
+              property_id: params.propertyId,
+              room_type_id: rp.relationships?.room_type?.data?.id ?? "",
+              title: rp.attributes.title,
+              sell_mode: rp.attributes.sell_mode ?? "per_room",
+              currency: rp.attributes.currency ?? "USD",
+              rate_mode: rp.attributes.rate_mode ?? "manual",
+              cached_at: now,
+            })),
+            { onConflict: "id" }
+          );
+        }
+
+        // Re-fetch from DB
+        const [refreshedChannels, refreshedRT, refreshedRP] = await Promise.all([
+          supabase.from("property_channels").select("*").eq("property_id", params.propertyId).order("channel_name"),
+          supabase.from("channex_room_types").select("*").eq("property_id", params.propertyId).order("title"),
+          supabase.from("channex_rate_plans").select("*").eq("property_id", params.propertyId).order("title"),
+        ]);
 
         return NextResponse.json({
-          channels: refreshed ?? [],
-          property: {
-            id: property.id,
-            name: property.name,
-            channex_property_id: property.channex_property_id,
-          },
+          channels: refreshedChannels.data ?? [],
+          room_types: refreshedRT.data ?? [],
+          rate_plans: refreshedRP.data ?? [],
+          property: { id: property.id, name: property.name, channex_property_id: property.channex_property_id },
         });
       } catch (err) {
-        console.error("[channels] Channex fetch failed, returning cached:", err instanceof Error ? err.message : err);
-        // Fall through to return cached data
+        console.error("[channels] Channex refresh failed:", err instanceof Error ? err.message : err);
       }
     }
 
     return NextResponse.json({
       channels,
-      property: {
-        id: property.id,
-        name: property.name,
-        channex_property_id: property.channex_property_id,
-      },
+      room_types: roomTypes,
+      rate_plans: ratePlans,
+      property: { id: property.id, name: property.name, channex_property_id: property.channex_property_id },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

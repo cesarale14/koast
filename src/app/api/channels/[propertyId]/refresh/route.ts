@@ -94,11 +94,15 @@ export async function POST(
       .delete()
       .eq("property_id", params.propertyId);
 
-    const ratePlanRows = channexRatePlans.map((rp) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ratePlanRows = channexRatePlans.map((rp: any) => ({
       id: rp.id,
       property_id: params.propertyId,
-      room_type_id: rp.attributes.room_type_id,
+      room_type_id: rp.relationships?.room_type?.data?.id ?? rp.attributes?.room_type_id ?? "",
       title: rp.attributes.title,
+      sell_mode: rp.attributes.sell_mode ?? "per_room",
+      currency: rp.attributes.currency ?? "USD",
+      rate_mode: rp.attributes.rate_mode ?? "manual",
       cached_at: now,
     }));
     if (ratePlanRows.length > 0) {

@@ -29,9 +29,28 @@ interface ChannelRecord {
   settings: Record<string, unknown>;
 }
 
+interface RoomTypeRecord {
+  id: string;
+  property_id: string;
+  title: string;
+  occ_adults: number;
+  count_of_rooms: number;
+}
+
+interface RatePlanRecord {
+  id: string;
+  property_id: string;
+  room_type_id: string;
+  title: string;
+  sell_mode: string;
+  currency: string;
+}
+
 interface ChannelsOverviewProps {
   properties: PropertyInfo[];
   channels: Record<string, unknown>[];
+  roomTypes: RoomTypeRecord[];
+  ratePlans: RatePlanRecord[];
   bookingCounts: Record<string, Record<string, number>>;
 }
 
@@ -211,6 +230,8 @@ function CompactChannelCard({
 export default function ChannelsOverview({
   properties,
   channels: rawChannels,
+  roomTypes: allRoomTypes,
+  ratePlans: allRatePlans,
   bookingCounts,
 }: ChannelsOverviewProps) {
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id ?? "");
@@ -252,6 +273,16 @@ export default function ChannelsOverview({
   );
 
   const connectedCount = channels.filter((ch) => ch.status === "active").length;
+
+  // Room types and rate plans for selected property
+  const propertyRoomTypes = useMemo(
+    () => allRoomTypes.filter((rt) => rt.property_id === selectedPropertyId),
+    [allRoomTypes, selectedPropertyId]
+  );
+  const propertyRatePlans = useMemo(
+    () => allRatePlans.filter((rp) => rp.property_id === selectedPropertyId),
+    [allRatePlans, selectedPropertyId]
+  );
 
   const handleRefresh = useCallback(() => {
     if (!selectedPropertyId) return;
@@ -379,6 +410,36 @@ export default function ChannelsOverview({
           Property ID: {selectedProperty?.channexPropertyId?.slice(0, 8)}...
         </span>
       </div>
+
+      {/* Channex Setup Info */}
+      {hasChannex && propertyRoomTypes.length > 0 && (
+        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-5 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <Cable size={20} className="text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-800">Channex Connected</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  {propertyRoomTypes.length} room type{propertyRoomTypes.length !== 1 ? "s" : ""} &middot; {propertyRatePlans.length} rate plan{propertyRatePlans.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="flex flex-wrap gap-1.5">
+                  {propertyRoomTypes.map((rt) => (
+                    <span key={rt.id} className="px-2 py-0.5 text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full">
+                      {rt.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top 3 OTA channel cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">

@@ -14,45 +14,49 @@ export default async function ChannelsPage() {
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties = (propertiesData ?? []) as any[];
-
-  // Fetch property_channels for each property that has channex
   const propertyIds = properties.map((p) => p.id);
-  let channels: Record<string, unknown>[] = [];
-  if (propertyIds.length > 0) {
-    const { data: channelsData } = await supabase
-      .from("property_channels")
-      .select("*")
-      .in("property_id", propertyIds)
-      .order("channel_name", { ascending: true });
-    channels = (channelsData ?? []) as Record<string, unknown>[];
-  }
 
-  // Fetch booking counts grouped by platform for all properties
-  const { data: bookingsData } = await supabase
-    .from("bookings")
-    .select("property_id, platform")
-    .in("property_id", propertyIds)
-    .eq("status", "confirmed");
+  // Fetch channels, room types, rate plans, and booking counts in parallel
+  const [channelsRes, roomTypesRes, ratePlansRes, bookingsRes] = await Promise.all([
+    propertyIds.length > 0
+      ? supabase.from("property_channels").select("*").in("property_id", propertyIds).order("channel_name")
+      : Promise.resolve({ data: [] }),
+    propertyIds.length > 0
+      ? supabase.from("channex_room_types").select("*").in("property_id", propertyIds).order("title")
+      : Promise.resolve({ data: [] }),
+    propertyIds.length > 0
+      ? supabase.from("channex_rate_plans").select("*").in("property_id", propertyIds).order("title")
+      : Promise.resolve({ data: [] }),
+    propertyIds.length > 0
+      ? supabase.from("bookings").select("property_id, platform").in("property_id", propertyIds).eq("status", "confirmed")
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const channels = (channelsRes.data ?? []) as Record<string, unknown>[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bookings = (bookingsData ?? []) as any[];
+  const roomTypes = (roomTypesRes.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ratePlans = (ratePlansRes.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookings = (bookingsRes.data ?? []) as any[];
 
   // Group booking counts by property + platform
   const bookingCounts: Record<string, Record<string, number>> = {};
   for (const b of bookings) {
-    const pid = b.property_id;
-    const plat = b.platform;
-    if (!bookingCounts[pid]) bookingCounts[pid] = {};
-    bookingCounts[pid][plat] = (bookingCounts[pid][plat] ?? 0) + 1;
+    if (!bookingCounts[b.property_id]) bookingCounts[b.property_id] = {};
+    bookingCounts[b.property_id][b.platform] = (bookingCounts[b.property_id][b.platform] ?? 0) + 1;
   }
 
   return (
     <ChannelsOverview
-      properties={properties.map((p) => ({
+      properties={properties.map((p: { id: string; name: string; channex_property_id: string | null }) => ({
         id: p.id,
         name: p.name,
         channexPropertyId: p.channex_property_id,
       }))}
       channels={channels}
+      roomTypes={roomTypes}
+      ratePlans={ratePlans}
       bookingCounts={bookingCounts}
     />
   );
