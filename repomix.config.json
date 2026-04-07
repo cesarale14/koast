@@ -1,0 +1,17 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml"
+  },
+  "ignore": {
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      ".next",
+      "node_modules",
+      "*.lock",
+      "public/images/**",
+      "public/fonts/**",
+      ".env*"
+    ]
+  }
+}
+

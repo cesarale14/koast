@@ -2,7 +2,7 @@
 
 ## FIRST STEPS FOR EVERY SESSION
 1. Read this file completely before any work
-2. Run `cat ~/staycommand/repomix-output.txt | head -200` for project structure
+2. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure
 3. If repomix is stale: `cd ~/staycommand && repomix`
 4. Never run `npm run build` on VPS — use `npx tsc --noEmit` then `git push` (Vercel builds)
 
