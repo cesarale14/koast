@@ -583,14 +583,18 @@ class ChannexClient {
   async createOneTimeToken(propertyId: string, groupId?: string): Promise<{ token: string }> {
     const body: Record<string, string> = { property_id: propertyId };
     if (groupId) body.group_id = groupId;
-    const res = await this.request<{ data: { attributes: { token: string } } }>(
+    // Response is { data: { token: "..." }, meta: { message: "..." } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await this.request<any>(
       "/auth/one_time_token",
       {
         method: "POST",
         body: JSON.stringify(body),
       }
     );
-    return { token: res.data.attributes.token };
+    const token = res.data?.token ?? res.data?.attributes?.token;
+    if (!token) throw new Error("No token in Channex response");
+    return { token };
   }
 
   // ==================== Health Check ====================
