@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           error: "CRS API returned 403 Forbidden. The Booking CRS app needs to be installed on this property.",
           instructions: [
-            "1. Go to https://staging.channex.io",
+            "1. Go to https://app.channex.io",
             "2. Navigate to Applications page",
             "3. Find 'Booking CRS' and install it on the test property",
             "4. Or use mode: 'poll' to process manually created bookings:",

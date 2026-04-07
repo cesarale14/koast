@@ -477,3 +477,64 @@ export const userPreferences = pgTable("user_preferences", {
   preferences: jsonb("preferences").notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
+
+// ==================== Property Channels ====================
+
+export const propertyChannels = pgTable("property_channels", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  channexChannelId: text("channex_channel_id").notNull(),
+  channelCode: text("channel_code").notNull(),
+  channelName: text("channel_name").notNull(),
+  status: text("status").notNull().default("active"),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  settings: jsonb("settings").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_property_channels_property").on(t.propertyId),
+  uniqueIndex("idx_property_channels_unique").on(t.propertyId, t.channexChannelId),
+]);
+
+export const propertyChannelsRelations = relations(propertyChannels, ({ one }) => ({
+  property: one(properties, { fields: [propertyChannels.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Channex Room Types ====================
+
+export const channexRoomTypes = pgTable("channex_room_types", {
+  id: text("id").primaryKey(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  channexPropertyId: text("channex_property_id").notNull(),
+  title: text("title").notNull(),
+  countOfRooms: integer("count_of_rooms").default(1),
+  occAdults: integer("occ_adults").default(2),
+  occChildren: integer("occ_children").default(0),
+  cachedAt: timestamp("cached_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_channex_room_types_property").on(t.propertyId),
+]);
+
+export const channexRoomTypesRelations = relations(channexRoomTypes, ({ one }) => ({
+  property: one(properties, { fields: [channexRoomTypes.propertyId], references: [properties.id] }),
+}));
+
+// ==================== Channex Rate Plans ====================
+
+export const channexRatePlans = pgTable("channex_rate_plans", {
+  id: text("id").primaryKey(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  roomTypeId: text("room_type_id").notNull(),
+  title: text("title").notNull(),
+  sellMode: text("sell_mode").default("per_room"),
+  currency: text("currency").default("USD"),
+  rateMode: text("rate_mode").default("manual"),
+  cachedAt: timestamp("cached_at", { withTimezone: true }).defaultNow(),
+}, (t) => [
+  index("idx_channex_rate_plans_property").on(t.propertyId),
+]);
+
+export const channexRatePlansRelations = relations(channexRatePlans, ({ one }) => ({
+  property: one(properties, { fields: [channexRatePlans.propertyId], references: [properties.id] }),
+}));

@@ -8,7 +8,7 @@ import type {
   ChannexRestrictionAttrs,
 } from "./types";
 
-const DEFAULT_BASE_URL = "https://staging.channex.io/api/v1";
+const DEFAULT_BASE_URL = "https://app.channex.io/api/v1";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyResponse = any;
@@ -570,6 +570,27 @@ class ChannexClient {
     ]);
 
     return { availabilityResult, restrictionsResult };
+  }
+
+  // ==================== Channels ====================
+
+  async getChannels(propertyId: string): Promise<AnyResponse> {
+    return this.request(`/channels?filter[property_id]=${propertyId}`);
+  }
+
+  // ==================== One-Time Token ====================
+
+  async createOneTimeToken(propertyId: string, groupId?: string): Promise<{ token: string }> {
+    const body: Record<string, string> = { property_id: propertyId };
+    if (groupId) body.group_id = groupId;
+    const res = await this.request<{ data: { attributes: { token: string } } }>(
+      "/auth/one_time_token",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+    return { token: res.data.attributes.token };
   }
 
   // ==================== Health Check ====================
