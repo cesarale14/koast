@@ -128,7 +128,7 @@ async function createOnProduction(prop: any, roomTypes: any[], ratePlans: any[])
       longitude: parseFloat(propAttrs.longitude),
       latitude: parseFloat(propAttrs.latitude),
       timezone: propAttrs.timezone,
-      property_type: propAttrs.property_category ?? "vacation_rental",
+      property_type: propAttrs.property_type ?? "apartment",
       content: {
         description: propAttrs.content?.description ?? "",
       },
