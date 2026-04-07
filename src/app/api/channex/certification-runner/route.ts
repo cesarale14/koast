@@ -7,16 +7,16 @@ export const maxDuration = 60;
 
 const VILLA_JAMAICA_DB_ID = "9a564a82-2677-4931-bcea-30976d958121";
 
-// ====== Villa Jamaica — Channex IDs ======
-const PROP = "cf4a8bc4-956a-4c89-a40a-14c2e56ebd96";
+// ====== Villa Jamaica — Channex IDs (PRODUCTION) ======
+const PROP = "4d52bb8c-5bee-479a-81ae-2d0a9cb02785";
 // Room Types: "Entire Home - Standard" / "Entire Home - Premium"
-const STANDARD_ROOM = "63f36a00-de78-4342-9d26-c0f8f1875688";
-const PREMIUM_ROOM = "025a9e93-6fa7-40eb-8902-8b723a50778a";
+const STANDARD_ROOM = "c87ccb4a-459a-4270-b98a-2e3e77b20ff2";
+const PREMIUM_ROOM = "09db835e-4613-427a-8a69-9420bf73bb0d";
 // Rate Plans
-const STANDARD_BAR = "d4dc52ea-672f-4f3c-8c85-525be07d0ee2";
-const STANDARD_BNB = "1ac4b701-ca7e-439a-afcb-a71e53bddc2b";
-const PREMIUM_BAR = "236ab9fd-9997-4b42-89be-5ae5fe776471";
-const PREMIUM_BNB = "6ab14f1b-d1c8-48a5-af82-d449470caf86";
+const STANDARD_BAR = "1290e74a-5cab-472a-bc26-c6fbdacae2cc";
+const STANDARD_BNB = "d5cc8032-6d3a-4bc9-95d1-83a73a7075fd";
+const PREMIUM_BAR = "3070d2ad-23a2-4de2-9fab-23840c23908c";
+const PREMIUM_BNB = "1fd96cb8-3506-40a5-bc0c-5fc022db21ce";
 // Aliases for test readability (Standard = "Twin", Premium = "Double" in cert spec)
 const TWIN_BAR = STANDARD_BAR;
 const TWIN_BNB = STANDARD_BNB;

@@ -36,7 +36,7 @@ StayCommand is a unified STR (short-term rental) operating system with AI-powere
 properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, weather_cache, channex_webhook_log, channex_sync_state, user_preferences
 
 ## Channex Integration (PRODUCTION CERTIFIED)
-- Villa Jamaica Channex ID: cf4a8bc4-956a-4c89-a40a-14c2e56ebd96
+- Villa Jamaica Channex ID: 4d52bb8c-5bee-479a-81ae-2d0a9cb02785 (PRODUCTION)
 - Room Types: Entire Home - Standard + Entire Home - Premium
 - 4 Rate Plans: BAR + B&B per room type
 - Webhook: POST /api/webhooks/channex (booking events)
