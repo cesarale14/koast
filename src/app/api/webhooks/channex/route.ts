@@ -1,52 +1,107 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
-import type { ChannexWebhookPayload } from "@/lib/channex/types";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
   const supabase = createServiceClient();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rawPayload: any;
   try {
-    const payload: ChannexWebhookPayload = await request.json();
+    rawPayload = await request.json();
+  } catch {
+    console.warn(`[webhook] Failed to parse JSON from ${sourceIp}`);
+    return NextResponse.json({ status: "ok", message: "Invalid JSON, ignored" });
+  }
 
-    if (!payload.event || !payload.payload) {
-      console.warn(`[webhook] Rejected malformed payload from ${sourceIp}`);
-      return NextResponse.json({ status: "error", message: "Missing required fields" }, { status: 400 });
-    }
+  const event = rawPayload?.event ?? rawPayload?.type ?? null;
+  const payloadBody = rawPayload?.payload ?? {};
+  const bookingId = payloadBody?.booking_id ?? null;
+  const revisionId = payloadBody?.revision_id ?? null;
+  const channexPropertyId = rawPayload?.property_id ?? payloadBody?.property_id ?? null;
 
-    const event = payload.event;
-    const bookingId = payload.payload?.booking_id;
-    const revisionId = payload.payload?.revision_id;
-    const channexPropertyId = payload.property_id;
+  console.log(`[webhook] ━━━ INCOMING ━━━`);
+  console.log(`[webhook] Event: ${event ?? "(none)"}`);
+  console.log(`[webhook] Booking ID: ${bookingId ?? "(none)"}`);
+  console.log(`[webhook] Property: ${channexPropertyId ?? "(none)"}`);
+  console.log(`[webhook] Source IP: ${sourceIp}`);
+  console.log(`[webhook] Payload: ${JSON.stringify(rawPayload).substring(0, 500)}`);
 
-    console.log(`[webhook] ━━━ INCOMING ━━━`);
-    console.log(`[webhook] Event: ${event}`);
-    console.log(`[webhook] Booking ID: ${bookingId}`);
-    console.log(`[webhook] Revision ID: ${revisionId}`);
-    console.log(`[webhook] Property: ${channexPropertyId}`);
-    console.log(`[webhook] Source IP: ${sourceIp}`);
-    console.log(`[webhook] Payload: ${JSON.stringify(payload).substring(0, 500)}`);
+  // Handle test/ping payloads — Channex sends these when testing webhook connectivity
+  const testEvents = ["test", "ping", "webhook_test"];
+  if (!event || testEvents.includes(event) || (!bookingId && !event)) {
+    console.log(`[webhook] Test/ping received (event=${event}), returning 200`);
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event ?? "test_ping",
+        booking_id: bookingId,
+        revision_id: revisionId,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "test_ping",
+        ack_sent: false,
+        ack_response: null,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", message: "webhook test received" });
+  }
 
-    if (!bookingId) {
-      return NextResponse.json({ status: "ok", message: "No booking_id, skipping" });
-    }
+  // Only handle booking events
+  const bookingEvents = [
+    "booking", "booking_new", "booking_modification", "booking_cancellation",
+    "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
+  ];
 
-    // Only handle booking events
-    const bookingEvents = [
-      "booking", "booking_new", "booking_modification", "booking_cancellation",
-      "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
-    ];
-    if (!bookingEvents.includes(event)) {
-      console.log(`[webhook] Event ${event} not a booking event, skipping`);
-      return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
-    }
+  if (!bookingEvents.includes(event)) {
+    console.log(`[webhook] Event "${event}" not a booking event, logging and returning 200`);
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        booking_id: bookingId,
+        revision_id: revisionId,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "skipped_non_booking",
+        ack_sent: false,
+        ack_response: null,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
+  }
 
-    if (!channexPropertyId) {
-      console.warn(`[webhook] Rejected: missing property_id`);
-      return NextResponse.json({ status: "error", message: "Missing property_id" }, { status: 400 });
-    }
+  if (!bookingId) {
+    console.log(`[webhook] Booking event without booking_id, logging and returning 200`);
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "skipped_no_booking_id",
+        ack_sent: false,
+        ack_response: null,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", message: "No booking_id, skipping" });
+  }
 
+  if (!channexPropertyId) {
+    console.warn(`[webhook] Missing property_id for booking ${bookingId}, logging and returning 200`);
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        booking_id: bookingId,
+        revision_id: revisionId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "skipped_no_property",
+        ack_sent: false,
+        ack_response: null,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", message: "Missing property_id" });
+  }
+
+  try {
     // Verify property exists in our DB
     const { data: propData } = await supabase
       .from("properties")
@@ -57,7 +112,15 @@ export async function POST(request: NextRequest) {
     const prop = ((propData ?? []) as any[])[0];
     if (!prop) {
       console.warn(`[webhook] Property ${channexPropertyId} not found in DB`);
-      return NextResponse.json({ status: "error", message: "Property not found" }, { status: 404 });
+      try {
+        await supabase.from("channex_webhook_log").insert({
+          event_type: event, booking_id: bookingId, revision_id: revisionId,
+          channex_property_id: channexPropertyId,
+          payload: rawPayload as Record<string, unknown>,
+          action_taken: "skipped_unknown_property", ack_sent: false, ack_response: null,
+        });
+      } catch { /* non-critical */ }
+      return NextResponse.json({ status: "ok", message: "Property not found" });
     }
     const propertyId: string = prop.id;
 
@@ -72,12 +135,10 @@ export async function POST(request: NextRequest) {
     // Check if this booking was created by our PMS (prevent webhook loop)
     const otaCode = ba.ota_reservation_code ?? "";
     if (otaCode.startsWith("SC-") && ba.ota_name === "Offline") {
-      // This booking was pushed from StayCommand — just ACK, don't re-process
       console.log(`[webhook] Skipping self-originated booking (ota_code=${otaCode})`);
       if (revisionId) {
         try { await channex.acknowledgeBookingRevision(revisionId); } catch { /* ignore */ }
       }
-      // Log it but skip DB changes
       try {
         await supabase.from("channex_webhook_log").insert({
           event_type: event, booking_id: bookingId, revision_id: revisionId ?? null,
@@ -199,13 +260,11 @@ export async function POST(request: NextRequest) {
         await channex.acknowledgeBookingRevision(revisionId);
         ackSent = true;
         ackResponse = "OK";
-        console.log(`[webhook] ✓ Acknowledged revision ${revisionId}`);
+        console.log(`[webhook] Acknowledged revision ${revisionId}`);
       } catch (e) {
         ackResponse = e instanceof Error ? e.message : String(e);
-        console.warn(`[webhook] ✗ Failed to acknowledge revision ${revisionId}: ${ackResponse}`);
+        console.warn(`[webhook] Failed to acknowledge revision ${revisionId}: ${ackResponse}`);
       }
-    } else {
-      console.log(`[webhook] No revision_id to acknowledge`);
     }
 
     // Log to channex_webhook_log table
@@ -218,7 +277,7 @@ export async function POST(request: NextRequest) {
         guest_name: guestName,
         check_in: ba.arrival_date,
         check_out: ba.departure_date,
-        payload: payload as unknown as Record<string, unknown>,
+        payload: rawPayload as Record<string, unknown>,
         action_taken: action,
         ack_sent: ackSent,
         ack_response: ackResponse,
@@ -243,10 +302,24 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[webhook] Error:", err);
-    return NextResponse.json(
-      { status: "error", message: err instanceof Error ? err.message : "Unknown" },
-      { status: 500 }
-    );
+    // Log the error but still return 200 to prevent Channex retries
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        booking_id: bookingId,
+        revision_id: revisionId,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "error",
+        ack_sent: false,
+        ack_response: err instanceof Error ? err.message : String(err),
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({
+      status: "ok",
+      message: "Processed with error",
+      error: err instanceof Error ? err.message : "Unknown",
+    });
   }
 }
 
