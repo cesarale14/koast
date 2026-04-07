@@ -44,7 +44,7 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - Booking sync: bidirectional (webhook instant + revision poll safety net)
 - Availability: StayCommand controls modify/cancel availability (Channex auto-adjust disabled)
 - Certification: All 14 tests passing, /channex-certification page
-- API: staging.channex.io/api/v1 (switch to app.channex.io for production)
+- API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
 
 ## 9-Signal Pricing Engine
@@ -140,3 +140,37 @@ TICKETMASTER_API_KEY
 Target: 400+ active users, $500K ARR → $3-4M acquisition at 6-8x ARR
 Pricing: Free ($0, 1 property), Pro ($79, 15 properties), Business ($149, unlimited)
 Key differentiator: 9-signal pricing + market intelligence + operations in one platform
+
+## Strategic Decision Framework
+
+### Prime Directive
+Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move StayCommand closer to being the best PMS on the market?"
+
+### Decision Criteria (in priority order)
+1. Host Time Savings — Will this reduce manual work for hosts? Quantify minutes saved per week if possible.
+2. Revenue Impact — Does this directly help hosts earn more? (pricing optimization, occupancy lift, direct bookings, reduced OTA fees)
+3. Competitive Moat — Does this create something Hospitable, Hostaway, or Guesty can't easily replicate? (9-signal engine, market intelligence, AI-powered operations)
+4. Scalability — Will this work for 1 property AND 50 properties without redesign?
+5. User Delight — Is the UX so good hosts would screenshot it and share in STR Facebook groups?
+6. Data Flywheel — Does this generate data that makes StayCommand smarter over time? (pricing outcomes, booking patterns, market trends)
+
+### Competitive Benchmarking
+Before building any major feature, answer:
+- How does Hospitable handle this? (messaging/automation leader)
+- How does Hostaway handle this? (channel management leader)
+- How does Guesty handle this? (enterprise PMS leader)
+- How does PriceLabs/Wheelhouse handle this? (pricing leader)
+- How will StayCommand do it better?
+
+### Channex Production
+- Production API: app.channex.io/api/v1 (NOT staging)
+- Whitelabel access: ACTIVE
+- All new Channex integration work should target production endpoints
+- Villa Jamaica should be migrated from staging to production
+
+### Build Philosophy
+- Ship features that are 90% polished, not 60% shipped fast
+- Every screen should look like it belongs in a $50M SaaS product
+- If a feature doesn't clearly serve the Prime Directive, defer it
+- Prefer deep integration over surface-level features (e.g., don't just show data — act on it automatically)
+- Always consider: "What would make a host switch FROM their current PMS TO StayCommand?"
