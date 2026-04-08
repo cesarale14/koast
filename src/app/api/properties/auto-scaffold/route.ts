@@ -38,13 +38,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count existing properties for naming
-    const { data: allProps } = await supabase
-      .from("properties")
-      .select("id")
-      .eq("user_id", user.id);
-    const count = (allProps ?? []).length;
-    const title = count === 0 ? "My Property" : `Property ${count + 1}`;
+    // Generate scaffold names
+    const scaffoldId = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    const title = `SC-Scaffold-${scaffoldId}`;
 
     const channex = createChannexClient();
 
@@ -118,7 +114,7 @@ export async function POST(request: NextRequest) {
       .from("properties")
       .insert({
         user_id: user.id,
-        name: title,
+        name: "Pending Setup",
         channex_property_id: channexProp.id,
       })
       .select("id")
