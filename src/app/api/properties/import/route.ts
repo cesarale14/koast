@@ -5,196 +5,293 @@ import { createChannexClient } from "@/lib/channex/client";
 
 /**
  * POST /api/properties/import
- * Imports unmapped OTA listings by creating Channex properties + room types + rate plans.
- * For listings that are already mapped to a Channex property but not in StayCommand,
- * creates the StayCommand property entry.
+ *
+ * Imports or updates a StayCommand property from a Channex property that was
+ * scaffolded via auto-scaffold and mapped via the Channex iframe.
+ *
+ * Body:
+ * {
+ *   "channex_property_id": "uuid",
+ *   "listing_id": "12345",
+ *   "custom_name": "My Beach House",  // optional
+ *   "platform": "airbnb",
+ *   "ical_url": "https://www.airbnb.com/calendar/ical/..."  // optional
+ * }
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. Auth check
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const listingIds = body.listing_ids as string[];
-    if (!Array.isArray(listingIds) || listingIds.length === 0) {
-      return NextResponse.json({ error: "Provide listing_ids array" }, { status: 400 });
+    const {
+      channex_property_id,
+      listing_id,
+      custom_name,
+      platform,
+      ical_url,
+    } = body as {
+      channex_property_id: string;
+      listing_id: string;
+      custom_name?: string;
+      platform: string;
+      ical_url?: string;
+    };
+
+    if (!channex_property_id) {
+      return NextResponse.json({ error: "Missing channex_property_id" }, { status: 400 });
+    }
+    if (!listing_id) {
+      return NextResponse.json({ error: "Missing listing_id" }, { status: 400 });
+    }
+    if (!platform) {
+      return NextResponse.json({ error: "Missing platform" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
     const channex = createChannexClient();
     const now = new Date().toISOString();
 
-    // Get all channels to find listing details
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const channelsRes = await channex.request<any>("/channels");
-    const channels = channelsRes.data ?? [];
+    // 2. Resolve property name and photo
+    let propertyName = custom_name || null;
+    let photoUrl: string | null = null;
 
-    // Build listing lookup from channel rate_plans
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const listingMap = new Map<string, any>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const ch of channels as any[]) {
-      const attrs = ch.attributes ?? {};
-      for (const rp of (attrs.rate_plans ?? [])) {
-        const lid = rp.settings?.listing_id;
-        if (lid) {
-          listingMap.set(String(lid), {
-            channelName: attrs.channel,
-            channelId: ch.id,
-            channexPropertyId: (attrs.properties ?? [])[0],
-            listingName: attrs.title ?? `${attrs.channel} Listing`,
-            listingType: rp.settings?.listing_type,
-            dailyPrice: rp.settings?.pricing_setting?.default_daily_price,
-            currency: rp.settings?.pricing_setting?.listing_currency ?? "USD",
-            ratePlanId: rp.rate_plan_id,
-          });
+    if (!propertyName && platform === "airbnb" && listing_id) {
+      // Fetch real name + photo from Airbnb listing details
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const detailsUrl = `${baseUrl}/api/airbnb/listing-details?listingId=${listing_id}`;
+
+        // Use internal fetch with auth cookie forwarding
+        const detailsRes = await fetch(detailsUrl, {
+          headers: {
+            cookie: request.headers.get("cookie") || "",
+          },
+        });
+        if (detailsRes.ok) {
+          const details = await detailsRes.json();
+          if (details.success) {
+            propertyName = details.short_name || details.name;
+            photoUrl = details.photo_url;
+          }
         }
+      } catch (err) {
+        console.warn("[properties/import] Failed to fetch Airbnb details:", err instanceof Error ? err.message : err);
       }
     }
 
-    // Check which listings are already imported
+    // Fallback name if nothing worked
+    if (!propertyName) {
+      propertyName = `Airbnb Listing ${listing_id}`;
+    }
+
+    // 3. Create or update StayCommand property
     const { data: existingProps } = await supabase
       .from("properties")
-      .select("id, name, channex_property_id")
-      .eq("user_id", user.id);
-    const existingChannexIds = new Set(
-      ((existingProps ?? []) as { channex_property_id: string | null }[])
-        .map((p) => p.channex_property_id)
-        .filter(Boolean)
-    );
+      .select("id, name, channex_property_id, cover_photo_url")
+      .eq("channex_property_id", channex_property_id)
+      .limit(1);
 
-    const results: { listing_id: string; status: string; property_name?: string; error?: string }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingProp = ((existingProps ?? []) as any[])[0];
+    let propertyId: string;
 
-    for (const listingId of listingIds) {
-      const listing = listingMap.get(String(listingId));
-      if (!listing) {
-        results.push({ listing_id: listingId, status: "not_found", error: "Listing not found in connected channels" });
-        continue;
+    if (existingProp) {
+      // UPDATE existing property (e.g. rename from "Pending Setup" to real name)
+      const updateData: Record<string, unknown> = {
+        name: propertyName,
+        updated_at: now,
+      };
+      if (photoUrl) updateData.cover_photo_url = photoUrl;
+
+      const { error: updateErr } = await supabase
+        .from("properties")
+        .update(updateData)
+        .eq("id", existingProp.id);
+
+      if (updateErr) {
+        return NextResponse.json({ error: `Update failed: ${updateErr.message}` }, { status: 500 });
+      }
+      propertyId = existingProp.id;
+      console.log(`[properties/import] Updated property ${propertyId} name="${propertyName}"`);
+    } else {
+      // INSERT new property
+      const { data: newProp, error: insertErr } = await supabase
+        .from("properties")
+        .insert({
+          user_id: user.id,
+          name: propertyName,
+          channex_property_id: channex_property_id,
+          cover_photo_url: photoUrl,
+        })
+        .select("id")
+        .single();
+
+      if (insertErr) {
+        return NextResponse.json({ error: `Insert failed: ${insertErr.message}` }, { status: 500 });
+      }
+      propertyId = newProp.id;
+      console.log(`[properties/import] Created property ${propertyId} name="${propertyName}"`);
+    }
+
+    // 4. Update Channex property title to match
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await channex.request<any>(`/properties/${channex_property_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          property: { title: propertyName },
+        }),
+      });
+      console.log(`[properties/import] Updated Channex property title to "${propertyName}"`);
+    } catch (err) {
+      console.warn("[properties/import] Failed to update Channex title:", err instanceof Error ? err.message : err);
+    }
+
+    // 5. Cache room types + rate plans from Channex
+    try {
+      const roomTypes = await channex.getRoomTypes(channex_property_id);
+      if (roomTypes.length > 0) {
+        await supabase.from("channex_room_types").upsert(
+          roomTypes.map((rt) => ({
+            id: rt.id,
+            property_id: propertyId,
+            channex_property_id: channex_property_id,
+            title: rt.attributes.title,
+            count_of_rooms: rt.attributes.count_of_rooms ?? 1,
+            occ_adults: rt.attributes.occ_adults ?? 4,
+            occ_children: rt.attributes.occ_children ?? 0,
+            cached_at: now,
+          })),
+          { onConflict: "id" }
+        );
       }
 
-      // Skip if already imported
-      if (listing.channexPropertyId && existingChannexIds.has(listing.channexPropertyId)) {
-        results.push({ listing_id: listingId, status: "already_imported", property_name: listing.listingName });
-        continue;
-      }
-
-      try {
-        // The listing is already mapped to a Channex property (from the iframe flow)
-        // We just need to create the StayCommand DB entry
-        const channexPropId = listing.channexPropertyId;
-
-        if (channexPropId) {
-          // Fetch property details from Channex
+      const ratePlans = await channex.getRatePlans(channex_property_id);
+      if (ratePlans.length > 0) {
+        await supabase.from("channex_rate_plans").upsert(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const propDetails = await channex.request<any>(`/properties/${channexPropId}`);
-          const pa = propDetails.data?.attributes ?? {};
+          ratePlans.map((rp: any) => ({
+            id: rp.id,
+            property_id: propertyId,
+            room_type_id: rp.relationships?.room_type?.data?.id ?? "",
+            title: rp.attributes.title,
+            sell_mode: rp.attributes.sell_mode ?? "per_room",
+            currency: rp.attributes.currency ?? "USD",
+            rate_mode: rp.attributes.rate_mode ?? "manual",
+            cached_at: now,
+          })),
+          { onConflict: "id" }
+        );
+      }
+    } catch (err) {
+      console.warn("[properties/import] Failed to cache room types/rate plans:", err instanceof Error ? err.message : err);
+    }
 
-          // Try to get photo from Airbnb OG image
-          let coverPhotoUrl: string | null = null;
-          if (listing.channelName === "AirBNB" && listingId) {
-            coverPhotoUrl = `https://a0.muscache.com/im/pictures/miso/Hosting-${listingId}/original/`;
-          }
+    // 6. Create property_channels record
+    try {
+      // Find the active channel for this platform
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const channelsRes = await channex.request<any>("/channels");
+      const channelMapping: Record<string, string> = {
+        airbnb: "AirBNB",
+        booking_com: "BookingCom",
+        vrbo: "VRBO",
+      };
+      const targetChannel = channelMapping[platform] || platform;
 
-          // Create property in StayCommand DB
-          const { data: newProp, error: insertErr } = await supabase
-            .from("properties")
-            .insert({
-              user_id: user.id,
-              name: listing.listingName || pa.title || "Imported Property",
-              address: pa.address || null,
-              city: pa.city || null,
-              state: pa.state || null,
-              zip: pa.zip_code || null,
-              latitude: pa.latitude ? parseFloat(pa.latitude) : null,
-              longitude: pa.longitude ? parseFloat(pa.longitude) : null,
-              channex_property_id: channexPropId,
-              property_type: listing.listingType === "house" ? "entire_home" : "entire_home",
-              cover_photo_url: coverPhotoUrl,
-            })
-            .select("id")
-            .single();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const matchingChannel = (channelsRes.data ?? []).find((ch: any) => {
+        const attrs = ch.attributes ?? {};
+        return (
+          attrs.channel === targetChannel &&
+          attrs.is_active &&
+          (attrs.properties ?? []).includes(channex_property_id)
+        );
+      });
 
-          if (insertErr) {
-            results.push({ listing_id: listingId, status: "error", error: insertErr.message });
-            continue;
-          }
-
-          // Cache room types
-          const roomTypes = await channex.getRoomTypes(channexPropId);
-          if (roomTypes.length > 0) {
-            await supabase.from("channex_room_types").upsert(
-              roomTypes.map((rt) => ({
-                id: rt.id,
-                property_id: newProp.id,
-                channex_property_id: channexPropId,
-                title: rt.attributes.title,
-                count_of_rooms: rt.attributes.count_of_rooms ?? 1,
-                occ_adults: rt.attributes.occ_adults ?? 4,
-                occ_children: rt.attributes.occ_children ?? 0,
-                cached_at: now,
-              })),
-              { onConflict: "id" }
-            );
-          }
-
-          // Cache rate plans
-          const ratePlans = await channex.getRatePlans(channexPropId);
-          if (ratePlans.length > 0) {
-            await supabase.from("channex_rate_plans").upsert(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ratePlans.map((rp: any) => ({
-                id: rp.id,
-                property_id: newProp.id,
-                room_type_id: rp.relationships?.room_type?.data?.id ?? "",
-                title: rp.attributes.title,
-                sell_mode: rp.attributes.sell_mode ?? "per_room",
-                currency: rp.attributes.currency ?? "USD",
-                rate_mode: rp.attributes.rate_mode ?? "manual",
-                cached_at: now,
-              })),
-              { onConflict: "id" }
-            );
-          }
-
-          // Cache channel connection
-          await supabase.from("property_channels").upsert({
-            property_id: newProp.id,
-            channex_channel_id: listing.channelId,
-            channel_code: listing.channelName === "AirBNB" ? "ABB" : listing.channelName === "BookingCom" ? "BDC" : listing.channelName,
-            channel_name: listing.listingName,
+      if (matchingChannel) {
+        await supabase.from("property_channels").upsert(
+          {
+            property_id: propertyId,
+            channex_channel_id: matchingChannel.id,
+            channel_code: platform === "airbnb" ? "ABB" : platform === "booking_com" ? "BDC" : platform.toUpperCase(),
+            channel_name: propertyName,
             status: "active",
             last_sync_at: now,
             updated_at: now,
-          }, { onConflict: "property_id,channex_channel_id" });
+          },
+          { onConflict: "property_id,channex_channel_id" }
+        );
+        console.log(`[properties/import] Created property_channels record for ${platform}`);
+      }
+    } catch (err) {
+      console.warn("[properties/import] Failed to create property_channels:", err instanceof Error ? err.message : err);
+    }
 
-          results.push({
-            listing_id: listingId,
-            status: "imported",
-            property_name: listing.listingName || pa.title,
+    // 7. Handle iCal feed if provided
+    let bookingCount = 0;
+    if (ical_url) {
+      try {
+        // Insert iCal feed
+        await supabase.from("ical_feeds").upsert(
+          {
+            property_id: propertyId,
+            platform,
+            feed_url: ical_url,
+            platform_listing_id: listing_id,
+            is_active: true,
+          },
+          { onConflict: "property_id,platform" }
+        );
+        console.log(`[properties/import] Saved iCal feed for ${platform}`);
+
+        // Trigger immediate sync
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : "http://localhost:3000";
+          const syncRes = await fetch(`${baseUrl}/api/properties/${propertyId}/sync-bookings`, {
+            method: "POST",
+            headers: {
+              cookie: request.headers.get("cookie") || "",
+            },
           });
-
-          existingChannexIds.add(channexPropId);
-        } else {
-          results.push({ listing_id: listingId, status: "unmapped", error: "Listing not yet mapped to a Channex property" });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            bookingCount = syncData.total ?? 0;
+            console.log(`[properties/import] Sync complete: ${bookingCount} bookings`);
+          }
+        } catch (syncErr) {
+          console.warn("[properties/import] Sync-bookings call failed:", syncErr instanceof Error ? syncErr.message : syncErr);
         }
-
-        // Small delay to avoid rate limiting
-        await new Promise((r) => setTimeout(r, 200));
       } catch (err) {
-        results.push({
-          listing_id: listingId,
-          status: "error",
-          error: err instanceof Error ? err.message : "Import failed",
-        });
+        console.warn("[properties/import] Failed to save iCal feed:", err instanceof Error ? err.message : err);
       }
     }
 
+    // If no iCal sync was done, count existing bookings
+    if (!ical_url) {
+      const { count } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", propertyId)
+        .neq("status", "cancelled");
+      bookingCount = count ?? 0;
+    }
+
+    // 8. Return result
     return NextResponse.json({
-      results,
-      total: listingIds.length,
-      imported: results.filter((r) => r.status === "imported").length,
-      already_imported: results.filter((r) => r.status === "already_imported").length,
-      errors: results.filter((r) => r.status === "error").length,
+      property: {
+        id: propertyId,
+        name: propertyName,
+        photo_url: photoUrl || existingProp?.cover_photo_url || null,
+        booking_count: bookingCount,
+      },
+      imported: true,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
