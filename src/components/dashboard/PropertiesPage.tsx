@@ -89,11 +89,11 @@ function ConnectionModal({
 
     async function init() {
       try {
-        // Step 1: Ensure user has at least one Channex property (for mapping after OAuth)
-        const scaffoldRes = await fetch("/api/properties/auto-scaffold", { method: "POST" });
+        // Step 1: Scaffold enough Channex properties for mapping (4 covers most hosts)
+        const scaffoldRes = await fetch("/api/properties/auto-scaffold?count=4", { method: "POST" });
         if (!scaffoldRes.ok) {
           const data = await scaffoldRes.json();
-          throw new Error(data.error ?? "Failed to set up property");
+          throw new Error(data.error ?? "Failed to set up properties");
         }
         const scaffold = await scaffoldRes.json();
         if (cancelled) return;
