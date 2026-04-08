@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import UnifiedInbox from "@/components/dashboard/UnifiedInbox";
 import TemplateManager from "@/components/dashboard/TemplateManager";
 import MessagesPageTabs from "@/components/dashboard/MessagesPageTabs";
+import EmptyState from "@/components/ui/EmptyState";
+import { MessageCircle } from "lucide-react";
 
 export default async function MessagesPage() {
   const supabase = createClient();
@@ -50,6 +52,23 @@ export default async function MessagesPage() {
     : { data: [] };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const templates = (templatesRes.data ?? []) as any[];
+
+  if (properties.length === 0) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Inbox</h1>
+          <p className="text-neutral-500">Unified inbox and message templates</p>
+        </div>
+        <EmptyState
+          icon={MessageCircle}
+          title="No messages yet"
+          description="Messages will appear here when guests contact you through connected channels."
+          action={{ label: "Connect a Channel", href: "/channels" }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>

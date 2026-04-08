@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import TurnoverBoard from "@/components/dashboard/TurnoverBoard";
+import EmptyState from "@/components/ui/EmptyState";
+import { SprayCan } from "lucide-react";
 
 export default async function TurnoverPage() {
   const supabase = createClient();
@@ -45,6 +47,23 @@ export default async function TurnoverPage() {
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allCleaners = (cleanerData ?? []) as any[];
+
+  if (properties.length === 0) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Turnover</h1>
+          <p className="text-sm text-neutral-500">Cleaning task management</p>
+        </div>
+        <EmptyState
+          icon={SprayCan}
+          title="No cleaning tasks"
+          description="Cleaning tasks are automatically created when new bookings arrive. Connect your calendar to get started."
+          action={{ label: "Add Property", href: "/properties" }}
+        />
+      </div>
+    );
+  }
 
   return (
     <TurnoverBoard

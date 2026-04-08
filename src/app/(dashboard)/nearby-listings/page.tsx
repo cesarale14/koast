@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import NearbyListingsClient from "./NearbyListingsClient";
+import EmptyState from "@/components/ui/EmptyState";
+import { MapPin } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,12 @@ export default async function NearbyListingsPage() {
       <div>
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Nearby Listings</h1>
         <p className="text-sm text-neutral-500 mb-8">Discover comparable properties in your market</p>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
-          <p className="text-neutral-400">Add a property first to see nearby listings.</p>
-        </div>
+        <EmptyState
+          icon={MapPin}
+          title="No location data"
+          description="Add a property address to discover nearby listings and market insights."
+          action={{ label: "Add Property", href: "/properties" }}
+        />
       </div>
     );
   }

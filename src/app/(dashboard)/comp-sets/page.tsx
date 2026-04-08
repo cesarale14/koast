@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import CompSetsClient from "./CompSetsClient";
+import EmptyState from "@/components/ui/EmptyState";
+import { GitCompare } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,12 @@ export default async function CompSetsPage() {
       <div>
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Comp Sets</h1>
         <p className="text-sm text-neutral-500 mb-8">Your competitive set analysis</p>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
-          <p className="text-neutral-400">Add a property first to build your comp set.</p>
-        </div>
+        <EmptyState
+          icon={GitCompare}
+          title="No competitive set"
+          description="Run a market analysis to build your competitive set of similar properties."
+          action={{ label: "Market Intel", href: "/market-explorer" }}
+        />
       </div>
     );
   }

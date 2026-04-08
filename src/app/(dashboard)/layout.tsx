@@ -8,8 +8,8 @@ import ReviewBadge from "@/components/ui/ReviewBadge";
 import Logo from "@/components/ui/Logo";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
-  Home, DollarSign, Cable, Star, Sparkles,
-  Globe, Map, MapPin, GitCompare, Search,
+  Home, DollarSign, Cable, Star, SprayCan,
+  Map, MapPin, GitCompare, Search,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,7 +22,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
-      { name: "Inbox", href: "/messages", icon: MessageCircle },
+      { name: "Messages", href: "/messages", icon: MessageCircle },
     ],
   },
   {
@@ -32,17 +32,16 @@ const navGroups: NavGroup[] = [
       { name: "Pricing", href: "/pricing", icon: DollarSign },
       { name: "Channels", href: "/channels", icon: Cable },
       { name: "Reviews", href: "/reviews", icon: Star, badge: true },
-      { name: "Turnover", href: "/turnover", icon: Sparkles },
+      { name: "Cleaning", href: "/turnover", icon: SprayCan },
     ],
   },
   {
     label: "GROW",
     items: [
-      { name: "Frontdesk", href: "/frontdesk", icon: Globe },
-      { name: "Market Explorer", href: "/market-explorer", icon: Map },
+      { name: "Market Intel", href: "/market-explorer", icon: Map },
       { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
       { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
-      { name: "Revenue Check", href: "/revenue-check", icon: Search, external: true },
+      { name: "Revenue Tool", href: "/revenue-check", icon: Search, external: true },
     ],
   },
 ];

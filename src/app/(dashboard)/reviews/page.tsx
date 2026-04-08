@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/Toast";
+import EmptyState from "@/components/ui/EmptyState";
+import { Star } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyData = any;
@@ -483,9 +485,12 @@ export default function ReviewsPage() {
               )}
 
               {data.pending_bookings.length === 0 && data.draft_reviews.length === 0 && data.scheduled_reviews.length === 0 && (
-                <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-12 text-center text-neutral-400 text-sm">
-                  No outgoing reviews to manage. Reviews will appear after guests check out.
-                </div>
+                <EmptyState
+                  icon={Star}
+                  title="No reviews yet"
+                  description="AI-powered reviews will be generated automatically after guest checkout."
+                  action={{ label: "View Properties", href: "/properties" }}
+                />
               )}
             </div>
           )}
@@ -494,9 +499,12 @@ export default function ReviewsPage() {
           {tab === "incoming" && data && (
             <div className="space-y-3">
               {data.incoming_reviews.length === 0 ? (
-                <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-12 text-center text-neutral-400 text-sm">
-                  No incoming reviews yet.
-                </div>
+                <EmptyState
+                  icon={Star}
+                  title="No reviews yet"
+                  description="AI-powered reviews will be generated automatically after guest checkout."
+                  action={{ label: "View Properties", href: "/properties" }}
+                />
               ) : (
                 data.incoming_reviews.map((r: AnyData) => (
                   <div key={r.id} className={`bg-neutral-0 rounded-lg border p-5 ${
