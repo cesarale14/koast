@@ -98,7 +98,6 @@ function ConnectionModal({
         const scaffold = await scaffoldRes.json();
         if (cancelled) return;
         setPropertyId(scaffold.property_id);
-        const channexPropId = scaffold.channex_property_id;
 
         // Step 2: Get property-scoped token for the iframe
         // The iframe needs a property context to show the channels/mapping page
