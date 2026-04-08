@@ -181,8 +181,9 @@ export default function ConnectChannelWizard({
         throw new Error(data.error ?? "Failed to get connection token");
       }
       const data = await res.json();
-      const channexPropertyId = selectedProperty?.channexPropertyId;
-      const url = `https://app.channex.io/auth/exchange?oauth_session_key=${data.token}&app_mode=headless&property_id=${channexPropertyId}&available_channels=${selectedChannel}`;
+      // Use the pre-built iframe_url from the API, append channel filter
+      const baseIframeUrl = data.iframe_url ?? `https://app.channex.io/auth/exchange?oauth_session_key=${data.token}&app_mode=headless&redirect_to=/channels&property_id=${data.channex_property_id ?? selectedProperty?.channexPropertyId}`;
+      const url = `${baseIframeUrl}&channels=${selectedChannel}`;
       setIframeUrl(url);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to start connection", "error");

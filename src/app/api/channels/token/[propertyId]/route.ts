@@ -3,7 +3,7 @@ import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-au
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 
-const CHANNEX_IFRAME_BASE = "https://app.channex.io/auth/exchange";
+const CHANNEX_IFRAME_BASE = "https://app.channex.io";
 
 export async function POST(
   _request: NextRequest,
@@ -40,11 +40,12 @@ export async function POST(
     const channex = createChannexClient();
     const { token } = await channex.createOneTimeToken(property.channex_property_id);
 
-    const iframeUrl = `${CHANNEX_IFRAME_BASE}?oauth_session_key=${token}&app_mode=headless`;
+    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=/channels&property_id=${property.channex_property_id}`;
 
     return NextResponse.json({
       token,
       iframe_url: iframeUrl,
+      channex_property_id: property.channex_property_id,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
