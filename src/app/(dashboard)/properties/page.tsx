@@ -48,23 +48,20 @@ export default async function PropertiesServerPage() {
   // Use service client for RLS bypass on property_channels
   const serviceClient = createServiceClient();
 
-  // Fetch all data in parallel
+  // Fetch all data in parallel (service client for consistent RLS bypass — user verified above)
   const [channelsRes, bookingsRes, upcomingRes, monthBookingsRes] = await Promise.all([
-    // Property channels (service client for RLS bypass)
     serviceClient
       .from("property_channels")
       .select("property_id, channel_code, channel_name, status")
       .in("property_id", propertyIds),
 
-    // Booking counts per property
-    supabase
+    serviceClient
       .from("bookings")
       .select("property_id")
       .in("property_id", propertyIds)
       .in("status", ["confirmed", "completed"]),
 
-    // Upcoming check-ins
-    supabase
+    serviceClient
       .from("bookings")
       .select("property_id, check_in, guest_name")
       .in("property_id", propertyIds)
@@ -73,8 +70,7 @@ export default async function PropertiesServerPage() {
       .order("check_in")
       .limit(100),
 
-    // Monthly bookings for occupancy
-    supabase
+    serviceClient
       .from("bookings")
       .select("property_id, check_in, check_out")
       .in("property_id", propertyIds)
