@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { notFound } from "next/navigation";
 import PropertyDetail from "@/components/dashboard/PropertyDetail";
 
@@ -32,13 +33,26 @@ export default async function PropertyDetailPage({
   if (propData.length === 0) notFound();
   const property = propData[0];
 
-  // Fetch related data
-  const listingsRes = await supabase
-    .from("listings")
-    .select("id, platform, platform_listing_id, listing_url, status")
-    .eq("property_id", params.id);
+  // Fetch related data — check both legacy listings table AND property_channels
+  const svc = createServiceClient();
+  const [listingsRes, channelsRes] = await Promise.all([
+    supabase.from("listings").select("id, platform, platform_listing_id, listing_url, status").eq("property_id", params.id),
+    svc.from("property_channels").select("id, channel_code, channel_name, status").eq("property_id", params.id),
+  ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listings = (listingsRes.data ?? []) as any[];
+  let listings = (listingsRes.data ?? []) as any[];
+  // If no legacy listings, build from property_channels
+  if (listings.length === 0) {
+    const channelToPlatform: Record<string, string> = { ABB: "airbnb", BDC: "booking_com", VRBO: "vrbo" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    listings = ((channelsRes.data ?? []) as any[]).map((ch) => ({
+      id: ch.id,
+      platform: channelToPlatform[ch.channel_code] ?? ch.channel_code,
+      platform_listing_id: null,
+      listing_url: null,
+      status: ch.status === "active" ? "active" : ch.status,
+    }));
+  }
 
   const bookingsRes = await supabase
     .from("bookings")
