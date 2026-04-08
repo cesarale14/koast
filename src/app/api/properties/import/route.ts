@@ -232,7 +232,67 @@ export async function POST(request: NextRequest) {
       console.warn("[properties/import] Failed to create property_channels:", err instanceof Error ? err.message : err);
     }
 
-    // 7. Handle iCal feed if provided
+    // 7. Push availability to Channex: all dates available, then block booked dates
+    // Without this, Channex defaults to availability=0 which blocks the entire calendar on OTAs
+    try {
+      const roomTypes = await channex.getRoomTypes(channex_property_id);
+      if (roomTypes.length > 0) {
+        const startStr = new Date().toISOString().split("T")[0];
+        const endAvail = new Date();
+        endAvail.setDate(endAvail.getDate() + 365);
+        const endStr = endAvail.toISOString().split("T")[0];
+
+        // Set all dates to available
+        const availValues = roomTypes.map((rt) => ({
+          property_id: channex_property_id,
+          room_type_id: rt.id,
+          date_from: startStr,
+          date_to: endStr,
+          availability: 1,
+        }));
+        await channex.updateAvailability(availValues);
+        console.log(`[properties/import] Pushed availability=1 for ${startStr} to ${endStr}`);
+
+        // Block dates with existing bookings
+        const { data: existingBookings } = await supabase
+          .from("bookings")
+          .select("check_in, check_out")
+          .eq("property_id", propertyId)
+          .in("status", ["confirmed", "completed"])
+          .gte("check_out", startStr);
+
+        if (existingBookings && existingBookings.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const blockedValues: any[] = [];
+          for (const b of existingBookings as { check_in: string; check_out: string }[]) {
+            for (const rt of roomTypes) {
+              const ci = new Date(b.check_in + "T00:00:00Z");
+              const co = new Date(b.check_out + "T00:00:00Z");
+              for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) {
+                const ds = d.toISOString().split("T")[0];
+                if (ds >= startStr) {
+                  blockedValues.push({
+                    property_id: channex_property_id,
+                    room_type_id: rt.id,
+                    date_from: ds,
+                    date_to: ds,
+                    availability: 0,
+                  });
+                }
+              }
+            }
+          }
+          if (blockedValues.length > 0) {
+            await channex.updateAvailability(blockedValues);
+            console.log(`[properties/import] Blocked ${blockedValues.length} booked date entries`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[properties/import] Failed to push availability:", err instanceof Error ? err.message : err);
+    }
+
+    // 8. Handle iCal feed if provided
     let bookingCount = 0;
     if (ical_url) {
       try {
