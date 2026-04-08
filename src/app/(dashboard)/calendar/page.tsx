@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 
 const TOTAL_DAYS = 730; // 24 months for continuous monthly scroll
@@ -47,26 +48,28 @@ export default async function CalendarPage() {
     );
   }
 
-  // Fetch bookings and rates for next 60 days (scoped to user's properties)
+  // Fetch bookings and rates (service client for consistent access — user verified above)
   const propertyIds = properties.map((p) => p.id);
-  const bookingsRes = await supabase
-    .from("bookings")
-    .select(
-      "id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes"
-    )
-    .in("property_id", propertyIds)
-    .lte("check_in", end)
-    .gte("check_out", today)
-    .in("status", ["confirmed", "completed", "pending"]);
-
-  const ratesRes = await supabase
-    .from("calendar_rates")
-    .select(
-      "property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
-    )
-    .in("property_id", propertyIds)
-    .gte("date", today)
-    .lte("date", end);
+  const svc = createServiceClient();
+  const [bookingsRes, ratesRes] = await Promise.all([
+    svc
+      .from("bookings")
+      .select(
+        "id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes"
+      )
+      .in("property_id", propertyIds)
+      .lte("check_in", end)
+      .gte("check_out", today)
+      .in("status", ["confirmed", "completed", "pending"]),
+    svc
+      .from("calendar_rates")
+      .select(
+        "property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
+      )
+      .in("property_id", propertyIds)
+      .gte("date", today)
+      .lte("date", end),
+  ]);
 
   const bookings = (bookingsRes.data ?? []) as {
     id: string;
