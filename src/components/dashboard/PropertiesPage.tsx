@@ -64,9 +64,11 @@ const TYPE_LABELS: Record<string, string> = {
 
 function ConnectionModal({
   platform,
+  hasExistingProperties,
   onClose,
 }: {
   platform: { code: string; name: string; color: string; letter: string } | null;
+  hasExistingProperties: boolean;
   onClose: (success: boolean) => void;
 }) {
   const { toast } = useToast();
@@ -89,8 +91,10 @@ function ConnectionModal({
 
     async function init() {
       try {
-        // Step 1: Ensure at least one Channex property exists
-        const scaffoldRes = await fetch("/api/properties/auto-scaffold", { method: "POST" });
+        // Step 1: Scaffold Channex property
+        // force=true when user already has properties (adding another listing)
+        const forceParam = hasExistingProperties ? "?force=true" : "";
+        const scaffoldRes = await fetch(`/api/properties/auto-scaffold${forceParam}`, { method: "POST" });
         if (!scaffoldRes.ok) {
           const data = await scaffoldRes.json();
           throw new Error(data.error ?? "Failed to set up property");
@@ -99,25 +103,17 @@ function ConnectionModal({
         if (cancelled) return;
         setPropertyId(scaffold.property_id);
 
-        // Step 2: Get property-scoped token for the iframe
-        // The iframe needs a property context to show the channels/mapping page
+        // Step 2: Get property-scoped iframe token for the NEW property
+        // This ensures the iframe mapping page shows this property's rate plan
         const tokenRes = await fetch(`/api/channels/token/${scaffold.property_id}`, { method: "POST" });
         if (!tokenRes.ok) {
-          // If property token fails, try group-level
-          const groupRes = await fetch("/api/channels/group-token", { method: "POST" });
-          if (!groupRes.ok) throw new Error("Failed to get connection token");
-          const groupData = await groupRes.json();
-          if (cancelled) return;
-          const url = `${groupData.iframe_url}&channels=${platformCode}`;
-          setIframeUrl(url);
-        } else {
-          const tokenData = await tokenRes.json();
-          if (cancelled) return;
-          // Use property-scoped iframe URL with channel filter
-          const baseUrl = tokenData.iframe_url;
-          const url = `${baseUrl}&channels=${platformCode}`;
-          setIframeUrl(url);
+          const data = await tokenRes.json();
+          throw new Error(data.error ?? "Failed to get connection token");
         }
+        const tokenData = await tokenRes.json();
+        if (cancelled) return;
+        const url = `${tokenData.iframe_url}&channels=${platformCode}`;
+        setIframeUrl(url);
         setStage("iframe");
       } catch (err) {
         if (!cancelled) {
@@ -128,7 +124,7 @@ function ConnectionModal({
 
     init();
     return () => { cancelled = true; };
-  }, [platform]);
+  }, [platform, hasExistingProperties]);
 
   // Listen for Channex iframe completion messages
   useEffect(() => {
@@ -643,7 +639,7 @@ export default function PropertiesPage({
       <div>
         <EmptyView onConnect={handleConnect} />
         {connectingPlatform && (
-          <ConnectionModal platform={connectingPlatform} onClose={handleModalClose} />
+          <ConnectionModal platform={connectingPlatform} hasExistingProperties={properties.length > 0} onClose={handleModalClose} />
         )}
       </div>
     );
@@ -735,7 +731,7 @@ export default function PropertiesPage({
 
       {/* Connection modal */}
       {connectingPlatform && (
-        <ConnectionModal platform={connectingPlatform} onClose={handleModalClose} />
+        <ConnectionModal platform={connectingPlatform} hasExistingProperties={properties.length > 0} onClose={handleModalClose} />
       )}
     </div>
   );
