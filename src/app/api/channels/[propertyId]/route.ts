@@ -5,6 +5,18 @@ import { createChannexClient } from "@/lib/channex/client";
 
 const STALE_MINUTES = 5;
 
+// Map Channex channel names to our standard codes
+function channexNameToCode(channelName: string): string {
+  const lower = (channelName ?? "").toLowerCase();
+  if (lower.includes("airbnb") || lower === "abb") return "ABB";
+  if (lower.includes("booking") || lower === "bdc") return "BDC";
+  if (lower.includes("vrbo") || lower.includes("homeaway")) return "VRBO";
+  if (lower.includes("expedia") || lower === "exp") return "EXP";
+  if (lower.includes("agoda") || lower === "ago") return "AGO";
+  if (lower.includes("trip") || lower.includes("ctrip") || lower === "ctp") return "CTP";
+  return channelName ?? "unknown";
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { propertyId: string } }
@@ -67,14 +79,15 @@ export async function GET(
         const channexChannels = Array.isArray(channexChannelsRes.data) ? channexChannelsRes.data : [];
         for (const ch of channexChannels) {
           const attrs = ch.attributes ?? {};
+          const code = channexNameToCode(attrs.channel ?? attrs.channel_code ?? "");
           await supabase.from("property_channels").upsert({
             property_id: params.propertyId,
             channex_channel_id: ch.id,
-            channel_code: attrs.channel_code ?? "unknown",
-            channel_name: attrs.title ?? "Unknown",
+            channel_code: code,
+            channel_name: attrs.title ?? attrs.channel ?? "Unknown",
             status: attrs.is_active === false ? "inactive" : "active",
             last_sync_at: now,
-            settings: attrs.settings ?? {},
+            settings: {},
             updated_at: now,
           }, { onConflict: "property_id,channex_channel_id" });
         }

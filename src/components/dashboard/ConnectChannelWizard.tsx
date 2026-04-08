@@ -192,18 +192,46 @@ export default function ConnectChannelWizard({
     }
   }, [selectedPropertyId, selectedChannel, selectedProperty, toast]);
 
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Complete connection: refresh channel data from Channex then go to step 4
+  const completeConnection = useCallback(async () => {
+    if (!selectedPropertyId) return;
+    setIsVerifying(true);
+    try {
+      const res = await fetch(`/api/channels/${selectedPropertyId}/refresh`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        const found = (data.channels ?? []).length > 0;
+        if (found) {
+          toast("Channel connected successfully!");
+        } else {
+          toast("Connection saved — channel may take a moment to activate", "error");
+        }
+      }
+    } catch {
+      // Non-critical — still proceed to step 4
+    }
+    setIsVerifying(false);
+    setStep(4);
+  }, [selectedPropertyId, toast]);
+
   // Listen for iframe messages
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
-      if (e.origin !== "https://app.channex.io") return;
-      if (e.data?.type === "channex:channel_connected" || e.data?.event === "connected") {
-        setStep(4);
-        toast("Channel connected successfully!");
+      // Accept messages from Channex domains
+      if (!e.origin.includes("channex.io")) return;
+      console.log("[channex-iframe] Message:", e.data);
+      // Auto-detect connection completion from various possible event formats
+      const d = e.data;
+      if (d?.type === "channex:channel_connected" || d?.event === "connected" ||
+          d?.type === "channel_created" || d?.action === "channel_created") {
+        completeConnection();
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [toast]);
+  }, [completeConnection]);
 
   // No properties
   if (properties.length === 0) {
@@ -483,11 +511,21 @@ export default function ConnectChannelWizard({
               Back
             </button>
             <button
-              onClick={() => { setStep(4); }}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
+              onClick={completeConnection}
+              disabled={isVerifying}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors disabled:opacity-50"
             >
-              I&apos;ve completed the setup
-              <ArrowRight size={15} />
+              {isVerifying ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Verifying connection...
+                </>
+              ) : (
+                <>
+                  I&apos;ve completed the setup
+                  <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </div>
         </div>
