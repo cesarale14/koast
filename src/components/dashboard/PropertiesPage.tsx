@@ -405,10 +405,23 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
     if (!chMap.has(ch.property_id)) chMap.set(ch.property_id, []);
     chMap.get(ch.property_id)!.push(ch);
   }
+
+  // Cleanup orphaned scaffolds on mount + when modal closes without completing
+  const cleanupScaffolds = useCallback(() => {
+    fetch("/api/properties/cleanup-scaffolds", { method: "POST" }).catch(() => {});
+  }, []);
+
+  useEffect(() => { cleanupScaffolds(); }, [cleanupScaffolds]);
+
   const closeModal = useCallback((didImport: boolean) => {
     setShowModal(false);
-    if (didImport) router.refresh();
-  }, [router]);
+    if (didImport) {
+      router.refresh();
+    } else {
+      // User cancelled — clean up any orphaned scaffold
+      cleanupScaffolds();
+    }
+  }, [router, cleanupScaffolds]);
 
   if (properties.length === 0) {
     return (
