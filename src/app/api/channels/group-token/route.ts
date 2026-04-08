@@ -1,42 +1,59 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
+import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 
 const CHANNEX_IFRAME_BASE = "https://app.channex.io";
 
 /**
- * Group-level Channex iframe token — not scoped to a single property.
- * Used for initial OTA OAuth where we want to connect the user's entire
- * Airbnb/BDC/VRBO account, not just one listing.
+ * Group-level Channex iframe token.
+ * Includes property_id of the first Channex property so the iframe
+ * channels page renders correctly (it needs a property context).
  */
 export async function POST() {
   try {
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const supabase = createServiceClient();
     const channex = createChannexClient();
 
-    // Get the user's Channex group (first group found)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const groups = await channex.request<any>("/groups");
-    const groupId = groups.data?.[0]?.id;
+    // Get user's first Channex property for iframe context
+    const { data: props } = await supabase
+      .from("properties")
+      .select("channex_property_id")
+      .eq("user_id", user.id)
+      .not("channex_property_id", "is", null)
+      .limit(1);
+    const channexPropertyId = ((props ?? []) as { channex_property_id: string }[])[0]?.channex_property_id;
 
-    // Generate group-level token (no property_id = access to all properties + channels)
-    const body: Record<string, string> = {};
-    if (groupId) body.group_id = groupId;
+    // Generate token (include property_id for iframe routing context)
+    const tokenBody: Record<string, string> = {};
+    if (channexPropertyId) tokenBody.property_id = channexPropertyId;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await channex.request<any>("/auth/one_time_token", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify(tokenBody),
     });
     const token = res.data?.token;
     if (!token) throw new Error("No token in Channex response");
 
-    // Group-level iframe URL — no property_id filter, shows all channels
-    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=/channels`;
+    // Build iframe URL — property_id gives the channels page a rendering context
+    const params = new URLSearchParams({
+      oauth_session_key: token,
+      app_mode: "headless",
+      redirect_to: "/channels",
+    });
+    if (channexPropertyId) params.set("property_id", channexPropertyId);
 
-    return NextResponse.json({ token, iframe_url: iframeUrl, group_id: groupId });
+    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?${params.toString()}`;
+
+    return NextResponse.json({
+      token,
+      iframe_url: iframeUrl,
+      channex_property_id: channexPropertyId ?? null,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[channels/group-token] Error:", msg);
