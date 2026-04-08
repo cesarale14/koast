@@ -62,7 +62,7 @@ function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy,
         <div className="h-40 bg-gradient-to-br from-brand-50 to-brand-100 rounded-t-xl flex items-center justify-center"><Home size={32} className="text-brand-300" strokeWidth={1.5} /></div>
       )}
       <div className="p-5">
-        <h3 className="text-lg font-semibold text-neutral-800 group-hover:text-brand-500 transition-colors">{p.name}</h3>
+        <h3 className="text-lg font-semibold text-neutral-800">{p.name}</h3>
         {(p.city || p.state) && <p className="text-sm text-neutral-500 mt-0.5">{[p.city, p.state].filter(Boolean).join(", ")}</p>}
         <div className="flex items-center gap-3 mt-3 text-xs text-neutral-400">
           {p.property_type && <span>{TYPE_LABELS[p.property_type] ?? p.property_type}</span>}
