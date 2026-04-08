@@ -121,6 +121,24 @@ async function syncFeedBookings(
         updatedCount++;
       }
     } else {
+      // Dedup: check if a booking already exists for same property + dates + platform
+      // (e.g. from Channex webhook) to avoid duplicates between iCal and Channex
+      const dupCheck = await db.select({ id: bookings.id })
+        .from(bookings)
+        .where(and(
+          eq(bookings.propertyId, propertyId),
+          eq(bookings.checkIn, entry.checkIn),
+          eq(bookings.checkOut, entry.checkOut),
+          eq(bookings.platform, entry.platform),
+          sql`${bookings.status} != 'cancelled'`
+        ))
+        .limit(1);
+
+      if (dupCheck.length > 0) {
+        console.log(`[iCal] Skipping duplicate: booking already exists for ${propertyId} ${entry.checkIn}-${entry.checkOut} (${entry.platform})`);
+        continue;
+      }
+
       // Insert new booking
       await db.insert(bookings).values({
         propertyId,
@@ -149,8 +167,13 @@ async function syncFeedBookings(
     }
   }
 
-  // Cancel bookings no longer in feed (only for this platform)
-  const existingBookings = await db.select({ id: bookings.id, platformBookingId: bookings.platformBookingId })
+  // Cancel bookings no longer in feed (only iCal-originated bookings for this platform)
+  // Skip bookings with channex_booking_id — those are managed by Channex, not iCal
+  const existingBookings = await db.select({
+    id: bookings.id,
+    platformBookingId: bookings.platformBookingId,
+    channexBookingId: bookings.channexBookingId,
+  })
     .from(bookings)
     .where(and(
       eq(bookings.propertyId, propertyId),
@@ -159,7 +182,8 @@ async function syncFeedBookings(
     ));
 
   for (const b of existingBookings) {
-    if (b.platformBookingId && !feedUids.has(b.platformBookingId)) {
+    // Only cancel iCal-originated bookings (no channex_booking_id) that disappeared from the feed
+    if (b.platformBookingId && !feedUids.has(b.platformBookingId) && !b.channexBookingId) {
       await db.update(bookings)
         .set({ status: "cancelled" })
         .where(eq(bookings.id, b.id));

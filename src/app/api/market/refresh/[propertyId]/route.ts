@@ -1,19 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncMarketData, getApiUsage } from "@/lib/airroi/market-sync";
 import { buildCompSet, storeCompSet } from "@/lib/airroi/compsets";
-import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { getAuthenticatedUser, verifyPropertyOwnership, verifyServiceKey } from "@/lib/auth/api-auth";
 
 export async function POST(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: { propertyId: string } }
 ) {
   try {
-    const { user } = await getAuthenticatedUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
-    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Allow VPS workers with service key to bypass session auth
+    if (verifyServiceKey(request)) {
+      // Service key valid — skip user auth, proceed with propertyId from params
+    } else {
+      const { user } = await getAuthenticatedUser();
+      if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+      if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const supabase = createServiceClient();
     const propertyId = params.propertyId;

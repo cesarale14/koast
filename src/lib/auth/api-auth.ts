@@ -1,5 +1,16 @@
+import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+
+/**
+ * Check for service API key in x-service-key header.
+ * Used by VPS workers that can't authenticate via Supabase session.
+ */
+export function verifyServiceKey(request: NextRequest): boolean {
+  const key = request.headers.get("x-service-key");
+  const expected = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return !!key && !!expected && key === expected;
+}
 
 export async function getAuthenticatedUser() {
   const supabase = createClient();
