@@ -40,12 +40,27 @@ export async function POST(
     const channex = createChannexClient();
     const { token } = await channex.createOneTimeToken(property.channex_property_id);
 
-    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=/channels&property_id=${property.channex_property_id}`;
+    // Try to find the active Airbnb channel ID for deep-linking to mapping
+    let channelId: string | null = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const channelsRes = await channex.request<any>("/channels");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const airbnbChannel = (channelsRes.data ?? []).find((ch: any) =>
+        ch.attributes?.channel === "AirBNB" && ch.attributes?.is_active
+      );
+      if (airbnbChannel) channelId = airbnbChannel.id;
+    } catch { /* fallback to /channels */ }
+
+    // Build iframe URL — try to deep-link to the channel's mapping page
+    const redirectTo = channelId ? `/channels/${channelId}` : "/channels";
+    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=${encodeURIComponent(redirectTo)}&property_id=${property.channex_property_id}`;
 
     return NextResponse.json({
       token,
       iframe_url: iframeUrl,
       channex_property_id: property.channex_property_id,
+      channel_id: channelId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
