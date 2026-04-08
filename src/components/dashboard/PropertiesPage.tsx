@@ -107,6 +107,7 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [scaffoldPropId, setScaffoldPropId] = useState<string | null>(null);
+  const [scaffoldChannexId, setScaffoldChannexId] = useState<string | null>(null);
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [mappedListingId, setMappedListingId] = useState<string | null>(null);
   const [listingName, setListingName] = useState("");
@@ -127,8 +128,9 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  const applyScaffold = useCallback((r: { propertyId: string; iframeUrl: string }) => {
+  const applyScaffold = useCallback((r: { propertyId: string; channexId: string; iframeUrl: string }) => {
     setScaffoldPropId(r.propertyId);
+    setScaffoldChannexId(r.channexId);
     setIframeUrl(r.iframeUrl);
   }, []);
 
@@ -197,33 +199,42 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
 
   // Step 4 -> 5: import property
   const handleImport = useCallback(async () => {
-    if (!mappedListingId) return;
+    if (!scaffoldChannexId || !mappedListingId) {
+      toast("Missing property or listing data", "error");
+      return;
+    }
     setImporting(true);
     try {
+      const platformName = platform?.code === "ABB" ? "airbnb" : platform?.code === "BDC" ? "booking_com" : "vrbo";
       const res = await fetch("/api/properties/import", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listing_ids: [mappedListingId] }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channex_property_id: scaffoldChannexId,
+          listing_id: mappedListingId,
+          custom_name: editedName.trim() || undefined,
+          platform: platformName,
+          ical_url: icalUrl.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
-      if ((data.imported ?? 0) > 0) {
-        if (icalUrl.trim()) {
-          try {
-            const ir = data.results?.find((r: { status: string }) => r.status === "imported");
-            if (ir) await fetch("/api/ical/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ property_id: ir.listing_id, url: icalUrl.trim(), platform: platform?.code === "ABB" ? "airbnb" : platform?.code === "BDC" ? "booking_com" : "vrbo" }) });
-          } catch { /* best-effort */ }
-        }
-        didImport.current = true; setImportedCount(data.imported);
-        toast("Property imported successfully!"); setStep(5);
-      } else throw new Error("No properties imported. The listing may already exist.");
+      if (data.imported) {
+        didImport.current = true;
+        setImportedCount(data.property?.booking_count ?? 0);
+        toast("Property imported successfully!");
+        setStep(5);
+      } else {
+        throw new Error("Import did not complete. The listing may already exist.");
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Import failed", "error");
     } finally { setImporting(false); }
-  }, [mappedListingId, icalUrl, platform, toast]);
+  }, [scaffoldChannexId, mappedListingId, editedName, icalUrl, platform, toast]);
 
   // Reset for "Add Another" -> back to Step 3 with fresh scaffold
   const handleAddAnother = useCallback(() => {
-    setScaffoldPropId(null); setIframeUrl(null); setMappedListingId(null);
+    setScaffoldPropId(null); setScaffoldChannexId(null); setIframeUrl(null); setMappedListingId(null);
     setListingName(""); setListingPhoto(null); setEditedName(""); setIcalUrl("");
     setImporting(false); setImportedCount(0); setError(null);
     if (!platform) { setStep(1); return; }
