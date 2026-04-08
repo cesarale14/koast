@@ -8,7 +8,7 @@ import ReviewBadge from "@/components/ui/ReviewBadge";
 import Logo from "@/components/ui/Logo";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
-  Home, DollarSign, Cable, Star, SprayCan,
+  Home, DollarSign, Star, SprayCan,
   Map, MapPin, GitCompare, Search,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
@@ -30,7 +30,6 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Properties", href: "/properties", icon: Home },
       { name: "Pricing", href: "/pricing", icon: DollarSign },
-      { name: "Channels", href: "/channels", icon: Cable },
       { name: "Reviews", href: "/reviews", icon: Star, badge: true },
       { name: "Cleaning", href: "/turnover", icon: SprayCan },
     ],
