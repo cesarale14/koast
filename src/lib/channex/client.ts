@@ -154,8 +154,11 @@ class ChannexClient {
       body: JSON.stringify({
         rate_plan: {
           ...data,
+          // NOTE: Do NOT set a default rate here. The rate will come from the OTA
+          // listing when the channel is mapped. Setting a rate here would override
+          // the Airbnb/OTA price with the scaffold default.
           options: data.options ?? [
-            { occupancy: data.sell_mode === "per_room" ? 1 : 1, is_primary: true, rate: 10000 },
+            { occupancy: 1, is_primary: true },
           ],
         },
       }),
