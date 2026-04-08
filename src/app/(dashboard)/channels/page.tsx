@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import ChannelsOverview from "@/components/dashboard/ChannelsOverview";
 
 export default async function ChannelsPage() {
@@ -6,7 +7,7 @@ export default async function ChannelsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Fetch user's properties with channex info
+  // Fetch user's properties with channex info (uses auth client for user scoping)
   const { data: propertiesData } = await supabase
     .from("properties")
     .select("id, name, channex_property_id")
@@ -14,18 +15,21 @@ export default async function ChannelsPage() {
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties = (propertiesData ?? []) as any[];
-  const propertyIds = properties.map((p) => p.id);
+  const propertyIds = properties.map((p: { id: string }) => p.id);
+
+  // Use service client for channel tables (RLS has no policies for these new tables)
+  const svc = createServiceClient();
 
   // Fetch channels, room types, rate plans, and booking counts in parallel
   const [channelsRes, roomTypesRes, ratePlansRes, bookingsRes] = await Promise.all([
     propertyIds.length > 0
-      ? supabase.from("property_channels").select("*").in("property_id", propertyIds).order("channel_name")
+      ? svc.from("property_channels").select("*").in("property_id", propertyIds).order("channel_name")
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from("channex_room_types").select("*").in("property_id", propertyIds).order("title")
+      ? svc.from("channex_room_types").select("*").in("property_id", propertyIds).order("title")
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from("channex_rate_plans").select("*").in("property_id", propertyIds).order("title")
+      ? svc.from("channex_rate_plans").select("*").in("property_id", propertyIds).order("title")
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
       ? supabase.from("bookings").select("property_id, platform").in("property_id", propertyIds).eq("status", "confirmed")
