@@ -70,12 +70,13 @@ function ConnectionModal({
   onClose: (success: boolean) => void;
 }) {
   const { toast } = useToast();
-  const [stage, setStage] = useState<"scaffolding" | "iframe" | "verifying">("scaffolding");
+  const [stage, setStage] = useState<"scaffolding" | "iframe" | "verifying" | "importing">("scaffolding");
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [propertyId, setPropertyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ synced: number; channels: number } | null>(null);
 
-  // Scaffold and get iframe token on mount
+  // Get group-level iframe token on mount (not scoped to a single property)
   useEffect(() => {
     if (!platform) return;
     const platformCode = platform.code;
@@ -83,7 +84,7 @@ function ConnectionModal({
 
     async function init() {
       try {
-        // Step 1: Auto-scaffold (creates Channex property if needed)
+        // Step 1: Ensure user has at least one Channex property (for mapping after OAuth)
         const scaffoldRes = await fetch("/api/properties/auto-scaffold", { method: "POST" });
         if (!scaffoldRes.ok) {
           const data = await scaffoldRes.json();
@@ -93,8 +94,8 @@ function ConnectionModal({
         if (cancelled) return;
         setPropertyId(scaffold.property_id);
 
-        // Step 2: Get iframe token
-        const tokenRes = await fetch(`/api/channels/token/${scaffold.property_id}`, { method: "POST" });
+        // Step 2: Get GROUP-LEVEL token (connects entire OTA account, not one property)
+        const tokenRes = await fetch("/api/channels/group-token", { method: "POST" });
         if (!tokenRes.ok) {
           const data = await tokenRes.json();
           throw new Error(data.error ?? "Failed to get connection token");
@@ -102,7 +103,7 @@ function ConnectionModal({
         const tokenData = await tokenRes.json();
         if (cancelled) return;
 
-        // Append channel filter to iframe URL
+        // Channel filter shows only the selected OTA
         const url = `${tokenData.iframe_url}&channels=${platformCode}`;
         setIframeUrl(url);
         setStage("iframe");
@@ -140,9 +141,13 @@ function ConnectionModal({
     if (!propertyId) return;
     setStage("verifying");
     try {
-      await fetch(`/api/channels/${propertyId}/refresh`, { method: "POST" });
+      const res = await fetch(`/api/channels/${propertyId}/refresh`, { method: "POST" });
+      const data = res.ok ? await res.json() : null;
+      const channelCount = (data?.channels ?? []).length;
+      const synced = (data?.room_types ?? []).length + (data?.rate_plans ?? []).length;
+      setImportResult({ synced, channels: channelCount });
+      setStage("importing");
       toast(`${platform?.name ?? "Channel"} connected successfully!`);
-      onClose(true);
     } catch {
       toast("Connection saved. Channel may take a moment to activate.", "error");
       onClose(true);
@@ -214,6 +219,33 @@ function ConnectionModal({
                 <Loader2 size={32} className="animate-spin text-emerald-500 mx-auto mb-3" />
                 <p className="text-sm font-medium text-neutral-600">Verifying connection...</p>
                 <p className="text-xs text-neutral-400 mt-1">Syncing channel data</p>
+              </div>
+            </div>
+          ) : stage === "importing" ? (
+            <div className="flex items-center justify-center h-full p-8">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-neutral-800 mb-2">
+                  {platform?.name} connected!
+                </h3>
+                <p className="text-sm text-neutral-500 mb-6">
+                  {importResult?.channels
+                    ? `${importResult.channels} channel${importResult.channels !== 1 ? "s" : ""} synced with ${importResult.synced} room types and rate plans.`
+                    : "Your account is now connected. Listings will sync automatically."}
+                </p>
+                <p className="text-xs text-neutral-400 mb-6">
+                  Your properties and bookings from {platform?.name} will now sync automatically to StayCommand.
+                </p>
+                <button
+                  onClick={() => onClose(true)}
+                  className="px-6 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"
+                >
+                  View Properties
+                </button>
               </div>
             </div>
           ) : iframeUrl ? (
