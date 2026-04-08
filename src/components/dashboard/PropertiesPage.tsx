@@ -81,7 +81,7 @@ function ConnectionModal({
   const [selectedListings, setSelectedListings] = useState<Set<string>>(new Set());
   const [importProgress, setImportProgress] = useState<{ listing_id: string; status: string; name?: string }[]>([]);
 
-  // Get group-level iframe token on mount (not scoped to a single property)
+  // On mount: scaffold one Channex property and open iframe for that property
   useEffect(() => {
     if (!platform) return;
     const platformCode = platform.code;
@@ -89,28 +89,36 @@ function ConnectionModal({
 
     async function init() {
       try {
-        // Step 1: Scaffold enough Channex properties for mapping (4 covers most hosts)
-        const scaffoldRes = await fetch("/api/properties/auto-scaffold?count=4", { method: "POST" });
+        // Step 1: Ensure at least one Channex property exists
+        const scaffoldRes = await fetch("/api/properties/auto-scaffold", { method: "POST" });
         if (!scaffoldRes.ok) {
           const data = await scaffoldRes.json();
-          throw new Error(data.error ?? "Failed to set up properties");
+          throw new Error(data.error ?? "Failed to set up property");
         }
         const scaffold = await scaffoldRes.json();
         if (cancelled) return;
         setPropertyId(scaffold.property_id);
+        const channexPropId = scaffold.channex_property_id;
 
-        // Step 2: Get GROUP-LEVEL token (connects entire OTA account, not one property)
-        const tokenRes = await fetch("/api/channels/group-token", { method: "POST" });
+        // Step 2: Get property-scoped token for the iframe
+        // The iframe needs a property context to show the channels/mapping page
+        const tokenRes = await fetch(`/api/channels/token/${scaffold.property_id}`, { method: "POST" });
         if (!tokenRes.ok) {
-          const data = await tokenRes.json();
-          throw new Error(data.error ?? "Failed to get connection token");
+          // If property token fails, try group-level
+          const groupRes = await fetch("/api/channels/group-token", { method: "POST" });
+          if (!groupRes.ok) throw new Error("Failed to get connection token");
+          const groupData = await groupRes.json();
+          if (cancelled) return;
+          const url = `${groupData.iframe_url}&channels=${platformCode}`;
+          setIframeUrl(url);
+        } else {
+          const tokenData = await tokenRes.json();
+          if (cancelled) return;
+          // Use property-scoped iframe URL with channel filter
+          const baseUrl = tokenData.iframe_url;
+          const url = `${baseUrl}&channels=${platformCode}`;
+          setIframeUrl(url);
         }
-        const tokenData = await tokenRes.json();
-        if (cancelled) return;
-
-        // Channel filter shows only the selected OTA
-        const url = `${tokenData.iframe_url}&channels=${platformCode}`;
-        setIframeUrl(url);
         setStage("iframe");
       } catch (err) {
         if (!cancelled) {

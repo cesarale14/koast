@@ -20,7 +20,9 @@ The Channex iframe mapping UI can show all 4 Airbnb listings because it uses an 
 ## What IS Available
 - Channel's `rate_plans[]` array contains mapped listings (listing_id, listing_type, daily_price)
 - Channel's `settings.tokens` contains the Airbnb access_token and user_id
-- Channel's `settings.mappingSettings.rooms` — empty object (no data)
+- Channel's `settings.mappingSettings.rooms` — can be written to via PUT but doesn't create actual mappings
+- `PUT /channels/{id}` with `{ channel: { properties: [...] } }` — can add/remove properties from a channel (200 OK)
+- Programmatic mapping via `mappingSettings.rooms` does NOT work — it sets the data but the actual OTA-to-room-type mapping only happens through the iframe
 
 ## Workaround Implemented
 
