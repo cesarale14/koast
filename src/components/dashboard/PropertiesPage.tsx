@@ -70,11 +70,16 @@ function ConnectionModal({
   onClose: (success: boolean) => void;
 }) {
   const { toast } = useToast();
-  const [stage, setStage] = useState<"scaffolding" | "iframe" | "verifying" | "importing">("scaffolding");
+  const [stage, setStage] = useState<"scaffolding" | "iframe" | "verifying" | "listings" | "importing_listings" | "done">("scaffolding");
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [propertyId, setPropertyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{ synced: number; channels: number } | null>(null);
+
+  // Listing import state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [listings, setListings] = useState<any[]>([]);
+  const [selectedListings, setSelectedListings] = useState<Set<string>>(new Set());
+  const [importProgress, setImportProgress] = useState<{ listing_id: string; status: string; name?: string }[]>([]);
 
   // Get group-level iframe token on mount (not scoped to a single property)
   useEffect(() => {
@@ -141,18 +146,56 @@ function ConnectionModal({
     if (!propertyId) return;
     setStage("verifying");
     try {
-      const res = await fetch(`/api/channels/${propertyId}/refresh`, { method: "POST" });
-      const data = res.ok ? await res.json() : null;
-      const channelCount = (data?.channels ?? []).length;
-      const synced = (data?.room_types ?? []).length + (data?.rate_plans ?? []).length;
-      setImportResult({ synced, channels: channelCount });
-      setStage("importing");
-      toast(`${platform?.name ?? "Channel"} connected successfully!`);
+      // Refresh channel data first
+      await fetch(`/api/channels/${propertyId}/refresh`, { method: "POST" });
+
+      // Fetch all listings from connected channels
+      const listingsRes = await fetch("/api/channels/listings");
+      if (listingsRes.ok) {
+        const data = await listingsRes.json();
+        const allListings = data.listings ?? [];
+        setListings(allListings);
+        // Auto-select unimported listings
+        const unimported = allListings.filter((l: { imported: boolean }) => !l.imported);
+        setSelectedListings(new Set(unimported.map((l: { listing_id: string }) => String(l.listing_id))));
+
+        if (allListings.length > 0) {
+          setStage("listings");
+          return;
+        }
+      }
+      // No listings found — just finish
+      toast(`${platform?.name ?? "Channel"} connected!`);
+      onClose(true);
     } catch {
       toast("Connection saved. Channel may take a moment to activate.", "error");
       onClose(true);
     }
   }, [propertyId, platform, toast, onClose]);
+
+  const handleImportSelected = useCallback(async () => {
+    const toImport = Array.from(selectedListings);
+    if (toImport.length === 0) {
+      onClose(true);
+      return;
+    }
+    setStage("importing_listings");
+    setImportProgress([]);
+    try {
+      const res = await fetch("/api/properties/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listing_ids: toImport }),
+      });
+      const data = await res.json();
+      setImportProgress(data.results ?? []);
+      toast(`${data.imported ?? 0} propert${(data.imported ?? 0) === 1 ? "y" : "ies"} imported!`);
+      setStage("done");
+    } catch {
+      toast("Some imports may have failed", "error");
+      setStage("done");
+    }
+  }, [selectedListings, toast, onClose]);
 
   if (!platform) return null;
 
@@ -221,7 +264,94 @@ function ConnectionModal({
                 <p className="text-xs text-neutral-400 mt-1">Syncing channel data</p>
               </div>
             </div>
-          ) : stage === "importing" ? (
+          ) : stage === "listings" ? (
+            <div className="p-6 overflow-y-auto" style={{ maxHeight: 550 }}>
+              <h3 className="text-lg font-bold text-neutral-800 mb-1">Import your listings</h3>
+              <p className="text-sm text-neutral-500 mb-4">
+                Select which {platform?.name} listings to add to StayCommand
+              </p>
+              <div className="space-y-2 mb-6">
+                {listings.map((l) => (
+                  <label
+                    key={l.listing_id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      l.imported
+                        ? "border-emerald-200 bg-emerald-50 cursor-default"
+                        : selectedListings.has(String(l.listing_id))
+                          ? "border-brand-300 bg-brand-50 cursor-pointer"
+                          : "border-[var(--border)] bg-neutral-0 hover:bg-neutral-50 cursor-pointer"
+                    }`}
+                  >
+                    {l.imported ? (
+                      <div className="w-5 h-5 rounded bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={selectedListings.has(String(l.listing_id))}
+                        onChange={(e) => {
+                          const next = new Set(selectedListings);
+                          if (e.target.checked) next.add(String(l.listing_id));
+                          else next.delete(String(l.listing_id));
+                          setSelectedListings(next);
+                        }}
+                        className="w-5 h-5 rounded border-neutral-300 text-brand-500 focus:ring-brand-500 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-neutral-800 truncate">{l.listing_name}</p>
+                      <p className="text-xs text-neutral-400">
+                        {l.listing_type ?? "Listing"} &middot; ID: {String(l.listing_id).slice(-6)}
+                        {l.daily_price ? ` · $${l.daily_price}/night` : ""}
+                      </p>
+                    </div>
+                    {l.imported ? (
+                      <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                        Imported
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                        Ready
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : stage === "importing_listings" ? (
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-neutral-800 mb-4">Importing properties...</h3>
+              <div className="space-y-2">
+                {importProgress.map((p) => (
+                  <div key={p.listing_id} className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50">
+                    {p.status === "imported" ? (
+                      <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : p.status === "error" ? (
+                      <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                        <X size={12} className="text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-neutral-300 flex-shrink-0" />
+                    )}
+                    <span className="text-sm text-neutral-700">{p.name ?? p.listing_id}</span>
+                    <span className="text-xs text-neutral-400 ml-auto">{p.status}</span>
+                  </div>
+                ))}
+                {importProgress.length === 0 && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={24} className="animate-spin text-brand-500" />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : stage === "done" ? (
             <div className="flex items-center justify-center h-full p-8">
               <div className="text-center max-w-sm">
                 <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -233,12 +363,9 @@ function ConnectionModal({
                   {platform?.name} connected!
                 </h3>
                 <p className="text-sm text-neutral-500 mb-6">
-                  {importResult?.channels
-                    ? `${importResult.channels} channel${importResult.channels !== 1 ? "s" : ""} synced with ${importResult.synced} room types and rate plans.`
-                    : "Your account is now connected. Listings will sync automatically."}
-                </p>
-                <p className="text-xs text-neutral-400 mb-6">
-                  Your properties and bookings from {platform?.name} will now sync automatically to StayCommand.
+                  {importProgress.filter((p) => p.status === "imported").length > 0
+                    ? `${importProgress.filter((p) => p.status === "imported").length} propert${importProgress.filter((p) => p.status === "imported").length === 1 ? "y" : "ies"} imported. Bookings will sync automatically.`
+                    : "Your account is connected. Bookings will sync automatically."}
                 </p>
                 <button
                   onClick={() => onClose(true)}
@@ -259,7 +386,7 @@ function ConnectionModal({
           ) : null}
         </div>
 
-        {/* Footer (only during iframe stage) */}
+        {/* Footer */}
         {stage === "iframe" && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border)] bg-neutral-50">
             <p className="text-xs text-neutral-500">
@@ -271,6 +398,23 @@ function ConnectionModal({
             >
               I&apos;ve completed the setup
               <ExternalLink size={14} />
+            </button>
+          </div>
+        )}
+        {stage === "listings" && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border)] bg-neutral-50">
+            <button
+              onClick={() => onClose(true)}
+              className="text-sm font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
+            >
+              Skip for now
+            </button>
+            <button
+              onClick={handleImportSelected}
+              disabled={selectedListings.size === 0}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
+            >
+              Import {selectedListings.size} listing{selectedListings.size !== 1 ? "s" : ""}
             </button>
           </div>
         )}
