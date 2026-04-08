@@ -35,17 +35,17 @@ StayCommand is a unified STR (short-term rental) operating system with AI-powere
 ## Database (20+ tables)
 properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, weather_cache, channex_webhook_log, channex_sync_state, user_preferences
 
-## Channex Integration (PRODUCTION CERTIFIED)
-- Villa Jamaica Channex ID: 4d52bb8c-5bee-479a-81ae-2d0a9cb02785 (PRODUCTION)
-- Room Types: Entire Home - Standard + Entire Home - Premium
-- 4 Rate Plans: BAR + B&B per room type
+## Channex Integration (PRODUCTION)
+- Current state: FRESH START — 0 properties in StayCommand, 4 properties in Channex (can't be deleted while mapped to Airbnb channel)
+- Airbnb channel ID: fa3398a3-e7a4-4ff6-b770-1663d8affd45 (active, OAuth connected, 4 listings mapped)
+- Channex properties exist but StayCommand DB is clean — re-import will reconnect them
 - Webhook: POST /api/webhooks/channex (booking events)
 - Revision polling: booking_sync.py every 15 min via systemd
 - Booking sync: bidirectional (webhook instant + revision poll safety net)
-- Availability: StayCommand controls modify/cancel availability (Channex auto-adjust disabled)
-- Certification: All 14 tests passing, /channex-certification page
+- Availability: StayCommand controls availability. On import, pushes avail=1 for 365 days then blocks booked dates
 - API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
+- IMPORTANT: Scaffold rate plans must NOT have a default rate — Airbnb manages its own pricing.
 
 ## 9-Signal Pricing Engine
 Weights (sum = 1.0):
@@ -126,9 +126,8 @@ Bottom: Settings, User avatar
 6. Build intelligent map with layers
 
 ## Properties in Database
-- Villa Jamaica: 4BR/2BA, Tampa, Airbnb listing 1240054136658113220, Channex connected
-- 123casa: Tampa property with iCal
-- test vacation rental: Test property with iCal
+- FRESH START: 0 properties (full reset for onboarding flow test)
+- 4 Airbnb listings available via Channex OAuth: Villa Jamaica, Cozy Loft, Modern House, Pool Home
 
 ## External API Keys (in .env.local + Vercel)
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
