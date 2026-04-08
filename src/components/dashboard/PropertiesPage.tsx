@@ -314,9 +314,10 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
               <div className="bg-neutral-50 rounded-xl p-4 mb-6 space-y-2">
                 <p className="text-sm text-neutral-700 font-medium">Follow these steps in the panel below:</p>
                 <ol className="text-sm text-neutral-600 space-y-1.5 list-decimal list-inside">
-                  <li>Click &quot;Not mapped&quot; next to the listing you want to add</li>
-                  <li>Select &quot;Entire Home&quot; then &quot;Best Available Rate&quot;</li>
-                  <li>Click Save</li>
+                  <li>Click the <span className="font-semibold">Mapping</span> tab at the top</li>
+                  <li>Find the listing you want to add and click <span className="font-semibold">&quot;Not mapped&quot;</span></li>
+                  <li>Select <span className="font-semibold">&quot;Entire Home&quot;</span> then <span className="font-semibold">&quot;Best Available Rate&quot;</span></li>
+                  <li>Click <span className="font-semibold">Save</span></li>
                 </ol>
               </div>
               {iframeUrl && (<>

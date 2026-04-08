@@ -52,8 +52,8 @@ export async function POST(
       if (airbnbChannel) channelId = airbnbChannel.id;
     } catch { /* fallback to /channels */ }
 
-    // Build iframe URL — try to deep-link to the channel's mapping page
-    const redirectTo = channelId ? `/channels/${channelId}` : "/channels";
+    // Build iframe URL — deep-link to the channel edit view (contains Mapping tab)
+    const redirectTo = channelId ? `/channels/${channelId}/edit` : "/channels";
     const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=${encodeURIComponent(redirectTo)}&property_id=${property.channex_property_id}`;
 
     return NextResponse.json({
