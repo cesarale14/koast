@@ -53,14 +53,14 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
       className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 ${
-        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-white hover:bg-sidebar-hover"
+        isActive ? "bg-emerald-50 text-emerald-700" : "text-gray-400 hover:text-gray-700 hover:bg-gray-50"
       }`}>
-      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-emerald-500" />}
+      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r bg-emerald-500" />}
       <Icon size={20} strokeWidth={1.5} />
-      {item.dot && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#1e293b]" />}
+      {item.dot && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />}
       {showTip && (
         <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
-          style={{ backgroundColor: "#334155", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+          style={{ backgroundColor: "#1f2937", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
           {item.name}
         </span>
       )}
@@ -75,13 +75,13 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
   return (
     <Link href={item.href} onClick={onClick} {...linkProps}
       className={`relative flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-md transition-all duration-150 ${
-        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-white hover:bg-sidebar-hover"
+        isActive ? "bg-emerald-50 text-emerald-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
       }`}>
-      {isActive && <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-emerald-500" />}
-      <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
+      {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r bg-emerald-500" />}
+      <Icon size={18} strokeWidth={1.5} className={`flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-400"}`} />
       <span className="truncate">{item.name}</span>
       {item.dot && <span className="w-2 h-2 rounded-full bg-emerald-500 ml-auto flex-shrink-0" />}
-      {item.external && <span className="text-sidebar-text/40 text-[10px] ml-auto">↗</span>}
+      {item.external && <span className="text-gray-300 text-[10px] ml-auto">↗</span>}
     </Link>
   );
 }
@@ -91,20 +91,20 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
   return (
     <>
     <aside
-      className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out border-r"
-      style={{ background: "var(--sidebar-bg)", width: expanded ? 240 : 60, borderColor: "rgba(148,163,184,0.15)" }}
+      className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 bg-white border-r border-gray-200 transition-[width] duration-200 ease-out"
+      style={{ width: expanded ? 240 : 60 }}
     >
       {expanded ? (
         /* ---- EXPANDED ---- */
         <>
-          <div className="px-4 h-14 flex items-center">
-            <Logo variant="full" size={28} className="[&_span]:!text-white [&_span]:!font-semibold" />
+          <div className="px-4 h-14 flex items-center border-b border-gray-100">
+            <Logo variant="full" size={28} className="[&_span]:!text-gray-900 [&_span]:!font-semibold" />
           </div>
-          <nav className="flex-1 px-3 overflow-y-auto mt-1">
+          <nav className="flex-1 px-3 overflow-y-auto mt-3">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-sidebar-border" : ""}>
+              <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-gray-100" : ""}>
                 {group.label && (
-                  <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#64748b" }}>{group.label}</p>
+                  <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-gray-400">{group.label}</p>
                 )}
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
@@ -115,11 +115,11 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
               </div>
             ))}
           </nav>
-          <div className="px-4 py-3 border-t border-sidebar-border">
+          <div className="px-4 py-3 border-t border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-sm font-semibold text-emerald-400">C</div>
-              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">Cesar</p></div>
-              <Link href="/settings" className="text-sidebar-text hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
+              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700">C</div>
+              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">Cesar</p></div>
+              <Link href="/settings" className="text-gray-400 hover:text-gray-600 transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
             </div>
           </div>
         </>
@@ -131,7 +131,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
           </Link>
           <nav className="flex-1 flex flex-col items-center gap-1 overflow-y-auto">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-sidebar-border w-8" : ""}>
+              <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-gray-100 w-8" : ""}>
                 <div className="flex flex-col items-center gap-1">
                   {group.items.map((item) => {
                     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -141,8 +141,8 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
               </div>
             ))}
           </nav>
-          <div className="mt-3 pt-3 border-t border-sidebar-border w-8 flex flex-col items-center">
-            <Link href="/settings" className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-xs font-semibold text-emerald-400 hover:bg-emerald-600/30 transition-colors">C</Link>
+          <div className="mt-3 pt-3 border-t border-gray-100 w-8 flex flex-col items-center">
+            <Link href="/settings" className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-semibold text-emerald-700 hover:bg-emerald-200 transition-colors">C</Link>
           </div>
         </div>
       )}
@@ -150,16 +150,16 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
     {/* Toggle pill — centered on sidebar right edge */}
     <button
       onClick={onToggle}
-      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 hover:border-slate-500 transition-all duration-200 ease-out"
+      className="hidden md:flex fixed z-40 items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all duration-200 ease-out"
       style={{
-        left: (expanded ? 240 : 60) - 14,
-        top: 18,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+        left: (expanded ? 240 : 60) - 12,
+        top: 20,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)",
         transitionProperty: "left, background-color, border-color, color",
       }}
       title={expanded ? "Collapse sidebar" : "Expand sidebar"}
     >
-      <ChevronLeft size={14} strokeWidth={2.5} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
+      <ChevronLeft size={13} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
     </button>
     </>
   );
@@ -169,17 +169,17 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
 function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () => void }) {
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
-      <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left" style={{ background: "var(--sidebar-bg)" }}>
-        <div className="px-4 h-14 flex items-center justify-between">
-          <Logo variant="full" size={28} className="[&_span]:!text-white [&_span]:!font-semibold" />
-          <button onClick={onClose} className="text-sidebar-text hover:text-white transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
+      <div className="fixed inset-0 bg-black/30 z-40 md:hidden" onClick={onClose} />
+      <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left bg-white border-r border-gray-200">
+        <div className="px-4 h-14 flex items-center justify-between border-b border-gray-100">
+          <Logo variant="full" size={28} className="[&_span]:!text-gray-900 [&_span]:!font-semibold" />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
         </div>
-        <nav className="flex-1 px-3 overflow-y-auto mt-1">
+        <nav className="flex-1 px-3 overflow-y-auto mt-3">
           {navGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-sidebar-border" : ""}>
+            <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-gray-100" : ""}>
               {group.label && (
-                <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#64748b" }}>{group.label}</p>
+                <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-gray-400">{group.label}</p>
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
@@ -190,11 +190,11 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
             </div>
           ))}
         </nav>
-        <div className="px-4 py-3 border-t border-sidebar-border">
+        <div className="px-4 py-3 border-t border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-sm font-semibold text-emerald-400">C</div>
-            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">Cesar</p></div>
-            <Link href="/settings" onClick={onClose} className="text-sidebar-text hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700">C</div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">Cesar</p></div>
+            <Link href="/settings" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
           </div>
         </div>
       </aside>
@@ -224,7 +224,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarWidth = sidebarExpanded ? 240 : 60;
 
   return (
-    <div className="flex h-screen overflow-x-hidden">
+    <div className="flex h-screen overflow-x-hidden bg-gray-50">
       <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} />
 
       {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} />}
@@ -237,22 +237,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <style>{`@media(min-width:768px){.main-offset{margin-left:${sidebarWidth}px}}`}</style>
         <div className="main-offset flex-1 flex flex-col min-h-screen">
           {/* Topbar */}
-          <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-neutral-0" style={{ borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}>
+          <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-gray-200 bg-white">
             <div className="flex items-center gap-3">
               {/* Mobile hamburger */}
               <button
-                className="md:hidden text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="md:hidden text-gray-500 hover:text-gray-700 transition-colors"
                 onClick={() => setMobileOpen(true)}
               >
                 <Menu size={20} strokeWidth={1.5} />
               </button>
-              <span className="md:hidden text-sm font-medium text-neutral-700">
+              <span className="md:hidden text-sm font-medium text-gray-700">
                 {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <button className="relative text-neutral-400 hover:text-neutral-600 transition-colors"><Bell size={18} strokeWidth={1.5} /></button>
-              <button className="hidden sm:flex items-center gap-2 px-3 h-8 text-sm font-medium text-neutral-500 hover:text-neutral-700 border rounded-md hover:border-neutral-300 transition-all" style={{ borderColor: "var(--border)" }}>
+              <button className="relative text-gray-400 hover:text-gray-600 transition-colors"><Bell size={18} strokeWidth={1.5} /></button>
+              <button className="hidden sm:flex items-center gap-2 px-3 h-8 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-md hover:border-gray-300 transition-all">
                 <RefreshCcw size={14} strokeWidth={1.5} />Sync Now
               </button>
             </div>
