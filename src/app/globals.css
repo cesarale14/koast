@@ -30,14 +30,14 @@
   --neutral-800: #1c1917;
   --neutral-900: #0c0a09;
 
-  /* Sidebar */
-  --sidebar-bg: #0f1117;
-  --sidebar-text: #a1a1aa;
+  /* Sidebar — softer slate */
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #94a3b8;
   --sidebar-text-active: #ffffff;
-  --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-active-bg: rgba(16, 185, 129, 0.12);
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
+  --sidebar-active-bg: rgba(16, 185, 129, 0.10);
   --sidebar-active-text: #34d399;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
 
   /* Semantic */
   --success: #10b981;

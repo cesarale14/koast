@@ -53,14 +53,14 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
       className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 ${
-        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-white hover:bg-sidebar-hover"
       }`}>
-      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-brand-400" />}
+      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-emerald-500" />}
       <Icon size={20} strokeWidth={1.5} />
-      {item.dot && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500" />}
+      {item.dot && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#1e293b]" />}
       {showTip && (
         <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
-          style={{ backgroundColor: "#1c1917", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
+          style={{ backgroundColor: "#334155", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
           {item.name}
         </span>
       )}
@@ -75,9 +75,9 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
   return (
     <Link href={item.href} onClick={onClick} {...linkProps}
       className={`relative flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-md transition-all duration-150 ${
-        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+        isActive ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-sidebar-text hover:text-white hover:bg-sidebar-hover"
       }`}>
-      {isActive && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-brand-400" />}
+      {isActive && <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-emerald-500" />}
       <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
       <span className="truncate">{item.name}</span>
       {item.dot && <span className="w-2 h-2 rounded-full bg-emerald-500 ml-auto flex-shrink-0" />}
@@ -91,20 +91,20 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
   return (
     <>
     <aside
-      className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out"
-      style={{ background: "var(--sidebar-bg)", width: expanded ? 240 : 60 }}
+      className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out border-r"
+      style={{ background: "var(--sidebar-bg)", width: expanded ? 240 : 60, borderColor: "rgba(148,163,184,0.15)" }}
     >
       {expanded ? (
         /* ---- EXPANDED ---- */
         <>
-          <div className="px-3 h-14 flex items-center">
-            <Logo variant="full" size={28} className="[&_span]:!text-white" />
+          <div className="px-4 h-14 flex items-center">
+            <Logo variant="full" size={28} className="[&_span]:!text-white [&_span]:!font-semibold" />
           </div>
-          <nav className="flex-1 px-3 overflow-y-auto">
+          <nav className="flex-1 px-3 overflow-y-auto mt-1">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
+              <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-sidebar-border" : ""}>
                 {group.label && (
-                  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-300">{group.label}</p>
+                  <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#64748b" }}>{group.label}</p>
                 )}
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
@@ -117,8 +117,8 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
           </nav>
           <div className="px-4 py-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center text-sm font-medium text-brand-200">U</div>
-              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">User</p></div>
+              <div className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-sm font-semibold text-emerald-400">C</div>
+              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">Cesar</p></div>
               <Link href="/settings" className="text-sidebar-text hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
             </div>
           </div>
@@ -142,23 +142,24 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
             ))}
           </nav>
           <div className="mt-3 pt-3 border-t border-sidebar-border w-8 flex flex-col items-center">
-            <Link href="/settings" className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center text-xs font-medium text-brand-200 hover:bg-brand-600 transition-colors">U</Link>
+            <Link href="/settings" className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-xs font-semibold text-emerald-400 hover:bg-emerald-600/30 transition-colors">C</Link>
           </div>
         </div>
       )}
     </aside>
-    {/* 3D toggle pill — centered on the sidebar's right border */}
+    {/* Toggle pill — centered on sidebar right edge */}
     <button
       onClick={onToggle}
-      className="hidden md:flex fixed z-40 items-center justify-center w-6 h-6 rounded-full bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 transition-[left] duration-200 ease-out"
+      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 hover:border-slate-500 transition-all duration-200 ease-out"
       style={{
-        left: (expanded ? 240 : 60) - 12,
-        top: 20,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
+        left: (expanded ? 240 : 60) - 14,
+        top: 18,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+        transitionProperty: "left, background-color, border-color, color",
       }}
       title={expanded ? "Collapse sidebar" : "Expand sidebar"}
     >
-      <ChevronLeft size={13} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
+      <ChevronLeft size={14} strokeWidth={2.5} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
     </button>
     </>
   );
@@ -171,14 +172,14 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
       <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
       <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left" style={{ background: "var(--sidebar-bg)" }}>
         <div className="px-4 h-14 flex items-center justify-between">
-          <Logo variant="full" size={28} className="[&_span]:!text-white" />
+          <Logo variant="full" size={28} className="[&_span]:!text-white [&_span]:!font-semibold" />
           <button onClick={onClose} className="text-sidebar-text hover:text-white transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
         </div>
-        <nav className="flex-1 px-3 overflow-y-auto">
+        <nav className="flex-1 px-3 overflow-y-auto mt-1">
           {navGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
+            <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-sidebar-border" : ""}>
               {group.label && (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-300">{group.label}</p>
+                <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#64748b" }}>{group.label}</p>
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
@@ -191,8 +192,8 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
         </nav>
         <div className="px-4 py-3 border-t border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center text-sm font-medium text-brand-200">U</div>
-            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">User</p></div>
+            <div className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-sm font-semibold text-emerald-400">C</div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">Cesar</p></div>
             <Link href="/settings" onClick={onClose} className="text-sidebar-text hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
           </div>
         </div>
