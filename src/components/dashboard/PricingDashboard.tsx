@@ -422,7 +422,7 @@ export default function PricingDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar heatmap (2/3 width) */}
-        <div className="lg:col-span-2 bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+        <div className="lg:col-span-2 bg-neutral-0 rounded-xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-neutral-800">Rate Calendar</h2>
             {/* Legend */}
@@ -523,7 +523,7 @@ export default function PricingDashboard({
         {/* Side panel: date detail / market context */}
         <div className="space-y-6">
           {/* Date detail panel */}
-          <div className="card-elevated bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+          <div className="card-elevated bg-neutral-0 rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-bold text-neutral-800 mb-4">
               {selectedDate ? formatDate(selectedDate) : "Select a Date"}
             </h2>
@@ -602,7 +602,7 @@ export default function PricingDashboard({
           </div>
 
           {/* Market context */}
-          <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+          <div className="bg-neutral-0 rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-bold text-neutral-800 mb-4">Market Context</h2>
             {snapshot ? (
               <div className="space-y-3 text-sm">
@@ -704,7 +704,7 @@ function UpcomingEventsPanel({ propertyId }: { propertyId: string }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
+    <div className="bg-neutral-0 rounded-xl shadow-sm p-6">
       <h2 className="text-lg font-bold text-neutral-800 mb-3">Events Affecting Rates</h2>
       <div className="space-y-2">
         {events.map((e, i) => (

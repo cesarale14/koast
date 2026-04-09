@@ -253,7 +253,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
       {/* Cleaners management panel */}
       {showCleaners && (
-        <div className="mb-6 bg-neutral-0 rounded-lg border border-[var(--border)] p-4">
+        <div className="mb-6 bg-neutral-0 rounded-xl shadow-sm p-4">
           <h3 className="text-sm font-semibold text-neutral-700 mb-3">Manage Cleaners</h3>
           <div className="space-y-2 mb-4">
             {cleaners.map((c) => (

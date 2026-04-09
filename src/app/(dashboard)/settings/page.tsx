@@ -24,6 +24,8 @@ interface ICalFeed {
   feed_url: string;
   last_synced: string | null;
   is_active: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  properties?: any;
 }
 
 interface NotificationPrefs {
@@ -74,7 +76,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-neutral-0 border border-[var(--border)] rounded-lg p-6">
+    <div className="bg-neutral-0 rounded-xl shadow-sm p-6">
       <div className="flex items-center gap-2 mb-1">
         <Icon size={18} className="text-neutral-600" />
         <h2 className="text-lg font-bold text-neutral-800">{title}</h2>
@@ -133,7 +135,7 @@ export default function SettingsPage() {
 
       const { data: icalData } = await supabase
         .from("ical_feeds")
-        .select("id, platform, feed_url, last_synced, is_active");
+        .select("id, platform, feed_url, last_synced, is_active, property_id, properties(name)");
       if (icalData) setFeeds(icalData);
 
       // Load notification prefs from database
@@ -424,7 +426,10 @@ export default function SettingsPage() {
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${platformColor(feed.platform)}`}>
                     {platformLabel(feed.platform)}
                   </span>
-                  <span className="text-xs text-neutral-400 truncate max-w-[200px]">
+                  <span className="text-xs font-medium text-neutral-700 truncate max-w-[150px]">
+                    {(Array.isArray(feed.properties) ? feed.properties[0]?.name : feed.properties?.name) ?? "Property"}
+                  </span>
+                  <span className="text-xs text-neutral-400">
                     {feed.last_synced
                       ? `Synced ${new Date(feed.last_synced).toLocaleDateString()}`
                       : "Never synced"}
