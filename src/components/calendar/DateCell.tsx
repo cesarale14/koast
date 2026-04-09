@@ -41,7 +41,7 @@ export default function DateCell({
   const displayRate = rate?.applied_rate ?? rate?.base_rate ?? null;
 
   // Rate comparison coloring
-  let rateColorClass = isAvailable ? "text-neutral-500" : "text-neutral-400 line-through";
+  let rateColorClass = isAvailable ? "text-neutral-600 font-semibold" : "text-neutral-400 line-through";
   if (isAvailable && rate?.applied_rate && rate?.suggested_rate) {
     const diff = Math.abs(rate.suggested_rate - rate.applied_rate) / rate.applied_rate;
     if (diff > 0.08) {
@@ -56,9 +56,13 @@ export default function DateCell({
           ? "bg-brand-50 ring-1 ring-inset ring-brand-300"
           : isGap
             ? "bg-amber-50"
-            : isAvailable
-              ? "bg-neutral-0 hover:bg-neutral-50"
-              : "bg-neutral-100"
+            : !isAvailable
+              ? "bg-neutral-100"
+              : rate?.suggested_rate && rate?.base_rate && rate.suggested_rate > rate.base_rate * 1.1
+                ? "bg-red-50/50 hover:bg-red-50"     // high demand
+                : rate?.suggested_rate && rate?.base_rate && rate.suggested_rate > rate.base_rate * 1.02
+                  ? "bg-amber-50/40 hover:bg-amber-50" // medium demand
+                  : "bg-neutral-0 hover:bg-neutral-50"  // normal
       } ${isToday ? "ring-1 ring-inset ring-brand-400" : ""}`}
       onClick={() => onClick(date, rate)}
       onMouseDown={() => onDragStart(date)}

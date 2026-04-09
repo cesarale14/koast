@@ -15,6 +15,7 @@ import {
   Lock,
   Check,
   AlertTriangle,
+  Cable,
 } from "lucide-react";
 
 interface ICalFeed {
@@ -354,6 +355,25 @@ export default function SettingsPage() {
             </span>
           </div>
         </div>
+      </SectionCard>
+
+      {/* CHANNEL MANAGER (PRO) */}
+      <SectionCard icon={Cable} title="Channel Manager" description="Connect to Channex for two-way rate sync, multi-channel distribution, and real-time webhooks.">
+        <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-neutral-800">Channex Integration</p>
+            <p className="text-xs text-neutral-500 mt-0.5">Push rates to Airbnb, Booking.com, VRBO. Sync availability across all platforms.</p>
+          </div>
+          <a
+            href="https://app.channex.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 text-sm font-semibold text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors flex-shrink-0"
+          >
+            Open Channex &rarr;
+          </a>
+        </div>
+        <p className="text-xs text-neutral-400 mt-3">Part of the Pro plan ($79/mo). Includes rate pushing, availability sync, real-time booking webhooks, and guest messaging.</p>
       </SectionCard>
 
       {/* NOTIFICATIONS */}

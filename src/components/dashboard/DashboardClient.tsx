@@ -160,6 +160,26 @@ export default function DashboardClient() {
       )}
 
       <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
+            <p className="text-xs text-neutral-400 font-medium">Properties</p>
+            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.propertyCards.length}</p>
+          </div>
+          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
+            <p className="text-xs text-neutral-400 font-medium">Occupancy</p>
+            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.performance.occupancyRate}%</p>
+          </div>
+          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
+            <p className="text-xs text-neutral-400 font-medium">Est. Revenue</p>
+            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{formatCurrency(data.performance.thisMonthRevenue)}</p>
+          </div>
+          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
+            <p className="text-xs text-neutral-400 font-medium">Check-ins (7d)</p>
+            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
+          </div>
+        </div>
+
         {/* Section 1: Property Status Strip */}
         <PropertyStatusStrip cards={data.propertyCards} />
 
