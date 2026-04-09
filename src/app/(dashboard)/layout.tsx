@@ -102,7 +102,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
             {navGroups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
                 {group.label && (
-                  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{group.label}</p>
+                  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-300">{group.label}</p>
                 )}
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
@@ -176,7 +176,7 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
           {navGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-4 pt-4 border-t border-sidebar-border" : ""}>
               {group.label && (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{group.label}</p>
+                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-300">{group.label}</p>
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {

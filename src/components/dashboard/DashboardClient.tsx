@@ -12,6 +12,7 @@ import {
   TrendingUp,
   BookOpen,
   CheckCircle2,
+  Home,
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
 import PlatformLogoDefault from "@/components/ui/PlatformLogo";
@@ -163,20 +164,20 @@ export default function DashboardClient() {
         {/* Quick Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <p className="text-xs text-neutral-400 font-medium">Properties</p>
-            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.propertyCards.length}</p>
+            <div className="flex items-center gap-2 mb-2"><Home size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Properties</p></div>
+            <p className="text-2xl font-bold font-mono text-neutral-800">{data.propertyCards.length}</p>
           </div>
           <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <p className="text-xs text-neutral-400 font-medium">Occupancy</p>
-            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.performance.occupancyRate}%</p>
+            <div className="flex items-center gap-2 mb-2"><TrendingUp size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Occupancy</p></div>
+            <p className="text-2xl font-bold font-mono text-neutral-800">{data.performance.occupancyRate}%</p>
           </div>
           <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <p className="text-xs text-neutral-400 font-medium">Est. Revenue</p>
-            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{formatCurrency(data.performance.thisMonthRevenue)}</p>
+            <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-emerald-500" /><p className="text-xs text-neutral-400 font-medium">Est. Revenue</p></div>
+            <p className="text-2xl font-bold font-mono text-emerald-600">{formatCurrency(data.performance.thisMonthRevenue)}</p>
           </div>
           <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <p className="text-xs text-neutral-400 font-medium">Check-ins (7d)</p>
-            <p className="text-2xl font-bold font-mono text-neutral-800 mt-1">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
+            <div className="flex items-center gap-2 mb-2"><Calendar size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Upcoming Check-ins</p></div>
+            <p className="text-2xl font-bold font-mono text-neutral-800">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
           </div>
         </div>
 
@@ -401,7 +402,7 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
 
   return (
     <div className="mb-6">
-      <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-neutral-500 mb-3">
         Needs Your Attention
       </h2>
       <div className="space-y-2">
@@ -507,7 +508,7 @@ function PerformanceSection({
 }) {
   return (
     <div className="bg-neutral-0 rounded-xl shadow-sm p-6 h-full">
-      <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">
+      <h2 className="text-sm font-semibold text-neutral-500 mb-4">
         Revenue
       </h2>
       <RevenueChart data={performance.revenueData} />
@@ -571,7 +572,7 @@ function MarketHealth({ market }: { market: CommandCenterData["market"] }) {
 
   return (
     <div className="bg-neutral-0 rounded-xl shadow-sm p-6 h-full flex flex-col">
-      <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-4">
+      <h2 className="text-xs font-semibold text-neutral-500 mb-4">
         Market Health
       </h2>
 
@@ -681,7 +682,7 @@ function ActivityFeed({ items }: { items: ActivityItem[] }) {
 
   return (
     <div className="bg-neutral-0 rounded-xl shadow-sm p-5">
-      <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-neutral-500 mb-3">
         Recent Activity
       </h2>
       <div className="space-y-2.5">

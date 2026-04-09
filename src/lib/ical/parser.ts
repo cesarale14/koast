@@ -83,7 +83,7 @@ export async function parseICalFeed(url: string): Promise<ICalBooking[]> {
     );
 
     // "Reserved" on Airbnb = booking with masked name
-    const guestName = isBlocked ? null : (isPlatformBooking ? "Guest (via " + platform + ")" : summary || null);
+    const guestName = isBlocked ? null : (isPlatformBooking ? "Airbnb Guest" : summary || null);
 
     bookings.push({
       uid,

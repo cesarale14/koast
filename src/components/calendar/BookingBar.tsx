@@ -37,7 +37,8 @@ export default function BookingBar({ booking, startCol, span, onClick }: Booking
     const co = Date.UTC(+booking.check_out.slice(0, 4), +booking.check_out.slice(5, 7) - 1, +booking.check_out.slice(8, 10));
     return Math.round((co - ci) / 86400000);
   })();
-  const firstName = booking.guest_name?.split(" ")[0] ?? "Guest";
+  const rawName = booking.guest_name?.split(" ")[0] ?? "";
+  const firstName = rawName && rawName !== "Airbnb" && rawName !== "Guest" ? rawName : "Booked";
 
   const cellWidth = 80;
   const barLeft = startCol * cellWidth + cellWidth / 2;

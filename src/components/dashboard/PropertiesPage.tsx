@@ -100,7 +100,7 @@ function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy,
   bookingCount: number; occupancy: number; nextCheckin: { date: string; guest: string | null } | null;
 }) {
   return (
-    <Link href={`/properties/${p.id}`} className="bg-neutral-0 rounded-xl border border-[var(--border)] shadow-sm hover:shadow-md transition-all group">
+    <Link href={`/properties/${p.id}`} className="bg-neutral-0 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 group">
       {p.cover_photo_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <div className="h-40 rounded-t-xl overflow-hidden"><img src={p.cover_photo_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /></div>

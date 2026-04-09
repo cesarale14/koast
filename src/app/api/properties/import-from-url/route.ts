@@ -260,7 +260,7 @@ async function syncIcalBookings(
       platform,
       platform_booking_id: bookingUid,
       guest_name:
-        guestName === "Reserved" ? `Guest (via ${platform})` : guestName,
+        guestName === "Reserved" ? "Airbnb Guest" : guestName,
       check_in: checkIn,
       check_out: checkOut,
       status: "confirmed",
