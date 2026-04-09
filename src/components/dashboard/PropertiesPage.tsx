@@ -60,10 +60,9 @@ function StepDots({ current }: { current: number }) {
 }
 
 /* ---------- Platform Badge ---------- */
+import { PlatformBadge as PlatformBadgeUI } from "@/components/ui/PlatformLogo";
 function PlatformBadge({ code }: { code: string }) {
-  const b = BADGE[code];
-  if (!b) return null;
-  return <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>;
+  return <PlatformBadgeUI platform={code} />;
 }
 
 /* ---------- Preview Card ---------- */
