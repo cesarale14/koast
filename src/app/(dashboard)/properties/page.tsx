@@ -7,6 +7,8 @@ export default async function PropertiesServerPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const svc = createServiceClient();
+
   const today = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString()
@@ -16,8 +18,8 @@ export default async function PropertiesServerPage() {
     .split("T")[0];
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
-  // Fetch properties
-  const propertiesRes = await supabase
+  // Fetch properties (service client to avoid RLS issues)
+  const propertiesRes = await svc
     .from("properties")
     .select("id, name, address, city, state, property_type, bedrooms, bathrooms, max_guests, channex_property_id, cover_photo_url")
     .eq("user_id", user.id)
@@ -30,7 +32,6 @@ export default async function PropertiesServerPage() {
     cover_photo_url: string | null;
   }[];
 
-  // If no properties, return early with empty data
   if (properties.length === 0) {
     return (
       <PropertiesPage
@@ -45,23 +46,20 @@ export default async function PropertiesServerPage() {
 
   const propertyIds = properties.map((p) => p.id);
 
-  // Use service client for RLS bypass on property_channels
-  const serviceClient = createServiceClient();
-
-  // Fetch all data in parallel (service client for consistent RLS bypass — user verified above)
+  // Fetch all data in parallel using service client
   const [channelsRes, bookingsRes, upcomingRes, monthBookingsRes] = await Promise.all([
-    serviceClient
+    svc
       .from("property_channels")
       .select("property_id, channel_code, channel_name, status")
       .in("property_id", propertyIds),
 
-    serviceClient
+    svc
       .from("bookings")
       .select("property_id")
       .in("property_id", propertyIds)
       .in("status", ["confirmed", "completed"]),
 
-    serviceClient
+    svc
       .from("bookings")
       .select("property_id, check_in, guest_name")
       .in("property_id", propertyIds)
@@ -70,7 +68,7 @@ export default async function PropertiesServerPage() {
       .order("check_in")
       .limit(100),
 
-    serviceClient
+    svc
       .from("bookings")
       .select("property_id, check_in, check_out")
       .in("property_id", propertyIds)

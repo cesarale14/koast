@@ -4,17 +4,16 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
-import ReviewBadge from "@/components/ui/ReviewBadge";
 import Logo from "@/components/ui/Logo";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, SprayCan,
-  Map, MapPin, GitCompare, Search,
+  Map, MapPin, GitCompare,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; badge?: boolean; external?: boolean; }
+interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; }
 interface NavGroup { label?: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
@@ -30,7 +29,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Properties", href: "/properties", icon: Home },
       { name: "Pricing", href: "/pricing", icon: DollarSign },
-      { name: "Reviews", href: "/reviews", icon: Star, badge: true },
+      { name: "Reviews", href: "/reviews", icon: Star },
       { name: "Cleaning", href: "/turnover", icon: SprayCan },
     ],
   },
@@ -40,7 +39,6 @@ const navGroups: NavGroup[] = [
       { name: "Market Intel", href: "/market-explorer", icon: Map },
       { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
       { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
-      { name: "Revenue Tool", href: "/revenue-check", icon: Search, external: true },
     ],
   },
 ];
@@ -59,7 +57,6 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       }`}>
       {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-brand-400" />}
       <Icon size={20} strokeWidth={1.5} />
-      {item.badge && <span className="absolute top-1 right-1"><ReviewBadge /></span>}
       {showTip && (
         <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
           style={{ backgroundColor: "#1c1917", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
@@ -82,7 +79,6 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       {isActive && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-brand-400" />}
       <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
       <span className="truncate">{item.name}</span>
-      {item.badge && <ReviewBadge />}
       {item.external && <span className="text-sidebar-text/40 text-[10px] ml-auto">↗</span>}
     </Link>
   );

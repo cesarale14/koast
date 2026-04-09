@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
-import { Home, Plus, X, Loader2, ChevronRight, Check, ExternalLink } from "lucide-react";
+import { Home, Plus, X, Loader2, ChevronRight, Check, ChevronDown } from "lucide-react";
 
 /* ---------- Types (keep compatible with server page.tsx) ---------- */
 interface PropertyData {
@@ -13,7 +13,7 @@ interface PropertyData {
   channex_property_id: string | null; cover_photo_url: string | null;
 }
 interface ChannelRecord { property_id: string; channel_code: string; channel_name: string; status: string; }
-interface PropertiesPageProps {
+export interface PropertiesPageProps {
   properties: PropertyData[]; channels: ChannelRecord[];
   bookingCounts: Record<string, number>; occupancy: Record<string, number>;
   nextCheckins: Record<string, { date: string; guest: string | null }>;
@@ -35,20 +35,67 @@ const BADGE: Record<string, { label: string; bg: string; text: string }> = {
   AGO: { label: "Agoda", bg: "bg-red-50", text: "text-red-700" },
   CTP: { label: "Trip.com", bg: "bg-blue-50", text: "text-blue-700" },
 };
-const TYPE_LABELS: Record<string, string> = { entire_home: "Entire Home", private_room: "Private Room", shared_room: "Shared Room" };
 
 /* ---------- Helpers ---------- */
-async function scaffoldAndGetIframe(force: boolean, channelCode: string) {
-  const scaff = await fetch(`/api/properties/auto-scaffold${force ? "?force=true" : ""}`, { method: "POST" });
-  if (!scaff.ok) { const d = await scaff.json(); throw new Error(d.error ?? "Failed to set up property"); }
-  const s = await scaff.json();
-  const tr = await fetch(`/api/channels/token/${s.property_id}`, { method: "POST" });
-  if (!tr.ok) { const d = await tr.json(); throw new Error(d.error ?? "Failed to get token"); }
-  const td = await tr.json();
-  return { propertyId: s.property_id as string, channexId: s.channex_property_id as string, iframeUrl: `${td.iframe_url}&channels=${channelCode}` };
+function parseListingUrl(url: string): { platform: string; listingId: string } | null {
+  const cleaned = url.trim().replace(/^https?:\/\//, "").replace(/^www\./, "");
+  const airbnbMatch = cleaned.match(/airbnb\.[a-z.]+\/rooms\/(\d+)/);
+  if (airbnbMatch) return { platform: "airbnb", listingId: airbnbMatch[1] };
+  const bdcMatch = cleaned.match(/booking\.com\/hotel\/[a-z]+\/([^/?]+)/);
+  if (bdcMatch) return { platform: "booking_com", listingId: bdcMatch[1] };
+  const vrboMatch = cleaned.match(/vrbo\.com\/(\d+)/);
+  if (vrboMatch) return { platform: "vrbo", listingId: vrboMatch[1] };
+  return null;
 }
 
-/* ---------- Property Card ---------- */
+/* ---------- Step Indicator ---------- */
+function StepDots({ current }: { current: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      {[1, 2, 3, 4].map((s) => (
+        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${current >= s ? "bg-emerald-500" : "bg-neutral-200"}`} />
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Platform Badge ---------- */
+function PlatformBadge({ code }: { code: string }) {
+  const b = BADGE[code];
+  if (!b) return null;
+  return <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>;
+}
+
+/* ---------- Preview Card ---------- */
+function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: {
+  photo: string | null; name: string; platformCode: string; bookingCount?: number; onNameChange?: (v: string) => void;
+}) {
+  const b = BADGE[platformCode];
+  return (
+    <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden max-w-md mx-auto">
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <div className="h-44 overflow-hidden"><img src={photo} alt={name} className="w-full h-full object-cover" /></div>
+      ) : (
+        <div className="h-44 bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center"><Home size={36} className="text-emerald-300" strokeWidth={1.5} /></div>
+      )}
+      <div className="p-4 space-y-3">
+        {b && <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>}
+        {onNameChange ? (
+          <input type="text" value={name} onChange={(e) => onNameChange(e.target.value)}
+            className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
+        ) : (
+          <p className="text-sm font-semibold text-neutral-800">{name}</p>
+        )}
+        {bookingCount != null && bookingCount > 0 && (
+          <p className="text-xs text-neutral-500">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Property Card (list view) ---------- */
 function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy, nextCheckin }: {
   property: PropertyData; connectedChannels: ChannelRecord[];
   bookingCount: number; occupancy: number; nextCheckin: { date: string; guest: string | null } | null;
@@ -59,26 +106,15 @@ function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy,
         // eslint-disable-next-line @next/next/no-img-element
         <div className="h-40 rounded-t-xl overflow-hidden"><img src={p.cover_photo_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /></div>
       ) : (
-        <div className="h-40 bg-gradient-to-br from-brand-50 to-brand-100 rounded-t-xl flex items-center justify-center"><Home size={32} className="text-brand-300" strokeWidth={1.5} /></div>
+        <div className="h-40 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-t-xl flex items-center justify-center"><Home size={32} className="text-emerald-300" strokeWidth={1.5} /></div>
       )}
       <div className="p-5">
         <h3 className="text-lg font-semibold text-neutral-800">{p.name}</h3>
         {(p.city || p.state) && <p className="text-sm text-neutral-500 mt-0.5">{[p.city, p.state].filter(Boolean).join(", ")}</p>}
-        <div className="flex items-center gap-3 mt-3 text-xs text-neutral-400">
-          {p.property_type && <span>{TYPE_LABELS[p.property_type] ?? p.property_type}</span>}
-          {p.bedrooms != null && <span>{p.bedrooms} bed</span>}
-          {p.bathrooms != null && <span>{p.bathrooms} bath</span>}
-          {p.max_guests != null && <span>{p.max_guests} guests</span>}
-        </div>
-        <div className="mt-3">
-          {connectedChannels.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {connectedChannels.map((ch) => {
-                const b = BADGE[ch.channel_code];
-                return <span key={ch.channel_code} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${b ? `${b.bg} ${b.text}` : "bg-neutral-100 text-neutral-500"}`}>{b?.label ?? ch.channel_name}</span>;
-              })}
-            </div>
-          ) : <span className="text-xs text-neutral-400">No channels connected</span>}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {connectedChannels.length > 0 ? connectedChannels.map((ch) => (
+            <PlatformBadge key={ch.channel_code} code={ch.channel_code} />
+          )) : <span className="text-xs text-neutral-400">No channels</span>}
         </div>
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-100">
           <div><p className="text-xs text-neutral-400">Bookings</p><p className="text-sm font-semibold font-mono text-neutral-800">{bookingCount}</p></div>
@@ -92,33 +128,59 @@ function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy,
   );
 }
 
-/* ---------- Iframe bar ---------- */
-function IframeBar({ platform, label }: { platform: Platform; label: string }) {
+/* ---------- iCal Help Section ---------- */
+function IcalHelp({ platform }: { platform: string }) {
+  const [open, setOpen] = useState(false);
+  const instructions: Record<string, string[]> = {
+    ABB: [
+      "Go to your Airbnb listing",
+      "Click Calendar \u2192 Availability settings",
+      "Scroll to \"Connect calendars\"",
+      "Copy the \"Export Calendar\" link",
+    ],
+    BDC: [
+      "Go to your Booking.com Extranet",
+      "Click Rates & Availability \u2192 Sync calendars",
+      "Copy the iCal export URL",
+    ],
+    VRBO: [
+      "Go to your VRBO listing dashboard",
+      "Click Calendar \u2192 Import/Export",
+      "Copy the export URL",
+    ],
+  };
+  const steps = instructions[platform] ?? instructions.ABB;
   return (
-    <div className="rounded-t-lg bg-emerald-600 px-4 py-2 flex items-center gap-2">
-      <div className={`w-6 h-6 rounded ${platform.color} flex items-center justify-center text-white text-[10px] font-bold`}>{platform.letter}</div>
-      <span className="text-sm font-medium text-white">{platform.name} &mdash; {label}</span>
+    <div className="mt-3">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 transition-colors">
+        <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        How to find your calendar URL
+      </button>
+      {open && (
+        <ol className="mt-2 ml-5 text-xs text-neutral-600 space-y-1 list-decimal">
+          {steps.map((s, i) => <li key={i}>{s}</li>)}
+        </ol>
+      )}
     </div>
   );
 }
 
-/* ---------- Full-Screen Add Property Modal (5 steps) ---------- */
-function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onClose: (didImport: boolean) => void }) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+/* ---------- Full-Screen Add Property Modal (4 steps) ---------- */
+function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }) {
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [platform, setPlatform] = useState<Platform | null>(null);
-  const [scaffoldPropId, setScaffoldPropId] = useState<string | null>(null);
-  const [scaffoldChannexId, setScaffoldChannexId] = useState<string | null>(null);
-  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
-  const [mappedListingId, setMappedListingId] = useState<string | null>(null);
+  const [listingUrl, setListingUrl] = useState("");
+  const [listingId, setListingId] = useState<string | null>(null);
   const [listingName, setListingName] = useState("");
-  const [listingPhoto, setListingPhoto] = useState<string | null>(null);
   const [editedName, setEditedName] = useState("");
+  const [listingPhoto, setListingPhoto] = useState<string | null>(null);
   const [icalUrl, setIcalUrl] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [importedCount, setImportedCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadMsg, setLoadMsg] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importedProperty, setImportedProperty] = useState<{ id: string; name: string; photo_url: string | null } | null>(null);
+  const [bookingCount, setBookingCount] = useState(0);
   const didImport = useRef(false);
   const { toast } = useToast();
 
@@ -128,134 +190,80 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  const applyScaffold = useCallback((r: { propertyId: string; channexId: string; iframeUrl: string }) => {
-    setScaffoldPropId(r.propertyId);
-    setScaffoldChannexId(r.channexId);
-    setIframeUrl(r.iframeUrl);
-  }, []);
+  /* Step 1: Choose platform */
+  const selectPlatform = (p: Platform) => {
+    setPlatform(p); setStep(2); setUrlError(null);
+  };
 
-  // Step 1 -> 2/3: select platform, check connection
-  const selectPlatform = useCallback(async (p: Platform) => {
-    setPlatform(p); setError(null); setStep(2); setLoading(true);
-    setLoadMsg("Checking account status...");
-    try {
-      const sr = await fetch("/api/channels/status");
-      if (!sr.ok) throw new Error("Failed to check channel status");
-      const sd = await sr.json();
-      const isConnected = sd.connected?.[p.code]?.active ?? false;
-      if (isConnected) {
-        setLoadMsg("Already connected \u2713");
-        await new Promise((r) => setTimeout(r, 800));
-      }
-      setLoadMsg(isConnected ? "Preparing listing selector..." : `Connecting to ${p.name}...`);
-      const r = await scaffoldAndGetIframe(hasExisting, p.code);
-      applyScaffold(r);
-      setLoading(false);
-      if (isConnected) setStep(3);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Setup failed"); setLoading(false);
-    }
-  }, [hasExisting, applyScaffold]);
-
-  // Step 2 -> 3: after OAuth, advance to mapping
-  const advanceToMapping = useCallback(async () => {
-    if (scaffoldPropId && iframeUrl) { setStep(3); return; }
-    setLoading(true); setLoadMsg("Preparing listing selector...");
-    try {
-      const r = await scaffoldAndGetIframe(hasExisting, platform?.code ?? "ABB");
-      applyScaffold(r); setLoading(false); setStep(3);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Setup failed"); setLoading(false);
-    }
-  }, [scaffoldPropId, iframeUrl, hasExisting, platform, applyScaffold]);
-
-  // Step 3 -> 4: after mapping, fetch listing details
-  const handleMappingDone = useCallback(async () => {
-    if (!scaffoldPropId || !scaffoldChannexId || !platform) return;
-    setStep(4); setLoading(true); setLoadMsg("Finding your listing details...");
-    try {
-      await fetch(`/api/channels/${scaffoldPropId}/refresh`, { method: "POST" });
-      const lr = await fetch("/api/channels/listings");
-      if (!lr.ok) throw new Error("Failed to fetch listings");
-      const ld = await lr.json();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const all = (ld.listings ?? []) as any[];
-      // Filter by this scaffold's Channex property ID to find the listing we just mapped
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let target = all.find((l: any) => l.channex_property_id === scaffoldChannexId);
-      // Fallback: first non-imported listing
-      if (!target) target = all.filter((l: { imported: boolean }) => !l.imported)[0] ?? all[0];
-      if (!target) throw new Error("No listing found. Please try the mapping step again.");
-      let name = target.listing_name ?? "Imported Property";
-      let photo: string | null = null;
-      if (platform.code === "ABB" && target.listing_id) {
-        try {
-          const dr = await fetch(`/api/airbnb/listing-details?listingId=${target.listing_id}`);
-          if (dr.ok) { const d = await dr.json(); if (d.name) name = d.short_name ?? d.name; if (d.photo_url) photo = d.photo_url; }
-        } catch { /* fallback */ }
-      }
-      setMappedListingId(String(target.listing_id));
-      // Update scaffoldChannexId to the actual mapped property (may differ from scaffold if reusing old Channex property)
-      if (target.channex_property_id && target.channex_property_id !== scaffoldChannexId) {
-        setScaffoldChannexId(target.channex_property_id);
-      }
-      setListingName(name); setListingPhoto(photo); setEditedName(name); setLoading(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch listing details"); setLoading(false);
-    }
-  }, [scaffoldPropId, scaffoldChannexId, platform]);
-
-  // Step 4 -> 5: import property
-  const handleImport = useCallback(async () => {
-    if (!scaffoldChannexId || !mappedListingId) {
-      toast("Missing property or listing data", "error");
+  /* Step 2: Validate URL + fetch preview */
+  const validateUrl = useCallback(async () => {
+    if (!listingUrl.trim()) return;
+    setUrlError(null);
+    const parsed = parseListingUrl(listingUrl);
+    if (!parsed) {
+      setUrlError("Couldn\u2019t find a listing in this URL. Make sure it includes the listing page.");
       return;
     }
+    setListingId(parsed.listingId);
+    setLoading(true); setLoadMsg("Fetching listing details...");
+    try {
+      const res = await fetch(`/api/airbnb/listing-details?listingId=${parsed.listingId}`);
+      if (res.ok) {
+        const d = await res.json();
+        const name = d.short_name || d.name || `Listing ${parsed.listingId}`;
+        setListingName(name); setEditedName(name);
+        setListingPhoto(d.photo_url || null);
+      } else {
+        setListingName(`Listing ${parsed.listingId}`);
+        setEditedName(`Listing ${parsed.listingId}`);
+      }
+    } catch {
+      setListingName(`Listing ${parsed.listingId}`);
+      setEditedName(`Listing ${parsed.listingId}`);
+    } finally { setLoading(false); }
+  }, [listingUrl]);
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") validateUrl();
+  };
+
+  /* Step 3 -> 4: Import */
+  const handleImport = async (skipIcal: boolean) => {
     setImporting(true);
     try {
-      const platformName = platform?.code === "ABB" ? "airbnb" : platform?.code === "BDC" ? "booking_com" : "vrbo";
-      const res = await fetch("/api/properties/import", {
+      const res = await fetch("/api/properties/import-from-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          channex_property_id: scaffoldChannexId,
-          listing_id: mappedListingId,
+          listing_url: listingUrl,
           custom_name: editedName.trim() || undefined,
-          platform: platformName,
-          ical_url: icalUrl.trim() || undefined,
+          ical_url: skipIcal ? undefined : icalUrl.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
       if (data.imported) {
         didImport.current = true;
-        setImportedCount(data.property?.booking_count ?? 0);
-        toast("Property imported successfully!");
-        setStep(5);
+        setImportedProperty(data.property);
+        setBookingCount(data.booking_count ?? 0);
+        setStep(4);
       } else {
-        throw new Error("Import did not complete. The listing may already exist.");
+        throw new Error("Import did not complete.");
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Import failed", "error");
     } finally { setImporting(false); }
-  }, [scaffoldChannexId, mappedListingId, editedName, icalUrl, platform, toast]);
+  };
 
-  // Reset for "Add Another" -> back to Step 3 with fresh scaffold
-  const handleAddAnother = useCallback(() => {
-    setScaffoldPropId(null); setScaffoldChannexId(null); setIframeUrl(null); setMappedListingId(null);
-    setListingName(""); setListingPhoto(null); setEditedName(""); setIcalUrl("");
-    setImporting(false); setImportedCount(0); setError(null);
-    if (!platform) { setStep(1); return; }
-    setStep(3); setLoading(true); setLoadMsg("Preparing listing selector...");
-    scaffoldAndGetIframe(true, platform.code).then((r) => {
-      applyScaffold(r); setLoading(false);
-    }).catch((e) => {
-      setError(e instanceof Error ? e.message : "Setup failed"); setLoading(false);
-    });
-  }, [platform, applyScaffold]);
+  /* Reset for Add Another */
+  const handleAddAnother = () => {
+    setPlatform(null); setListingUrl(""); setListingId(null);
+    setListingName(""); setEditedName(""); setListingPhoto(null);
+    setIcalUrl(""); setUrlError(null); setImportedProperty(null);
+    setBookingCount(0); setStep(1);
+  };
 
-  const badge = platform ? BADGE[platform.code] : null;
-  const iframeStyle = { height: 600, borderRadius: "0 0 8px 8px" } as const;
+  const canAdvanceToStep3 = !!listingId && !!listingName && !loading;
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
@@ -265,33 +273,14 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
           <button onClick={() => onClose(didImport.current)} className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors"><X size={20} /></button>
           <h1 className="text-lg font-bold text-neutral-800">Add a Property</h1>
         </div>
-        <div className="flex items-center gap-2">
-          {[1, 2, 3, 4, 5].map((s) => (
-            <div key={s} className={`w-2 h-2 rounded-full ${step >= s ? "bg-brand-500" : "bg-neutral-200"}`} />
-          ))}
-        </div>
+        <StepDots current={step} />
       </div>
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-6 py-8">
-          {error ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="text-center">
-                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4"><X size={24} className="text-red-500" /></div>
-                <p className="text-sm font-medium text-neutral-800 mb-1">Something went wrong</p>
-                <p className="text-xs text-neutral-500 mb-4">{error}</p>
-                <button onClick={() => { setError(null); setStep(1); }} className="px-4 py-2 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors">Try again</button>
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="flex items-center justify-center py-32">
-              <div className="text-center">
-                <Loader2 size={28} className="animate-spin text-brand-500 mx-auto mb-3" />
-                <p className="text-sm font-medium text-neutral-600">{loadMsg}</p>
-              </div>
-            </div>
 
-          ) : step === 1 ? (
+          {step === 1 && (
             <div>
               <h2 className="text-xl font-bold text-neutral-800 mb-2">Choose a platform</h2>
               <p className="text-sm text-neutral-500 mb-6">Select where your property is listed</p>
@@ -299,7 +288,7 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
                 {PLATFORMS.map((p) => (
                   <button key={p.code} onClick={() => selectPlatform(p)}
                     className="w-full flex items-center gap-4 p-5 rounded-xl border border-[var(--border)] bg-white hover:bg-neutral-50 hover:border-neutral-300 transition-all group text-left">
-                    <div className={`w-12 h-12 rounded-xl ${p.color} flex items-center justify-center text-white font-bold text-lg shrink-0`}>{p.letter}</div>
+                    <div className={`w-12 h-12 rounded-full ${p.color} flex items-center justify-center text-white font-bold text-lg shrink-0`}>{p.letter}</div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-neutral-800">{p.name}</p>
                       <p className="text-xs text-neutral-500">{p.desc}</p>
@@ -308,106 +297,107 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
                   </button>
                 ))}
                 <button disabled className="w-full flex items-center gap-4 p-5 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-left opacity-50 cursor-not-allowed">
-                  <div className="w-12 h-12 rounded-xl bg-neutral-200 flex items-center justify-center text-neutral-400 font-bold text-lg shrink-0">+</div>
+                  <div className="w-12 h-12 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-400 font-bold text-lg shrink-0">+</div>
                   <div className="flex-1 min-w-0"><p className="font-semibold text-neutral-400">Add manually</p><p className="text-xs text-neutral-400">Coming soon</p></div>
                 </button>
               </div>
             </div>
+          )}
 
-          ) : step === 2 && platform ? (
+          {step === 2 && platform && (
             <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Connect your {platform.name} account</h2>
-              <p className="text-sm text-neutral-500 mb-6">Authorize {platform.name} access to import your listings</p>
-              {iframeUrl && (<>
-                <IframeBar platform={platform} label="Connect Account" />
-                <iframe src={iframeUrl} className="w-full border border-neutral-200 rounded-b-lg" style={iframeStyle} allow="camera; microphone" title={`Connect ${platform.name}`} />
-                <div className="mt-6 flex justify-end">
-                  <button onClick={advanceToMapping} className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors">I&apos;ve connected my account</button>
+              <h2 className="text-xl font-bold text-neutral-800 mb-2">Paste your {platform.name} listing URL</h2>
+              <p className="text-sm text-neutral-500 mb-6">We&apos;ll pull in your listing details automatically</p>
+              <input
+                type="url" autoFocus value={listingUrl}
+                onChange={(e) => { setListingUrl(e.target.value); setUrlError(null); setListingId(null); }}
+                onBlur={validateUrl} onKeyDown={handleUrlKeyDown}
+                placeholder="e.g., airbnb.com/rooms/1234567890"
+                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-neutral-300"
+              />
+              {urlError && <p className="mt-2 text-sm text-red-500">{urlError}</p>}
+
+              {loading && (
+                <div className="flex items-center gap-2 mt-6 justify-center py-8">
+                  <Loader2 size={20} className="animate-spin text-emerald-500" />
+                  <p className="text-sm text-neutral-500">{loadMsg}</p>
                 </div>
-              </>)}
-            </div>
+              )}
 
-          ) : step === 3 && platform ? (
-            <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Map your listing</h2>
-              <div className="bg-neutral-50 rounded-xl p-4 mb-6 space-y-2">
-                <p className="text-sm text-neutral-700 font-medium">Follow these steps in the panel below:</p>
-                <ol className="text-sm text-neutral-600 space-y-1.5 list-decimal list-inside">
-                  <li>Click <span className="font-semibold">Actions</span> &rarr; <span className="font-semibold">Edit</span> on the Airbnb channel</li>
-                  <li>Go to the <span className="font-semibold">Mapping</span> tab</li>
-                  <li>Find the listing you want to add and click <span className="font-semibold">&quot;Not mapped&quot;</span></li>
-                  <li>Select <span className="font-semibold">&quot;Entire Home&quot;</span> then <span className="font-semibold">&quot;Best Available Rate&quot;</span></li>
-                  <li>Click <span className="font-semibold">Save</span></li>
-                </ol>
-              </div>
-              {iframeUrl && (<>
-                <IframeBar platform={platform} label="Map your listing" />
-                <iframe src={iframeUrl} className="w-full border border-neutral-200 rounded-b-lg" style={iframeStyle} allow="camera; microphone" title={`Map ${platform.name} listing`} />
-              </>)}
-              <div className="mt-6 flex justify-end">
-                <button onClick={handleMappingDone} className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors">I&apos;ve mapped my listing</button>
+              {!loading && listingId && listingName && (
+                <div className="mt-6">
+                  <PreviewCard photo={listingPhoto} name={editedName} platformCode={platform.code} onNameChange={setEditedName} />
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-between items-center">
+                <button onClick={() => setStep(1)} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">&larr; Back</button>
+                <button onClick={() => setStep(3)} disabled={!canAdvanceToStep3}
+                  className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  Next
+                </button>
               </div>
             </div>
+          )}
 
-          ) : step === 4 ? (
+          {step === 3 && platform && (
             <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Confirm your property</h2>
-              <p className="text-sm text-neutral-500 mb-6">Review the details below before importing</p>
-              <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden max-w-md mx-auto">
-                {listingPhoto ? (
-                  <div className="h-52 overflow-hidden rounded-t-xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={listingPhoto} alt={editedName} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="h-52 bg-gradient-to-br from-brand-50 to-brand-100 rounded-t-xl flex items-center justify-center"><Home size={40} className="text-brand-300" strokeWidth={1.5} /></div>
-                )}
-                <div className="p-5 space-y-4">
-                  {badge && <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${badge.bg} ${badge.text}`}>{badge.label}</span>}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-500 mb-1">Property Name</label>
-                    <input type="text" value={editedName} onChange={(e) => setEditedName(e.target.value)}
-                      className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-500 mb-1">iCal Calendar URL <span className="text-neutral-400">(optional)</span></label>
-                    <input type="url" value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="Paste your Airbnb calendar export URL"
-                      className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 placeholder:text-neutral-300" />
-                    <p className="mt-1.5 text-xs text-neutral-400 flex items-center gap-1"><ExternalLink size={10} />How to find this: Airbnb &rarr; Listing &rarr; Calendar &rarr; Export</p>
-                  </div>
-                  <button onClick={handleImport} disabled={importing || !editedName.trim()}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50">
-                    {importing ? <><Loader2 size={16} className="animate-spin" />Importing...</> : "Import Property"}
+              <h2 className="text-xl font-bold text-neutral-800 mb-2">Import existing bookings</h2>
+              <p className="text-sm text-neutral-500 mb-6">Paste your calendar export URL to import past and upcoming bookings</p>
+              <input
+                type="url" value={icalUrl}
+                onChange={(e) => setIcalUrl(e.target.value)}
+                placeholder={`e.g., airbnb.com/calendar/ical/${listingId ?? "1234567890"}.ics`}
+                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-neutral-300"
+              />
+              <IcalHelp platform={platform.code} />
+
+              {importing && (
+                <div className="flex items-center gap-2 mt-6 justify-center py-4">
+                  <Loader2 size={20} className="animate-spin text-emerald-500" />
+                  <p className="text-sm text-neutral-500">Importing property and syncing bookings...</p>
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-between items-center">
+                <button onClick={() => setStep(2)} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">&larr; Back</button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => handleImport(true)} disabled={importing}
+                    className="px-5 py-3 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors disabled:opacity-50">
+                    Skip for now
+                  </button>
+                  <button onClick={() => handleImport(false)} disabled={importing || !icalUrl.trim()}
+                    className="px-5 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                    {importing && <Loader2 size={16} className="animate-spin" />}
+                    Import &amp; Continue
                   </button>
                 </div>
               </div>
             </div>
+          )}
 
-          ) : step === 5 ? (
+          {step === 4 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center max-w-sm">
                 <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-emerald-500" strokeWidth={2.5} /></div>
                 <h2 className="text-xl font-bold text-neutral-800 mb-2">Property added!</h2>
-                {importedCount > 0 && <p className="text-sm text-neutral-500 mb-6">{importedCount} booking{importedCount !== 1 ? "s" : ""} imported</p>}
-                <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden mt-4 mb-8 text-left">
-                  {listingPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <div className="h-36 overflow-hidden"><img src={listingPhoto} alt={editedName || listingName} className="w-full h-full object-cover" /></div>
-                  ) : (
-                    <div className="h-36 bg-gradient-to-br from-brand-50 to-brand-100 flex items-center justify-center"><Home size={28} className="text-brand-300" strokeWidth={1.5} /></div>
-                  )}
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-neutral-800">{editedName || listingName}</p>
-                    {badge && <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full mt-2 ${badge.bg} ${badge.text}`}>{badge.label}</span>}
-                  </div>
+                {bookingCount > 0 && <p className="text-sm text-neutral-500 mb-4">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>}
+                <div className="mt-4 mb-8">
+                  <PreviewCard
+                    photo={importedProperty?.photo_url ?? listingPhoto}
+                    name={importedProperty?.name ?? editedName ?? listingName}
+                    platformCode={platform?.code ?? "ABB"}
+                    bookingCount={bookingCount}
+                  />
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button onClick={handleAddAnother} className="px-5 py-2.5 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors">Add Another Property</button>
-                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors">Done</button>
+                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Go to Dashboard</button>
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
+
         </div>
       </div>
     </div>
@@ -426,44 +416,26 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
     chMap.get(ch.property_id)!.push(ch);
   }
 
-  // Cleanup orphaned scaffolds on mount + when modal closes without completing
-  const cleanupScaffolds = useCallback(() => {
-    fetch("/api/properties/cleanup-scaffolds", { method: "POST" }).catch(() => {});
-  }, []);
-
-  useEffect(() => { cleanupScaffolds(); }, [cleanupScaffolds]);
-
   const closeModal = useCallback((didImport: boolean) => {
     setShowModal(false);
-    if (didImport) {
-      router.refresh();
-    } else {
-      // User cancelled — clean up any orphaned scaffold
-      cleanupScaffolds();
-    }
-  }, [router, cleanupScaffolds]);
+    if (didImport) router.refresh();
+  }, [router]);
 
   if (properties.length === 0) {
     return (
       <div>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-lg">
-            <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><Home size={32} className="text-brand-500" strokeWidth={1.5} /></div>
+            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><Home size={32} className="text-emerald-500" strokeWidth={1.5} /></div>
             <h1 className="text-2xl font-bold text-neutral-800 mb-2">Add your first property</h1>
             <p className="text-neutral-500 mb-8">Import from Airbnb, Booking.com, or VRBO to get started</p>
-            <div className="space-y-3 max-w-sm mx-auto mb-8">
-              {PLATFORMS.map((p) => (
-                <button key={p.code} onClick={() => setShowModal(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] bg-white hover:bg-neutral-50 hover:border-neutral-300 transition-all group text-left">
-                  <div className={`w-10 h-10 rounded-lg ${p.color} flex items-center justify-center text-white font-bold text-sm shrink-0`}>{p.letter}</div>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-neutral-800">{p.name}</p><p className="text-xs text-neutral-500">{p.desc}</p></div>
-                  <ChevronRight size={16} className="text-neutral-400 group-hover:text-neutral-600 shrink-0" />
-                </button>
-              ))}
-            </div>
+            <button onClick={() => setShowModal(true)}
+              className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mx-auto">
+              <Plus size={16} />Add Property
+            </button>
           </div>
         </div>
-        {showModal && <AddPropertyModal hasExisting={false} onClose={closeModal} />}
+        {showModal && <AddPropertyModal onClose={closeModal} />}
       </div>
     );
   }
@@ -472,7 +444,7 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
     <div>
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-bold text-neutral-800">Properties</h1>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors"><Plus size={16} />Add Property</button>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors"><Plus size={16} />Add Property</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {properties.map((prop) => (
@@ -481,7 +453,7 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
             nextCheckin={nextCheckins[prop.id] ?? null} />
         ))}
       </div>
-      {showModal && <AddPropertyModal hasExisting={properties.length > 0} onClose={closeModal} />}
+      {showModal && <AddPropertyModal onClose={closeModal} />}
     </div>
   );
 }
