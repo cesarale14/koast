@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import UnifiedInbox from "@/components/dashboard/UnifiedInbox";
 import TemplateManager from "@/components/dashboard/TemplateManager";
 import MessagesPageTabs from "@/components/dashboard/MessagesPageTabs";
@@ -10,8 +11,10 @@ export default async function MessagesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const svc = createServiceClient();
+
   // Fetch user's properties first
-  const propertiesRes = await supabase
+  const propertiesRes = await svc
     .from("properties")
     .select("id, name, city")
     .eq("user_id", user.id)
@@ -20,9 +23,9 @@ export default async function MessagesPage() {
   const properties = (propertiesRes.data ?? []) as any[];
   const propertyIds = properties.map((p: { id: string }) => p.id);
 
-  // Fetch messages and bookings scoped to user's properties
+  // Fetch messages and bookings scoped to user's properties (service client for RLS bypass)
   const messagesRes = propertyIds.length > 0
-    ? await supabase
+    ? await svc
         .from("messages")
         .select("id, property_id, booking_id, platform, direction, sender_name, content, ai_draft, ai_draft_status, created_at")
         .in("property_id", propertyIds)
@@ -33,7 +36,7 @@ export default async function MessagesPage() {
   const messages = (messagesRes.data ?? []) as any[];
 
   const bookingsRes = propertyIds.length > 0
-    ? await supabase
+    ? await svc
         .from("bookings")
         .select("id, guest_name, check_in, check_out, property_id")
         .in("property_id", propertyIds)
@@ -45,7 +48,7 @@ export default async function MessagesPage() {
 
   // Fetch templates scoped to user's properties
   const templatesRes = propertyIds.length > 0
-    ? await supabase
+    ? await svc
         .from("message_templates")
         .select("id, property_id, template_type, subject, body, is_active, trigger_type, trigger_days_offset, trigger_time")
         .in("property_id", propertyIds)
@@ -64,7 +67,7 @@ export default async function MessagesPage() {
           icon={MessageCircle}
           title="No messages yet"
           description="Messages will appear here when guests contact you through connected channels."
-          action={{ label: "Connect a Channel", href: "/channels" }}
+          action={{ label: "Add a Property", href: "/properties" }}
         />
       </div>
     );
