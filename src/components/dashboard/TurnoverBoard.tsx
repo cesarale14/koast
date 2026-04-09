@@ -318,7 +318,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       >
                         <div className="flex items-start justify-between mb-1">
                           <div className="flex items-center gap-2 min-w-0">
-                            <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={24} />
+                            <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={32} />
                             <p className="text-sm font-medium text-neutral-900 truncate">{propName}</p>
                           </div>
                           {isUrgent && (
@@ -343,7 +343,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                           <p className="text-xs text-info mt-0.5">Cleaner: {cleanerMap.get(task.cleaner_id)!.name}</p>
                         )}
                         {/* Checklist progress */}
-                        {totalCount > 0 && (
+                        {totalCount > 0 && doneCount > 0 && (
                           <div className="mt-2">
                             <div className="flex items-center justify-between text-[10px] text-neutral-400 mb-0.5">
                               <span className="font-mono">{doneCount}/{totalCount}</span>

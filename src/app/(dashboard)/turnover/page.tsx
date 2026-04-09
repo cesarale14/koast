@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import TurnoverBoard from "@/components/dashboard/TurnoverBoard";
 import EmptyState from "@/components/ui/EmptyState";
 import { SprayCan } from "lucide-react";
@@ -8,8 +9,10 @@ export default async function TurnoverPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const svc = createServiceClient();
+
   // Fetch user's properties first
-  const { data: props } = await supabase
+  const { data: props } = await svc
     .from("properties")
     .select("id, name, cover_photo_url")
     .eq("user_id", user.id)
@@ -20,7 +23,7 @@ export default async function TurnoverPage() {
 
   // Fetch cleaning tasks and bookings scoped to user's properties
   const { data: tasks } = propertyIds.length > 0
-    ? await supabase
+    ? await svc
         .from("cleaning_tasks")
         .select("id, property_id, booking_id, next_booking_id, cleaner_id, status, scheduled_date, scheduled_time, checklist, notes, completed_at, cleaner_token, created_at")
         .in("property_id", propertyIds)
@@ -30,7 +33,7 @@ export default async function TurnoverPage() {
   const allTasks = (tasks ?? []) as any[];
 
   const { data: bookings } = propertyIds.length > 0
-    ? await supabase
+    ? await svc
         .from("bookings")
         .select("id, guest_name, check_in, check_out")
         .in("property_id", propertyIds)
@@ -40,7 +43,7 @@ export default async function TurnoverPage() {
   const allBookings = (bookings ?? []) as any[];
 
   // Fetch cleaners
-  const { data: cleanerData } = await supabase
+  const { data: cleanerData } = await svc
     .from("cleaners")
     .select("id, name, phone, email, is_active")
     .eq("user_id", user.id)

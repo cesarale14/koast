@@ -14,6 +14,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
+import PlatformLogoDefault from "@/components/ui/PlatformLogo";
+const DashPlatformLogo = PlatformLogoDefault;
 
 // ====== Types ======
 
@@ -259,16 +261,8 @@ function PropertyCardComponent({
         </span>
         {/* Platform badge — bottom right */}
         {card.platform && (
-          <span
-            className={`absolute bottom-2 right-2 px-1.5 py-0.5 text-[10px] font-bold rounded ${
-              card.platform.toLowerCase() === "airbnb"
-                ? "bg-airbnb text-white"
-                : card.platform.toLowerCase() === "vrbo"
-                  ? "bg-vrbo text-white"
-                  : "bg-white/90 text-neutral-600"
-            }`}
-          >
-            {card.platform.charAt(0).toUpperCase() + card.platform.slice(1)}
+          <span className="absolute bottom-2 right-2 bg-white/90 rounded-full p-0.5">
+            <DashPlatformLogo platform={card.platform} size="sm" />
           </span>
         )}
       </div>
