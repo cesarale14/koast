@@ -147,6 +147,11 @@ export default function PricingDashboard({
     };
   }, [rates]);
 
+  const avgBaseRate = useMemo(() => {
+    const bases = rates.map((r) => r.base_rate).filter((v): v is number => v != null && v > 0);
+    return bases.length > 0 ? Math.round(bases.reduce((s, b) => s + b, 0) / bases.length) : null;
+  }, [rates]);
+
   const selectedRateEntry = useMemo(
     () => rates.find((r) => r.date === selectedDate) ?? null,
     [rates, selectedDate]
@@ -423,7 +428,7 @@ export default function PricingDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar heatmap (2/3 width) */}
         <div className="lg:col-span-2 bg-neutral-0 rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-bold text-neutral-800">Rate Calendar</h2>
             {/* Legend */}
             <div className="flex items-center gap-2 text-[10px] text-neutral-400">
@@ -434,11 +439,17 @@ export default function PricingDashboard({
                 ))}
               </div>
               <span>High</span>
-              <span className="ml-2">{"\u25CF"}</span>
-              <span className="text-emerald-500">{"\u2191"} raise</span>
-              <span className="text-danger">{"\u2193"} lower</span>
+              <span className="mx-1 text-neutral-200">|</span>
+              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> raise</span>
+              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-danger inline-block" /> lower</span>
             </div>
           </div>
+          {avgBaseRate && (
+            <p className="text-[11px] text-neutral-400 mb-4">
+              Base rate: <span className="font-mono font-medium text-neutral-600">${avgBaseRate}/night</span>
+              {" · "}Range: <span className="font-mono font-medium text-neutral-600">${rateRange.min}–${rateRange.max}</span>
+            </p>
+          )}
 
           {/* Bulk action bar */}
           {selectedDates.size > 1 && (

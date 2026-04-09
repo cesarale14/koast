@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; }
+interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; dot?: boolean; }
 interface NavGroup { label?: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
@@ -21,7 +21,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
-      { name: "Messages", href: "/messages", icon: MessageCircle },
+      { name: "Messages", href: "/messages", icon: MessageCircle, dot: true },
     ],
   },
   {
@@ -57,6 +57,7 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       }`}>
       {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-brand-400" />}
       <Icon size={20} strokeWidth={1.5} />
+      {item.dot && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500" />}
       {showTip && (
         <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
           style={{ backgroundColor: "#1c1917", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
@@ -79,6 +80,7 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       {isActive && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-brand-400" />}
       <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
       <span className="truncate">{item.name}</span>
+      {item.dot && <span className="w-2 h-2 rounded-full bg-emerald-500 ml-auto flex-shrink-0" />}
       {item.external && <span className="text-sidebar-text/40 text-[10px] ml-auto">↗</span>}
     </Link>
   );
