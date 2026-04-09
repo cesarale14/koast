@@ -35,13 +35,15 @@ function BookingIcon({ s }: { s: number }) {
   );
 }
 
-/** VRBO official mark */
+/** VRBO — lowercase "vrbo" wordmark with house roof on the v. Brand blue #0B4DA2 */
 function VrboIcon({ s }: { s: number }) {
   return (
     <svg width={s} height={s} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="6" fill="#0E47A1"/>
-      <path d="M6 9h3l3 10.5h.1L15.1 9H18l-5 14h-2.5L6 9z" fill="white"/>
-      <path d="M17.5 23V9H20v5h.1c.5-1 1.6-1.5 2.8-1.5 1 0 1.8.3 2.3.8.6.5.8 1.3.8 2.4V23h-2.5v-6.5c0-.6-.1-1-.4-1.3-.3-.3-.6-.4-1.1-.4-.6 0-1 .2-1.4.6-.3.4-.5.9-.5 1.5V23h-2.6z" fill="white"/>
+      <rect width="32" height="32" rx="6" fill="#0B4DA2"/>
+      {/* House roof accent above the "v" */}
+      <path d="M7.5 9L10 6.5 12.5 9" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* "vrbo" text */}
+      <text x="4" y="23" fill="white" fontSize="11" fontWeight="700" fontFamily="'Nunito',Arial,sans-serif" letterSpacing="-0.3">vrbo</text>
     </svg>
   );
 }
@@ -52,8 +54,8 @@ const LABEL: Record<string, string> = {
 };
 
 const LABEL_COLOR: Record<string, string> = {
-  airbnb: "text-[#FF5A5F]", booking_com: "text-[#003580]", vrbo: "text-[#0E47A1]",
-  ABB: "text-[#FF5A5F]", BDC: "text-[#003580]", VRBO: "text-[#0E47A1]",
+  airbnb: "text-[#FF5A5F]", booking_com: "text-[#003580]", vrbo: "text-[#0B4DA2]",
+  ABB: "text-[#FF5A5F]", BDC: "text-[#003580]", VRBO: "text-[#0B4DA2]",
 };
 
 function resolve(platform: string) {
