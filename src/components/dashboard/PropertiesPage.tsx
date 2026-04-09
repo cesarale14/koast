@@ -60,7 +60,7 @@ function StepDots({ current }: { current: number }) {
 }
 
 /* ---------- Platform Badge ---------- */
-import { PlatformBadge as PlatformBadgeUI } from "@/components/ui/PlatformLogo";
+import PlatformLogoIcon, { PlatformBadge as PlatformBadgeUI } from "@/components/ui/PlatformLogo";
 function PlatformBadge({ code }: { code: string }) {
   return <PlatformBadgeUI platform={code} />;
 }
@@ -287,7 +287,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                 {PLATFORMS.map((p) => (
                   <button key={p.code} onClick={() => selectPlatform(p)}
                     className="w-full flex items-center gap-4 p-5 rounded-xl border border-[var(--border)] bg-white hover:bg-neutral-50 hover:border-neutral-300 transition-all group text-left">
-                    <div className={`w-12 h-12 rounded-full ${p.color} flex items-center justify-center text-white font-bold text-lg shrink-0`}>{p.letter}</div>
+                    <PlatformLogoIcon platform={p.code} size="xl" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-neutral-800">{p.name}</p>
                       <p className="text-xs text-neutral-500">{p.desc}</p>
