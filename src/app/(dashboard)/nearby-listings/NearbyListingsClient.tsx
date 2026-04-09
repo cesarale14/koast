@@ -151,8 +151,18 @@ export default function NearbyListingsClient({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={comp.photo_url} alt={comp.comp_name ?? ""} className="w-full h-40 object-cover rounded-t-xl" />
                 ) : (
-                  <div className="w-full h-40 rounded-t-xl bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                    <span className="text-5xl font-bold text-neutral-300">
+                  <div className={`w-full h-40 rounded-t-xl flex items-center justify-center ${
+                    (() => {
+                      const n = (comp.comp_name ?? "").toLowerCase();
+                      if (n.includes("sun") || n.includes("bay")) return "bg-gradient-to-br from-amber-100 to-orange-200";
+                      if (n.includes("downtown") || n.includes("channel") || n.includes("river")) return "bg-gradient-to-br from-blue-100 to-cyan-200";
+                      if (n.includes("pool") || n.includes("beach") || n.includes("marina")) return "bg-gradient-to-br from-teal-100 to-emerald-200";
+                      if (n.includes("hyde") || n.includes("palma") || n.includes("garden")) return "bg-gradient-to-br from-green-100 to-lime-200";
+                      if (n.includes("loft") || n.includes("studio") || n.includes("modern")) return "bg-gradient-to-br from-violet-100 to-purple-200";
+                      return "bg-gradient-to-br from-rose-100 to-pink-200";
+                    })()
+                  }`}>
+                    <span className="text-4xl font-bold text-white/60">
                       {(comp.comp_name ?? "L").charAt(0).toUpperCase()}
                     </span>
                   </div>
