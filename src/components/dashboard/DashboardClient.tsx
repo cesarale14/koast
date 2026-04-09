@@ -369,7 +369,7 @@ const actionTypeConfig: Record<string, { icon: typeof DollarSign; iconBg: string
   revenue: { icon: TrendingUp, iconBg: "bg-emerald-100", iconColor: "text-emerald-600" },
   cleaning: { icon: Sparkles, iconBg: "bg-amber-100", iconColor: "text-amber-600" },
   event: { icon: Calendar, iconBg: "bg-blue-100", iconColor: "text-blue-600" },
-  review: { icon: Star, iconBg: "bg-purple-100", iconColor: "text-purple-600" },
+  review: { icon: Star, iconBg: "bg-yellow-100", iconColor: "text-yellow-600" },
 };
 
 function SmartActions({ actions }: { actions: ActionItem[] }) {
@@ -468,10 +468,10 @@ function EventsBar({ events }: { events: EventPill[] }) {
           const intensity = (e.demandImpact ?? 0);
           const bg =
             intensity >= 0.6
-              ? "bg-red-50 border-red-200 text-red-700"
+              ? "bg-red-100 text-red-700"
               : intensity >= 0.3
-                ? "bg-amber-50 border-amber-200 text-amber-700"
-                : "bg-neutral-50 border-neutral-200 text-neutral-600";
+                ? "bg-amber-100 text-amber-700"
+                : "bg-blue-50 text-blue-600";
           const emoji =
             e.eventType === "sports" || e.eventType === "sporting_event"
               ? "🏟"
@@ -486,7 +486,7 @@ function EventsBar({ events }: { events: EventPill[] }) {
             <Link
               key={i}
               href="/pricing"
-              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border ${bg} hover:opacity-80 transition-opacity`}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full ${bg} hover:opacity-80 transition-opacity`}
             >
               <span>{emoji}</span>
               <span className="truncate max-w-[160px]">{e.name}</span>

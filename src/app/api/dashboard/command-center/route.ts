@@ -425,7 +425,7 @@ export async function POST() {
       marketOccupancy = Math.round(snapshotValues.reduce((s, v) => s + Number(v.market_occupancy ?? 0), 0) / snapshotValues.length);
     }
 
-    // Your ADR from bookings
+    // Your ADR from bookings (or calendar_rates if no pricing data)
     const bookingsWithPrice = thisMonthBookings.filter((b) => b.total_price && b.total_price > 0);
     let yourAdr = 0;
     if (bookingsWithPrice.length > 0) {
@@ -439,6 +439,19 @@ export async function POST() {
         totalRev += b.total_price!;
       }
       yourAdr = totalNights > 0 ? Math.round(totalRev / totalNights) : 0;
+    }
+    // Fallback: average from calendar_rates if no booking prices (iCal bookings)
+    if (yourAdr === 0 && propIds.length > 0) {
+      const { data: avgRates } = await supabase
+        .from("calendar_rates")
+        .select("applied_rate")
+        .in("property_id", propIds)
+        .gte("date", thisMonthStart)
+        .lte("date", thisMonthEnd)
+        .not("applied_rate", "is", null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rates = ((avgRates ?? []) as any[]).map((r) => Number(r.applied_rate)).filter((v) => v > 0);
+      if (rates.length > 0) yourAdr = Math.round(rates.reduce((s, v) => s + v, 0) / rates.length);
     }
 
     // Market grade
