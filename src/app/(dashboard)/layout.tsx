@@ -25,7 +25,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "MANAGE",
     items: [
       { name: "Properties", href: "/properties", icon: Home },
       { name: "Pricing", href: "/pricing", icon: DollarSign },
@@ -34,7 +33,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "GROW",
     items: [
       { name: "Market Intel", href: "/market-explorer", icon: Map },
       { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
@@ -52,14 +50,14 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
     <Link href={item.href}
       onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
-      className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 ${
-        isActive ? "bg-emerald-50 text-emerald-700" : "text-gray-400 hover:text-gray-700 hover:bg-gray-50"
+      className={`relative flex items-center justify-center w-11 h-11 rounded-lg transition-all duration-150 ${
+        isActive ? "bg-emerald-50 text-emerald-600" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
       }`}>
-      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r bg-emerald-500" />}
+      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-emerald-500" />}
       <Icon size={20} strokeWidth={1.5} />
       {item.dot && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />}
       {showTip && (
-        <span className="fixed ml-[68px] px-2.5 py-1.5 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
+        <span className="fixed ml-[72px] px-3 py-2 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
           style={{ backgroundColor: "#1f2937", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
           {item.name}
         </span>
@@ -74,11 +72,11 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
   const linkProps = item.external ? { target: "_blank" as const, rel: "noopener noreferrer" } : {};
   return (
     <Link href={item.href} onClick={onClick} {...linkProps}
-      className={`relative flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-md transition-all duration-150 ${
-        isActive ? "bg-emerald-50 text-emerald-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+      className={`relative flex items-center gap-3 px-3 h-11 text-sm font-medium rounded-lg transition-all duration-150 ${
+        isActive ? "bg-emerald-50 text-emerald-600" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
       }`}>
-      {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r bg-emerald-500" />}
-      <Icon size={18} strokeWidth={1.5} className={`flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-400"}`} />
+      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-emerald-500" />}
+      <Icon size={20} strokeWidth={1.5} className={`flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-400"}`} />
       <span className="truncate">{item.name}</span>
       {item.dot && <span className="w-2 h-2 rounded-full bg-emerald-500 ml-auto flex-shrink-0" />}
       {item.external && <span className="text-gray-300 text-[10px] ml-auto">↗</span>}
@@ -97,15 +95,12 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
       {expanded ? (
         /* ---- EXPANDED ---- */
         <>
-          <div className="px-4 h-14 flex items-center border-b border-gray-100">
-            <Logo variant="full" size={28} className="[&_span]:!text-gray-900 [&_span]:!font-semibold" />
+          <div className="px-5 h-16 flex items-center">
+            <Logo variant="full" size={30} className="[&_span]:!text-gray-900 [&_span]:!font-bold [&_span]:!text-lg" />
           </div>
-          <nav className="flex-1 px-3 overflow-y-auto mt-3">
+          <nav className="flex-1 px-3 overflow-y-auto">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-gray-100" : ""}>
-                {group.label && (
-                  <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-gray-400">{group.label}</p>
-                )}
+              <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -115,7 +110,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
               </div>
             ))}
           </nav>
-          <div className="px-4 py-3 border-t border-gray-100">
+          <div className="px-4 py-4 border-t border-gray-100">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700">C</div>
               <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">Cesar</p></div>
@@ -125,14 +120,14 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
         </>
       ) : (
         /* ---- COLLAPSED ---- */
-        <div className="flex flex-col items-center py-3 h-full">
-          <Link href="/" className="mb-6">
-            <Logo variant="icon" size={28} />
+        <div className="flex flex-col items-center pt-4 h-full">
+          <Link href="/" className="mb-5">
+            <Logo variant="icon" size={30} />
           </Link>
-          <nav className="flex-1 flex flex-col items-center gap-1 overflow-y-auto">
+          <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-gray-100 w-8" : ""}>
-                <div className="flex flex-col items-center gap-1">
+              <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100 w-8" : ""}>
+                <div className="flex flex-col items-center gap-0.5">
                   {group.items.map((item) => {
                     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                     return <NavLinkCollapsed key={item.name} item={item} isActive={isActive} />;
@@ -141,8 +136,8 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
               </div>
             ))}
           </nav>
-          <div className="mt-3 pt-3 border-t border-gray-100 w-8 flex flex-col items-center">
-            <Link href="/settings" className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-semibold text-emerald-700 hover:bg-emerald-200 transition-colors">C</Link>
+          <div className="mt-3 pt-3 border-t border-gray-100 w-8 flex flex-col items-center pb-3">
+            <Link href="/settings" className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-semibold text-emerald-700 hover:bg-emerald-200 transition-colors">C</Link>
           </div>
         </div>
       )}
@@ -150,7 +145,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
     {/* Toggle pill — centered on sidebar right edge */}
     <button
       onClick={onToggle}
-      className="hidden md:flex fixed z-40 items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all duration-200 ease-out"
+      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 ease-out"
       style={{
         left: (expanded ? 240 : 60) - 12,
         top: 20,
@@ -171,16 +166,13 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
     <>
       <div className="fixed inset-0 bg-black/30 z-40 md:hidden" onClick={onClose} />
       <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left bg-white border-r border-gray-200">
-        <div className="px-4 h-14 flex items-center justify-between border-b border-gray-100">
-          <Logo variant="full" size={28} className="[&_span]:!text-gray-900 [&_span]:!font-semibold" />
+        <div className="px-5 h-16 flex items-center justify-between">
+          <Logo variant="full" size={30} className="[&_span]:!text-gray-900 [&_span]:!font-bold [&_span]:!text-lg" />
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
         </div>
-        <nav className="flex-1 px-3 overflow-y-auto mt-3">
+        <nav className="flex-1 px-3 overflow-y-auto">
           {navGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-5 pt-4 border-t border-gray-100" : ""}>
-              {group.label && (
-                <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-gray-400">{group.label}</p>
-              )}
+            <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -190,7 +182,7 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
             </div>
           ))}
         </nav>
-        <div className="px-4 py-3 border-t border-gray-100">
+        <div className="px-4 py-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700">C</div>
             <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">Cesar</p></div>
@@ -237,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <style>{`@media(min-width:768px){.main-offset{margin-left:${sidebarWidth}px}}`}</style>
         <div className="main-offset flex-1 flex flex-col min-h-screen">
           {/* Topbar */}
-          <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-gray-200 bg-white">
+          <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-gray-100 bg-white">
             <div className="flex items-center gap-3">
               {/* Mobile hamburger */}
               <button
@@ -249,10 +241,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="md:hidden text-sm font-medium text-gray-700">
                 {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
+              <span className="hidden md:block text-sm text-gray-500">
+                {(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; })()}, Cesar
+              </span>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <button className="relative text-gray-400 hover:text-gray-600 transition-colors"><Bell size={18} strokeWidth={1.5} /></button>
-              <button className="hidden sm:flex items-center gap-2 px-3 h-8 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-md hover:border-gray-300 transition-all">
+              <button className="relative text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-50"><Bell size={20} strokeWidth={1.5} /></button>
+              <button className="hidden sm:flex items-center gap-2 px-3.5 h-9 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-all">
                 <RefreshCcw size={14} strokeWidth={1.5} />Sync Now
               </button>
             </div>

@@ -162,22 +162,22 @@ export default function DashboardClient() {
 
       <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-2"><Home size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Properties</p></div>
-            <p className="text-2xl font-bold font-mono text-neutral-800">{data.propertyCards.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-emerald-500">
+            <div className="flex items-center gap-2.5 mb-3"><Home size={22} className="text-emerald-500" /><p className="text-sm font-medium text-gray-500">Properties</p></div>
+            <p className="text-3xl font-bold text-gray-900">{data.propertyCards.length}</p>
           </div>
-          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-2"><TrendingUp size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Occupancy</p></div>
-            <p className="text-2xl font-bold font-mono text-neutral-800">{data.performance.occupancyRate}%</p>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-blue-500">
+            <div className="flex items-center gap-2.5 mb-3"><TrendingUp size={22} className="text-blue-500" /><p className="text-sm font-medium text-gray-500">Occupancy</p></div>
+            <p className="text-3xl font-bold text-gray-900">{data.performance.occupancyRate}%</p>
           </div>
-          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-emerald-500" /><p className="text-xs text-neutral-400 font-medium">Est. Revenue</p></div>
-            <p className="text-2xl font-bold font-mono text-emerald-600">{formatCurrency(data.performance.thisMonthRevenue)}</p>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-emerald-500">
+            <div className="flex items-center gap-2.5 mb-3"><DollarSign size={22} className="text-emerald-500" /><p className="text-sm font-medium text-gray-500">Est. Revenue</p></div>
+            <p className="text-3xl font-bold text-emerald-600">{formatCurrency(data.performance.thisMonthRevenue)}</p>
           </div>
-          <div className="bg-neutral-0 rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-2"><Calendar size={14} className="text-neutral-400" /><p className="text-xs text-neutral-400 font-medium">Upcoming Check-ins</p></div>
-            <p className="text-2xl font-bold font-mono text-neutral-800">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-amber-500">
+            <div className="flex items-center gap-2.5 mb-3"><Calendar size={22} className="text-amber-500" /><p className="text-sm font-medium text-gray-500">Upcoming Check-ins</p></div>
+            <p className="text-3xl font-bold text-gray-900">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
           </div>
         </div>
 
@@ -289,8 +289,8 @@ function PropertyCardComponent({
       </div>
 
       {/* Info section */}
-      <div className="p-3 h-[80px] flex flex-col justify-between">
-        <p className="text-sm font-bold text-neutral-800 truncate">{card.name}</p>
+      <div className="p-3.5 h-[84px] flex flex-col justify-between">
+        <p className="text-base font-semibold text-gray-900 truncate">{card.name}</p>
 
         {isOccupiedLike && card.guestName && (
           <div>
@@ -303,7 +303,7 @@ function PropertyCardComponent({
                 {formatShortDate(card.checkIn)} – {formatShortDate(card.checkOut)} ({card.nights}n)
               </span>
               {card.tonightRate != null && (
-                <span className="text-sm font-mono text-emerald-600 font-semibold">
+                <span className="text-lg font-bold text-emerald-600">
                   ${card.tonightRate}
                 </span>
               )}
@@ -402,17 +402,18 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
 
   return (
     <div className="mb-6">
-      <h2 className="text-xs font-semibold text-neutral-500 mb-3">
+      <h2 className="text-sm font-semibold text-gray-800 mb-3">
         Needs Your Attention
       </h2>
       <div className="space-y-2">
         {visible.slice(0, 5).map((a) => {
           const config = actionTypeConfig[a.type] ?? actionTypeConfig.event;
           const Icon = config.icon;
+          const borderColor = a.type === "cleaning" ? "border-l-amber-500" : a.type === "event" ? "border-l-blue-500" : "border-l-emerald-500";
           return (
             <div
               key={a.id}
-              className="flex items-center gap-3 p-3 rounded-xl bg-neutral-0 shadow-sm group"
+              className={`flex items-center gap-3.5 p-4 rounded-xl bg-white shadow-sm border-l-4 ${borderColor} group`}
             >
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.iconBg}`}
@@ -420,13 +421,13 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
                 <Icon size={18} className={config.iconColor} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-neutral-800">{a.title}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">{a.description}</p>
+                <p className="text-sm font-semibold text-gray-900">{a.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{a.description}</p>
               </div>
               {a.action && (
                 <Link
                   href={a.action.href}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+                  className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
                 >
                   {a.action.label}
                 </Link>
@@ -436,7 +437,7 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
                   e.preventDefault();
                   dismiss(a.id);
                 }}
-                className="flex-shrink-0 p-1 text-neutral-300 hover:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="flex-shrink-0 p-1 text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <XIcon size={14} />
               </button>
@@ -507,8 +508,8 @@ function PerformanceSection({
   performance: CommandCenterData["performance"];
 }) {
   return (
-    <div className="bg-neutral-0 rounded-xl shadow-sm p-6 h-full">
-      <h2 className="text-sm font-semibold text-neutral-500 mb-4">
+    <div className="bg-white rounded-xl shadow-sm p-6 h-full">
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">
         Revenue
       </h2>
       <RevenueChart data={performance.revenueData} />
@@ -571,8 +572,8 @@ function MarketHealth({ market }: { market: CommandCenterData["market"] }) {
   const hasMarketData = market.marketAdr > 0;
 
   return (
-    <div className="bg-neutral-0 rounded-xl shadow-sm p-6 h-full flex flex-col">
-      <h2 className="text-xs font-semibold text-neutral-500 mb-4">
+    <div className="bg-white rounded-xl shadow-sm p-6 h-full flex flex-col">
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">
         Market Health
       </h2>
 
@@ -681,8 +682,8 @@ function ActivityFeed({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="bg-neutral-0 rounded-xl shadow-sm p-5">
-      <h2 className="text-xs font-semibold text-neutral-500 mb-3">
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <h2 className="text-lg font-semibold text-gray-800 mb-3">
         Recent Activity
       </h2>
       <div className="space-y-2.5">

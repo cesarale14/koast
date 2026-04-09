@@ -37,11 +37,11 @@ interface TurnoverBoardProps {
 }
 
 const COLUMNS = [
-  { key: "pending", label: "Upcoming", color: "border-neutral-300" },
-  { key: "today", label: "Today", color: "border-warning" },
-  { key: "in_progress", label: "In Progress", color: "border-info" },
-  { key: "completed", label: "Completed", color: "border-success" },
-  { key: "issue", label: "Issues", color: "border-danger" },
+  { key: "today", label: "Today", bg: "bg-amber-50 border-amber-200", text: "text-amber-700", countBg: "bg-amber-100 text-amber-700" },
+  { key: "pending", label: "Upcoming", bg: "bg-gray-50 border-gray-200", text: "text-gray-700", countBg: "bg-gray-200 text-gray-600" },
+  { key: "in_progress", label: "In Progress", bg: "bg-blue-50 border-blue-200", text: "text-blue-700", countBg: "bg-blue-100 text-blue-700" },
+  { key: "completed", label: "Completed", bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", countBg: "bg-emerald-100 text-emerald-700" },
+  { key: "issue", label: "Issues", bg: "bg-red-50 border-red-200", text: "text-red-700", countBg: "bg-red-100 text-red-700" },
 ];
 
 const statusColors: Record<string, string> = {
@@ -198,8 +198,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-neutral-800 mb-1">Cleaning</h1>
-            <p className="text-sm text-neutral-500">Cleaning schedules and task management</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Cleaning</h1>
+            <p className="text-sm text-gray-500">Cleaning schedules and task management</p>
           </div>
         </div>
 
@@ -281,23 +281,28 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         </div>
       )}
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 min-w-0">
         {COLUMNS.map((col) => {
           const colTasks = groupedTasks[col.key] ?? [];
           return (
-            <div key={col.key} className="flex-shrink-0 w-64">
-              {/* Column header */}
-              <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 ${col.color} bg-neutral-50`}>
-                <span className="text-sm uppercase tracking-wider text-neutral-400">{col.label}</span>
-                <span className="text-xs text-neutral-400 bg-neutral-0 px-2 py-0.5 rounded-full">{colTasks.length}</span>
+            <div key={col.key} className="flex-shrink-0 w-72">
+              {/* Column header — colored card style */}
+              <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${col.bg} mb-3`}>
+                <span className={`text-sm font-bold uppercase tracking-wide ${col.text}`}>{col.label}</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.countBg}`}>{colTasks.length}</span>
               </div>
 
               {/* Task cards */}
-              <div className="bg-neutral-50/50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
+              <div className="space-y-2.5 min-h-[200px]">
                 {colTasks.length === 0 ? (
-                  <p className="text-xs text-neutral-400 text-center py-8">No tasks</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                      <Sparkles size={18} className="text-gray-300" />
+                    </div>
+                    <p className="text-xs text-gray-400">No tasks yet</p>
+                  </div>
                 ) : (
-                  colTasks.map((task) => {
+                  colTasks.map((task: Task) => {
                     const prop = propMap.get(task.property_id);
                     const propName = prop?.name ?? "Property";
                     const checkoutBooking = task.booking_id ? bookingMap.get(task.booking_id) : null;
@@ -312,45 +317,51 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       <div
                         key={task.id}
                         onClick={() => setSelectedTask(task.id)}
-                        className={`bg-neutral-0 rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${
-                          isUrgent ? "border-danger/40" : "border-[var(--border)]"
-                        } ${selectedTask === task.id ? "ring-2 ring-brand-400" : ""}`}
+                        className={`bg-white rounded-xl p-3.5 shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${
+                          isUrgent ? "border-red-200" : "border-gray-100"
+                        } ${selectedTask === task.id ? "ring-2 ring-emerald-400" : ""}`}
                       >
-                        <div className="flex items-start justify-between mb-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={32} />
-                            <p className="text-sm font-medium text-neutral-900 truncate">{propName}</p>
+                        <div className="flex items-start gap-3 mb-2">
+                          <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={48} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{propName}</p>
+                              {isUrgent && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-600 rounded ml-1 flex-shrink-0">URGENT</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                            </p>
                           </div>
-                          {isUrgent && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-danger-light text-danger rounded">URGENT</span>
-                          )}
                         </div>
-                        <p className="text-xs text-neutral-400">
-                          {new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          {task.scheduled_time ? ` at ${task.scheduled_time.slice(0, 5)}` : ""}
-                        </p>
-                        {checkoutBooking && (
-                          <p className="text-xs text-neutral-500 mt-1">
-                            Out: {checkoutBooking.guest_name ?? "Guest"}
-                          </p>
+                        {/* Checkout → Check-in timeline */}
+                        {(checkoutBooking || nextBooking) && (
+                          <div className="text-xs text-gray-500 mb-2">
+                            {checkoutBooking && <span>{checkoutBooking.guest_name ?? "Guest"} checkout</span>}
+                            {checkoutBooking && nextBooking && <span className="mx-1 text-gray-300">→</span>}
+                            {nextBooking && <span className="text-emerald-600 font-medium">{nextBooking.guest_name ?? "Guest"} check-in</span>}
+                          </div>
                         )}
-                        {nextBooking && (
-                          <p className="text-xs text-brand-500 mt-0.5">
-                            In: {nextBooking.guest_name ?? "Guest"} ({nextBooking.check_in})
-                          </p>
-                        )}
-                        {task.cleaner_id && cleanerMap.get(task.cleaner_id) && (
-                          <p className="text-xs text-info mt-0.5">Cleaner: {cleanerMap.get(task.cleaner_id)!.name}</p>
+                        {/* Cleaner assignment pill */}
+                        {task.cleaner_id && cleanerMap.get(task.cleaner_id) ? (
+                          <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                            Assigned: {cleanerMap.get(task.cleaner_id)!.name}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                            Unassigned
+                          </span>
                         )}
                         {/* Checklist progress */}
                         {totalCount > 0 && doneCount > 0 && (
-                          <div className="mt-2">
-                            <div className="flex items-center justify-between text-[10px] text-neutral-400 mb-0.5">
+                          <div className="mt-2.5">
+                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
                               <span className="font-mono">{doneCount}/{totalCount}</span>
                             </div>
-                            <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-brand-500 rounded-full"
+                                className="h-full bg-emerald-500 rounded-full"
                                 style={{ width: `${(doneCount / totalCount) * 100}%` }}
                               />
                             </div>
