@@ -171,7 +171,7 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
 
   // Step 3 -> 4: after mapping, fetch listing details
   const handleMappingDone = useCallback(async () => {
-    if (!scaffoldPropId || !platform) return;
+    if (!scaffoldPropId || !scaffoldChannexId || !platform) return;
     setStep(4); setLoading(true); setLoadMsg("Finding your listing details...");
     try {
       await fetch(`/api/channels/${scaffoldPropId}/refresh`, { method: "POST" });
@@ -180,7 +180,11 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
       const ld = await lr.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const all = (ld.listings ?? []) as any[];
-      const target = all.filter((l: { imported: boolean }) => !l.imported)[0] ?? all[0];
+      // Filter by this scaffold's Channex property ID to find the listing we just mapped
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let target = all.find((l: any) => l.channex_property_id === scaffoldChannexId);
+      // Fallback: first non-imported listing
+      if (!target) target = all.filter((l: { imported: boolean }) => !l.imported)[0] ?? all[0];
       if (!target) throw new Error("No listing found. Please try the mapping step again.");
       let name = target.listing_name ?? "Imported Property";
       let photo: string | null = null;
@@ -191,11 +195,15 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
         } catch { /* fallback */ }
       }
       setMappedListingId(String(target.listing_id));
+      // Update scaffoldChannexId to the actual mapped property (may differ from scaffold if reusing old Channex property)
+      if (target.channex_property_id && target.channex_property_id !== scaffoldChannexId) {
+        setScaffoldChannexId(target.channex_property_id);
+      }
       setListingName(name); setListingPhoto(photo); setEditedName(name); setLoading(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch listing details"); setLoading(false);
     }
-  }, [scaffoldPropId, platform]);
+  }, [scaffoldPropId, scaffoldChannexId, platform]);
 
   // Step 4 -> 5: import property
   const handleImport = useCallback(async () => {
