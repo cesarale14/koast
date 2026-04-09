@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
-import { RefreshCw, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronRight, Sparkles, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 
 interface Task {
   id: string;
@@ -36,76 +36,128 @@ interface TurnoverBoardProps {
   cleaners?: Cleaner[];
 }
 
-const COLUMNS = [
-  { key: "today", label: "Today", bg: "bg-amber-50 border-amber-200", text: "text-amber-700", countBg: "bg-amber-100 text-amber-700" },
-  { key: "pending", label: "Upcoming", bg: "bg-gray-50 border-gray-200", text: "text-gray-700", countBg: "bg-gray-200 text-gray-600" },
-  { key: "in_progress", label: "In Progress", bg: "bg-blue-50 border-blue-200", text: "text-blue-700", countBg: "bg-blue-100 text-blue-700" },
-  { key: "completed", label: "Completed", bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", countBg: "bg-emerald-100 text-emerald-700" },
-  { key: "issue", label: "Issues", bg: "bg-red-50 border-red-200", text: "text-red-700", countBg: "bg-red-100 text-red-700" },
-];
+type TabKey = "today" | "upcoming" | "completed" | "all";
 
-const statusColors: Record<string, string> = {
-  pending: "bg-neutral-100 text-neutral-600",
-  assigned: "bg-info-light text-info",
-  in_progress: "bg-info-light text-info",
-  completed: "bg-success-light text-success",
-  issue: "bg-danger-light text-danger",
-};
+function formatDateHeader(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatTime(time: string | null): string {
+  if (!time) return "";
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
+}
 
 export default function TurnoverBoard({ tasks: initialTasks, properties, bookings, cleaners: initialCleaners = [] }: TurnoverBoardProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [tasks, setTasks] = useState(initialTasks);
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("today");
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [backfilling, setBackfilling] = useState(false);
   const [cleaners, setCleaners] = useState(initialCleaners);
   const [showCleaners, setShowCleaners] = useState(false);
   const [newCleanerName, setNewCleanerName] = useState("");
   const [newCleanerPhone, setNewCleanerPhone] = useState("");
   const [addingCleaner, setAddingCleaner] = useState(false);
+  const [updatingTask, setUpdatingTask] = useState<string | null>(null);
+  const [upcomingLimit, setUpcomingLimit] = useState(14);
 
   const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p])), [properties]);
   const cleanerMap = useMemo(() => new Map(cleaners.map((c) => [c.id, c])), [cleaners]);
   const bookingMap = useMemo(() => new Map(bookings.map((b) => [b.id, b])), [bookings]);
   const today = new Date().toISOString().split("T")[0];
 
-  const groupedTasks = useMemo(() => {
-    const groups: Record<string, Task[]> = {
-      pending: [], today: [], in_progress: [], completed: [], issue: [],
-    };
-    for (const t of tasks) {
-      if (t.status === "completed") groups.completed.push(t);
-      else if (t.status === "issue") groups.issue.push(t);
-      else if (t.status === "in_progress") groups.in_progress.push(t);
-      else if (t.scheduled_date === today) groups.today.push(t);
-      else groups.pending.push(t);
-    }
-    return groups;
+  // Stats
+  const stats = useMemo(() => {
+    const todayTasks = tasks.filter((t) => t.scheduled_date === today && t.status !== "completed");
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekStr = weekEnd.toISOString().split("T")[0];
+    const weekTasks = tasks.filter((t) => t.scheduled_date >= today && t.scheduled_date <= weekStr && t.status !== "completed");
+    const unassigned = tasks.filter((t) => !t.cleaner_id && t.status !== "completed");
+    return { today: todayTasks.length, week: weekTasks.length, unassigned: unassigned.length };
   }, [tasks, today]);
 
-  const selectedTaskData = useMemo(
-    () => tasks.find((t) => t.id === selectedTask) ?? null,
-    [tasks, selectedTask]
-  );
+  // Filtered tasks by tab
+  const filteredTasks = useMemo(() => {
+    switch (activeTab) {
+      case "today":
+        return tasks.filter((t) => t.scheduled_date === today && t.status !== "completed");
+      case "upcoming": {
+        const limitDate = new Date();
+        limitDate.setDate(limitDate.getDate() + upcomingLimit);
+        const limitStr = limitDate.toISOString().split("T")[0];
+        return tasks.filter((t) => t.scheduled_date > today && t.scheduled_date <= limitStr && t.status !== "completed");
+      }
+      case "completed":
+        return tasks.filter((t) => t.status === "completed").sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? ""));
+      case "all":
+        return [...tasks].sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+    }
+  }, [tasks, activeTab, today, upcomingLimit]);
 
+  // Group upcoming by date
+  const dateGroups = useMemo(() => {
+    if (activeTab !== "upcoming") return [];
+    const groups: { date: string; label: string; tasks: Task[] }[] = [];
+    let current = "";
+    for (const t of filteredTasks) {
+      if (t.scheduled_date !== current) {
+        current = t.scheduled_date;
+        groups.push({ date: current, label: formatDateHeader(current), tasks: [] });
+      }
+      groups[groups.length - 1].tasks.push(t);
+    }
+    return groups;
+  }, [filteredTasks, activeTab]);
+
+  // Actions
   const updateStatus = useCallback(async (taskId: string, newStatus: string) => {
+    setUpdatingTask(taskId);
     try {
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task?.cleaner_token) return;
-      await fetch(`/api/clean/${taskId}/${task.cleaner_token}/update`, {
+      const res = await fetch("/api/turnover/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ taskId, status: newStatus }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setTasks((prev) => prev.map((t) =>
         t.id === taskId ? { ...t, status: newStatus, completed_at: newStatus === "completed" ? new Date().toISOString() : t.completed_at } : t
       ));
-      toast(`Task updated to ${newStatus}`);
-      router.refresh();
-    } catch {
-      toast("Failed to update", "error");
+      toast(`Task marked as ${newStatus.replace("_", " ")}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update", "error");
     }
-  }, [tasks, toast, router]);
+    setUpdatingTask(null);
+  }, [toast]);
+
+  const assignCleaner = useCallback(async (taskId: string, cleanerId: string) => {
+    try {
+      const res = await fetch("/api/turnover/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, cleanerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, cleaner_id: cleanerId, status: "assigned" } : t));
+      toast(`Assigned to ${data.cleanerName}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to assign", "error");
+    }
+  }, [toast]);
 
   const backfill = useCallback(async () => {
     setBackfilling(true);
@@ -141,6 +193,14 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     setAddingCleaner(false);
   }, [newCleanerName, newCleanerPhone, toast]);
 
+  const removeCleaner = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/cleaners?id=${id}`, { method: "DELETE" });
+      setCleaners((prev) => prev.filter((c) => c.id !== id));
+      toast("Cleaner removed");
+    } catch { toast("Failed", "error"); }
+  }, [toast]);
+
   const testSMS = useCallback(async (phone: string) => {
     try {
       const res = await fetch("/api/cleaners", {
@@ -153,69 +213,47 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     } catch { toast("SMS failed", "error"); }
   }, [toast]);
 
-  const removeCleaner = useCallback(async (id: string) => {
-    try {
-      await fetch(`/api/cleaners?id=${id}`, { method: "DELETE" });
-      setCleaners((prev) => prev.filter((c) => c.id !== id));
-      toast("Cleaner removed");
-    } catch { toast("Failed", "error"); }
-  }, [toast]);
+  const toggleExpand = (id: string) => {
+    setExpandedTasks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
-  const assignCleaner = useCallback(async (taskId: string, cleanerId: string) => {
-    try {
-      const res = await fetch("/api/turnover/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, cleanerId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, cleaner_id: cleanerId, status: "assigned" } : t));
-      toast(`Assigned to ${data.cleanerName} — SMS sent`);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to assign", "error");
-    }
-  }, [toast]);
+  const toggleDateCollapse = (date: string) => {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date); else next.add(date);
+      return next;
+    });
+  };
 
-  const copyCleanerLink = useCallback(async (taskId: string, token: string) => {
-    const url = `${window.location.origin}/clean/${taskId}/${token}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast("Cleaner link copied to clipboard");
-    } catch {
-      toast("Failed to copy link", "error");
-    }
-  }, [toast]);
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: "today", label: "Today" },
+    { key: "upcoming", label: "Upcoming" },
+    { key: "completed", label: "Completed" },
+    { key: "all", label: "All" },
+  ];
 
-  const openCleanerLink = useCallback((taskId: string, token: string) => {
-    const url = `${window.location.origin}/clean/${taskId}/${token}`;
-    window.open(url, "_blank");
-  }, []);
-
-  // Empty state: all columns empty
+  // Empty state
   if (tasks.length === 0) {
     return (
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Cleaning</h1>
-            <p className="text-sm text-gray-500">Cleaning schedules and task management</p>
-          </div>
-        </div>
-
+        <Header stats={stats} cleanerCount={cleaners.length} onShowCleaners={() => setShowCleaners(!showCleaners)} onBackfill={backfill} backfilling={backfilling} />
         <div className="flex items-center justify-center py-20">
           <div className="text-center max-w-sm">
-            <div className="mx-auto w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
-              <Sparkles className="w-8 h-8 text-neutral-400" />
+            <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <Sparkles className="w-8 h-8 text-gray-400" />
             </div>
-            <h2 className="text-lg font-semibold text-neutral-800 mb-2">No upcoming turnovers</h2>
-            <p className="text-sm text-neutral-500 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">No upcoming turnovers</h2>
+            <p className="text-sm text-gray-500 mb-6">
               Cleaning tasks are automatically created when new bookings sync from your calendar.
             </p>
             <button
               onClick={backfill}
               disabled={backfilling}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
               {backfilling ? "Creating..." : "Auto-Create Tasks"}
@@ -228,299 +266,419 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Cleaning</h1>
-          <p className="text-neutral-500">Cleaning schedules and task management</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowCleaners(!showCleaners)}
-            className="px-4 py-2 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 transition-colors"
-          >
-            Cleaners ({cleaners.length})
-          </button>
-          <button
-            onClick={backfill}
-            disabled={backfilling}
-            className="btn-primary-3d inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
-            {backfilling ? "Creating..." : "Auto-Create Tasks"}
-          </button>
-        </div>
-      </div>
+      <Header stats={stats} cleanerCount={cleaners.length} onShowCleaners={() => setShowCleaners(!showCleaners)} onBackfill={backfill} backfilling={backfilling} />
 
       {/* Cleaners management panel */}
       {showCleaners && (
-        <div className="mb-6 bg-neutral-0 rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-neutral-700 mb-3">Manage Cleaners</h3>
+        <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Manage Cleaners</h3>
           <div className="space-y-2 mb-4">
             {cleaners.map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
+              <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-neutral-800">{c.name}</p>
-                  <p className="text-xs text-neutral-400">{c.phone}</p>
+                  <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                  <p className="text-xs text-gray-400">{c.phone}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => testSMS(c.phone)} className="text-xs text-brand-500 hover:text-brand-600 font-medium">Test SMS</button>
-                  <button onClick={() => removeCleaner(c.id)} className="text-xs text-danger hover:text-danger/80 font-medium">Remove</button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => testSMS(c.phone)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Test SMS</button>
+                  <button onClick={() => removeCleaner(c.id)} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
                 </div>
               </div>
             ))}
-            {cleaners.length === 0 && <p className="text-sm text-neutral-400">No cleaners added yet.</p>}
+            {cleaners.length === 0 && <p className="text-sm text-gray-400">No cleaners added yet.</p>}
           </div>
           <div className="flex gap-2">
-            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg" />
-            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg" />
+            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
             <button onClick={addCleaner} disabled={addingCleaner || !newCleanerName || !newCleanerPhone}
-              className="btn-primary-3d px-4 py-1.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50">
+              className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
               {addingCleaner ? "..." : "Add"}
             </button>
           </div>
         </div>
       )}
 
-      <div className="flex gap-4 overflow-x-auto pb-4 min-w-0">
-        {COLUMNS.map((col) => {
-          const colTasks = groupedTasks[col.key] ?? [];
-          return (
-            <div key={col.key} className="flex-shrink-0 w-72">
-              {/* Column header — colored card style */}
-              <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${col.bg} mb-3`}>
-                <span className={`text-sm font-bold uppercase tracking-wide ${col.text}`}>{col.label}</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.countBg}`}>{colTasks.length}</span>
-              </div>
-
-              {/* Task cards */}
-              <div className="space-y-2.5 min-h-[200px]">
-                {colTasks.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                      <Sparkles size={18} className="text-gray-300" />
-                    </div>
-                    <p className="text-xs text-gray-400">No tasks yet</p>
-                  </div>
-                ) : (
-                  colTasks.map((task: Task) => {
-                    const prop = propMap.get(task.property_id);
-                    const propName = prop?.name ?? "Property";
-                    const checkoutBooking = task.booking_id ? bookingMap.get(task.booking_id) : null;
-                    const nextBooking = task.next_booking_id ? bookingMap.get(task.next_booking_id) : null;
-                    const doneCount = (task.checklist ?? []).filter((i) => i.done).length;
-                    const totalCount = (task.checklist ?? []).length;
-
-                    // Urgency: less than 2 hours until next guest
-                    const isUrgent = nextBooking && task.scheduled_date === today;
-
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => setSelectedTask(task.id)}
-                        className={`bg-white rounded-xl p-3.5 shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${
-                          isUrgent ? "border-red-200" : "border-gray-100"
-                        } ${selectedTask === task.id ? "ring-2 ring-emerald-400" : ""}`}
-                      >
-                        <div className="flex items-start gap-3 mb-2">
-                          <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={48} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between">
-                              <p className="text-sm font-semibold text-gray-900 truncate">{propName}</p>
-                              {isUrgent && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-600 rounded ml-1 flex-shrink-0">URGENT</span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-500">
-                              {new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                            </p>
-                          </div>
-                        </div>
-                        {/* Checkout → Check-in timeline */}
-                        {(checkoutBooking || nextBooking) && (
-                          <div className="text-xs text-gray-500 mb-2">
-                            {checkoutBooking && <span>{checkoutBooking.guest_name ?? "Guest"} checkout</span>}
-                            {checkoutBooking && nextBooking && <span className="mx-1 text-gray-300">→</span>}
-                            {nextBooking && <span className="text-emerald-600 font-medium">{nextBooking.guest_name ?? "Guest"} check-in</span>}
-                          </div>
-                        )}
-                        {/* Cleaner assignment pill */}
-                        {task.cleaner_id && cleanerMap.get(task.cleaner_id) ? (
-                          <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                            Assigned: {cleanerMap.get(task.cleaner_id)!.name}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                            Unassigned
-                          </span>
-                        )}
-                        {/* Checklist progress */}
-                        {totalCount > 0 && doneCount > 0 && (
-                          <div className="mt-2.5">
-                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
-                              <span className="font-mono">{doneCount}/{totalCount}</span>
-                            </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-emerald-500 rounded-full"
-                                style={{ width: `${(doneCount / totalCount) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
+      {/* Tab navigation */}
+      <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+              activeTab === tab.key
+                ? "text-emerald-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Task detail side panel */}
-      {selectedTaskData && (
-        <>
-          <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setSelectedTask(null)} />
-          <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-neutral-0 shadow-xl z-50 overflow-y-auto animate-slide-in">
-            <div className="sticky top-0 bg-neutral-0 border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-neutral-800">Task Details</h2>
-              <button onClick={() => setSelectedTask(null)} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+      {/* Content */}
+      {filteredTasks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+            <CheckCircle2 size={20} className="text-gray-300" />
+          </div>
+          <p className="text-sm text-gray-500">
+            {activeTab === "today" ? "No turnovers today" : activeTab === "completed" ? "No completed tasks yet" : "No tasks found"}
+          </p>
+        </div>
+      ) : activeTab === "upcoming" ? (
+        /* Upcoming — grouped by date */
+        <div className="space-y-4">
+          {dateGroups.map((group) => (
+            <div key={group.date}>
+              <button
+                onClick={() => toggleDateCollapse(group.date)}
+                className="flex items-center gap-2 mb-2 w-full text-left"
+              >
+                {collapsedDates.has(group.date) ? <ChevronRight size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                <span className="text-sm font-semibold text-gray-700">{group.label}</span>
+                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{group.tasks.length}</span>
               </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div>
-                <p className="text-xs text-neutral-400">Property</p>
-                <p className="text-lg font-semibold text-neutral-800">{propMap.get(selectedTaskData.property_id)?.name ?? "Property"}</p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[selectedTaskData.status] ?? "bg-neutral-100 text-neutral-600"}`}>
-                  {selectedTaskData.status.replace("_", " ")}
-                </span>
-                <span className="text-sm text-neutral-500">
-                  {new Date(selectedTaskData.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                </span>
-              </div>
-
-              {/* Guest info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-neutral-400">Checkout Guest</p>
-                  <p className="text-sm font-medium text-neutral-900">
-                    {selectedTaskData.booking_id ? (bookingMap.get(selectedTaskData.booking_id)?.guest_name ?? "—") : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-400">Next Guest</p>
-                  <p className="text-sm font-medium text-neutral-900">
-                    {selectedTaskData.next_booking_id ? (bookingMap.get(selectedTaskData.next_booking_id)?.guest_name ?? "—") : "None"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Checklist */}
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-700 mb-2">Checklist</h3>
-                <div className="space-y-1">
-                  {(selectedTaskData.checklist ?? []).map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 py-1">
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-success border-success" : "border-neutral-300"}`}>
-                        {item.done && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`text-sm ${item.done ? "text-neutral-400 line-through" : "text-neutral-700"}`}>{item.label}</span>
-                    </div>
+              {!collapsedDates.has(group.date) && (
+                <div className="space-y-2 ml-6">
+                  {group.tasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      propMap={propMap}
+                      bookingMap={bookingMap}
+                      cleanerMap={cleanerMap}
+                      cleaners={cleaners}
+                      expanded={expandedTasks.has(task.id)}
+                      onToggle={() => toggleExpand(task.id)}
+                      onUpdateStatus={updateStatus}
+                      onAssign={assignCleaner}
+                      updating={updatingTask === task.id}
+                      compact
+                    />
                   ))}
                 </div>
-              </div>
-
-              {selectedTaskData.notes && (
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-700 mb-1">Notes</h3>
-                  <p className="text-sm text-neutral-600">{selectedTaskData.notes}</p>
-                </div>
               )}
+            </div>
+          ))}
+          {filteredTasks.length >= 10 && (
+            <button
+              onClick={() => setUpcomingLimit((v) => v + 14)}
+              className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Load more
+            </button>
+          )}
+        </div>
+      ) : (
+        /* Today / Completed / All — flat list */
+        <div className="space-y-3">
+          {filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              propMap={propMap}
+              bookingMap={bookingMap}
+              cleanerMap={cleanerMap}
+              cleaners={cleaners}
+              expanded={expandedTasks.has(task.id)}
+              onToggle={() => toggleExpand(task.id)}
+              onUpdateStatus={updateStatus}
+              onAssign={assignCleaner}
+              updating={updatingTask === task.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-              {/* Cleaner action buttons */}
-              {selectedTaskData.cleaner_token && (
-                <div className="space-y-2">
-                  <p className="text-xs text-neutral-400">Cleaner Mobile Page</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => copyCleanerLink(selectedTaskData.id, selectedTaskData.cleaner_token!)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy Cleaner Link
-                    </button>
-                    <button
-                      onClick={() => openCleanerLink(selectedTaskData.id, selectedTaskData.cleaner_token!)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      View Checklist
-                    </button>
-                  </div>
-                </div>
-              )}
+// ====== Header ======
+function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }: {
+  stats: { today: number; week: number; unassigned: number };
+  cleanerCount: number;
+  onShowCleaners: () => void;
+  onBackfill: () => void;
+  backfilling: boolean;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Cleaning</h1>
+        <p className="text-sm text-gray-500">Cleaning schedules and task management</p>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Stats pills */}
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <Clock size={12} /> Today: {stats.today}
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-50 text-gray-600 border border-gray-200">
+          This Week: {stats.week}
+        </span>
+        {stats.unassigned > 0 && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
+            <AlertTriangle size={12} /> Unassigned: {stats.unassigned}
+          </span>
+        )}
+        <button
+          onClick={onShowCleaners}
+          className="px-3.5 py-1.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          Cleaners ({cleanerCount})
+        </button>
+        <button
+          onClick={onBackfill}
+          disabled={backfilling}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${backfilling ? "animate-spin" : ""}`} />
+          {backfilling ? "Creating..." : "Auto-Create"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
-              {/* Assign cleaner */}
-              {cleaners.length > 0 && (
-                <div>
-                  <p className="text-xs text-neutral-400 mb-1">Assign Cleaner</p>
-                  <select
-                    value={selectedTaskData.cleaner_id ?? ""}
-                    onChange={(e) => { if (e.target.value) assignCleaner(selectedTaskData.id, e.target.value); }}
-                    className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
-                  >
-                    <option value="">Select cleaner...</option>
-                    {cleaners.filter((c) => c.is_active).map((c) => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                    ))}
-                  </select>
-                  {selectedTaskData.cleaner_id && cleanerMap.get(selectedTaskData.cleaner_id) && (
-                    <p className="text-xs text-brand-500 mt-1">Assigned: {cleanerMap.get(selectedTaskData.cleaner_id)!.name}</p>
-                  )}
-                </div>
-              )}
+// ====== Task Card ======
+function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, onToggle, onUpdateStatus, onAssign, updating, compact }: {
+  task: Task;
+  propMap: Map<string, { id: string; name: string; cover_photo_url?: string | null }>;
+  bookingMap: Map<string, { id: string; guest_name: string | null; check_in: string; check_out: string }>;
+  cleanerMap: Map<string, Cleaner>;
+  cleaners: Cleaner[];
+  expanded: boolean;
+  onToggle: () => void;
+  onUpdateStatus: (taskId: string, status: string) => Promise<void>;
+  onAssign: (taskId: string, cleanerId: string) => Promise<void>;
+  updating: boolean;
+  compact?: boolean;
+}) {
+  const prop = propMap.get(task.property_id);
+  const propName = prop?.name ?? "Property";
+  const checkoutBooking = task.booking_id ? bookingMap.get(task.booking_id) : null;
+  const nextBooking = task.next_booking_id ? bookingMap.get(task.next_booking_id) : null;
+  const assignedCleaner = task.cleaner_id ? cleanerMap.get(task.cleaner_id) : null;
+  const doneCount = (task.checklist ?? []).filter((i) => i.done).length;
+  const totalCount = (task.checklist ?? []).length;
+  const photoSize = compact ? 48 : 64;
 
-              {/* Status actions */}
-              <div className="space-y-2 pt-2">
-                {selectedTaskData.status === "pending" && (
-                  <button
-                    onClick={() => updateStatus(selectedTaskData.id, "in_progress")}
-                    className="w-full py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600"
-                  >
-                    Mark In Progress
-                  </button>
-                )}
-                {selectedTaskData.status === "in_progress" && (
-                  <button
-                    onClick={() => updateStatus(selectedTaskData.id, "completed")}
-                    className="w-full py-2.5 bg-success text-white text-sm font-medium rounded-lg hover:bg-success/90"
-                  >
-                    Mark Complete
-                  </button>
-                )}
-                {selectedTaskData.status !== "issue" && selectedTaskData.status !== "completed" && (
-                  <button
-                    onClick={() => updateStatus(selectedTaskData.id, "issue")}
-                    className="w-full py-2.5 bg-neutral-0 text-danger text-sm font-medium rounded-lg border border-danger/20 hover:bg-danger-light"
-                  >
-                    Report Issue
-                  </button>
-                )}
-              </div>
+  return (
+    <div
+      className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow ${
+        task.status === "issue" ? "border-l-4 border-l-red-400" : ""
+      }`}
+    >
+      <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={onToggle}>
+        {/* Property photo */}
+        <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
+
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
+              <p className="text-sm text-gray-500">
+                {formatShortDate(task.scheduled_date)}
+                {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
+                {nextBooking && " → 3:00 PM check-in"}
+              </p>
+            </div>
+            {/* Status badge — desktop */}
+            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+              {task.status === "completed" ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                  <CheckCircle2 size={12} /> Completed
+                </span>
+              ) : task.status === "in_progress" ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                  <Clock size={12} /> In Progress
+                </span>
+              ) : task.status === "issue" ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+                  <AlertTriangle size={12} /> Issue
+                </span>
+              ) : null}
             </div>
           </div>
-        </>
+
+          {/* Guest info */}
+          {!compact && (checkoutBooking || nextBooking) && (
+            <p className="text-xs text-gray-500 mt-1">
+              {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
+              {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
+              {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
+            </p>
+          )}
+        </div>
+
+        {/* Cleaner assignment — desktop */}
+        <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+          {assignedCleaner ? (
+            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+              {assignedCleaner.name}
+            </span>
+          ) : (
+            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+              Unassigned
+            </span>
+          )}
+        </div>
+
+        {/* Action buttons — desktop */}
+        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+          {task.status !== "completed" && task.status !== "in_progress" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "in_progress"); }}
+              disabled={updating}
+              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+            >
+              {updating ? "..." : "In Progress"}
+            </button>
+          )}
+          {task.status !== "completed" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "completed"); }}
+              disabled={updating}
+              className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+            >
+              {updating ? "..." : "Complete"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile action row */}
+      <div className="sm:hidden px-4 pb-3 flex items-center gap-2 flex-wrap">
+        {assignedCleaner ? (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
+        ) : (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
+        )}
+        {task.status !== "completed" && task.status !== "in_progress" && (
+          <button
+            onClick={() => onUpdateStatus(task.id, "in_progress")}
+            disabled={updating}
+            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg"
+          >
+            In Progress
+          </button>
+        )}
+        {task.status !== "completed" && (
+          <button
+            onClick={() => onUpdateStatus(task.id, "completed")}
+            disabled={updating}
+            className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg"
+          >
+            Complete
+          </button>
+        )}
+      </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+          {/* Assign cleaner */}
+          {cleaners.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-gray-500 mb-1 block">Assign Cleaner</label>
+              <select
+                value={task.cleaner_id ?? ""}
+                onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
+                className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              >
+                <option value="">Select cleaner...</option>
+                {cleaners.filter((c) => c.is_active).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Checklist */}
+          {totalCount > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-2">Checklist ({doneCount}/{totalCount})</p>
+              <div className="space-y-1.5">
+                {task.checklist.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-emerald-500 border-emerald-500" : "border-gray-300"}`}>
+                      {item.done && (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm ${item.done ? "text-gray-400 line-through" : "text-gray-700"}`}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {task.notes && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
+              <p className="text-sm text-gray-600">{task.notes}</p>
+            </div>
+          )}
+
+          {/* Guest details */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400">Checkout Guest</p>
+              <p className="text-sm font-medium text-gray-900">
+                {checkoutBooking?.guest_name ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Next Guest</p>
+              <p className="text-sm font-medium text-gray-900">
+                {nextBooking?.guest_name ?? "None"}
+              </p>
+            </div>
+          </div>
+
+          {/* Status actions */}
+          {task.status !== "completed" && (
+            <div className="flex gap-2 pt-2">
+              {task.status !== "in_progress" && (
+                <button
+                  onClick={() => onUpdateStatus(task.id, "in_progress")}
+                  disabled={updating}
+                  className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                >
+                  Mark In Progress
+                </button>
+              )}
+              <button
+                onClick={() => onUpdateStatus(task.id, "completed")}
+                disabled={updating}
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                Mark Complete
+              </button>
+              {task.status !== "issue" && (
+                <button
+                  onClick={() => onUpdateStatus(task.id, "issue")}
+                  disabled={updating}
+                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                >
+                  Report Issue
+                </button>
+              )}
+            </div>
+          )}
+
+          {task.completed_at && (
+            <p className="text-xs text-gray-400">
+              Completed {new Date(task.completed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
