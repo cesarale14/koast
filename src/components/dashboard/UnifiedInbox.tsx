@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { DEFAULT_TEMPLATES, fillTemplate } from "@/lib/templates/messages";
+import PlatformLogoIcon from "@/components/ui/PlatformLogo";
 
 // ---------- Types ----------
 
@@ -102,15 +103,19 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
     const groups = new Map<string, ConversationGroup>();
 
     for (const msg of messages) {
-      // Group by property + booking (or property + sender for non-booked)
+      // Group by property + booking, or property + inbound sender for non-booked
+      const inboundName = msg.direction === "inbound" ? (msg.sender_name ?? "Guest") : null;
       const key = msg.booking_id
         ? `${msg.property_id}:${msg.booking_id}`
-        : `${msg.property_id}:${msg.sender_name ?? "unknown"}`;
+        : `${msg.property_id}:${inboundName ?? "thread"}`;
 
       if (!groups.has(key)) {
         const prop = propMap.get(msg.property_id);
         const booking = msg.booking_id ? bookingMap.get(msg.booking_id) : null;
-        const guestName = booking?.guest_name ?? msg.sender_name ?? "Unknown Guest";
+        // For guest name: use booking guest, inbound sender, or fallback — never "Host"
+        const guestName = booking?.guest_name
+          ?? (msg.direction === "inbound" ? msg.sender_name : null)
+          ?? "Guest";
 
         groups.set(key, {
           key,
@@ -135,6 +140,11 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
       convo.lastMessage = convo.messages[convo.messages.length - 1];
       convo.needsReply = convo.lastMessage.direction === "inbound";
       convo.unread = convo.needsReply;
+      // Fix guest name if still generic — look for inbound sender names
+      if (convo.guestName === "Guest" || convo.guestName === "Host") {
+        const inbound = convo.messages.find((m) => m.direction === "inbound" && m.sender_name && m.sender_name !== "Host");
+        if (inbound?.sender_name) convo.guestName = inbound.sender_name;
+      }
     }
 
     // Sort conversations by most recent
@@ -286,9 +296,15 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                   activeConvo === convo.key ? "bg-brand-50 border-l-2 border-brand-500" : "hover:bg-neutral-50"
                 }`}
               >
-                {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600 flex-shrink-0">
-                  {initials(convo.guestName)}
+                {/* Avatar — platform logo for OTA conversations */}
+                <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                  {convo.platform === "airbnb" || convo.platform === "booking_com" || convo.platform === "vrbo" ? (
+                    <PlatformLogoIcon platform={convo.platform} size="lg" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600">
+                      {initials(convo.guestName)}
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -297,9 +313,7 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
                   </div>
                   <p className="text-xs text-neutral-400 truncate">{convo.propertyName}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${platformColors[convo.platform] ?? "bg-neutral-100 text-neutral-500"}`}>
-                      {platformLabels[convo.platform] ?? convo.platform}
-                    </span>
+                    <PlatformLogoIcon platform={convo.platform} size="sm" />
                     <p className="text-xs text-neutral-500 truncate flex-1">{convo.lastMessage.content}</p>
                     {convo.unread && <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0" />}
                   </div>
