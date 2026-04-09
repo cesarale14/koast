@@ -347,7 +347,7 @@ export default function SettingsPage() {
               disabled
               className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 rounded-lg opacity-50 cursor-not-allowed"
             >
-              Upgrade to Pro &mdash; $29/mo
+              Upgrade to Pro &mdash; $79/mo
             </button>
             <span className="text-xs font-medium text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">
               Coming Soon

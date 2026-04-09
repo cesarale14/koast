@@ -490,7 +490,7 @@ export default function CalendarGrid({
             <div key={prop.id} className="flex">
               {/* Sticky property name with avatar */}
               <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
-                <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={32} />
+                <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={40} />
                 <span className="text-sm font-medium text-neutral-700 truncate">
                   {prop.name}
                 </span>

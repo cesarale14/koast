@@ -128,7 +128,7 @@ export default function NearbyListingsClient({
             <div>
               <p className="text-sm font-bold text-neutral-800">{currentProp.name}</p>
               <p className="text-xs text-neutral-500">
-                {currentProp.bedrooms ?? "?"}BR · {currentProp.bathrooms ?? "?"}BA · Your Property
+                {currentProp.bedrooms ? `${currentProp.bedrooms}BR` : ""}{currentProp.bedrooms && currentProp.bathrooms ? " · " : ""}{currentProp.bathrooms ? `${currentProp.bathrooms}BA` : ""}{(currentProp.bedrooms || currentProp.bathrooms) ? " · " : ""}Your Property
               </p>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function NearbyListingsClient({
                     {comp.comp_name ?? "Listing"}
                   </h3>
                   <p className="text-xs text-neutral-400 mb-3">
-                    {comp.comp_bedrooms ?? "?"}BR · {comp.distance_km != null ? `${comp.distance_km} km away` : "—"}
+                    {comp.comp_bedrooms ? `${comp.comp_bedrooms}BR · ` : ""}{comp.distance_km != null ? `${comp.distance_km} km away` : "\u2014"}
                   </p>
 
                   {/* Stats */}

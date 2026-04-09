@@ -99,12 +99,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Create property in DB
+    // Try to extract location from name or default to Tampa
+    const nameLower = propertyName.toLowerCase();
+    const isTampa = nameLower.includes("tampa");
+    const defaultLat = isTampa ? "27.9506" : null;
+    const defaultLng = isTampa ? "-82.4572" : null;
+
     const { data: newProp, error: insertErr } = await supabase
       .from("properties")
       .insert({
         user_id: user.id,
         name: propertyName,
         cover_photo_url: photoUrl,
+        city: isTampa ? "Tampa" : null,
+        state: isTampa ? "FL" : null,
+        latitude: defaultLat,
+        longitude: defaultLng,
       })
       .select("id")
       .single();

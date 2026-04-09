@@ -198,7 +198,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-neutral-800 mb-1">Turnover Ops</h1>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Cleaning</h1>
             <p className="text-sm text-neutral-500">Cleaning schedules and task management</p>
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Turnover Ops</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Cleaning</h1>
           <p className="text-neutral-500">Cleaning schedules and task management</p>
         </div>
         <div className="flex items-center gap-2">
