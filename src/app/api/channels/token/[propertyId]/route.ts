@@ -52,9 +52,9 @@ export async function POST(
       if (airbnbChannel) channelId = airbnbChannel.id;
     } catch { /* fallback to /channels */ }
 
-    // Build iframe URL — deep-link to the channel edit view (contains Mapping tab)
-    const redirectTo = channelId ? `/channels/${channelId}/edit` : "/channels";
-    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=${encodeURIComponent(redirectTo)}&property_id=${property.channex_property_id}`;
+    // Build iframe URL — use /channels which shows the channel list scoped to this property
+    // The property_id parameter ensures Channex shows this property's channel context
+    const iframeUrl = `${CHANNEX_IFRAME_BASE}/auth/exchange?oauth_session_key=${token}&app_mode=headless&redirect_to=/channels&property_id=${property.channex_property_id}`;
 
     return NextResponse.json({
       token,

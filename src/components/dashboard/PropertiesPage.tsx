@@ -322,13 +322,11 @@ function AddPropertyModal({ hasExisting, onClose }: { hasExisting: boolean; onCl
           ) : step === 3 && platform ? (
             <div>
               <h2 className="text-xl font-bold text-neutral-800 mb-2">Map your listing</h2>
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
-                <p className="text-sm font-semibold text-emerald-800 mb-0.5">First: click the &quot;Mapping&quot; tab in the panel below</p>
-                <p className="text-xs text-emerald-600">You&apos;ll see it next to &quot;General Settings&quot; at the top of the panel</p>
-              </div>
               <div className="bg-neutral-50 rounded-xl p-4 mb-6 space-y-2">
-                <p className="text-sm text-neutral-700 font-medium">Then follow these steps:</p>
+                <p className="text-sm text-neutral-700 font-medium">Follow these steps in the panel below:</p>
                 <ol className="text-sm text-neutral-600 space-y-1.5 list-decimal list-inside">
+                  <li>Click <span className="font-semibold">Actions</span> &rarr; <span className="font-semibold">Edit</span> on the Airbnb channel</li>
+                  <li>Go to the <span className="font-semibold">Mapping</span> tab</li>
                   <li>Find the listing you want to add and click <span className="font-semibold">&quot;Not mapped&quot;</span></li>
                   <li>Select <span className="font-semibold">&quot;Entire Home&quot;</span> then <span className="font-semibold">&quot;Best Available Rate&quot;</span></li>
                   <li>Click <span className="font-semibold">Save</span></li>
