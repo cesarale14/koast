@@ -102,31 +102,27 @@ export default function UnifiedInbox({ messages: initialMessages, properties, bo
   const conversations = useMemo(() => {
     const groups = new Map<string, ConversationGroup>();
 
-    // First pass: build a map of property → most recent inbound sender
-    const propInboundNames = new Map<string, string>();
+    // First pass: collect ALL inbound sender names per property
+    const propInboundNames = new Map<string, string[]>();
     for (const msg of messages) {
       if (msg.direction === "inbound" && msg.sender_name && msg.sender_name !== "Host") {
-        if (!propInboundNames.has(msg.property_id)) propInboundNames.set(msg.property_id, msg.sender_name);
+        if (!propInboundNames.has(msg.property_id)) propInboundNames.set(msg.property_id, []);
+        const names = propInboundNames.get(msg.property_id)!;
+        if (!names.includes(msg.sender_name)) names.push(msg.sender_name);
       }
     }
 
     for (const msg of messages) {
-      // Group by property + booking. Non-booking messages: group by property + inbound sender name.
-      // Outbound messages without booking join the most recent inbound thread for that property.
       let key: string;
       if (msg.booking_id) {
         key = `${msg.property_id}:${msg.booking_id}`;
       } else if (msg.direction === "inbound" && msg.sender_name) {
         key = `${msg.property_id}:${msg.sender_name}`;
       } else {
-        // Outbound: try to match by checking if message content mentions a known guest
-        const knownGuest = propInboundNames.get(msg.property_id);
-        if (knownGuest && msg.content?.includes(knownGuest)) {
-          key = `${msg.property_id}:${knownGuest}`;
-        } else {
-          // Fall back to property-level thread
-          key = `${msg.property_id}:${knownGuest ?? "thread"}`;
-        }
+        // Outbound: match to the guest thread whose name appears in the message
+        const knownGuests = propInboundNames.get(msg.property_id) ?? [];
+        const matched = knownGuests.find((name) => msg.content?.includes(name));
+        key = `${msg.property_id}:${matched ?? "thread"}`;
       }
 
       if (!groups.has(key)) {
