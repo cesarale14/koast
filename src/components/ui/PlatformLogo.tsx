@@ -35,15 +35,18 @@ function BookingIcon({ s }: { s: number }) {
   );
 }
 
-/** VRBO — lowercase "vrbo" wordmark with house roof on the v. Brand blue #0B4DA2 */
+/** VRBO — decorative serif "Vrbo" on blue. Matches the App Store icon style */
 function VrboIcon({ s }: { s: number }) {
   return (
     <svg width={s} height={s} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="6" fill="#0B4DA2"/>
-      {/* House roof accent above the "v" */}
-      <path d="M7.5 9L10 6.5 12.5 9" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* "vrbo" text */}
-      <text x="4" y="23" fill="white" fontSize="11" fontWeight="700" fontFamily="'Nunito',Arial,sans-serif" letterSpacing="-0.3">vrbo</text>
+      <defs>
+        <linearGradient id="vrboGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#4C7CEF"/>
+          <stop offset="100%" stopColor="#1A4FD8"/>
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="8" fill="url(#vrboGrad)"/>
+      <text x="16" y="22" fill="white" fontSize="14" fontWeight="700" fontFamily="Georgia,'Times New Roman',serif" textAnchor="middle" fontStyle="italic" letterSpacing="-0.5">Vrbo</text>
     </svg>
   );
 }
