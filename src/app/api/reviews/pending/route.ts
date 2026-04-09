@@ -9,7 +9,10 @@ export async function GET() {
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const today = new Date().toISOString().split("T")[0];
+    // Include checkouts up to 3 days in the future (hosts can pre-write reviews)
+    const futureWindow = new Date();
+    futureWindow.setDate(futureWindow.getDate() + 3);
+    const maxDate = futureWindow.toISOString().split("T")[0];
 
     // Airbnb allows reviews up to 14 days after checkout
     const reviewWindowStart = new Date();
@@ -53,7 +56,7 @@ export async function GET() {
       .where(
         and(
           inArray(bookings.propertyId, userPropertyIds),
-          lt(bookings.checkOut, today),
+          lt(bookings.checkOut, maxDate),
           gte(bookings.checkOut, reviewCutoff),
           ne(bookings.status, "cancelled")
         )
@@ -95,7 +98,7 @@ export async function GET() {
       .where(
         and(
           inArray(guestReviews.propertyId, userPropertyIds),
-          inArray(guestReviews.status, ["draft_generated", "bad_review_held"])
+          inArray(guestReviews.status, ["pending", "draft_generated", "bad_review_held"])
         )
       )
       .orderBy(desc(guestReviews.createdAt));
