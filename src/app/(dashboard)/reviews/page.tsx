@@ -290,17 +290,29 @@ export default function ReviewsPage() {
                   <div className="space-y-3">
                     {data.draft_reviews.map((r: AnyData) => {
                       const isEditing = editingDraftId === r.id;
+                      const hasText = r.draft_text && r.draft_text !== ".." && r.draft_text.length > 5;
+                      const checkInFmt = r.check_in ? new Date(r.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+                      const checkOutFmt = r.check_out ? new Date(r.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
                       return (
-                        <div key={r.id} className="bg-warning-light rounded-lg border border-warning/20 p-5">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              {statusBadge(r.status)}
-                              <StarRating
-                                rating={isEditing ? editDraftRating : r.star_rating}
-                                onChange={isEditing ? (v) => setEditDraftRating(v) : undefined}
-                              />
+                        <div key={r.id} className="bg-neutral-0 rounded-xl shadow-sm p-5">
+                          {/* Context row */}
+                          <div className="flex items-center gap-3 mb-4">
+                            {r.property_photo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={r.property_photo} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                                <span className="text-emerald-600 text-xs font-bold">{(r.property_name ?? "P").charAt(0)}</span>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-neutral-800 truncate">{r.property_name ?? "Property"}</p>
+                              <p className="text-xs text-neutral-500">{r.guest_name ?? "Airbnb Guest"} &middot; {checkInFmt}{checkOutFmt ? ` – ${checkOutFmt}` : ""}</p>
                             </div>
-                            <span className="text-xs text-neutral-400 font-mono">Booking: {r.booking_id?.slice(0, 8)}</span>
+                            <StarRating
+                              rating={isEditing ? editDraftRating : (r.star_rating ?? 5)}
+                              onChange={isEditing ? (v) => setEditDraftRating(v) : undefined}
+                            />
                           </div>
 
                           {isEditing ? (
@@ -308,12 +320,22 @@ export default function ReviewsPage() {
                               value={editDraftText}
                               onChange={(e) => setEditDraftText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 text-sm border border-warning/30 rounded-lg mb-4 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                              className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg mb-4 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                             />
-                          ) : (
-                            <p className="text-sm text-neutral-700 mb-4 italic bg-neutral-0 rounded-lg p-3 border border-neutral-100">
+                          ) : hasText ? (
+                            <p className="text-sm text-neutral-700 mb-4 bg-neutral-50 rounded-lg p-3">
                               &quot;{r.draft_text}&quot;
                             </p>
+                          ) : (
+                            <div className="mb-4">
+                              <button
+                                onClick={() => generateReview(r.booking_id)}
+                                disabled={generating === r.booking_id}
+                                className="w-full py-3 text-sm font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                              >
+                                {generating === r.booking_id ? "Writing your review..." : "✨ Generate AI Review"}
+                              </button>
+                            </div>
                           )}
 
                           <div className="flex gap-2 flex-wrap">

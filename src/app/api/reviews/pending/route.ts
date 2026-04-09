@@ -145,13 +145,52 @@ export async function GET() {
       )
       .orderBy(guestReviews.scheduledPublishAt);
 
+    // Enrich drafts with property and booking context
+    const draftBookingIds = drafts.map((d) => d.booking_id).filter(Boolean) as string[];
+    const draftPropertyIds = drafts.map((d) => d.property_id).filter(Boolean) as string[];
+
+    const draftBookings = draftBookingIds.length > 0
+      ? await db.select({
+          id: bookings.id,
+          guest_name: bookings.guestName,
+          check_in: bookings.checkIn,
+          check_out: bookings.checkOut,
+          platform: bookings.platform,
+        }).from(bookings).where(inArray(bookings.id, draftBookingIds))
+      : [];
+
+    const draftProperties = draftPropertyIds.length > 0
+      ? await db.select({
+          id: properties.id,
+          name: properties.name,
+          cover_photo_url: properties.coverPhotoUrl,
+        }).from(properties).where(inArray(properties.id, draftPropertyIds))
+      : [];
+
+    const bookingLookup = new Map(draftBookings.map((b) => [b.id, b]));
+    const propLookup = new Map(draftProperties.map((p) => [p.id, p]));
+
+    const enrichedDrafts = drafts.map((d) => {
+      const bk = d.booking_id ? bookingLookup.get(d.booking_id) : null;
+      const pr = d.property_id ? propLookup.get(d.property_id) : null;
+      return {
+        ...d,
+        guest_name: bk?.guest_name ?? "Airbnb Guest",
+        check_in: bk?.check_in ?? null,
+        check_out: bk?.check_out ?? null,
+        platform: bk?.platform ?? "airbnb",
+        property_name: pr?.name ?? "Property",
+        property_photo: pr?.cover_photo_url ?? null,
+      };
+    });
+
     return NextResponse.json({
       needs_review: pendingBookings.length,
-      needs_approval: drafts.length,
+      needs_approval: enrichedDrafts.length,
       needs_response: incoming.length,
       scheduled: scheduled.length,
       pending_bookings: pendingBookings,
-      draft_reviews: drafts,
+      draft_reviews: enrichedDrafts,
       incoming_reviews: incoming,
       scheduled_reviews: scheduled,
     });
