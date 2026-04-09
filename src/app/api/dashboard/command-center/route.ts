@@ -31,15 +31,19 @@ type BookingRow = {
 
 function calcRevenue(bookingList: BookingRow[], rangeStart: string, rangeEnd: string): number {
   let rev = 0;
+  const EST_RATE = 150; // fallback per-night estimate when no total_price (iCal bookings)
   for (const b of bookingList) {
-    if (!b.total_price || b.total_price <= 0) continue;
-    const totalNights = Math.max(1, Math.round(
-      (new Date(b.check_out + "T00:00:00Z").getTime() - new Date(b.check_in + "T00:00:00Z").getTime()) / 86400000
-    ));
     const oStart = Math.max(new Date(b.check_in + "T00:00:00Z").getTime(), new Date(rangeStart + "T00:00:00Z").getTime());
     const oEnd = Math.min(new Date(b.check_out + "T00:00:00Z").getTime(), new Date(addDay(rangeEnd) + "T00:00:00Z").getTime());
     const oNights = Math.max(0, Math.round((oEnd - oStart) / 86400000));
-    rev += (b.total_price * oNights) / totalNights;
+    if (b.total_price && b.total_price > 0) {
+      const totalNights = Math.max(1, Math.round(
+        (new Date(b.check_out + "T00:00:00Z").getTime() - new Date(b.check_in + "T00:00:00Z").getTime()) / 86400000
+      ));
+      rev += (b.total_price * oNights) / totalNights;
+    } else {
+      rev += oNights * EST_RATE;
+    }
   }
   return Math.round(rev);
 }
