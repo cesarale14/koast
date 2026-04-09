@@ -131,7 +131,7 @@ export default function DashboardClient() {
   }
 
   if (!data) {
-    router.push("/onboarding");
+    router.push("/properties");
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-neutral-400 text-sm">Redirecting to setup...</div>
