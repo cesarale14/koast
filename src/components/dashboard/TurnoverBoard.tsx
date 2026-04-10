@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
-import { RefreshCw, ChevronDown, ChevronRight, Sparkles, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronRight, Sparkles, CheckCircle2, Clock, AlertTriangle, MessageSquare } from "lucide-react";
 
 interface Task {
   id: string;
@@ -229,11 +229,19 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     });
   };
 
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: "today", label: "Today" },
-    { key: "upcoming", label: "Upcoming" },
-    { key: "completed", label: "Completed" },
-    { key: "all", label: "All" },
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    const todayCount = tasks.filter((t) => t.scheduled_date === today && t.status !== "completed").length;
+    const upcomingCount = tasks.filter((t) => t.scheduled_date > today && t.status !== "completed").length;
+    const completedCount = tasks.filter((t) => t.status === "completed").length;
+    return { today: todayCount, upcoming: upcomingCount, completed: completedCount, all: tasks.length };
+  }, [tasks, today]);
+
+  const tabs: { key: TabKey; label: string; count: number }[] = [
+    { key: "today", label: "Today", count: tabCounts.today },
+    { key: "upcoming", label: "Upcoming", count: tabCounts.upcoming },
+    { key: "completed", label: "Completed", count: tabCounts.completed },
+    { key: "all", label: "All", count: tabCounts.all },
   ];
 
   // Empty state
@@ -298,19 +306,24 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         </div>
       )}
 
-      {/* Tab navigation */}
-      <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
+      {/* Tab navigation — scrollable on mobile */}
+      <div className="flex items-center gap-1 mb-6 border-b border-gray-200 overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+            className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap ${
               activeTab === tab.key
                 ? "text-emerald-600"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {tab.label}
+            {tab.count > 0 && (
+              <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                activeTab === tab.key ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+              }`}>{tab.count}</span>
+            )}
             {activeTab === tab.key && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />
             )}
@@ -465,57 +478,106 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
   const totalCount = (task.checklist ?? []).length;
   const photoSize = compact ? 48 : 64;
 
+  const statusBorder = task.status === "issue" ? "border-l-4 border-l-red-400"
+    : task.status === "in_progress" ? "border-l-4 border-l-blue-400"
+    : task.status === "completed" ? "border-l-4 border-l-emerald-400"
+    : "";
+
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow ${
-        task.status === "issue" ? "border-l-4 border-l-red-400" : ""
-      }`}
+      className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 ${statusBorder}`}
     >
-      <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={onToggle}>
-        {/* Property photo */}
-        <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
+      <div className="p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 cursor-pointer" onClick={onToggle}>
+        {/* Property photo + info row */}
+        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+          <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
 
-        {/* Main info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
-              <p className="text-sm text-gray-500">
-                {formatShortDate(task.scheduled_date)}
-                {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
-                {nextBooking && " → 3:00 PM check-in"}
-              </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
+                <p className="text-sm text-gray-500">
+                  {formatShortDate(task.scheduled_date)}
+                  {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
+                  {nextBooking && " → 3:00 PM check-in"}
+                </p>
+              </div>
             </div>
-            {/* Status badge — desktop */}
-            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+
+            {/* Guest info */}
+            {!compact && (checkoutBooking || nextBooking) && (
+              <p className="text-xs text-gray-500 mt-1">
+                {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
+                {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
+                {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
+              </p>
+            )}
+
+            {/* Status + Cleaner + Actions — mobile (below text) */}
+            <div className="flex items-center gap-2 flex-wrap mt-2 sm:hidden">
+              {/* Status badge — mobile */}
               {task.status === "completed" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
-                  <CheckCircle2 size={12} /> Completed
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                  <CheckCircle2 size={11} /> Done
                 </span>
               ) : task.status === "in_progress" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                  <Clock size={12} /> In Progress
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                  <Clock size={11} /> In Progress
                 </span>
               ) : task.status === "issue" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
-                  <AlertTriangle size={12} /> Issue
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+                  <AlertTriangle size={11} /> Issue
                 </span>
               ) : null}
+
+              {/* Cleaner pill — mobile */}
+              {assignedCleaner ? (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
+              ) : (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
+              )}
+
+              {/* Buttons — mobile */}
+              {task.status !== "completed" && task.status !== "in_progress" && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "in_progress"); }}
+                  disabled={updating}
+                  className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg disabled:opacity-50"
+                >
+                  {updating ? "..." : "In Progress"}
+                </button>
+              )}
+              {task.status !== "completed" && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "completed"); }}
+                  disabled={updating}
+                  className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-50"
+                >
+                  {updating ? "..." : "Complete"}
+                </button>
+              )}
             </div>
           </div>
-
-          {/* Guest info */}
-          {!compact && (checkoutBooking || nextBooking) && (
-            <p className="text-xs text-gray-500 mt-1">
-              {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
-              {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
-              {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
-            </p>
-          )}
         </div>
 
-        {/* Cleaner assignment — desktop */}
+        {/* Desktop right side: status + cleaner + actions */}
         <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+          {/* Status badge */}
+          {task.status === "completed" ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+              <CheckCircle2 size={12} /> Completed
+            </span>
+          ) : task.status === "in_progress" ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+              <Clock size={12} /> In Progress
+            </span>
+          ) : task.status === "issue" ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+              <AlertTriangle size={12} /> Issue
+            </span>
+          ) : null}
+
+          {/* Cleaner pill */}
           {assignedCleaner ? (
             <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
               {assignedCleaner.name}
@@ -525,10 +587,19 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               Unassigned
             </span>
           )}
-        </div>
 
-        {/* Action buttons — desktop */}
-        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+          {/* Notify cleaner button */}
+          {assignedCleaner && task.status !== "completed" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
+              className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+              title={`Notify ${assignedCleaner.name}`}
+            >
+              <MessageSquare size={14} />
+            </button>
+          )}
+
+          {/* Action buttons */}
           {task.status !== "completed" && task.status !== "in_progress" && (
             <button
               onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "in_progress"); }}
@@ -550,33 +621,6 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
         </div>
       </div>
 
-      {/* Mobile action row */}
-      <div className="sm:hidden px-4 pb-3 flex items-center gap-2 flex-wrap">
-        {assignedCleaner ? (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
-        ) : (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
-        )}
-        {task.status !== "completed" && task.status !== "in_progress" && (
-          <button
-            onClick={() => onUpdateStatus(task.id, "in_progress")}
-            disabled={updating}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg"
-          >
-            In Progress
-          </button>
-        )}
-        {task.status !== "completed" && (
-          <button
-            onClick={() => onUpdateStatus(task.id, "completed")}
-            disabled={updating}
-            className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg"
-          >
-            Complete
-          </button>
-        )}
-      </div>
-
       {/* Expanded details */}
       {expanded && (
         <div className="border-t border-gray-100 px-4 py-4 space-y-4">
@@ -584,16 +628,27 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           {cleaners.length > 0 && (
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">Assign Cleaner</label>
-              <select
-                value={task.cleaner_id ?? ""}
-                onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
-                className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              >
-                <option value="">Select cleaner...</option>
-                {cleaners.filter((c) => c.is_active).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={task.cleaner_id ?? ""}
+                  onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                >
+                  <option value="">Select cleaner...</option>
+                  {cleaners.filter((c) => c.is_active).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                  ))}
+                </select>
+                {assignedCleaner && task.status !== "completed" && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors flex-shrink-0"
+                  >
+                    <MessageSquare size={12} /> Notify
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
