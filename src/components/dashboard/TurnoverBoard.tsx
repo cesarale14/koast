@@ -124,6 +124,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
   // Actions
   const updateStatus = useCallback(async (taskId: string, newStatus: string) => {
+    console.log("[TurnoverBoard] updateStatus called", { taskId, newStatus });
     setUpdatingTask(taskId);
     // Optimistic update
     setTasks((prev) => prev.map((t) =>
@@ -136,6 +137,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         body: JSON.stringify({ taskId, status: newStatus }),
       });
       const data = await res.json();
+      console.log("[TurnoverBoard] update response", res.status, data);
       if (!res.ok) {
         // Revert on failure
         setTasks((prev) => prev.map((t) =>
@@ -146,6 +148,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       toast(`Task marked as ${newStatus.replace("_", " ")}`);
       router.refresh();
     } catch (err) {
+      console.error("[TurnoverBoard] update failed", err);
       toast(err instanceof Error ? err.message : "Failed to update", "error");
     }
     setUpdatingTask(null);
@@ -492,137 +495,153 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
     : task.status === "completed" ? "border-l-4 border-l-emerald-400"
     : "";
 
+  const handleStatus = (e: React.MouseEvent, newStatus: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onUpdateStatus(task.id, newStatus);
+  };
+
+  const handleNotify = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (assignedCleaner) {
+      alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`);
+    }
+  };
+
   return (
     <div
       className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 ${statusBorder}`}
     >
-      <div className="p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 cursor-pointer" onClick={onToggle}>
-        {/* Property photo + info row */}
-        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
-          <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
-                <p className="text-sm text-gray-500">
-                  {formatShortDate(task.scheduled_date)}
-                  {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
-                  {nextBooking && " → 3:00 PM check-in"}
-                </p>
-              </div>
-            </div>
-
-            {/* Guest info */}
-            {!compact && (checkoutBooking || nextBooking) && (
-              <p className="text-xs text-gray-500 mt-1">
-                {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
-                {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
-                {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
+      <div className="p-4">
+        {/* Top row: photo + info (clickable to expand) + desktop actions */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          {/* Clickable area = photo + info ONLY */}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0 text-left"
+          >
+            <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
+              <p className="text-sm text-gray-500">
+                {formatShortDate(task.scheduled_date)}
+                {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
+                {nextBooking && " → 3:00 PM check-in"}
               </p>
+              {!compact && (checkoutBooking || nextBooking) && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
+                  {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
+                  {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
+                </p>
+              )}
+            </div>
+          </button>
+
+          {/* Desktop right side: status + cleaner + actions */}
+          <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+            {/* Status badge */}
+            {task.status === "completed" ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                <CheckCircle2 size={12} /> Completed
+              </span>
+            ) : task.status === "in_progress" ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                <Clock size={12} /> In Progress
+              </span>
+            ) : task.status === "issue" ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+                <AlertTriangle size={12} /> Issue
+              </span>
+            ) : null}
+
+            {/* Cleaner pill */}
+            {assignedCleaner ? (
+              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                {assignedCleaner.name}
+              </span>
+            ) : (
+              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+                Unassigned
+              </span>
             )}
 
-            {/* Status + Cleaner + Actions — mobile (below text) */}
-            <div className="flex items-center gap-2 flex-wrap mt-2 sm:hidden">
-              {/* Status badge — mobile */}
-              {task.status === "completed" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                  <CheckCircle2 size={11} /> Done
-                </span>
-              ) : task.status === "in_progress" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                  <Clock size={11} /> In Progress
-                </span>
-              ) : task.status === "issue" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
-                  <AlertTriangle size={11} /> Issue
-                </span>
-              ) : null}
+            {/* Notify cleaner button */}
+            {assignedCleaner && task.status !== "completed" && (
+              <button
+                type="button"
+                onClick={handleNotify}
+                className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                title={`Notify ${assignedCleaner.name}`}
+              >
+                <MessageSquare size={14} />
+              </button>
+            )}
 
-              {/* Cleaner pill — mobile */}
-              {assignedCleaner ? (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
-              ) : (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
-              )}
-
-              {/* Buttons — mobile */}
-              {task.status !== "completed" && task.status !== "in_progress" && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "in_progress"); }}
-                  disabled={updating}
-                  className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg disabled:opacity-50"
-                >
-                  {updating ? "..." : "In Progress"}
-                </button>
-              )}
-              {task.status !== "completed" && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "completed"); }}
-                  disabled={updating}
-                  className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-50"
-                >
-                  {updating ? "..." : "Complete"}
-                </button>
-              )}
-            </div>
+            {/* Action buttons */}
+            {task.status !== "completed" && task.status !== "in_progress" && (
+              <button
+                type="button"
+                onClick={(e) => handleStatus(e, "in_progress")}
+                disabled={updating}
+                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+              >
+                {updating ? "..." : "In Progress"}
+              </button>
+            )}
+            {task.status !== "completed" && (
+              <button
+                type="button"
+                onClick={(e) => handleStatus(e, "completed")}
+                disabled={updating}
+                className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+              >
+                {updating ? "..." : "Complete"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Desktop right side: status + cleaner + actions */}
-        <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
-          {/* Status badge */}
+        {/* Mobile bottom row: status + cleaner + actions (NOT inside the expand button) */}
+        <div className="flex items-center gap-2 flex-wrap mt-3 sm:hidden">
           {task.status === "completed" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
-              <CheckCircle2 size={12} /> Completed
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+              <CheckCircle2 size={11} /> Done
             </span>
           ) : task.status === "in_progress" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-              <Clock size={12} /> In Progress
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+              <Clock size={11} /> In Progress
             </span>
           ) : task.status === "issue" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
-              <AlertTriangle size={12} /> Issue
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+              <AlertTriangle size={11} /> Issue
             </span>
           ) : null}
 
-          {/* Cleaner pill */}
           {assignedCleaner ? (
-            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
-              {assignedCleaner.name}
-            </span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
           ) : (
-            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">
-              Unassigned
-            </span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
           )}
 
-          {/* Notify cleaner button */}
-          {assignedCleaner && task.status !== "completed" && (
-            <button
-              onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
-              className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-              title={`Notify ${assignedCleaner.name}`}
-            >
-              <MessageSquare size={14} />
-            </button>
-          )}
-
-          {/* Action buttons */}
           {task.status !== "completed" && task.status !== "in_progress" && (
             <button
-              onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "in_progress"); }}
+              type="button"
+              onClick={(e) => handleStatus(e, "in_progress")}
               disabled={updating}
-              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg disabled:opacity-50"
             >
               {updating ? "..." : "In Progress"}
             </button>
           )}
           {task.status !== "completed" && (
             <button
-              onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, "completed"); }}
+              type="button"
+              onClick={(e) => handleStatus(e, "completed")}
               disabled={updating}
-              className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-50"
             >
               {updating ? "..." : "Complete"}
             </button>
