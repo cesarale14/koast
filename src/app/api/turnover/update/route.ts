@@ -40,7 +40,10 @@ export async function POST(request: NextRequest) {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (svc.from("cleaning_tasks") as any).update(updateData).eq("id", taskId);
+  const { error } = await (svc.from("cleaning_tasks") as any).update(updateData).eq("id", taskId);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ updated: true, status });
 }

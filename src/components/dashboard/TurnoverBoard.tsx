@@ -125,6 +125,10 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
   // Actions
   const updateStatus = useCallback(async (taskId: string, newStatus: string) => {
     setUpdatingTask(taskId);
+    // Optimistic update
+    setTasks((prev) => prev.map((t) =>
+      t.id === taskId ? { ...t, status: newStatus, completed_at: newStatus === "completed" ? new Date().toISOString() : t.completed_at } : t
+    ));
     try {
       const res = await fetch("/api/turnover/update", {
         method: "POST",
@@ -132,16 +136,20 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         body: JSON.stringify({ taskId, status: newStatus }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setTasks((prev) => prev.map((t) =>
-        t.id === taskId ? { ...t, status: newStatus, completed_at: newStatus === "completed" ? new Date().toISOString() : t.completed_at } : t
-      ));
+      if (!res.ok) {
+        // Revert on failure
+        setTasks((prev) => prev.map((t) =>
+          t.id === taskId ? { ...t, status: "pending", completed_at: null } : t
+        ));
+        throw new Error(data.error || "Update failed");
+      }
       toast(`Task marked as ${newStatus.replace("_", " ")}`);
+      router.refresh();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to update", "error");
     }
     setUpdatingTask(null);
-  }, [toast]);
+  }, [toast, router]);
 
   const assignCleaner = useCallback(async (taskId: string, cleanerId: string) => {
     try {
@@ -154,10 +162,11 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       if (!res.ok) throw new Error(data.error);
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, cleaner_id: cleanerId, status: "assigned" } : t));
       toast(`Assigned to ${data.cleanerName}`);
+      router.refresh();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to assign", "error");
     }
-  }, [toast]);
+  }, [toast, router]);
 
   const backfill = useCallback(async () => {
     setBackfilling(true);
