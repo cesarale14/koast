@@ -277,8 +277,13 @@ export default function MonthlyView({
     );
     for (let i = 0; i < sorted.length; i++) {
       for (let j = i + 1; j < sorted.length; j++) {
+        // Same-day turnovers (Guest A checks out, Guest B checks in on
+        // the same date) are a normal back-to-back booking, NOT a
+        // conflict. Half-open interval math handles it already but we
+        // enforce it explicitly for clarity.
         if (sorted[j].check_in >= sorted[i].check_out) continue;
         if (!(sorted[i].check_in < sorted[j].check_out && sorted[j].check_in < sorted[i].check_out)) continue;
+        if (sorted[i].check_out === sorted[j].check_in || sorted[j].check_out === sorted[i].check_in) continue;
         const start = sorted[i].check_in > sorted[j].check_in ? sorted[i].check_in : sorted[j].check_in;
         const end = sorted[i].check_out < sorted[j].check_out ? sorted[i].check_out : sorted[j].check_out;
         const nights = getNights(start, end);

@@ -26,9 +26,13 @@ interface ConflictPair {
 }
 
 function overlapRange(a: BookingRow, b: BookingRow): { start: string; end: string; nights: number } | null {
-  // Half-open [check_in, check_out) — standard hotel interval semantics.
-  // a and b overlap iff a.check_in < b.check_out AND b.check_in < a.check_out.
+  // STR interval semantics: [check_in, check_out) half-open. A same-day
+  // turnover (a.check_out === b.check_in) is NOT a conflict — it's a
+  // normal back-to-back booking. We enforce that explicitly so the logic
+  // is obvious to future readers, even though half-open math already
+  // excludes it.
   if (!(a.check_in < b.check_out && b.check_in < a.check_out)) return null;
+  if (a.check_out === b.check_in || b.check_out === a.check_in) return null;
   const start = a.check_in > b.check_in ? a.check_in : b.check_in;
   const end = a.check_out < b.check_out ? a.check_out : b.check_out;
   const startMs = Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10));
