@@ -27,6 +27,8 @@ interface BarSegment {
   isStart: boolean; isEnd: boolean; // actual checkin/checkout (gets offset)
   capLeft: boolean; capRight: boolean; // rounded cap (month break or actual start/end)
   nights: number; isPast: boolean;
+  lane: number; // vertical lane within the row (0 = bottom, stacking upward for conflicts)
+  conflict: boolean; // true if this booking overlaps another in the calendar's bookings
 }
 
 interface MonthData {
@@ -42,6 +44,7 @@ export interface MonthlyViewProps {
   todayTrigger: number;
   onBookingClick: (booking: BookingBarData) => void;
   onDateClick: (propertyId: string, date: string, rate: RateData | null) => void;
+  onConflictResolve?: (booking1: BookingBarData, booking2: BookingBarData) => void;
 }
 
 function pad2(n: number): string { return String(n).padStart(2, "0"); }
@@ -49,6 +52,17 @@ function toDateStr(y: number, m: number, d: number): string { return `${y}-${pad
 function getNights(ci: string, co: string): number {
   return Math.round((Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10)) -
     Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10))) / 86400000);
+}
+
+function formatPillRange(start: string, end: string): string {
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  const sMonth = s.toLocaleDateString("en-US", { month: "short" });
+  const eMonth = e.toLocaleDateString("en-US", { month: "short" });
+  return sameMonth
+    ? `${sMonth} ${s.getDate()}–${e.getDate()}`
+    : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
 }
 
 function buildMonthDays(year: number, month: number, todayStr: string): { days: DayInfo[]; startDow: number; totalDays: number } {
@@ -66,7 +80,7 @@ function buildMonthDays(year: number, month: number, todayStr: string): { days: 
   return { days, startDow, totalDays };
 }
 
-function buildBarSegments(bookings: BookingBarData[], year: number, month: number, startDow: number, totalDays: number, todayStr: string): BarSegment[] {
+function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<string>, year: number, month: number, startDow: number, totalDays: number, todayStr: string): BarSegment[] {
   const monthStart = toDateStr(year, month, 1);
   const monthEnd = toDateStr(year, month, totalDays);
   const nm = month === 11 ? 0 : month + 1;
@@ -116,9 +130,40 @@ function buildBarSegments(bookings: BookingBarData[], year: number, month: numbe
         capLeft: row === sRow ? capLeft : false,
         capRight: row === eRow ? capRight : false,
         nights, isPast,
+        lane: 0,
+        conflict: conflictBookingIds.has(booking.id),
       });
     }
   }
+
+  // Assign lanes per row with a greedy interval packing pass so overlapping
+  // bookings stack upward instead of colliding on a single line.
+  const byRow = new Map<number, BarSegment[]>();
+  for (const s of segments) {
+    if (!byRow.has(s.row)) byRow.set(s.row, []);
+    byRow.get(s.row)!.push(s);
+  }
+  for (const rowSegs of Array.from(byRow.values())) {
+    rowSegs.sort((a, b) => a.startCol - b.startCol || a.endCol - b.endCol);
+    // lanes[i] = the rightmost endCol currently occupied in lane i
+    const lanes: number[] = [];
+    for (const seg of rowSegs) {
+      let placed = false;
+      for (let li = 0; li < lanes.length; li++) {
+        if (seg.startCol > lanes[li]) {
+          seg.lane = li;
+          lanes[li] = seg.endCol;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        seg.lane = lanes.length;
+        lanes.push(seg.endCol);
+      }
+    }
+  }
+
   return segments;
 }
 
@@ -128,7 +173,7 @@ const gridVars = {
 } as React.CSSProperties;
 
 export default function MonthlyView({
-  propertyId, bookings, rates, todayStr, todayTrigger, onBookingClick, onDateClick,
+  propertyId, bookings, rates, todayStr, todayTrigger, onBookingClick, onDateClick, onConflictResolve,
 }: MonthlyViewProps) {
   const thisYear = new Date().getFullYear();
   const thisMonth = new Date().getMonth();
@@ -196,12 +241,6 @@ export default function MonthlyView({
     return result;
   }, [todayStr, thisYear, thisMonth]);
 
-  const segmentsByMonth = useMemo(() => {
-    const map = new Map<string, BarSegment[]>();
-    for (const m of months) map.set(m.key, buildBarSegments(bookings, m.year, m.month, m.startDow, m.totalDays, todayStr));
-    return map;
-  }, [months, bookings, todayStr]);
-
   const bookedDates = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookings) {
@@ -213,12 +252,13 @@ export default function MonthlyView({
   }, [bookings]);
 
   // Overbooking detection — dates where two or more confirmed bookings
-  // span the same night. Computed locally from the bookings the calendar
-  // already has, so no extra API call is needed.
-  const conflictDates = useMemo(() => {
+  // span the same night, plus the set of booking IDs involved in any
+  // overlap and the pairwise conflict ranges shown in the summary pill.
+  // Computed locally from the bookings the calendar already has.
+  const { conflictDates, conflictBookingIds, conflictPairs } = useMemo(() => {
+    const confirmed = bookings.filter((b) => !b.status || b.status === "confirmed");
     const dateToCount = new Map<string, number>();
-    for (const b of bookings) {
-      if (b.status && b.status !== "confirmed") continue;
+    for (const b of confirmed) {
       const d = new Date(b.check_in + "T00:00:00");
       const co = new Date(b.check_out + "T00:00:00");
       while (d < co) {
@@ -227,10 +267,35 @@ export default function MonthlyView({
         d.setDate(d.getDate() + 1);
       }
     }
-    const set = new Set<string>();
-    for (const [k, v] of Array.from(dateToCount.entries())) if (v > 1) set.add(k);
-    return set;
+    const dates = new Set<string>();
+    for (const [k, v] of Array.from(dateToCount.entries())) if (v > 1) dates.add(k);
+
+    const ids = new Set<string>();
+    const pairs: { a: BookingBarData; b: BookingBarData; start: string; end: string; nights: number }[] = [];
+    const sorted = [...confirmed].sort((x, y) =>
+      x.check_in === y.check_in ? x.check_out.localeCompare(y.check_out) : x.check_in.localeCompare(y.check_in)
+    );
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (sorted[j].check_in >= sorted[i].check_out) continue;
+        if (!(sorted[i].check_in < sorted[j].check_out && sorted[j].check_in < sorted[i].check_out)) continue;
+        const start = sorted[i].check_in > sorted[j].check_in ? sorted[i].check_in : sorted[j].check_in;
+        const end = sorted[i].check_out < sorted[j].check_out ? sorted[i].check_out : sorted[j].check_out;
+        const nights = getNights(start, end);
+        if (nights === 0) continue;
+        ids.add(sorted[i].id);
+        ids.add(sorted[j].id);
+        pairs.push({ a: sorted[i], b: sorted[j], start, end, nights });
+      }
+    }
+    return { conflictDates: dates, conflictBookingIds: ids, conflictPairs: pairs };
   }, [bookings]);
+
+  const segmentsByMonth = useMemo(() => {
+    const map = new Map<string, BarSegment[]>();
+    for (const m of months) map.set(m.key, buildBarSegments(bookings, conflictBookingIds, m.year, m.month, m.startDow, m.totalDays, todayStr));
+    return map;
+  }, [months, bookings, conflictBookingIds, todayStr]);
 
   // Gap night detection — 1-2 available nights between bookings
   const gapDates = useMemo(() => {
@@ -292,6 +357,30 @@ export default function MonthlyView({
         ))}
       </div>
 
+      {/* Conflict summary pill — pinned above the scroll area so it stays
+          visible regardless of month scrolled to. */}
+      {conflictPairs.length > 0 && (
+        <div className="flex-shrink-0 px-3 py-2 border-b border-red-100 bg-red-50">
+          <div className="flex flex-wrap items-center gap-2">
+            {conflictPairs.map((p, i) => {
+              const label = `${conflictPairs.length > 1 ? `#${i + 1} ` : ""}${p.nights} night${p.nights === 1 ? "" : "s"} overlap ${formatPillRange(p.start, p.end)}`;
+              return (
+                <button
+                  key={`${p.a.id}-${p.b.id}`}
+                  onClick={() => onConflictResolve?.(p.a, p.b)}
+                  className="inline-flex items-center gap-2 px-3 h-8 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200 hover:bg-red-200 transition-colors"
+                  title={`${p.a.guest_name ?? "Guest"} × ${p.b.guest_name ?? "Guest"}`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-red-500 text-white inline-flex items-center justify-center text-[10px] font-bold">!</span>
+                  <span>{label}</span>
+                  <span className="text-red-600/80 font-normal">· Click to resolve</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
         <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
@@ -342,9 +431,9 @@ export default function MonthlyView({
                         <div className="flex items-start justify-between">
                           <div>
                             {day.isToday ? (
-                              <span className="inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500 text-white text-[12px] md:text-[13px] font-semibold leading-none">{day.dayNum}</span>
+                              <span className={`inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full ${isConflict ? "bg-red-500" : "bg-emerald-500"} text-white text-[12px] md:text-[13px] font-semibold leading-none`}>{day.dayNum}</span>
                             ) : (
-                              <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
+                              <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${isConflict ? "text-red-600" : day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
                             )}
                           </div>
                           {/* Event dot indicator */}
@@ -391,21 +480,35 @@ export default function MonthlyView({
                   if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
                   const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
 
-                  // Position bar at bottom of its row using measured cell height (px)
+                  // Position bar at bottom of its row; stack higher lanes
+                  // upward so conflicting bookings are visible side-by-side
+                  // stacked, not overdrawing each other.
+                  const BAR_H = 30;
+                  const LANE_GAP = 2;
+                  const laneOffset = seg.lane * (BAR_H + LANE_GAP);
                   const rowUnit = cellH + GAP;
-                  const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 3}px` : "0px";
+                  const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 3 - laneOffset}px` : "0px";
 
                   const color = platformColors[seg.booking.platform] ?? "#333333";
                   const logo = platformLogos[seg.booking.platform] ?? null;
                   const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
                   const effectiveSpan = span - startFrac - endFrac;
-                  const showText = effectiveSpan >= 1.5;
+                  const showText = effectiveSpan >= 1.0;
 
                   const rL = seg.capLeft ? "14px" : "0";
                   const rR = seg.capRight ? "14px" : "0";
                   const shadow = seg.isStart
                     ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
                     : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+
+                  // Red diagonal stripe overlay signals the booking overlaps
+                  // another one somewhere on the calendar.
+                  const conflictOverlay = seg.conflict
+                    ? "repeating-linear-gradient(45deg, rgba(239,68,68,0.55) 0 6px, rgba(239,68,68,0) 6px 12px)"
+                    : undefined;
+                  const border = seg.conflict
+                    ? "2px solid #ef4444"
+                    : "1px solid rgba(0,0,0,0.15)";
 
                   return (
                     <div
@@ -414,19 +517,20 @@ export default function MonthlyView({
                       style={{
                         left, width, top, transform: "translateY(-100%)",
                         backgroundColor: color,
+                        backgroundImage: conflictOverlay,
                         borderRadius: `${rL} ${rR} ${rR} ${rL}`,
-                        zIndex: seg.isStart ? 2 : 1,
+                        zIndex: seg.conflict ? 3 : seg.isStart ? 2 : 1,
                         paddingLeft: seg.capLeft ? "3px" : "4px",
                         paddingRight: seg.capRight ? "10px" : "4px",
                         opacity: seg.isPast ? 0.7 : 1,
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        borderTop: "1px solid rgba(255,255,255,0.1)",
+                        border,
+                        borderTop: seg.conflict ? undefined : "1px solid rgba(255,255,255,0.1)",
                         boxShadow: shadow,
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = shadow; }}
                       onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
-                      title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}`}
+                      title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
                     >
                       {seg.capLeft && logo && (
                         <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
@@ -435,7 +539,12 @@ export default function MonthlyView({
                           <img src={logo} alt="" className="w-[14px] h-[14px] md:w-[16px] md:h-[16px]" />
                         </div>
                       )}
-                      {showText && <span className="truncate text-[11px] md:text-[12px] font-medium">{firstName} +{seg.nights}</span>}
+                      {showText && (
+                        <span className="truncate text-[11px] md:text-[12px] font-medium">
+                          {seg.booking.guest_name ?? firstName}
+                          {effectiveSpan >= 2 ? ` · ${seg.nights}n` : ""}
+                        </span>
+                      )}
                     </div>
                   );
                 })}

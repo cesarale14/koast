@@ -6,6 +6,7 @@ import PropertyRow from "./PropertyRow";
 import MonthlyView from "./MonthlyView";
 import BookingSidePanel from "./BookingSidePanel";
 import DateEditPopover from "./DateEditPopover";
+import { ConflictResolutionModal, type Conflict, type ConflictBooking } from "@/components/dashboard/ConflictResolution";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
@@ -106,6 +107,7 @@ export default function CalendarGrid({
 
   // ---------- Common state ----------
   const [selectedBooking, setSelectedBooking] = useState<BookingBarData | null>(null);
+  const [activeConflict, setActiveConflict] = useState<Conflict | null>(null);
   const [popover, setPopover] = useState<{
     propertyId: string;
     dates: string[];
@@ -598,6 +600,36 @@ export default function CalendarGrid({
               todayTrigger={monthlyTodayTrigger}
               onBookingClick={setSelectedBooking}
               onDateClick={handleDateClick}
+              onConflictResolve={(a, b) => {
+                const toConflictBooking = (x: BookingBarData): ConflictBooking => ({
+                  id: x.id,
+                  property_id: x.property_id,
+                  guest_name: x.guest_name,
+                  check_in: x.check_in,
+                  check_out: x.check_out,
+                  platform: x.platform,
+                  total_price: x.total_price,
+                  channex_booking_id: null,
+                  platform_booking_id: null,
+                  status: x.status,
+                });
+                const start = a.check_in > b.check_in ? a.check_in : b.check_in;
+                const end = a.check_out < b.check_out ? a.check_out : b.check_out;
+                const nights = Math.round(
+                  (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
+                    Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
+                    86400000
+                );
+                setActiveConflict({
+                  property_id: monthlyPropertyId,
+                  property_name: properties.find((p) => p.id === monthlyPropertyId)?.name ?? "Property",
+                  booking1: toConflictBooking(a),
+                  booking2: toConflictBooking(b),
+                  overlap_start: start,
+                  overlap_end: end,
+                  overlap_nights: nights,
+                });
+              }}
             />
           </div>
         </div>
@@ -608,6 +640,13 @@ export default function CalendarGrid({
         booking={selectedBooking}
         onClose={() => setSelectedBooking(null)}
         propertyMap={new Map(properties.map((p) => [p.id, { name: p.name, cover_photo_url: p.cover_photo_url }]))}
+      />
+
+      {/* Conflict resolution modal */}
+      <ConflictResolutionModal
+        conflict={activeConflict}
+        onClose={() => setActiveConflict(null)}
+        onResolved={() => { /* parent refreshes on navigation — bookings already reloaded from server on next mount */ }}
       />
 
       {/* Date edit popover */}

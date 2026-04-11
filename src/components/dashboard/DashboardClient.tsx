@@ -13,6 +13,7 @@ import {
   BookOpen,
   CheckCircle2,
   Home,
+  AlertTriangle,
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
 import PlatformLogoDefault from "@/components/ui/PlatformLogo";
@@ -203,7 +204,11 @@ export default function DashboardClient() {
         <PropertyStatusStrip cards={data.propertyCards} />
 
         {/* Section 2: Smart Actions */}
-        <SmartActions actions={data.actions} />
+        <SmartActions
+          actions={data.actions}
+          conflicts={conflictsData?.conflicts ?? []}
+          onResolveConflict={(c) => setActiveConflict(c)}
+        />
 
         {/* Section 3: Upcoming Events Bar */}
         <EventsBar events={data.events} />
@@ -398,7 +403,15 @@ const actionTypeConfig: Record<string, { icon: typeof DollarSign; iconBg: string
   review: { icon: Star, iconBg: "bg-yellow-100", iconColor: "text-yellow-600" },
 };
 
-function SmartActions({ actions }: { actions: ActionItem[] }) {
+function SmartActions({
+  actions,
+  conflicts,
+  onResolveConflict,
+}: {
+  actions: ActionItem[];
+  conflicts: Conflict[];
+  onResolveConflict: (c: Conflict) => void;
+}) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -415,7 +428,7 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
 
   const visible = actions.filter((a) => !dismissed.has(a.id));
 
-  if (visible.length === 0) {
+  if (visible.length === 0 && conflicts.length === 0) {
     if (actions.length > 0) {
       return (
         <div className="mb-6 p-4 rounded-xl bg-brand-50/50 text-center">
@@ -426,12 +439,53 @@ function SmartActions({ actions }: { actions: ActionItem[] }) {
     return null;
   }
 
+  const formatPillRange = (start: string, end: string) => {
+    const s = new Date(start + "T00:00:00");
+    const e = new Date(end + "T00:00:00");
+    const sMonth = s.toLocaleDateString("en-US", { month: "short" });
+    const eMonth = e.toLocaleDateString("en-US", { month: "short" });
+    return s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()
+      ? `${sMonth} ${s.getDate()}-${e.getDate()}`
+      : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
+  };
+
   return (
     <div className="mb-6">
       <h2 className="text-sm font-semibold text-gray-800 mb-3">
         Needs Your Attention
       </h2>
       <div className="space-y-2">
+        {conflicts.map((c) => {
+          const platformLabel = (p: string) => (p === "booking_com" ? "Booking.com" : p === "airbnb" ? "Airbnb" : p === "vrbo" ? "VRBO" : p);
+          const a = c.booking1;
+          const b = c.booking2;
+          const samePlatform = a.platform === b.platform;
+          const platformDesc = samePlatform ? `2 ${platformLabel(a.platform)} bookings overlap.` : `${platformLabel(a.platform)} and ${platformLabel(b.platform)} bookings overlap.`;
+          return (
+            <div
+              key={`conflict-${c.booking1.id}-${c.booking2.id}`}
+              className="flex items-center gap-3.5 p-4 rounded-xl bg-white shadow-sm border-l-4 border-l-red-500"
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-red-50">
+                <AlertTriangle size={18} className="text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">
+                  Overbooking at {c.property_name} — {formatPillRange(c.overlap_start, c.overlap_end)}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {platformDesc} Resolve immediately.
+                </p>
+              </div>
+              <button
+                onClick={() => onResolveConflict(c)}
+                className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Resolve
+              </button>
+            </div>
+          );
+        })}
         {visible.slice(0, 5).map((a) => {
           const config = actionTypeConfig[a.type] ?? actionTypeConfig.event;
           const Icon = config.icon;
