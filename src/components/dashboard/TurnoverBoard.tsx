@@ -213,7 +213,11 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
     } catch { toast("Failed", "error"); }
   }, [toast]);
 
-  const testSMS = useCallback(async (phone: string) => {
+  // SMS state per cleaner: sending | success | error message
+  const [smsState, setSmsState] = useState<Record<string, { status: "sending" | "success" | "error"; message?: string }>>({});
+
+  const testSMS = useCallback(async (cleanerId: string, phone: string) => {
+    setSmsState((prev) => ({ ...prev, [cleanerId]: { status: "sending" } }));
     try {
       const res = await fetch("/api/cleaners", {
         method: "PUT",
@@ -221,8 +225,26 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         body: JSON.stringify({ phone }),
       });
       const data = await res.json();
-      toast(data.success ? "Test SMS sent!" : "SMS failed", data.success ? undefined : "error");
-    } catch { toast("SMS failed", "error"); }
+      console.log("[TurnoverBoard] testSMS response", res.status, data);
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setSmsState((prev) => ({ ...prev, [cleanerId]: { status: "success", message: "SMS sent!" } }));
+      toast("Test SMS sent!");
+      // Auto-clear success message after 4s
+      setTimeout(() => {
+        setSmsState((prev) => {
+          const next = { ...prev };
+          delete next[cleanerId];
+          return next;
+        });
+      }, 4000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send";
+      console.error("[TurnoverBoard] testSMS failed", err);
+      setSmsState((prev) => ({ ...prev, [cleanerId]: { status: "error", message } }));
+      toast(`SMS failed: ${message}`, "error");
+    }
   }, [toast]);
 
   const toggleExpand = (id: string) => {
@@ -293,18 +315,35 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-sm font-semibold text-gray-800 mb-3">Manage Cleaners</h3>
           <div className="space-y-2 mb-4">
-            {cleaners.map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                  <p className="text-xs text-gray-400">{c.phone}</p>
+            {cleaners.map((c) => {
+              const sms = smsState[c.id];
+              return (
+                <div key={c.id} className="py-2.5 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                      <p className="text-xs text-gray-400">{c.phone}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => testSMS(c.id, c.phone)}
+                        disabled={sms?.status === "sending"}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                      >
+                        {sms?.status === "sending" ? "Sending..." : "Test SMS"}
+                      </button>
+                      <button onClick={() => removeCleaner(c.id)} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
+                    </div>
+                  </div>
+                  {sms?.status === "success" && (
+                    <p className="mt-1 text-xs text-emerald-600 font-medium">✓ {sms.message}</p>
+                  )}
+                  {sms?.status === "error" && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">✗ Failed: {sms.message}</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => testSMS(c.phone)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Test SMS</button>
-                  <button onClick={() => removeCleaner(c.id)} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {cleaners.length === 0 && <p className="text-sm text-gray-400">No cleaners added yet.</p>}
           </div>
           <div className="flex gap-2">

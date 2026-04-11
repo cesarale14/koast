@@ -25,6 +25,27 @@ export async function sendSMS(to: string, body: string): Promise<string | null> 
   }
 }
 
+/**
+ * Variant that throws on error so callers can return the actual error
+ * message instead of a generic boolean. Use this for user-initiated
+ * actions like Test SMS where we want to surface the cause.
+ */
+export async function sendSMSOrThrow(to: string, body: string): Promise<string> {
+  if (!from) throw new Error("TWILIO_PHONE_NUMBER not configured on the server");
+  if (!accountSid || !authToken) throw new Error("Twilio credentials not configured on the server");
+  try {
+    const message = await getClient().messages.create({ body, from, to });
+    return message.sid;
+  } catch (err) {
+    // Twilio errors have a `code` and `message`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const e = err as any;
+    const code = e?.code ? ` (Twilio code ${e.code})` : "";
+    const msg = e?.message || (err instanceof Error ? err.message : "Unknown SMS error");
+    throw new Error(`${msg}${code}`);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function logSMS(supabase: any, params: {
   userId?: string;
