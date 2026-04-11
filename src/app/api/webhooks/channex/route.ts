@@ -47,9 +47,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ok", message: "webhook test received" });
   }
 
-  // Only handle booking events
+  // Only handle booking events. Keep the list explicit so a new Channex
+  // event type falls through to the logger instead of mutating rows.
   const bookingEvents = [
-    "booking", "booking_new", "booking_modification", "booking_cancellation",
+    "booking", "booking_new", "booking_modification", "booking_modified",
+    "booking_cancellation", "booking_cancelled",
+    "booking_unmapped_new", "booking_unmapped_modified", "booking_unmapped_cancelled",
     "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
   ];
 
@@ -68,6 +71,26 @@ export async function POST(request: NextRequest) {
       });
     } catch { /* non-critical */ }
     return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
+  }
+
+  // Unmapped-channel events: we don't yet know which StayCommand
+  // property the booking belongs to, so log + ack without mutating any
+  // rows. They'll show up in channex_webhook_log for debugging.
+  if (event.startsWith("booking_unmapped")) {
+    console.log(`[webhook] Unmapped-channel event "${event}" received — logging for debugging`);
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        booking_id: bookingId,
+        revision_id: revisionId,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: "logged_unmapped",
+        ack_sent: false,
+        ack_response: null,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", message: `Unmapped event ${event} logged` });
   }
 
   if (!bookingId) {

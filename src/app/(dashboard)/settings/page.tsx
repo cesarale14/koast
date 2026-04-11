@@ -117,6 +117,7 @@ export default function SettingsPage() {
   const [feeds, setFeeds] = useState<ICalFeed[]>([]);
   const [channelConnections, setChannelConnections] = useState<ChannelConnection[]>([]);
   const [syncingChannex, setSyncingChannex] = useState(false);
+  const [lastSync, setLastSync] = useState<{ at: string; checked: number; updated: number; inserted: number; cancelled: number } | null>(null);
 
   // Security
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -215,19 +216,49 @@ export default function SettingsPage() {
     }
   };
 
+  // Restore last sync timestamp from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("channex-last-sync");
+    if (saved) try { setLastSync(JSON.parse(saved)); } catch { /* ignore */ }
+  }, []);
+
   const handleSyncChannex = async () => {
     setSyncingChannex(true);
     try {
       const res = await fetch("/api/channex/sync-bookings");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Sync failed");
-      const count = data.synced_count ?? 0;
-      toast(count > 0 ? `Synced ${count} booking${count === 1 ? "" : "s"} from Channex` : "No new bookings");
+      const checked = data.checked ?? 0;
+      const inserted = data.inserted ?? 0;
+      const updated = data.updated ?? 0;
+      const cancelled = data.cancelled ?? 0;
+      const summary = {
+        at: data.synced_at ?? new Date().toISOString(),
+        checked, updated, inserted, cancelled,
+      };
+      setLastSync(summary);
+      localStorage.setItem("channex-last-sync", JSON.stringify(summary));
+      const parts = [`${checked} checked`];
+      if (inserted > 0) parts.push(`${inserted} new`);
+      if (updated > 0) parts.push(`${updated} updated`);
+      if (cancelled > 0) parts.push(`${cancelled} cancelled`);
+      toast(`\u2713 Synced: ${parts.join(", ")}`);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Sync failed", "error");
     } finally {
       setSyncingChannex(false);
     }
+  };
+
+  const formatLastSync = (iso: string): string => {
+    const then = new Date(iso);
+    const ms = Date.now() - then.getTime();
+    const mins = Math.round(ms / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return then.toLocaleDateString();
   };
 
   const handleExportJson = async () => {
@@ -435,18 +466,42 @@ export default function SettingsPage() {
             Open Channex &rarr;
           </a>
         </div>
-        <div className="mt-3 flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
-          <div>
-            <p className="text-sm font-medium text-neutral-800">Manual Booking Sync</p>
-            <p className="text-xs text-neutral-500 mt-0.5">Pull the latest bookings from Channex. Run this if a webhook was missed.</p>
+        <div className="mt-3 p-4 bg-neutral-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-neutral-800">Manual Booking Sync</p>
+              <p className="text-xs text-neutral-500 mt-0.5">Pull the latest bookings from Channex. Run this if a webhook was missed.</p>
+            </div>
+            <button
+              onClick={handleSyncChannex}
+              disabled={syncingChannex}
+              className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 flex items-center gap-2"
+            >
+              {syncingChannex && (
+                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {syncingChannex ? "Syncing..." : "Sync from Channex"}
+            </button>
           </div>
-          <button
-            onClick={handleSyncChannex}
-            disabled={syncingChannex}
-            className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
-          >
-            {syncingChannex ? "Syncing..." : "Sync from Channex"}
-          </button>
+          {lastSync && (
+            <div className="mt-3 pt-3 border-t border-neutral-200 flex items-center justify-between text-xs">
+              <span className="text-neutral-500">
+                Last sync: <span className="font-medium text-neutral-700">{formatLastSync(lastSync.at)}</span>
+              </span>
+              <span className="text-neutral-500">
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                  <Check size={12} strokeWidth={3} />
+                  {lastSync.checked} checked
+                </span>
+                {lastSync.inserted > 0 && <span className="ml-2">· {lastSync.inserted} new</span>}
+                {lastSync.updated > 0 && <span className="ml-2">· {lastSync.updated} updated</span>}
+                {lastSync.cancelled > 0 && <span className="ml-2 text-red-600">· {lastSync.cancelled} cancelled</span>}
+              </span>
+            </div>
+          )}
         </div>
         <p className="text-xs text-neutral-400 mt-3">Part of the Pro plan ($79/mo). Includes rate pushing, availability sync, real-time booking webhooks, and guest messaging.</p>
       </SectionCard>

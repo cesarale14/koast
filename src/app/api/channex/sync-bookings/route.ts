@@ -18,12 +18,36 @@ function detectPlatform(otaName: string | null | undefined, uniqueId: string | n
   return "direct";
 }
 
+export interface SyncResult {
+  message: string;
+  checked: number;      // total bookings pulled from Channex
+  inserted: number;     // new rows in bookings
+  updated: number;      // existing rows whose fields changed (includes cancellations)
+  cancelled: number;    // rows flipped to cancelled during this run
+  synced_count: number; // inserted + updated (back-compat with previous UI)
+  synced_at: string;    // ISO timestamp
+  properties: PerProperty[];
+  errors?: string[];
+}
+
+interface PerProperty {
+  property_id: string;
+  name: string;
+  fetched: number;
+  inserted: number;
+  updated: number;
+  cancelled: number;
+  error?: string;
+}
+
 /**
  * GET /api/channex/sync-bookings
  *
- * Pulls every booking for the authenticated user's Channex-mapped properties
- * from the Channex API and upserts them into the bookings table. Skips
- * cancelled bookings per the task spec. Returns per-property counts.
+ * Pulls every booking for the authed user's Channex-mapped properties
+ * and upserts them into the bookings table. Cancellations on the
+ * Channex side flip the local row's status to "cancelled" — they no
+ * longer get skipped. Returns per-property counts and a timestamp for
+ * the UI to display.
  */
 export async function GET() {
   try {
@@ -44,42 +68,38 @@ export async function GET() {
     const properties = (propData ?? []) as { id: string; name: string; channex_property_id: string }[];
 
     if (properties.length === 0) {
-      return NextResponse.json({
+      const empty: SyncResult = {
         message: "No Channex-mapped properties for this user",
+        checked: 0,
+        inserted: 0,
+        updated: 0,
+        cancelled: 0,
         synced_count: 0,
+        synced_at: new Date().toISOString(),
         properties: [],
-      });
+      };
+      return NextResponse.json(empty);
     }
 
-    let totalSynced = 0;
-    let totalSkippedCancelled = 0;
-    const perProperty: {
-      property_id: string;
-      name: string;
-      fetched: number;
-      inserted: number;
-      updated: number;
-      skipped_cancelled: number;
-      error?: string;
-    }[] = [];
+    let totalChecked = 0;
+    let totalInserted = 0;
+    let totalUpdated = 0;
+    let totalCancelled = 0;
+    const perProperty: PerProperty[] = [];
+    const errors: string[] = [];
 
     for (const prop of properties) {
       let fetched = 0;
       let inserted = 0;
       let updated = 0;
-      let skippedCancelled = 0;
+      let cancelled = 0;
       try {
         const bookings = await channex.getBookings({ propertyId: prop.channex_property_id });
         fetched = bookings.length;
+        totalChecked += fetched;
 
         for (const b of bookings) {
           const ba = b.attributes;
-
-          if (ba.status === "cancelled") {
-            skippedCancelled++;
-            continue;
-          }
-
           const guestName = ba.customer
             ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ")
             : null;
@@ -89,6 +109,8 @@ export async function GET() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (ba as any).unique_id ?? ba.ota_reservation_code
           );
+
+          const isCancelled = ba.status === "cancelled";
 
           const bookingRecord = {
             property_id: prop.id,
@@ -101,48 +123,54 @@ export async function GET() {
             check_out: ba.departure_date,
             total_price: ba.amount ? parseFloat(ba.amount) : null,
             currency: ba.currency || "USD",
-            status: "confirmed",
+            status: isCancelled ? "cancelled" : "confirmed",
             platform_booking_id: ba.ota_reservation_code || null,
             notes: ba.notes || null,
+            updated_at: new Date().toISOString(),
           };
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const bookTable = supabase.from("bookings") as any;
           const { data: existing } = await bookTable
-            .select("id")
+            .select("id, status")
             .eq("channex_booking_id", b.id)
             .limit(1);
 
           if (existing && existing.length > 0) {
+            const wasConfirmed = existing[0].status === "confirmed";
             const { error } = await bookTable.update(bookingRecord).eq("id", existing[0].id);
             if (error) {
               console.error(`[sync-bookings] update ${b.id}:`, error.message);
             } else {
               updated++;
-              totalSynced++;
+              if (isCancelled && wasConfirmed) cancelled++;
             }
-          } else {
+          } else if (!isCancelled) {
+            // Only insert fresh rows for non-cancelled bookings — no point
+            // creating a row that's already dead.
             const { error } = await bookTable.insert(bookingRecord);
             if (error) {
               console.error(`[sync-bookings] insert ${b.id}:`, error.message);
             } else {
               inserted++;
-              totalSynced++;
             }
           }
         }
 
-        totalSkippedCancelled += skippedCancelled;
+        totalInserted += inserted;
+        totalUpdated += updated;
+        totalCancelled += cancelled;
         perProperty.push({
           property_id: prop.id,
           name: prop.name,
           fetched,
           inserted,
           updated,
-          skipped_cancelled: skippedCancelled,
+          cancelled,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${prop.name}: ${msg}`);
         console.error(`[sync-bookings] ${prop.name}: ${msg}`);
         perProperty.push({
           property_id: prop.id,
@@ -150,18 +178,24 @@ export async function GET() {
           fetched,
           inserted,
           updated,
-          skipped_cancelled: skippedCancelled,
+          cancelled,
           error: msg,
         });
       }
     }
 
-    return NextResponse.json({
-      message: `Synced ${totalSynced} booking${totalSynced === 1 ? "" : "s"} from Channex`,
-      synced_count: totalSynced,
-      skipped_cancelled: totalSkippedCancelled,
+    const result: SyncResult = {
+      message: `${totalChecked} booking${totalChecked === 1 ? "" : "s"} checked, ${totalInserted} new, ${totalUpdated} updated${totalCancelled > 0 ? `, ${totalCancelled} cancelled` : ""}`,
+      checked: totalChecked,
+      inserted: totalInserted,
+      updated: totalUpdated,
+      cancelled: totalCancelled,
+      synced_count: totalInserted + totalUpdated,
+      synced_at: new Date().toISOString(),
       properties: perProperty,
-    });
+      errors: errors.length > 0 ? errors : undefined,
+    };
+    return NextResponse.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Sync failed";
     console.error("[sync-bookings] top-level:", msg);
