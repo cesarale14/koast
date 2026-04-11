@@ -1,5 +1,7 @@
 "use client";
 
+import PlatformLogo from "@/components/ui/PlatformLogo";
+
 const platformColors: Record<string, string> = {
   airbnb: "#FF5A5F",
   vrbo: "#3B5998",
@@ -60,6 +62,9 @@ export default function BookingBar({ booking, startCol, span, onClick }: Booking
       }}
       title={`${booking.guest_name} · ${nights} night${nights !== 1 ? "s" : ""} · ${booking.platform}`}
     >
+      <span className="inline-flex items-center justify-center bg-white rounded-full flex-shrink-0" style={{ width: 18, height: 18 }}>
+        <PlatformLogo platform={booking.platform} size="sm" />
+      </span>
       <span className="truncate">{firstName}</span>
       <span className="text-white/70 text-[10px] flex-shrink-0">{nights}n</span>
     </div>
