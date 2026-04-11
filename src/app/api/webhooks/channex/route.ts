@@ -156,11 +156,21 @@ export async function POST(request: NextRequest) {
       ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ")
       : null;
 
+    // Prefer unique_id prefix (BDC-/ABB-/VRBO-) — it's Channex's canonical
+    // per-channel source tag — then fall back to ota_name.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const uniqueId = String(((ba as any).unique_id ?? ba.ota_reservation_code ?? "")).toUpperCase();
     let platform = "direct";
-    const otaLower = (ba.ota_name ?? "").toLowerCase();
-    if (otaLower.includes("airbnb")) platform = "airbnb";
-    else if (otaLower.includes("vrbo") || otaLower.includes("homeaway")) platform = "vrbo";
-    else if (otaLower.includes("booking")) platform = "booking_com";
+    if (uniqueId.startsWith("BDC-")) platform = "booking_com";
+    else if (uniqueId.startsWith("ABB-")) platform = "airbnb";
+    else if (uniqueId.startsWith("VRBO-") || uniqueId.startsWith("HA-")) platform = "vrbo";
+    else {
+      const otaLower = (ba.ota_name ?? "").toLowerCase();
+      if (otaLower.includes("airbnb")) platform = "airbnb";
+      else if (otaLower.includes("vrbo") || otaLower.includes("homeaway")) platform = "vrbo";
+      else if (otaLower.includes("booking")) platform = "booking_com";
+    }
+    console.log(`[webhook] Detected platform=${platform} (unique_id=${uniqueId || "—"}, ota_name=${ba.ota_name ?? "—"})`);
 
     // Determine action from event type AND booking status
     let action: "created" | "modified" | "cancelled";

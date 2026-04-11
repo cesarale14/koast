@@ -116,6 +116,7 @@ export default function SettingsPage() {
   // Connected accounts
   const [feeds, setFeeds] = useState<ICalFeed[]>([]);
   const [channelConnections, setChannelConnections] = useState<ChannelConnection[]>([]);
+  const [syncingChannex, setSyncingChannex] = useState(false);
 
   // Security
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -211,6 +212,21 @@ export default function SettingsPage() {
       toast(error.message, "error");
     } else {
       toast("Password reset email sent");
+    }
+  };
+
+  const handleSyncChannex = async () => {
+    setSyncingChannex(true);
+    try {
+      const res = await fetch("/api/channex/sync-bookings");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Sync failed");
+      const count = data.synced_count ?? 0;
+      toast(count > 0 ? `Synced ${count} booking${count === 1 ? "" : "s"} from Channex` : "No new bookings");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Sync failed", "error");
+    } finally {
+      setSyncingChannex(false);
     }
   };
 
@@ -418,6 +434,19 @@ export default function SettingsPage() {
           >
             Open Channex &rarr;
           </a>
+        </div>
+        <div className="mt-3 flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-neutral-800">Manual Booking Sync</p>
+            <p className="text-xs text-neutral-500 mt-0.5">Pull the latest bookings from Channex. Run this if a webhook was missed.</p>
+          </div>
+          <button
+            onClick={handleSyncChannex}
+            disabled={syncingChannex}
+            className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {syncingChannex ? "Syncing..." : "Sync from Channex"}
+          </button>
         </div>
         <p className="text-xs text-neutral-400 mt-3">Part of the Pro plan ($79/mo). Includes rate pushing, availability sync, real-time booking webhooks, and guest messaging.</p>
       </SectionCard>
