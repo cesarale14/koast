@@ -25,6 +25,7 @@ interface PropertyCard {
   name: string;
   coverPhotoUrl: string | null;
   platform: string | null;
+  platforms?: string[];
   status: "occupied" | "vacant" | "turnover_today" | "checkin_today" | "checkout_today";
   guestName?: string;
   numGuests?: number;
@@ -280,12 +281,20 @@ function PropertyCardComponent({
         >
           {label}
         </span>
-        {/* Platform badge — bottom right */}
-        {card.platform && (
-          <span className="absolute bottom-2 right-2 bg-white/90 rounded-full p-0.5">
-            <DashPlatformLogo platform={card.platform} size="sm" />
-          </span>
-        )}
+        {/* Platform badges — bottom right */}
+        {(() => {
+          const plats = card.platforms && card.platforms.length > 0
+            ? card.platforms
+            : card.platform ? [card.platform] : [];
+          if (plats.length === 0) return null;
+          return (
+            <span className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 rounded-full px-1 py-0.5">
+              {plats.map((p) => (
+                <DashPlatformLogo key={p} platform={p} size="sm" />
+              ))}
+            </span>
+          );
+        })()}
       </div>
 
       {/* Info section */}

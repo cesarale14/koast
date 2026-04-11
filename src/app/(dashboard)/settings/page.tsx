@@ -28,6 +28,15 @@ interface ICalFeed {
   properties?: any;
 }
 
+interface ChannelConnection {
+  id: string;
+  property_id: string;
+  channel_code: string;
+  channel_name: string;
+  status: string;
+  property_name: string;
+}
+
 interface NotificationPrefs {
   email_new_booking: boolean;
   email_messages: boolean;
@@ -106,6 +115,7 @@ export default function SettingsPage() {
 
   // Connected accounts
   const [feeds, setFeeds] = useState<ICalFeed[]>([]);
+  const [channelConnections, setChannelConnections] = useState<ChannelConnection[]>([]);
 
   // Security
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -137,6 +147,24 @@ export default function SettingsPage() {
         .from("ical_feeds")
         .select("id, platform, feed_url, last_synced, is_active, property_id, properties(name)");
       if (icalData) setFeeds(icalData);
+
+      // Load Channex-connected channels with property name
+      const { data: channelData } = await supabase
+        .from("property_channels")
+        .select("id, property_id, channel_code, channel_name, status, properties(name)")
+        .eq("status", "active");
+      if (channelData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows: ChannelConnection[] = (channelData as any[]).map((r) => ({
+          id: r.id,
+          property_id: r.property_id,
+          channel_code: r.channel_code,
+          channel_name: r.channel_name,
+          status: r.status,
+          property_name: Array.isArray(r.properties) ? r.properties[0]?.name ?? "Property" : r.properties?.name ?? "Property",
+        }));
+        setChannelConnections(rows);
+      }
 
       // Load notification prefs from database
       try {
@@ -251,6 +279,22 @@ export default function SettingsPage() {
       booking_com: "bg-indigo-100 text-indigo-700",
       direct: "bg-neutral-100 text-neutral-700",
     }[p] ?? "bg-neutral-100 text-neutral-700");
+
+  const channelCodeToLabel = (code: string, name: string): string => {
+    const c = code.toUpperCase();
+    if (c === "ABB") return "Airbnb";
+    if (c === "BDC") return "Booking.com";
+    if (c === "VRBO") return "VRBO";
+    return name || code;
+  };
+
+  const channelCodeToColor = (code: string): string => {
+    const c = code.toUpperCase();
+    if (c === "ABB") return "bg-rose-100 text-rose-700";
+    if (c === "BDC") return "bg-indigo-100 text-indigo-700";
+    if (c === "VRBO") return "bg-blue-100 text-blue-700";
+    return "bg-neutral-100 text-neutral-700";
+  };
 
   const featureList = [
     { label: "1 property", included: true },
@@ -412,41 +456,75 @@ export default function SettingsPage() {
       </SectionCard>
 
       {/* CONNECTED ACCOUNTS */}
-      <SectionCard icon={Link2} title="Connected Accounts" description="Your linked calendar feeds and integrations.">
+      <SectionCard icon={Link2} title="Connected Accounts" description="Your linked OTA channels and calendar feeds.">
         <div className="space-y-3">
-          {feeds.length === 0 ? (
-            <p className="text-sm text-neutral-400">No calendar feeds connected yet.</p>
-          ) : (
-            feeds.map((feed) => (
-              <div
-                key={feed.id}
-                className="flex items-center justify-between py-2 px-3 border border-[var(--border)] rounded-lg"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${platformColor(feed.platform)}`}>
-                    {platformLabel(feed.platform)}
-                  </span>
-                  <span className="text-xs font-medium text-neutral-700 truncate max-w-[150px]">
-                    {(Array.isArray(feed.properties) ? feed.properties[0]?.name : feed.properties?.name) ?? "Property"}
-                  </span>
-                  <span className="text-xs text-neutral-400">
-                    {feed.last_synced
-                      ? `Synced ${new Date(feed.last_synced).toLocaleDateString()}`
-                      : "Never synced"}
+          {(() => {
+            const codeToPlatform: Record<string, string> = { ABB: "airbnb", BDC: "booking_com", VRBO: "vrbo" };
+            const covered = new Set(
+              channelConnections.map((ch) => `${ch.property_id}:${codeToPlatform[ch.channel_code.toUpperCase()] ?? ch.channel_code.toLowerCase()}`)
+            );
+            const visibleFeeds = feeds.filter((f) => !covered.has(`${(f as unknown as { property_id: string }).property_id}:${f.platform}`));
+            if (channelConnections.length === 0 && visibleFeeds.length === 0) {
+              return <p className="text-sm text-neutral-400">No channels connected yet.</p>;
+            }
+            return (
+            <>
+              {channelConnections.map((ch) => (
+                <div
+                  key={ch.id}
+                  className="flex items-center justify-between py-2 px-3 border border-[var(--border)] rounded-lg"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${channelCodeToColor(ch.channel_code)}`}>
+                      {channelCodeToLabel(ch.channel_code, ch.channel_name)}
+                    </span>
+                    <span className="text-xs font-medium text-neutral-700 truncate max-w-[180px]">
+                      {ch.property_name}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      ch.status === "active"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-neutral-100 text-neutral-500"
+                    }`}
+                  >
+                    {ch.status === "active" ? "Active" : ch.status.charAt(0).toUpperCase() + ch.status.slice(1)}
                   </span>
                 </div>
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    feed.is_active
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-neutral-100 text-neutral-500"
-                  }`}
+              ))}
+              {visibleFeeds.map((feed) => (
+                <div
+                  key={feed.id}
+                  className="flex items-center justify-between py-2 px-3 border border-[var(--border)] rounded-lg"
                 >
-                  {feed.is_active ? "Active" : "Inactive"}
-                </span>
-              </div>
-            ))
-          )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${platformColor(feed.platform)}`}>
+                      {platformLabel(feed.platform)}
+                    </span>
+                    <span className="text-xs font-medium text-neutral-700 truncate max-w-[150px]">
+                      {(Array.isArray(feed.properties) ? feed.properties[0]?.name : feed.properties?.name) ?? "Property"}
+                    </span>
+                    <span className="text-xs text-neutral-400">
+                      {feed.last_synced
+                        ? `Synced ${new Date(feed.last_synced).toLocaleDateString()}`
+                        : "Never synced"}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      feed.is_active
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-neutral-100 text-neutral-500"
+                    }`}
+                  >
+                    {feed.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              ))}
+            </>
+            );
+          })()}
           <a
             href="/properties"
             className="inline-flex items-center text-sm font-medium text-brand-500 hover:text-brand-600 transition-colors"

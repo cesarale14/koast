@@ -80,6 +80,7 @@ export async function POST() {
     const [
       bookingsRes,
       listingsRes,
+      channelsRes,
       ratesRes,
       cleaningTodayRes,
       cleanersRes,
@@ -101,6 +102,12 @@ export async function POST() {
       supabase
         .from("listings")
         .select("property_id, platform")
+        .in("property_id", propIds)
+        .eq("status", "active"),
+      // Property channels (Channex-connected OTAs)
+      supabase
+        .from("property_channels")
+        .select("property_id, channel_code, status")
         .in("property_id", propIds)
         .eq("status", "active"),
       // Calendar rates: today + next 30 days
@@ -162,6 +169,7 @@ export async function POST() {
 
     const bookings = (bookingsRes.data ?? []) as BookingRow[];
     const listings = (listingsRes.data ?? []) as { property_id: string; platform: string }[];
+    const channelRows = (channelsRes.data ?? []) as { property_id: string; channel_code: string; status: string }[];
     const rates = (ratesRes.data ?? []) as { property_id: string; date: string; applied_rate: number | null; suggested_rate: number | null }[];
     const cleaningTasks = (cleaningTodayRes.data ?? []) as { id: string; property_id: string; booking_id: string | null; cleaner_id: string | null; status: string; scheduled_date: string }[];
     const allCleaners = (cleanersRes.data ?? []) as { id: string; name: string }[];
@@ -176,6 +184,22 @@ export async function POST() {
     const listingMap = new Map<string, string>();
     for (const l of listings) {
       if (!listingMap.has(l.property_id)) listingMap.set(l.property_id, l.platform);
+    }
+
+    // Channel code (ABB/BDC/VRBO) -> platform slug used by PlatformLogo
+    const codeToPlatform = (code: string): string => {
+      const c = code.toUpperCase();
+      if (c === "ABB") return "airbnb";
+      if (c === "BDC") return "booking_com";
+      if (c === "VRBO") return "vrbo";
+      return code.toLowerCase();
+    };
+    const channelPlatformMap = new Map<string, string[]>();
+    for (const ch of channelRows) {
+      const platform = codeToPlatform(ch.channel_code);
+      const existing = channelPlatformMap.get(ch.property_id) ?? [];
+      if (!existing.includes(platform)) existing.push(platform);
+      channelPlatformMap.set(ch.property_id, existing);
     }
     const tonightRateMap = new Map<string, number>();
     for (const r of rates) {
@@ -198,12 +222,19 @@ export async function POST() {
       else if (activeTonight) status = "occupied";
       else status = "vacant";
 
+      const channelPlatforms = channelPlatformMap.get(prop.id) ?? [];
+      const listingPlatform = listingMap.get(prop.id) || null;
+      const platforms = channelPlatforms.length > 0
+        ? channelPlatforms
+        : (listingPlatform ? [listingPlatform] : []);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const card: any = {
         id: prop.id,
         name: prop.name,
         coverPhotoUrl: prop.cover_photo_url,
-        platform: listingMap.get(prop.id) || null,
+        platform: platforms[0] ?? null,
+        platforms,
         status,
         tonightRate: tonightRateMap.get(prop.id) || null,
       };
