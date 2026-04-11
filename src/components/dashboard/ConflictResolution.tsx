@@ -413,7 +413,7 @@ export function ConflictResolutionModal({
                   Contact {laterBooking.platform === "booking_com" ? "Booking.com" : laterBooking.platform === "airbnb" ? "Airbnb" : "platform"} support
                   <ExternalLink size={12} />
                 </p>
-                <p className="text-xs text-neutral-500 mt-0.5">Opens the platform's partner help center in a new tab.</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Opens the platform&apos;s partner help center in a new tab.</p>
               </div>
             </label>
           </div>
