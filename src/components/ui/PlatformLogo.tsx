@@ -24,13 +24,12 @@ function AirbnbIcon({ s }: { s: number }) {
   );
 }
 
-/** Booking.com official mark */
+/** Booking.com "B." mark */
 function BookingIcon({ s }: { s: number }) {
   return (
-    <svg width={s} height={s} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="6" fill="#003580"/>
-      <path d="M8.5 8h5c1.5 0 2.6.3 3.4.9.7.5 1 1.3 1 2.3 0 .7-.2 1.2-.5 1.7-.4.4-.9.7-1.5.9v.1c.8.1 1.4.5 1.9 1 .4.5.7 1.2.7 2 0 1.1-.4 1.9-1.1 2.5-.8.6-1.8.9-3.1.9H8.5V8zm2.8 5.2h2c.6 0 1.1-.1 1.4-.4.3-.2.5-.6.5-1.1s-.2-.8-.5-1c-.3-.2-.8-.3-1.4-.3h-2v2.8zm0 5.6h2.2c.7 0 1.2-.1 1.5-.4.4-.3.5-.7.5-1.2s-.2-.9-.5-1.1c-.3-.3-.9-.4-1.5-.4h-2.2v3.1z" fill="white"/>
-      <circle cx="21.5" cy="20" r="1.5" fill="white"/>
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="4" fill="#003580"/>
+      <text x="5" y="18" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="16" fill="white">B.</text>
     </svg>
   );
 }
