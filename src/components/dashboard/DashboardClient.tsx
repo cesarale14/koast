@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
 import PlatformLogoDefault from "@/components/ui/PlatformLogo";
+import { useConflicts, ConflictBanner, ConflictResolutionModal, type Conflict } from "./ConflictResolution";
 const DashPlatformLogo = PlatformLogoDefault;
 
 // ====== Types ======
@@ -107,6 +108,8 @@ export default function DashboardClient() {
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const { data: conflictsData, refresh: refreshConflicts } = useConflicts(true);
+  const [activeConflict, setActiveConflict] = useState<Conflict | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -145,6 +148,20 @@ export default function DashboardClient() {
 
   return (
     <div className="max-w-[1200px] mx-auto">
+      {/* Overbooking alert banner — top of dashboard, above stats */}
+      {conflictsData && conflictsData.conflicts.length > 0 && (
+        <ConflictBanner
+          conflicts={conflictsData.conflicts}
+          onResolve={(c) => setActiveConflict(c)}
+        />
+      )}
+
+      <ConflictResolutionModal
+        conflict={activeConflict}
+        onClose={() => setActiveConflict(null)}
+        onResolved={() => { refreshConflicts(); fetchData(); }}
+      />
+
       {/* Error banner */}
       {fetchError && data && (
         <div className="mb-4 flex items-center justify-between px-4 py-3 rounded-lg bg-warning-light border border-warning/20">

@@ -212,6 +212,26 @@ export default function MonthlyView({
     return set;
   }, [bookings]);
 
+  // Overbooking detection — dates where two or more confirmed bookings
+  // span the same night. Computed locally from the bookings the calendar
+  // already has, so no extra API call is needed.
+  const conflictDates = useMemo(() => {
+    const dateToCount = new Map<string, number>();
+    for (const b of bookings) {
+      if (b.status && b.status !== "confirmed") continue;
+      const d = new Date(b.check_in + "T00:00:00");
+      const co = new Date(b.check_out + "T00:00:00");
+      while (d < co) {
+        const key = d.toISOString().split("T")[0];
+        dateToCount.set(key, (dateToCount.get(key) ?? 0) + 1);
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    const set = new Set<string>();
+    for (const [k, v] of Array.from(dateToCount.entries())) if (v > 1) set.add(k);
+    return set;
+  }, [bookings]);
+
   // Gap night detection — 1-2 available nights between bookings
   const gapDates = useMemo(() => {
     const gaps = new Set<string>();
@@ -301,20 +321,22 @@ export default function MonthlyView({
                   const isBooked = bookedDates.has(day.date);
                   const isBlocked = !isAvail && !isBooked;
                   const isGap = gapDates.has(day.date);
+                  const isConflict = conflictDates.has(day.date);
 
                   return (
                     <div
                       key={day.date}
                       data-cell
                       className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
-                        day.isPast ? "bg-[#f9f9f7]" : isGap ? "bg-amber-50" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
+                        isConflict ? "bg-red-50 ring-2 ring-red-400" : day.isPast ? "bg-[#f9f9f7]" : isGap ? "bg-amber-50" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
                       }`}
                       style={{
-                        border: "1px solid #e8e8e8",
+                        border: isConflict ? "1px solid #fca5a5" : "1px solid #e8e8e8",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
                         ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                       }}
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
+                      title={isConflict ? "Overbooking — two bookings on this night" : undefined}
                     >
                       <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between">
@@ -334,6 +356,10 @@ export default function MonthlyView({
                           {/* Gap night indicator */}
                           {isGap && !day.isPast && (
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-200 flex-shrink-0" title="Gap night — hard to fill" />
+                          )}
+                          {/* Overbooking warning */}
+                          {isConflict && (
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex-shrink-0" title="Overbooking conflict">!</span>
                           )}
                         </div>
                         {/* Rate with comparison color */}

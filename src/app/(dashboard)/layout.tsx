@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; dot?: boolean; }
+interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; dot?: boolean; dotColor?: "emerald" | "red"; }
 interface NavGroup { label?: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
@@ -46,6 +46,7 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
   const Icon = item.icon;
   const [showTip, setShowTip] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dotBg = item.dotColor === "red" ? "bg-red-500" : "bg-emerald-500";
   return (
     <Link href={item.href}
       onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
@@ -55,7 +56,7 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       }`}>
       {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-emerald-500" />}
       <Icon size={20} strokeWidth={1.5} />
-      {item.dot && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />}
+      {item.dot && <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full ${dotBg} ring-2 ring-white`} />}
       {showTip && (
         <span className="fixed ml-[72px] px-3 py-2 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
           style={{ backgroundColor: "#1f2937", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
@@ -78,14 +79,14 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-emerald-500" />}
       <Icon size={20} strokeWidth={1.5} className={`flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-400"}`} />
       <span className="truncate">{item.name}</span>
-      {item.dot && <span className="w-2 h-2 rounded-full bg-emerald-500 ml-auto flex-shrink-0" />}
+      {item.dot && <span className={`w-2 h-2 rounded-full ml-auto flex-shrink-0 ${item.dotColor === "red" ? "bg-red-500" : "bg-emerald-500"}`} />}
       {item.external && <span className="text-gray-300 text-[10px] ml-auto">↗</span>}
     </Link>
   );
 }
 
 /* ---- Desktop sidebar — toggleable collapsed/expanded ---- */
-function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; expanded: boolean; onToggle: () => void }) {
+function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: string; expanded: boolean; onToggle: () => void; groups: NavGroup[] }) {
   return (
     <>
     <aside
@@ -99,7 +100,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
             <Logo variant="full" size={30} className="[&_span]:!text-gray-900 [&_span]:!font-bold [&_span]:!text-lg" />
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
-            {navGroups.map((group, gi) => (
+            {groups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
@@ -125,7 +126,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
             <Logo variant="icon" size={30} />
           </Link>
           <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto">
-            {navGroups.map((group, gi) => (
+            {groups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100 w-8" : ""}>
                 <div className="flex flex-col items-center gap-0.5">
                   {group.items.map((item) => {
@@ -161,7 +162,7 @@ function DesktopSidebar({ pathname, expanded, onToggle }: { pathname: string; ex
 }
 
 /* ---- Mobile sidebar ---- */
-function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () => void }) {
+function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClose: () => void; groups: NavGroup[] }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40 md:hidden" onClick={onClose} />
@@ -171,7 +172,7 @@ function MobileSidebar({ pathname, onClose }: { pathname: string; onClose: () =>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
         </div>
         <nav className="flex-1 px-3 overflow-y-auto">
-          {navGroups.map((group, gi) => (
+          {groups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
@@ -198,12 +199,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [conflictCount, setConflictCount] = useState(0);
 
   // Persist sidebar preference
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-expanded");
     if (saved === "true") setSidebarExpanded(true);
   }, []);
+
+  // Poll for unresolved overbookings — flips the Messages dot red.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/bookings/conflicts");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setConflictCount(json.count ?? 0);
+      } catch { /* non-critical */ }
+    };
+    fetchCount();
+    const t = setInterval(fetchCount, 60000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+  // Rebuild navGroups with the current dot color for Messages
+  const dynamicNavGroups = navGroups.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.name === "Messages"
+        ? { ...item, dotColor: conflictCount > 0 ? ("red" as const) : ("emerald" as const) }
+        : item
+    ),
+  }));
 
   const toggleSidebar = useCallback(() => {
     setSidebarExpanded((v) => {
@@ -217,9 +245,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-x-hidden bg-gray-50">
-      <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} />
+      <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} groups={dynamicNavGroups} />
 
-      {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} />}
+      {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} groups={dynamicNavGroups} />}
 
       {/* Main content — smooth margin transition */}
       <div
