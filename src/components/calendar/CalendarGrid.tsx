@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import CalendarToolbar from "./CalendarToolbar";
-import PropertyRow from "./PropertyRow";
 import MonthlyView from "./MonthlyView";
 import BookingSidePanel from "./BookingSidePanel";
-import DateEditPopover from "./DateEditPopover";
 import { ConflictResolutionModal, type Conflict, type ConflictBooking } from "@/components/dashboard/ConflictResolution";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import type { BookingBarData } from "./BookingBar";
@@ -57,69 +55,30 @@ interface CalendarGridProps {
   totalDays: number;
 }
 
-function generateDates(startDate: Date, count: number): string[] {
-  const dates: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split("T")[0]);
-  }
-  return dates;
-}
-
 function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
-
 
 export default function CalendarGrid({
   properties,
   bookings,
   rates: initialRates,
-  totalDays,
 }: CalendarGridProps) {
   const { toast } = useToast();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
   const todayStr = getToday();
 
-  // ---------- View mode (persisted) ----------
-  const defaultView = properties.length === 1 ? "monthly" : "timeline";
-  const [viewMode, setViewMode] = useState<"timeline" | "monthly">(defaultView);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("calendar-view");
-    if (saved === "timeline" || saved === "monthly") setViewMode(saved);
-  }, []);
-
-  const handleViewChange = useCallback((mode: "timeline" | "monthly") => {
-    setViewMode(mode);
-    localStorage.setItem("calendar-view", mode);
-  }, []);
-
-  // ---------- Timeline state ----------
-  const [offsetWeeks, setOffsetWeeks] = useState(0);
-  const [timelinePropertyId, setTimelinePropertyId] = useState<string | null>(null);
-
-  // ---------- Monthly state ----------
+  // ---------- State ----------
   const [monthlyPropertyId, setMonthlyPropertyId] = useState(properties[0]?.id ?? "");
   const [monthlyTodayTrigger, setMonthlyTodayTrigger] = useState(0);
-
-  // ---------- Common state ----------
   const [selectedBooking, setSelectedBooking] = useState<BookingBarData | null>(null);
   const [activeConflict, setActiveConflict] = useState<Conflict | null>(null);
-  const [popover, setPopover] = useState<{
+
+  // Right-side rate editing panel
+  const [ratePanel, setRatePanel] = useState<{
     propertyId: string;
     dates: string[];
     rate: RateData | null;
-    position: { top: number; left: number };
   } | null>(null);
-
-  // ---------- Drag selection (timeline) ----------
-  const [dragPropertyId, setDragPropertyId] = useState<string | null>(null);
-  const [dragStart, setDragStart] = useState<string | null>(null);
-  const [dragEnd, setDragEnd] = useState<string | null>(null);
-  const isDragging = useRef(false);
 
   // ---------- Rates ----------
   const [ratesState, setRatesState] = useState(initialRates);
@@ -151,6 +110,7 @@ export default function CalendarGrid({
   }, [bookings]);
 
   // ---------- Events (per property) ----------
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [eventLookup, setEventLookup] = useState<Map<string, Map<string, CalendarEvent>>>(new Map());
   useEffect(() => {
     const map = new Map<string, Map<string, CalendarEvent>>();
@@ -175,127 +135,10 @@ export default function CalendarGrid({
     Promise.all(fetches).then(() => setEventLookup(new Map(map)));
   }, [properties]);
 
-  // ---------- Gap nights (per property) ----------
-  const gapLookup = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const propId of Array.from(bookingLookup.keys())) {
-      const propBookings = bookingLookup.get(propId)!;
-      const gaps = new Set<string>();
-      const sorted = [...propBookings].sort((a, b) => a.check_in.localeCompare(b.check_in));
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const co = sorted[i].check_out;
-        const ci = sorted[i + 1].check_in;
-        const gapMs = Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10)) -
-                      Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10));
-        const gapNights = Math.round(gapMs / 86400000);
-        if (gapNights >= 1 && gapNights <= 2) {
-          const d = new Date(co + "T00:00:00");
-          const end = new Date(ci + "T00:00:00");
-          while (d < end) {
-            gaps.add(d.toISOString().split("T")[0]);
-            d.setDate(d.getDate() + 1);
-          }
-        }
-      }
-      map.set(propId, gaps);
-    }
-    return map;
-  }, [bookingLookup]);
-
-  // ---------- Timeline dates ----------
-  const allDates = generateDates(today, totalDays);
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() + offsetWeeks * 7);
-  const visibleDayCount = 30;
-  const startIdx = Math.max(0, offsetWeeks * 7);
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + startIdx + visibleDayCount - 1);
-
-  // ---------- Scroll ----------
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current) setScrollLeft(scrollRef.current.scrollLeft);
-  }, []);
-
-  const visibleColStart = Math.floor(scrollLeft / 80);
-  const visibleColEnd = Math.min(
-    allDates.length,
-    visibleColStart + Math.ceil((scrollRef.current?.clientWidth ?? 1200) / 80) + 2,
-  );
-
-  // ---------- Filtered properties (timeline) ----------
-  const filteredProperties = timelinePropertyId
-    ? properties.filter((p) => p.id === timelinePropertyId)
-    : properties;
-
-  // ---------- Drag helpers ----------
-  const getSelectedDates = useCallback((): Set<string> => {
-    if (!dragStart || !dragEnd || !isDragging.current) return new Set();
-    const start = dragStart < dragEnd ? dragStart : dragEnd;
-    const end = dragStart < dragEnd ? dragEnd : dragStart;
-    const selected = new Set<string>();
-    for (const d of allDates) {
-      if (d >= start && d <= end) selected.add(d);
-    }
-    return selected;
-  }, [dragStart, dragEnd, allDates]);
-
-  const handleDragStart = useCallback(
-    (propertyId: string, date: string) => {
-      const propBookings = bookingLookup.get(propertyId) ?? [];
-      const isBooked = propBookings.some((b) => date >= b.check_in && date < b.check_out);
-      if (isBooked) return;
-      isDragging.current = true;
-      setDragPropertyId(propertyId);
-      setDragStart(date);
-      setDragEnd(date);
-    },
-    [bookingLookup],
-  );
-
-  const handleDragEnter = useCallback((_propertyId: string, date: string) => {
-    if (isDragging.current) setDragEnd(date);
-  }, []);
-
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isDragging.current && dragPropertyId && dragStart && dragEnd) {
-        isDragging.current = false;
-        const start = dragStart < dragEnd ? dragStart : dragEnd;
-        const end = dragStart < dragEnd ? dragEnd : dragStart;
-        const dates = allDates.filter((d) => d >= start && d <= end);
-
-        if (dates.length > 0) {
-          const propRates = rateLookup.get(dragPropertyId);
-          const firstRate = propRates?.get(dates[0]) ?? null;
-          setPopover({
-            propertyId: dragPropertyId,
-            dates,
-            rate: firstRate,
-            position: { top: 100, left: 300 },
-          });
-        }
-
-        setDragStart(null);
-        setDragEnd(null);
-        setDragPropertyId(null);
-      }
-    };
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => window.removeEventListener("mouseup", handleMouseUp);
-  }, [dragPropertyId, dragStart, dragEnd, allDates, rateLookup]);
-
   // ---------- Handlers ----------
   const handleDateClick = useCallback(
     (propertyId: string, date: string, rate: RateData | null) => {
-      if (isDragging.current) return;
-      setPopover({
-        propertyId,
-        dates: [date],
-        rate,
-        position: { top: 100, left: 300 },
-      });
+      setRatePanel({ propertyId, dates: [date], rate });
     },
     [],
   );
@@ -307,13 +150,13 @@ export default function CalendarGrid({
       is_available: boolean;
       min_stay: number;
     }) => {
-      if (!popover) return;
+      if (!ratePanel) return;
       const supabase = createClient();
 
       for (const date of updates.dates) {
         await supabase.from("calendar_rates").upsert(
           {
-            property_id: popover.propertyId,
+            property_id: ratePanel.propertyId,
             date,
             applied_rate: updates.applied_rate,
             is_available: updates.is_available,
@@ -329,10 +172,10 @@ export default function CalendarGrid({
         const next = [...prev];
         for (const date of updates.dates) {
           const idx = next.findIndex(
-            (r) => r.property_id === popover.propertyId && r.date === date,
+            (r) => r.property_id === ratePanel.propertyId && r.date === date,
           );
           const entry: CalendarRate = {
-            property_id: popover.propertyId,
+            property_id: ratePanel.propertyId,
             date,
             base_rate: null,
             suggested_rate: null,
@@ -351,35 +194,10 @@ export default function CalendarGrid({
       });
 
       toast(`Rate saved for ${updates.dates.length} date${updates.dates.length > 1 ? "s" : ""}. Use "Push to OTAs" on the Pricing page to sync to Channex.`);
-      setPopover(null);
+      setRatePanel(null);
     },
-    [popover, toast],
+    [ratePanel, toast],
   );
-
-  // ---------- Timeline navigation ----------
-  const goToTodayTimeline = useCallback(() => {
-    setOffsetWeeks(0);
-    if (scrollRef.current) scrollRef.current.scrollLeft = 0;
-  }, []);
-
-  const goToPrevWeek = useCallback(() => {
-    setOffsetWeeks((w) => {
-      const next = Math.max(0, w - 1);
-      if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
-      return next;
-    });
-  }, []);
-
-  const goToNextWeek = useCallback(() => {
-    setOffsetWeeks((w) => {
-      const maxOffset = Math.max(0, Math.ceil((totalDays - 7) / 7));
-      const next = Math.min(maxOffset, w + 1);
-      if (scrollRef.current) scrollRef.current.scrollLeft = next * 7 * 80;
-      return next;
-    });
-  }, [totalDays]);
-
-  const selectedDates = getSelectedDates();
 
   // ---------- Monthly property stats ----------
   const monthlyStats = useMemo(() => {
@@ -413,9 +231,8 @@ export default function CalendarGrid({
     return { nextCheckIn, occupancy, avgRate };
   }, [monthlyPropertyId, bookingLookup, rateLookup, todayStr]);
 
-  // ---------- Conflict pairs (monthly banner) ----------
+  // ---------- Conflict pairs (banner) ----------
   const monthlyConflictPairs = useMemo(() => {
-    if (viewMode !== "monthly") return [];
     const propBookings = bookingLookup.get(monthlyPropertyId) ?? [];
     const confirmed = propBookings.filter((b) => !b.status || b.status === "confirmed");
     const sorted = [...confirmed].sort((x, y) =>
@@ -438,7 +255,7 @@ export default function CalendarGrid({
       }
     }
     return pairs;
-  }, [viewMode, monthlyPropertyId, bookingLookup]);
+  }, [monthlyPropertyId, bookingLookup]);
 
   const handleConflictResolve = useCallback(
     (a: BookingBarData, b: BookingBarData) => {
@@ -468,25 +285,14 @@ export default function CalendarGrid({
   return (
     <div className="flex flex-col h-full relative bg-white">
       <CalendarToolbar
-        viewMode={viewMode}
-        onViewChange={handleViewChange}
-        startDate={new Date(today.getTime() + offsetWeeks * 7 * 86400000)}
-        endDate={endDate}
-        onToday={viewMode === "timeline" ? goToTodayTimeline : () => setMonthlyTodayTrigger((t) => t + 1)}
-        onPrev={goToPrevWeek}
-        onNext={goToNextWeek}
+        onToday={() => setMonthlyTodayTrigger((t) => t + 1)}
         properties={properties}
-        selectedPropertyId={viewMode === "timeline" ? timelinePropertyId : monthlyPropertyId}
-        onPropertyChange={
-          viewMode === "timeline"
-            ? setTimelinePropertyId
-            : (id) => setMonthlyPropertyId(id ?? properties[0]?.id ?? "")
-        }
-        showAllOption={viewMode === "timeline"}
+        selectedPropertyId={monthlyPropertyId}
+        onPropertyChange={(id) => setMonthlyPropertyId(id ?? properties[0]?.id ?? "")}
       />
 
       {/* Conflict banner — full width between toolbar and calendar */}
-      {viewMode === "monthly" && monthlyConflictPairs.length > 0 && (
+      {monthlyConflictPairs.length > 0 && (
         <div className="flex-shrink-0 px-4 py-2 border-b border-red-100 bg-red-50">
           <div className="flex flex-wrap items-center gap-2">
             {monthlyConflictPairs.map((p, i) => {
@@ -517,173 +323,71 @@ export default function CalendarGrid({
       )}
 
       {/* Main content fills remaining viewport height */}
-      <div className="flex-1 min-h-0">
-        {/* ============ TIMELINE VIEW ============ */}
-        {viewMode === "timeline" && (
-          <div className="h-full overflow-hidden bg-white">
-            {/* Header: date labels */}
-            <div className="flex border-b border-gray-100">
-              <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-50 border-r border-gray-100 px-4 py-2 sticky left-0 z-20">
-                <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-                  Property
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white overflow-hidden">
+        {/* Left property panel — desktop only */}
+        <aside className="hidden md:flex flex-col w-[200px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
+          <div className="p-3">
+            <div className="space-y-0.5">
+              {properties.map((p) => {
+                const isActive = monthlyPropertyId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setMonthlyPropertyId(p.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                      isActive ? "bg-gray-100" : "hover:bg-gray-50"
+                    }`}
+                    style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
+                  >
+                    <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={26} />
+                    <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
+                      {p.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick stats */}
+          <div className="border-t border-gray-100 p-3 mt-auto">
+            <h3 className="text-[10px] font-medium uppercase tracking-widest text-[#999] mb-2">
+              Quick Stats
+            </h3>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#999]">Next check-in</span>
+                <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#999]">Occupancy</span>
+                <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#999]">Avg rate</span>
+                <span className="font-mono font-medium text-[#333]">
+                  {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
                 </span>
               </div>
-
-              <div
-                className="flex-1 overflow-x-auto scroll-smooth"
-                ref={scrollRef}
-                onScroll={handleScroll}
-              >
-                <div className="flex" style={{ width: `${allDates.length * 80}px` }}>
-                  {allDates.map((date, i) => {
-                    if (i < visibleColStart - 1 || i > visibleColEnd + 1) {
-                      return <div key={date} className="w-[80px] flex-shrink-0" />;
-                    }
-                    const d = new Date(date + "T00:00:00");
-                    const isToday = date === todayStr;
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const isFirstOfMonth = d.getDate() === 1;
-                    return (
-                      <div
-                        key={date}
-                        className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
-                          isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-25" : ""
-                        } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
-                      >
-                        {isFirstOfMonth && (
-                          <div className="text-[9px] text-brand-500 font-semibold uppercase tracking-wider mb-0.5">
-                            {d.toLocaleDateString("en-US", { month: "short" })}
-                          </div>
-                        )}
-                        <div
-                          className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}
-                        >
-                          {d.toLocaleDateString("en-US", { weekday: "short" })}
-                        </div>
-                        <div
-                          className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}
-                        >
-                          {d.getDate()}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Property rows */}
-            {filteredProperties.map((prop) => (
-              <div key={prop.id} className="flex">
-                <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-white border-r border-gray-100 px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
-                  <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={40} />
-                  <span className="text-sm font-medium text-neutral-700 truncate">
-                    {prop.name}
-                  </span>
-                </div>
-
-                <div className="flex-1 overflow-hidden">
-                  <div
-                    style={{
-                      transform: `translateX(-${scrollLeft}px)`,
-                      width: `${allDates.length * 80}px`,
-                    }}
-                  >
-                    <PropertyRow
-                      property={prop}
-                      dates={allDates}
-                      bookings={bookingLookup.get(prop.id) ?? []}
-                      rates={rateLookup.get(prop.id) ?? new Map()}
-                      todayStr={todayStr}
-                      visibleStart={visibleColStart}
-                      visibleEnd={visibleColEnd}
-                      selectedDates={dragPropertyId === prop.id ? selectedDates : new Set()}
-                      onBookingClick={setSelectedBooking}
-                      onDateClick={handleDateClick}
-                      onDragStart={handleDragStart}
-                      onDragEnter={handleDragEnter}
-                      events={eventLookup.get(prop.id) ?? new Map()}
-                      gaps={gapLookup.get(prop.id) ?? new Set()}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {filteredProperties.length === 0 && (
-              <div className="p-12 text-center text-neutral-400 text-sm">
-                No properties to display.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ============ MONTHLY VIEW ============ */}
-        {viewMode === "monthly" && (
-          <div className="h-full flex flex-col md:flex-row bg-white overflow-hidden">
-            {/* Left property panel — desktop only */}
-            <aside className="hidden md:flex flex-col w-[200px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
-              <div className="p-3">
-                <div className="space-y-0.5">
-                  {properties.map((p) => {
-                    const isActive = monthlyPropertyId === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => setMonthlyPropertyId(p.id)}
-                        className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                          isActive ? "bg-gray-100" : "hover:bg-gray-50"
-                        }`}
-                        style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
-                      >
-                        <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={26} />
-                        <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
-                          {p.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Quick stats */}
-              <div className="border-t border-gray-100 p-3 mt-auto">
-                <h3 className="text-[10px] font-medium uppercase tracking-widest text-[#999] mb-2">
-                  Quick Stats
-                </h3>
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-[#999]">Next check-in</span>
-                    <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#999]">Occupancy</span>
-                    <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#999]">Avg rate</span>
-                    <span className="font-mono font-medium text-[#333]">
-                      {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </aside>
-
-            {/* Calendar grid fills remaining space */}
-            <div className="flex-1 min-w-0 flex flex-col min-h-0">
-              <MonthlyView
-                propertyId={monthlyPropertyId}
-                bookings={bookingLookup.get(monthlyPropertyId) ?? []}
-                rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
-                todayStr={todayStr}
-                todayTrigger={monthlyTodayTrigger}
-                onBookingClick={setSelectedBooking}
-                onDateClick={handleDateClick}
-              />
             </div>
           </div>
-        )}
+        </aside>
+
+        {/* Calendar grid fills remaining space */}
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          <MonthlyView
+            propertyId={monthlyPropertyId}
+            bookings={bookingLookup.get(monthlyPropertyId) ?? []}
+            rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
+            todayStr={todayStr}
+            todayTrigger={monthlyTodayTrigger}
+            onBookingClick={setSelectedBooking}
+            onDateClick={handleDateClick}
+          />
+        </div>
+
+        {/* Right-side rate/availability panel */}
+        {ratePanel && <RateSettingsPanel ratePanel={ratePanel} rateLookup={rateLookup} onSave={handleSaveRate} onClose={() => setRatePanel(null)} />}
       </div>
 
       {/* Booking side panel */}
@@ -697,19 +401,166 @@ export default function CalendarGrid({
       <ConflictResolutionModal
         conflict={activeConflict}
         onClose={() => setActiveConflict(null)}
-        onResolved={() => { /* parent refreshes on navigation — bookings already reloaded from server on next mount */ }}
+        onResolved={() => {}}
       />
-
-      {/* Date edit popover */}
-      {popover && (
-        <DateEditPopover
-          dates={popover.dates}
-          initialRate={popover.rate}
-          position={popover.position}
-          onSave={handleSaveRate}
-          onClose={() => setPopover(null)}
-        />
-      )}
     </div>
+  );
+}
+
+// ---------- Right-side rate settings panel ----------
+
+function RateSettingsPanel({
+  ratePanel,
+  rateLookup,
+  onSave,
+  onClose,
+}: {
+  ratePanel: { propertyId: string; dates: string[]; rate: RateData | null };
+  rateLookup: Map<string, Map<string, RateData>>;
+  onSave: (updates: { dates: string[]; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
+  onClose: () => void;
+}) {
+  const r = ratePanel.rate;
+  const [rateValue, setRateValue] = useState(r?.applied_rate?.toString() ?? r?.base_rate?.toString() ?? "");
+  const [available, setAvailable] = useState(r?.is_available !== false);
+  const [minStay, setMinStay] = useState(r?.min_stay ?? 1);
+  const [saving, setSaving] = useState(false);
+
+  // Reset form when selection changes
+  const panelKey = ratePanel.dates.join(",");
+  useEffect(() => {
+    const fresh = ratePanel.rate;
+    setRateValue(fresh?.applied_rate?.toString() ?? fresh?.base_rate?.toString() ?? "");
+    setAvailable(fresh?.is_available !== false);
+    setMinStay(fresh?.min_stay ?? 1);
+    setSaving(false);
+  }, [panelKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const propRates = rateLookup.get(ratePanel.propertyId);
+  const dateLabel =
+    ratePanel.dates.length === 1
+      ? new Date(ratePanel.dates[0] + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+      : `${ratePanel.dates.length} dates`;
+
+  const handleSave = () => {
+    setSaving(true);
+    onSave({
+      dates: ratePanel.dates,
+      applied_rate: rateValue ? parseFloat(rateValue) : null,
+      is_available: available,
+      min_stay: minStay,
+    });
+  };
+
+  return (
+    <aside className="w-[260px] flex-shrink-0 border-l border-gray-100 bg-white overflow-y-auto flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <h3 className="text-sm font-bold text-[#222]">{dateLabel}</h3>
+        <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="p-4 space-y-4 flex-1">
+        {/* Current rate info */}
+        {ratePanel.dates.length === 1 && (() => {
+          const dr = propRates?.get(ratePanel.dates[0]);
+          if (!dr) return null;
+          return (
+            <div className="space-y-1.5">
+              <h4 className="text-[10px] font-medium uppercase tracking-widest text-[#999]">Current</h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {dr.base_rate != null && (
+                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <div className="text-[10px] text-[#999]">Base</div>
+                    <div className="font-mono font-semibold text-[#333]">${dr.base_rate}</div>
+                  </div>
+                )}
+                {dr.suggested_rate != null && (
+                  <div className="bg-emerald-50 rounded-lg px-2.5 py-2">
+                    <div className="text-[10px] text-emerald-600">Suggested</div>
+                    <div className="font-mono font-semibold text-emerald-700">${dr.suggested_rate}</div>
+                  </div>
+                )}
+                {dr.applied_rate != null && (
+                  <div className="bg-blue-50 rounded-lg px-2.5 py-2">
+                    <div className="text-[10px] text-blue-600">Applied</div>
+                    <div className="font-mono font-semibold text-blue-700">${dr.applied_rate}</div>
+                  </div>
+                )}
+                <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="text-[10px] text-[#999]">Source</div>
+                  <div className="font-medium text-[#333] capitalize">{dr.rate_source}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Rate input */}
+        <div>
+          <label className="block text-[11px] font-medium text-[#666] mb-1">Nightly Rate ($)</label>
+          <input
+            type="number"
+            value={rateValue}
+            onChange={(e) => setRateValue(e.target.value)}
+            className="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+            placeholder="0"
+            min="0"
+            step="1"
+          />
+        </div>
+
+        {/* Min stay */}
+        <div>
+          <label className="block text-[11px] font-medium text-[#666] mb-1">Min Stay (nights)</label>
+          <input
+            type="number"
+            value={minStay}
+            onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+            min="1"
+          />
+        </div>
+
+        {/* Availability toggle */}
+        <label className="flex items-center justify-between cursor-pointer py-1">
+          <span className="text-sm text-[#333]">Available</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={available}
+            onClick={() => setAvailable(!available)}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              available ? "bg-emerald-500" : "bg-gray-300"
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+              available ? "translate-x-[18px]" : "translate-x-[3px]"
+            }`} />
+          </button>
+        </label>
+      </div>
+
+      {/* Actions */}
+      <div className="p-4 border-t border-gray-100 space-y-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full px-3 py-2 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full px-3 py-2 text-sm font-medium text-[#666] bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </aside>
   );
 }

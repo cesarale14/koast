@@ -1,110 +1,46 @@
 "use client";
 
 interface CalendarToolbarProps {
-  viewMode: "timeline" | "monthly";
-  onViewChange: (mode: "timeline" | "monthly") => void;
-  startDate: Date;
-  endDate: Date;
   onToday: () => void;
-  onPrev: () => void;
-  onNext: () => void;
   properties: { id: string; name: string }[];
   selectedPropertyId: string | null;
   onPropertyChange: (id: string | null) => void;
-  showAllOption: boolean;
-}
-
-function formatRange(start: Date, end: Date): string {
-  const s = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const e = end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return `${s} — ${e}`;
 }
 
 export default function CalendarToolbar({
-  viewMode,
-  onViewChange,
-  startDate,
-  endDate,
   onToday,
-  onPrev,
-  onNext,
   properties,
   selectedPropertyId,
   onPropertyChange,
-  showAllOption,
 }: CalendarToolbarProps) {
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
-      {/* Left: title + view toggle */}
-      <div className="flex items-center gap-4">
-        <h1 className="text-sm font-bold text-neutral-800 hidden md:block">Calendar</h1>
-        <div className="hidden md:flex bg-neutral-100 rounded-lg p-0.5">
-          {(["timeline", "monthly"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onViewChange(mode)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize ${
-                viewMode === mode
-                  ? "bg-white text-neutral-800 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-700"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Left: title */}
+      <h1 className="text-sm font-bold text-neutral-800">Calendar</h1>
 
-      {/* Center: navigation */}
-      <div className="flex items-center gap-2">
-        {viewMode === "timeline" && (
-          <button
-            onClick={onPrev}
-            className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        )}
-        <button
-          onClick={onToday}
-          className="px-2.5 py-1 text-xs font-medium text-neutral-600 bg-white border border-gray-200 rounded-lg hover:bg-neutral-50 transition-colors"
-        >
-          Today
-        </button>
-        {viewMode === "timeline" && (
-          <>
-            <button
-              onClick={onNext}
-              className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            <span className="text-xs font-medium text-neutral-600 ml-1">
-              {formatRange(startDate, endDate)}
-            </span>
-          </>
-        )}
-      </div>
+      {/* Center: today button */}
+      <button
+        onClick={onToday}
+        className="px-2.5 py-1 text-xs font-medium text-neutral-600 bg-white border border-gray-200 rounded-lg hover:bg-neutral-50 transition-colors"
+      >
+        Today
+      </button>
 
-      {/* Right: property selector */}
+      {/* Right: property selector (mobile only — desktop sidebar handles it) */}
       <select
         value={selectedPropertyId ?? ""}
         onChange={(e) => onPropertyChange(e.target.value || null)}
-        className={`h-8 px-2.5 text-xs border border-gray-200 rounded-lg bg-white text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors ${
-          !showAllOption ? "md:hidden" : ""
-        }`}
+        className="md:hidden h-8 px-2.5 text-xs border border-gray-200 rounded-lg bg-white text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
       >
-        {showAllOption && <option value="">All Properties</option>}
         {properties.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>
         ))}
       </select>
+
+      {/* Desktop: invisible spacer for centering */}
+      <div className="hidden md:block w-[1px]" />
     </div>
   );
 }
