@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 0;
+const GAP = 3;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -224,7 +224,7 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
 }
 
 const gridVars = {
-  "--col": `${100 / 7}%`,
+  "--col": `calc((100% + ${GAP}px) / 7)`,
 } as React.CSSProperties;
 
 export default function MonthlyView({
@@ -441,7 +441,7 @@ export default function MonthlyView({
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-[#e0e0e0]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#efe9dd]">
           {DAY_LABELS.map((l, i) => (
             <div key={`${l}-${i}`} className="py-1 text-center text-[11px] font-medium text-[#999]">
               <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
@@ -460,7 +460,7 @@ export default function MonthlyView({
               </div>
 
               {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
-              <div className="relative grid grid-cols-7" style={{ ...gridVars }}>
+              <div className="relative grid grid-cols-7" style={{ gap: `${GAP}px`, ...gridVars }}>
                 {m.days.map((day, i) => {
                   const rate = rates.get(day.date);
                   const isAvail = rate?.is_available !== false;
@@ -473,13 +473,11 @@ export default function MonthlyView({
                     <div
                       key={day.date}
                       data-cell
-                      className={`relative cursor-pointer transition-colors ${
-                        isConflict ? "bg-red-50" : day.isPast ? "bg-[#fafafa]" : isBlocked ? "bg-[#f7f7f7]" : "bg-white hover:bg-[#f5f5f5]"
+                      className={`relative aspect-square cursor-pointer transition-colors rounded-lg ${
+                        isConflict ? "bg-red-50 ring-1 ring-red-300" : day.isPast ? "bg-[#f5f3ee]" : isBlocked ? "bg-[#f0ede6]" : "bg-white hover:bg-[#faf8f4]"
                       }`}
                       style={{
-                        minHeight: "58px",
-                        borderRight: "1px solid #e5e5e5",
-                        borderBottom: "1px solid #e5e5e5",
+                        border: "1px solid #efe9dd",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
                       }}
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
@@ -511,7 +509,7 @@ export default function MonthlyView({
                   // --col width so the bar meets the cell edge cleanly.
                   const cellSpan = seg.floatEnd - seg.floatStart;
                   const left = `calc(var(--col) * ${seg.floatStart})`;
-                  const width = `calc(var(--col) * ${cellSpan})`;
+                  const width = `calc(var(--col) * ${cellSpan} - ${GAP}px)`;
 
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
