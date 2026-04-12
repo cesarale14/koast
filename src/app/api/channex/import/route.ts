@@ -109,16 +109,18 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const propTable = supabase.from("properties") as any;
 
-        // Try to find existing property first
+        // Try to find existing property first — by channex_property_id
         const { data: existing } = await propTable
-          .select("id")
+          .select("id, channex_property_id")
           .eq("channex_property_id", channexId)
           .limit(1);
 
         let propertyId: string;
+        let migratedFromScaffold = false;
+        let oldChannexPropertyId: string | null = null;
 
         if (existing && existing.length > 0) {
-          // Update existing
+          // Update existing (already linked to this Channex property)
           propertyId = existing[0].id;
           const { error: updateErr } = await propTable
             .update(propInsert)
@@ -129,17 +131,51 @@ export async function POST(request: NextRequest) {
           }
           console.log(`[channex/import] Updated existing property ${propertyId}`);
         } else {
-          // Insert new
-          const { data: newProp, error: insertErr } = await propTable
-            .insert(propInsert)
-            .select("id")
-            .single();
-          if (insertErr) {
-            console.error("[channex/import] Property insert error:", JSON.stringify(insertErr));
-            throw new Error(`Property insert failed: ${insertErr.message}`);
+          // No exact channex_property_id match — check for a name match
+          // (catches properties created via onboarding that later connected
+          // BDC with a scaffold, or properties without any Channex link)
+          const propName = (attrs.title || "").toLowerCase()
+            .replace(/\s*(in|-)?\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
+          const { data: nameMatches } = await propTable
+            .select("id, name, channex_property_id")
+            .eq("user_id", userId);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const nameMatch = (nameMatches ?? []).find((p: any) => {
+            const mName = (p.name || "").toLowerCase()
+              .replace(/\s*-\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
+            return (
+              mName === propName ||
+              mName.includes(propName) ||
+              propName.includes(mName)
+            );
+          });
+
+          if (nameMatch) {
+            // Found a Moora property by name — update it with the real Channex ID
+            propertyId = nameMatch.id;
+            oldChannexPropertyId = nameMatch.channex_property_id;
+            migratedFromScaffold = !!oldChannexPropertyId && oldChannexPropertyId !== channexId;
+            const { error: updateErr } = await propTable
+              .update(propInsert)
+              .eq("id", propertyId);
+            if (updateErr) {
+              console.error("[channex/import] Property name-match update error:", JSON.stringify(updateErr));
+              throw new Error(`Property update failed: ${updateErr.message}`);
+            }
+            console.log(`[channex/import] Matched by name "${nameMatch.name}" → updating with real Channex ID ${channexId}${migratedFromScaffold ? ` (was scaffold ${oldChannexPropertyId})` : ""}`);
+          } else {
+            // No match at all — insert new property
+            const { data: newProp, error: insertErr } = await propTable
+              .insert(propInsert)
+              .select("id")
+              .single();
+            if (insertErr) {
+              console.error("[channex/import] Property insert error:", JSON.stringify(insertErr));
+              throw new Error(`Property insert failed: ${insertErr.message}`);
+            }
+            propertyId = newProp.id;
+            console.log(`[channex/import] Inserted new property ${propertyId}`);
           }
-          propertyId = newProp.id;
-          console.log(`[channex/import] Inserted new property ${propertyId}`);
         }
 
         // 3. Fetch room types → create listings
@@ -180,6 +216,67 @@ export async function POST(request: NextRequest) {
           }
         } catch (rtErr) {
           console.error("[channex/import] Room types error:", rtErr);
+        }
+
+        // 3b. If migrating from scaffold, update room types, rate plans, and BDC channel
+        if (migratedFromScaffold && oldChannexPropertyId) {
+          try {
+            const realRoomTypes = await channex.getRoomTypes(channexId);
+            const realRatePlans = await channex.getRatePlans(channexId);
+            const realRtId = realRoomTypes[0]?.id;
+            const realRpId = realRatePlans[0]?.id;
+
+            if (realRtId) {
+              // Remove old scaffold room type/rate plan, insert real ones
+              await supabase.from("channex_rate_plans").delete().eq("property_id", propertyId);
+              await supabase.from("channex_room_types").delete().eq("property_id", propertyId);
+
+              await supabase.from("channex_room_types").upsert({
+                id: realRtId,
+                property_id: propertyId,
+                channex_property_id: channexId,
+                title: realRoomTypes[0].attributes?.title || "Entire Home",
+                count_of_rooms: 1,
+                occ_adults: realRoomTypes[0].attributes?.occ_adults || 6,
+                cached_at: new Date().toISOString(),
+              }, { onConflict: "id" });
+
+              if (realRpId) {
+                await supabase.from("channex_rate_plans").upsert({
+                  id: realRpId,
+                  property_id: propertyId,
+                  room_type_id: realRtId,
+                  title: realRatePlans[0].attributes?.title || "Best Available Rate",
+                  sell_mode: "per_room",
+                  currency: "USD",
+                  rate_mode: "manual",
+                  cached_at: new Date().toISOString(),
+                }, { onConflict: "id" });
+              }
+              console.log(`[channex/import] Migrated room type ${realRtId} and rate plan ${realRpId} from scaffold`);
+            }
+
+            // Update any BDC channel that was pointing to the scaffold
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const allChannels = await channex.getAllChannels();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const bdcChannel = (allChannels.data ?? []).find((ch: any) => {
+              const props: string[] = ch.attributes?.properties ?? [];
+              return ch.attributes?.channel === "BookingCom" && props.includes(oldChannexPropertyId!);
+            });
+
+            if (bdcChannel && realRtId) {
+              const oldProps: string[] = bdcChannel.attributes?.properties ?? [];
+              const newProps = oldProps.map((p: string) => p === oldChannexPropertyId ? channexId : p);
+              await channex.updateChannel(bdcChannel.id, {
+                properties: newProps,
+              });
+              console.log(`[channex/import] Migrated BDC channel ${bdcChannel.id} from scaffold ${oldChannexPropertyId} → ${channexId}`);
+            }
+          } catch (migErr) {
+            console.error("[channex/import] Scaffold migration error:", migErr);
+            // Non-fatal — property import continues
+          }
         }
 
         // 4. Fetch bookings for next 90 days

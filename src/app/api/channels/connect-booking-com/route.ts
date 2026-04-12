@@ -37,30 +37,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    // 2. Ensure Channex property exists (auto-scaffold if missing)
+    // 2. Ensure Channex property exists
+    //    First try to find a matching Channex property from the user's account
+    //    (e.g., from Airbnb OAuth) before falling back to scaffold creation.
     let channexPropertyId = property.channex_property_id;
     if (!channexPropertyId) {
-      const scaffoldTitle = `SC-Scaffold-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
-      const channexProp = await channex.createProperty({
-        title: scaffoldTitle,
-        currency: "USD",
-        email: user.email || "",
-        phone: "",
-        zip_code: "",
-        country: "US",
-        state: "",
-        city: "",
-        address: "",
-        longitude: 0,
-        latitude: 0,
-        timezone: "America/New_York",
+      // Search existing Channex properties for a name match
+      const allChannexProps = await channex.getProperties();
+      const propName = (property.name || "").toLowerCase().replace(/\s*-\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
+      const matched = allChannexProps.find((p) => {
+        const cTitle = (p.attributes?.title || "").toLowerCase().trim();
+        // Match if either name contains the other (handles "Pool House" vs "Pool Home in Tampa")
+        const cBase = cTitle.replace(/\s*(in|-)?\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
+        return (
+          cBase === propName ||
+          cBase.includes(propName) ||
+          propName.includes(cBase)
+        );
       });
-      channexPropertyId = channexProp.id;
-      await supabase
-        .from("properties")
-        .update({ channex_property_id: channexPropertyId })
-        .eq("id", propertyId);
-      console.log(`[connect-bdc] Auto-scaffolded Channex property ${channexPropertyId}`);
+
+      if (matched) {
+        channexPropertyId = matched.id;
+        await supabase
+          .from("properties")
+          .update({ channex_property_id: channexPropertyId })
+          .eq("id", propertyId);
+        console.log(`[connect-bdc] Matched existing Channex property "${matched.attributes?.title}" (${channexPropertyId})`);
+      } else {
+        // No match — scaffold a new Channex property
+        const scaffoldTitle = `SC-Scaffold-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+        const channexProp = await channex.createProperty({
+          title: scaffoldTitle,
+          currency: "USD",
+          email: user.email || "",
+          phone: "",
+          zip_code: "",
+          country: "US",
+          state: "",
+          city: "",
+          address: "",
+          longitude: 0,
+          latitude: 0,
+          timezone: "America/New_York",
+        });
+        channexPropertyId = channexProp.id;
+        await supabase
+          .from("properties")
+          .update({ channex_property_id: channexPropertyId })
+          .eq("id", propertyId);
+        console.log(`[connect-bdc] Auto-scaffolded Channex property ${channexPropertyId}`);
+      }
     }
 
     // 3. Ensure room type + rate plan exist
