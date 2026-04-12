@@ -386,8 +386,14 @@ export default function CalendarGrid({
           />
         </div>
 
-        {/* Right-side rate/availability panel */}
-        {ratePanel && <RateSettingsPanel ratePanel={ratePanel} rateLookup={rateLookup} onSave={handleSaveRate} onClose={() => setRatePanel(null)} />}
+        {/* Right-side settings panel — always visible on desktop, expandable on mobile */}
+        <RightSettingsPanel
+          monthlyStats={monthlyStats}
+          ratePanel={ratePanel}
+          rateLookup={rateLookup}
+          onSave={handleSaveRate}
+          onCloseDate={() => setRatePanel(null)}
+        />
       </div>
 
       {/* Booking side panel */}
@@ -407,28 +413,32 @@ export default function CalendarGrid({
   );
 }
 
-// ---------- Right-side rate settings panel ----------
+// ---------- Right-side settings panel (always visible) ----------
 
-function RateSettingsPanel({
+function RightSettingsPanel({
+  monthlyStats,
   ratePanel,
   rateLookup,
   onSave,
-  onClose,
+  onCloseDate,
 }: {
-  ratePanel: { propertyId: string; dates: string[]; rate: RateData | null };
+  monthlyStats: { nextCheckIn: string; occupancy: number; avgRate: number };
+  ratePanel: { propertyId: string; dates: string[]; rate: RateData | null } | null;
   rateLookup: Map<string, Map<string, RateData>>;
   onSave: (updates: { dates: string[]; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
-  onClose: () => void;
+  onCloseDate: () => void;
 }) {
-  const r = ratePanel.rate;
-  const [rateValue, setRateValue] = useState(r?.applied_rate?.toString() ?? r?.base_rate?.toString() ?? "");
-  const [available, setAvailable] = useState(r?.is_available !== false);
-  const [minStay, setMinStay] = useState(r?.min_stay ?? 1);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Date-specific editing state
+  const [rateValue, setRateValue] = useState("");
+  const [available, setAvailable] = useState(true);
+  const [minStay, setMinStay] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Reset form when selection changes
-  const panelKey = ratePanel.dates.join(",");
+  const panelKey = ratePanel?.dates.join(",") ?? "";
   useEffect(() => {
+    if (!ratePanel) return;
     const fresh = ratePanel.rate;
     setRateValue(fresh?.applied_rate?.toString() ?? fresh?.base_rate?.toString() ?? "");
     setAvailable(fresh?.is_available !== false);
@@ -436,13 +446,8 @@ function RateSettingsPanel({
     setSaving(false);
   }, [panelKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const propRates = rateLookup.get(ratePanel.propertyId);
-  const dateLabel =
-    ratePanel.dates.length === 1
-      ? new Date(ratePanel.dates[0] + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-      : `${ratePanel.dates.length} dates`;
-
   const handleSave = () => {
+    if (!ratePanel) return;
     setSaving(true);
     onSave({
       dates: ratePanel.dates,
@@ -452,115 +457,145 @@ function RateSettingsPanel({
     });
   };
 
-  return (
-    <aside className="w-[260px] flex-shrink-0 border-l border-gray-100 bg-white overflow-y-auto flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <h3 className="text-sm font-bold text-[#222]">{dateLabel}</h3>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  const dateLabel = ratePanel
+    ? ratePanel.dates.length === 1
+      ? new Date(ratePanel.dates[0] + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+      : `${ratePanel.dates.length} dates`
+    : null;
+
+  const propRates = ratePanel ? rateLookup.get(ratePanel.propertyId) : null;
+  const dateRate = ratePanel && ratePanel.dates.length === 1 ? propRates?.get(ratePanel.dates[0]) : null;
+
+  const panelContent = (
+    <div className="flex flex-col h-full">
+      {/* Price settings — always visible */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-[#222]">Price settings</h3>
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        </button>
+        </div>
+        <div className="text-[13px] text-[#555] space-y-0.5">
+          <div>${monthlyStats.avgRate > 0 ? monthlyStats.avgRate : "—"} per night</div>
+          <div>{monthlyStats.occupancy}% occupancy (30d)</div>
+        </div>
       </div>
 
-      <div className="p-4 space-y-4 flex-1">
-        {/* Current rate info */}
-        {ratePanel.dates.length === 1 && (() => {
-          const dr = propRates?.get(ratePanel.dates[0]);
-          if (!dr) return null;
-          return (
-            <div className="space-y-1.5">
-              <h4 className="text-[10px] font-medium uppercase tracking-widest text-[#999]">Current</h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {dr.base_rate != null && (
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
-                    <div className="text-[10px] text-[#999]">Base</div>
-                    <div className="font-mono font-semibold text-[#333]">${dr.base_rate}</div>
+      {/* Availability settings — always visible */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-[#222]">Availability settings</h3>
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+        <div className="text-[13px] text-[#555] space-y-0.5">
+          <div>Next check-in: {monthlyStats.nextCheckIn}</div>
+        </div>
+      </div>
+
+      {/* Date-specific editing — shown when a date is clicked */}
+      {ratePanel && (
+        <div className="flex-1 flex flex-col">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#222]">{dateLabel}</h3>
+            <button onClick={onCloseDate} className="p-0.5 text-gray-400 hover:text-gray-600 rounded transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="px-4 py-3 space-y-3 flex-1">
+            {/* Current rate cards */}
+            {dateRate && (
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {dateRate.base_rate != null && (
+                  <div className="bg-gray-50 rounded px-2 py-1.5">
+                    <div className="text-[9px] text-[#999]">Base</div>
+                    <div className="font-mono font-semibold text-[#333]">${dateRate.base_rate}</div>
                   </div>
                 )}
-                {dr.suggested_rate != null && (
-                  <div className="bg-emerald-50 rounded-lg px-2.5 py-2">
-                    <div className="text-[10px] text-emerald-600">Suggested</div>
-                    <div className="font-mono font-semibold text-emerald-700">${dr.suggested_rate}</div>
+                {dateRate.suggested_rate != null && (
+                  <div className="bg-emerald-50 rounded px-2 py-1.5">
+                    <div className="text-[9px] text-emerald-600">Suggested</div>
+                    <div className="font-mono font-semibold text-emerald-700">${dateRate.suggested_rate}</div>
                   </div>
                 )}
-                {dr.applied_rate != null && (
-                  <div className="bg-blue-50 rounded-lg px-2.5 py-2">
-                    <div className="text-[10px] text-blue-600">Applied</div>
-                    <div className="font-mono font-semibold text-blue-700">${dr.applied_rate}</div>
-                  </div>
-                )}
-                <div className="bg-gray-50 rounded-lg px-2.5 py-2">
-                  <div className="text-[10px] text-[#999]">Source</div>
-                  <div className="font-medium text-[#333] capitalize">{dr.rate_source}</div>
-                </div>
               </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-medium text-[#666] mb-1">Nightly Rate ($)</label>
+              <input
+                type="number"
+                value={rateValue}
+                onChange={(e) => setRateValue(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                placeholder="0" min="0" step="1"
+              />
             </div>
-          );
-        })()}
 
-        {/* Rate input */}
-        <div>
-          <label className="block text-[11px] font-medium text-[#666] mb-1">Nightly Rate ($)</label>
-          <input
-            type="number"
-            value={rateValue}
-            onChange={(e) => setRateValue(e.target.value)}
-            className="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-            placeholder="0"
-            min="0"
-            step="1"
-          />
+            <div>
+              <label className="block text-[11px] font-medium text-[#666] mb-1">Min Stay</label>
+              <input
+                type="number"
+                value={minStay}
+                onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
+                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                min="1"
+              />
+            </div>
+
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-sm text-[#333]">Available</span>
+              <button type="button" role="switch" aria-checked={available} onClick={() => setAvailable(!available)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${available ? "bg-emerald-500" : "bg-gray-300"}`}>
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${available ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+              </button>
+            </label>
+          </div>
+
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button onClick={handleSave} disabled={saving}
+              className="w-full px-3 py-1.5 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
+      )}
+    </div>
+  );
 
-        {/* Min stay */}
-        <div>
-          <label className="block text-[11px] font-medium text-[#666] mb-1">Min Stay (nights)</label>
-          <input
-            type="number"
-            value={minStay}
-            onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-            min="1"
-          />
-        </div>
+  return (
+    <>
+      {/* Desktop: always-visible sidebar */}
+      <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+        {panelContent}
+      </aside>
 
-        {/* Availability toggle */}
-        <label className="flex items-center justify-between cursor-pointer py-1">
-          <span className="text-sm text-[#333]">Available</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={available}
-            onClick={() => setAvailable(!available)}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              available ? "bg-emerald-500" : "bg-gray-300"
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-              available ? "translate-x-[18px]" : "translate-x-[3px]"
-            }`} />
-          </button>
-        </label>
-      </div>
-
-      {/* Actions */}
-      <div className="p-4 border-t border-gray-100 space-y-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full px-3 py-2 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
-        <button
-          onClick={onClose}
-          className="w-full px-3 py-2 text-sm font-medium text-[#666] bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </aside>
+      {/* Mobile: expandable bottom sheet */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="md:hidden fixed bottom-4 right-4 z-30 w-12 h-12 rounded-full bg-[#222] text-white shadow-lg flex items-center justify-center"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
+      {mobileOpen && (
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/30 z-40" onClick={() => setMobileOpen(false)} />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+            <div className="flex justify-center py-2">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            {panelContent}
+          </div>
+        </>
+      )}
+    </>
   );
 }

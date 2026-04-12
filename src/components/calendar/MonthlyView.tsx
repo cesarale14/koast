@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 1;
+const GAP = 0;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -224,8 +224,7 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
 }
 
 const gridVars = {
-  "--col": `calc(100% / 7)`,
-  "--cell": `calc(100% / 7 - ${GAP}px)`,
+  "--col": `${100 / 7}%`,
 } as React.CSSProperties;
 
 export default function MonthlyView({
@@ -461,7 +460,7 @@ export default function MonthlyView({
               </div>
 
               {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
-              <div className="relative grid grid-cols-7" style={{ gap: `${GAP}px`, overflow: "visible", ...gridVars }}>
+              <div className="relative grid grid-cols-7" style={{ ...gridVars }}>
                 {m.days.map((day, i) => {
                   const rate = rates.get(day.date);
                   const isAvail = rate?.is_available !== false;
@@ -512,7 +511,7 @@ export default function MonthlyView({
                   // --col width so the bar meets the cell edge cleanly.
                   const cellSpan = seg.floatEnd - seg.floatStart;
                   const left = `calc(var(--col) * ${seg.floatStart})`;
-                  const width = `calc(var(--col) * ${cellSpan} - ${GAP}px)`;
+                  const width = `calc(var(--col) * ${cellSpan})`;
 
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
