@@ -28,6 +28,7 @@ export async function GET(
       .from("calendar_rates")
       .select("date, base_rate, suggested_rate, applied_rate, rate_source, factors, is_available, min_stay")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .gte("date", today)
       .lte("date", endStr)
       .order("date");

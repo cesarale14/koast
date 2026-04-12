@@ -115,6 +115,7 @@ export async function POST() {
         .from("calendar_rates")
         .select("property_id, date, applied_rate, suggested_rate")
         .in("property_id", propIds)
+        .is("channel_code", null)
         .gte("date", today)
         .lte("date", d30),
       // Cleaning tasks today & tomorrow

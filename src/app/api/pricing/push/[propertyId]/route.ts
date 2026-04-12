@@ -36,38 +36,69 @@ export async function POST(
       );
     }
 
-    // Fetch applied rates for next 90 days
+    // Fetch rates for the next 90 days — BOTH base rates (channel_code=NULL)
+    // and any per-channel overrides. Per-channel overrides take precedence
+    // for their channel; the base rate is the fallback for channels that
+    // don't have an explicit override set.
     const today = new Date().toISOString().split("T")[0];
     const end = new Date();
     end.setDate(end.getDate() + 90);
     const endStr = end.toISOString().split("T")[0];
 
-    const { data: ratesData } = await supabase
+    // Base rates
+    const { data: baseRatesData } = await supabase
       .from("calendar_rates")
       .select("date, applied_rate, min_stay, is_available")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .gte("date", today)
       .lte("date", endStr)
       .not("applied_rate", "is", null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rates = (ratesData ?? []) as any[];
-    if (rates.length === 0) {
+    const baseRates = (baseRatesData ?? []) as Array<{
+      date: string;
+      applied_rate: number;
+      min_stay: number | null;
+      is_available: boolean;
+    }>;
+    if (baseRates.length === 0) {
       return NextResponse.json({ error: "No applied rates to push" }, { status: 400 });
+    }
+
+    // Per-channel override rates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: overrideRatesData } = await (supabase.from("calendar_rates") as any)
+      .select("date, channel_code, applied_rate, min_stay, is_available")
+      .eq("property_id", propertyId)
+      .not("channel_code", "is", null)
+      .gte("date", today)
+      .lte("date", endStr);
+
+    // overrides[channel_code][date] = { rate, min_stay, is_available }
+    const overrides = new Map<string, Map<string, { applied_rate: number; min_stay: number | null; is_available: boolean }>>();
+    for (const r of (overrideRatesData ?? []) as Array<{
+      date: string;
+      channel_code: string;
+      applied_rate: number | null;
+      min_stay: number | null;
+      is_available: boolean;
+    }>) {
+      if (r.applied_rate == null) continue;
+      if (!overrides.has(r.channel_code)) overrides.set(r.channel_code, new Map());
+      overrides.get(r.channel_code)!.set(r.date, {
+        applied_rate: Number(r.applied_rate),
+        min_stay: r.min_stay,
+        is_available: r.is_available,
+      });
     }
 
     const channex = createChannexClient();
 
-    // Resolve which rate plans to push to.
-    //
-    // Preferred: use per-channel rate plans registered in property_channels
-    // so each channel gets its own rate (different Airbnb vs Booking.com
-    // prices are supported and channels don't overwrite each other).
-    //
-    // Fallback: if the user hasn't connected any channels through the
-    // dedicated flow yet, fall back to pushing to every rate plan on the
-    // Channex property (legacy behavior for properties that were imported
-    // directly from Channex without going through connect-booking-com).
+    // Resolve which rate plans to push to via per-channel registration.
+    // Legacy fallback: if no property_channels entries exist, push to every
+    // rate plan on the Channex property (keeps properties imported directly
+    // from Channex working without going through connect-booking-com).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: channelLinks } = await (supabase.from("property_channels") as any)
       .select("channel_code, channel_name, settings, status")
@@ -77,17 +108,21 @@ export async function POST(
     type RatePlanTarget = { id: string; channel: string };
     const targets: RatePlanTarget[] = [];
 
+    // Airbnb is read-only — we don't push rates to it (Airbnb manages its
+    // own pricing per CLAUDE.md). Skip its rate plan even if it's linked.
+    const READ_ONLY_CHANNELS = new Set(["ABB"]);
+
     for (const link of (channelLinks ?? []) as Array<{
       channel_code: string;
       channel_name: string;
       settings: { rate_plan_id?: string } | null;
     }>) {
+      if (READ_ONLY_CHANNELS.has(link.channel_code)) continue;
       const rpId = link.settings?.rate_plan_id;
       if (rpId) targets.push({ id: rpId, channel: link.channel_code });
     }
 
     if (targets.length === 0) {
-      // Legacy fallback — push to every rate plan on the Channex property
       const ratePlans = await channex.getRatePlans(property.channex_property_id);
       if (ratePlans.length === 0) {
         return NextResponse.json(
@@ -98,20 +133,38 @@ export async function POST(
       for (const rp of ratePlans) targets.push({ id: rp.id, channel: "legacy" });
     }
 
-    // Push rates to each targeted rate plan. Currently all channels get the
-    // same applied_rate — per-channel pricing multipliers would go here
-    // (e.g. BDC gets 1.15x to cover commission) if the user configures them.
-    const restrictionValues = rates.flatMap((r) =>
-      targets.map((t) => ({
-        property_id: property.channex_property_id,
-        rate_plan_id: t.id,
-        date_from: r.date,
-        date_to: r.date,
-        rate: Math.round(r.applied_rate * 100), // Channex uses cents
-        min_stay_arrival: r.min_stay ?? 1,
-        stop_sell: !r.is_available,
-      }))
-    );
+    // Per-target, per-date restrictions. For each target channel, use the
+    // per-channel override if one exists for the date, else the base rate.
+    // This ensures manual markups (e.g. BDC +15%) are preserved when the
+    // pricing engine re-pushes — the biggest risk we're fixing here.
+    const restrictionValues: Array<{
+      property_id: string;
+      rate_plan_id: string;
+      date_from: string;
+      date_to: string;
+      rate: number;
+      min_stay_arrival: number;
+      stop_sell: boolean;
+    }> = [];
+
+    for (const t of targets) {
+      const channelOverrides = overrides.get(t.channel);
+      for (const base of baseRates) {
+        const override = channelOverrides?.get(base.date);
+        const rateDollars = override?.applied_rate ?? base.applied_rate;
+        const minStay = override?.min_stay ?? base.min_stay ?? 1;
+        const isAvailable = override?.is_available ?? base.is_available;
+        restrictionValues.push({
+          property_id: property.channex_property_id,
+          rate_plan_id: t.id,
+          date_from: base.date,
+          date_to: base.date,
+          rate: Math.round(rateDollars * 100),
+          min_stay_arrival: minStay,
+          stop_sell: !isAvailable,
+        });
+      }
+    }
 
     let pushed = 0;
     for (let i = 0; i < restrictionValues.length; i += 200) {
@@ -120,11 +173,15 @@ export async function POST(
       pushed += batch.length;
     }
 
+    // Summarize: which channels had overrides actually applied for any date?
+    const channelsWithOverrides = Array.from(overrides.keys());
+
     return NextResponse.json({
       pushed,
       channex_property_id: property.channex_property_id,
       ratePlans: targets.length,
       targets: targets.map((t) => t.channel),
+      channels_with_overrides: channelsWithOverrides,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

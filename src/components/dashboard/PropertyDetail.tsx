@@ -105,6 +105,7 @@ export default function PropertyDetail({
       .from("calendar_rates")
       .select("date, applied_rate, suggested_rate, base_rate")
       .eq("property_id", property.id)
+      .is("channel_code", null)
       .in("date", dates)
       .then(({ data }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,6 +139,7 @@ export default function PropertyDetail({
       .from("calendar_rates")
       .select("date, applied_rate, suggested_rate, base_rate")
       .eq("property_id", property.id)
+      .is("channel_code", null)
       .in("date", dates)
       .then(({ data }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

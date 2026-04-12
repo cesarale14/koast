@@ -119,6 +119,13 @@ export const calendarRates = pgTable("calendar_rates", {
   isAvailable: boolean("is_available").default(true),
   rateSource: text("rate_source").default("manual"),
   factors: jsonb("factors"),
+  // Per-channel rate overrides. NULL for base/engine rates, populated
+  // (e.g. 'BDC', 'VRBO') for channel-specific rate overrides that live
+  // alongside the base row.
+  channelCode: text("channel_code"),
+  channexRatePlanId: text("channex_rate_plan_id"),
+  lastPushedAt: timestamp("last_pushed_at", { withTimezone: true }),
+  lastChannexRate: decimal("last_channex_rate", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_calendar_rates_property_date").on(t.propertyId, t.date),

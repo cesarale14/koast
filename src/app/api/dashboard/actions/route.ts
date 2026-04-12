@@ -37,6 +37,7 @@ export async function POST() {
     .from("calendar_rates")
     .select("date, applied_rate, suggested_rate, property_id")
     .in("property_id", propIds)
+    .is("channel_code", null)
     .gte("date", todayStr).lte("date", d14)
     .not("suggested_rate", "is", null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

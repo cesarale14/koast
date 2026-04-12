@@ -22,7 +22,7 @@ export async function generateScenarios(supabase: any, propertyId: string): Prom
       .eq("property_id", propertyId).gte("check_out", todayStr).lte("check_in", end90)
       .in("status", ["confirmed", "completed"]),
     supabase.from("calendar_rates").select("date, applied_rate, suggested_rate, min_stay, is_available")
-      .eq("property_id", propertyId).gte("date", todayStr).lte("date", end90),
+      .eq("property_id", propertyId).is("channel_code", null).gte("date", todayStr).lte("date", end90),
     supabase.from("market_comps").select("comp_adr, comp_occupancy").eq("property_id", propertyId),
     supabase.from("market_snapshots").select("market_adr, market_occupancy, market_supply")
       .eq("property_id", propertyId).order("snapshot_date", { ascending: false }).limit(1),

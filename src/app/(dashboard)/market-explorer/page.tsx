@@ -83,6 +83,7 @@ export default async function MarketExplorerPage({ searchParams }: { searchParam
     .from("calendar_rates")
     .select("date, applied_rate, suggested_rate, base_rate")
     .eq("property_id", propertyId)
+    .is("channel_code", null)
     .gte("date", new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0])
     .lte("date", endStr)
     .order("date");

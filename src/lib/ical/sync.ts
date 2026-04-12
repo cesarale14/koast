@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { parseICalFeed } from "./parser";
 import { icalFeeds, bookings, calendarRates } from "@/lib/db/schema";
 import type { ICalBooking } from "./types";
@@ -85,7 +85,7 @@ async function syncFeedBookings(
         const dateStr = d.toISOString().split("T")[0];
         const existing = await db.select({ id: calendarRates.id })
           .from(calendarRates)
-          .where(and(eq(calendarRates.propertyId, propertyId), eq(calendarRates.date, dateStr)))
+          .where(and(eq(calendarRates.propertyId, propertyId), eq(calendarRates.date, dateStr), isNull(calendarRates.channelCode)))
           .limit(1);
 
         if (existing.length > 0) {

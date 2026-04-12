@@ -87,6 +87,7 @@ export default async function PropertyDetailPage({
     .from("calendar_rates")
     .select("applied_rate")
     .eq("property_id", params.id)
+    .is("channel_code", null)
     .gte("date", monthStart)
     .lte("date", monthEnd)
     .not("applied_rate", "is", null);
@@ -108,6 +109,7 @@ export default async function PropertyDetailPage({
     .from("calendar_rates")
     .select("property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source")
     .eq("property_id", params.id)
+    .is("channel_code", null)
     .gte("date", today)
     .lte("date", end60);
 

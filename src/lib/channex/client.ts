@@ -479,6 +479,43 @@ class ChannexClient {
     return res.data;
   }
 
+  /**
+   * Fetch restrictions for a property in the "bucketed" format Channex uses
+   * when you pass `filter[restrictions]=...`. The response is nested as
+   *   { rate_plan_id: { "YYYY-MM-DD": { rate, availability, min_stay_arrival, stop_sell } } }
+   * which is the shape we need for per-channel rate UI — one call returns
+   * every rate plan on the property in a single round-trip.
+   */
+  async getRestrictionsBucketed(
+    propertyId: string,
+    dateFrom: string,
+    dateTo: string,
+    fields: Array<"rate" | "availability" | "min_stay_arrival" | "min_stay_through" | "stop_sell" | "closed_to_arrival" | "closed_to_departure"> = ["rate", "availability", "min_stay_arrival", "stop_sell"]
+  ): Promise<Record<string, Record<string, {
+    rate?: string;
+    availability?: number;
+    min_stay_arrival?: number;
+    min_stay_through?: number;
+    stop_sell?: boolean;
+    closed_to_arrival?: boolean;
+    closed_to_departure?: boolean;
+  }>>> {
+    const res = await this.request<{
+      data: Record<string, Record<string, Record<string, unknown>>>;
+    }>(
+      `/restrictions?filter[property_id]=${propertyId}&filter[date][gte]=${dateFrom}&filter[date][lte]=${dateTo}&filter[restrictions]=${fields.join(",")}`
+    );
+    return (res.data ?? {}) as Record<string, Record<string, {
+      rate?: string;
+      availability?: number;
+      min_stay_arrival?: number;
+      min_stay_through?: number;
+      stop_sell?: boolean;
+      closed_to_arrival?: boolean;
+      closed_to_departure?: boolean;
+    }>>;
+  }
+
   async updateRestrictions(
     values: {
       property_id: string;

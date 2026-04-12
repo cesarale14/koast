@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import CalendarToolbar from "./CalendarToolbar";
 import MonthlyView from "./MonthlyView";
 import BookingSidePanel from "./BookingSidePanel";
+import { PerChannelRateEditor } from "./PerChannelRateEditor";
 import { ConflictResolutionModal, type Conflict, type ConflictBooking } from "@/components/dashboard/ConflictResolution";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import type { BookingBarData } from "./BookingBar";
@@ -162,9 +163,10 @@ export default function CalendarGrid({
             is_available: updates.is_available,
             min_stay: updates.min_stay,
             rate_source: "manual",
+            channel_code: null,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
-          { onConflict: "property_id,date" },
+          { onConflict: "property_id,date,channel_code" },
         );
       }
 
@@ -555,6 +557,12 @@ function RightSettingsPanel({
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${available ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
               </button>
             </label>
+
+            <PerChannelRateEditor
+              propertyId={ratePanel.propertyId}
+              dates={ratePanel.dates}
+              baseRate={dateRate?.suggested_rate ?? dateRate?.base_rate ?? null}
+            />
           </div>
 
           <div className="px-4 py-3 border-t border-gray-100">

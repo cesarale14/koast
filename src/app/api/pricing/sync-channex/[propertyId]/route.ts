@@ -41,6 +41,7 @@ export async function POST(
       .from("calendar_rates")
       .select("date, applied_rate, min_stay, is_available")
       .eq("property_id", params.propertyId)
+      .is("channel_code", null)
       .in("date", dates);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rates = (rateData ?? []) as any[];

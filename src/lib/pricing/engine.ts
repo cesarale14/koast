@@ -100,6 +100,7 @@ export class PricingEngine {
       .from("calendar_rates")
       .select("date, applied_rate")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .gte("date", startStr)
       .lte("date", endStr);
     const rateMap = new Map<string, number>();
@@ -261,6 +262,7 @@ export class PricingEngine {
         base_rate: rate.base_rate,
         is_available: true,
         min_stay: 1,
+        channel_code: null,
       };
       if (rate.applied_rate != null) row.applied_rate = rate.applied_rate;
       return row;
@@ -269,7 +271,7 @@ export class PricingEngine {
     // Single upsert — existing rows update, new rows insert
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (this.supabase.from("calendar_rates") as any).upsert(rows, {
-      onConflict: "property_id,date",
+      onConflict: "property_id,date,channel_code",
     });
     if (error) throw new Error(`applyRates upsert failed: ${error.message}`);
 
@@ -282,10 +284,11 @@ export class PricingEngine {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = this.supabase.from("calendar_rates") as any;
 
-    // Fetch all matching rows in one query
+    // Fetch all matching rows in one query — base rows only
     const { data } = await table
       .select("id, date, suggested_rate")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .in("date", dates);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -315,6 +318,7 @@ export class PricingEngine {
     const { data, error: fetchError } = await table
       .select("id, date")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .in("date", dates);
 
     if (fetchError) throw new Error(`overrideRates fetch failed: ${fetchError.message}`);

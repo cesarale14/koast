@@ -1,0 +1,452 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { createServiceClient } from "@/lib/supabase/service";
+import { createChannexClient } from "@/lib/channex/client";
+
+/**
+ * Per-channel rate editing API for the calendar right-side panel.
+ *
+ * GET  /api/channels/rates/[propertyId]?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD[&refresh=1]
+ *      Returns the LIVE rate/availability state from Channex for every
+ *      connected channel that has a rate plan registered in
+ *      property_channels.settings.rate_plan_id, bucketed per channel per date,
+ *      along with the locally-stored override rate (if any) so the UI can
+ *      flag mismatches. Base rates are included for reference.
+ *
+ * POST /api/channels/rates/[propertyId]
+ *      Body: { date_from, date_to, channel_code, rate, min_stay_arrival? }
+ *      Saves a per-channel override to calendar_rates and pushes the new
+ *      rate/restriction to the corresponding Channex rate plan. Airbnb is
+ *      a no-op because Airbnb manages its own pricing per CLAUDE.md.
+ */
+
+// ---------- In-memory cache ----------
+// Keyed by `${propertyId}|${dateFrom}|${dateTo}`. 5-minute TTL. Serverless
+// warm containers share this within the same lambda instance; cold starts
+// just refetch. Good enough for typical click-through cadence; a "refresh"
+// query param bypasses it for manual force-refresh.
+type CacheEntry = { ts: number; data: GetResponseBody };
+const rateCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function cacheKey(propertyId: string, dateFrom: string, dateTo: string) {
+  return `${propertyId}|${dateFrom}|${dateTo}`;
+}
+
+function invalidatePropertyCache(propertyId: string) {
+  for (const key of Array.from(rateCache.keys())) {
+    if (key.startsWith(`${propertyId}|`)) rateCache.delete(key);
+  }
+}
+
+// ---------- Response types ----------
+type ChannelDateEntry = {
+  rate: number | null;
+  availability: number | null;
+  min_stay_arrival: number | null;
+  stop_sell: boolean;
+  stored_rate: number | null;
+  mismatch: boolean;
+  source: "channex" | "channex+db";
+};
+
+type ChannelBlock = {
+  channel_code: string;
+  channel_name: string;
+  rate_plan_id: string | null;
+  status: string;
+  editable: boolean;
+  read_only_reason?: string;
+  needs_setup?: boolean;
+  setup_hint?: string;
+  dates: Record<string, ChannelDateEntry>;
+};
+
+type GetResponseBody = {
+  base: Record<string, { base_rate: number | null; suggested_rate: number | null; applied_rate: number | null; min_stay: number | null }>;
+  channels: ChannelBlock[];
+  fetched_at: string;
+  cache_hit: boolean;
+};
+
+const CHANNEL_NAME: Record<string, string> = {
+  ABB: "Airbnb",
+  BDC: "Booking.com",
+  VRBO: "Vrbo",
+  DIRECT: "Direct",
+};
+
+// Airbnb rates are managed inside Airbnb itself — we read them from Channex
+// for display but never push back. Keeping this as a set so other channels
+// can be added later if needed (per CLAUDE.md guidance).
+const READ_ONLY_CHANNELS = new Set(["ABB"]);
+
+// ==========================================================================
+// GET
+// ==========================================================================
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { propertyId: string } }
+) {
+  try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const url = new URL(request.url);
+    const dateFrom = url.searchParams.get("date_from");
+    const dateTo = url.searchParams.get("date_to");
+    const refresh = url.searchParams.get("refresh") === "1";
+
+    if (!dateFrom || !dateTo) {
+      return NextResponse.json(
+        { error: "date_from and date_to are required (YYYY-MM-DD)" },
+        { status: 400 }
+      );
+    }
+
+    const propertyId = params.propertyId;
+    const ck = cacheKey(propertyId, dateFrom, dateTo);
+    if (!refresh) {
+      const hit = rateCache.get(ck);
+      if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+        return NextResponse.json({ ...hit.data, cache_hit: true });
+      }
+    }
+
+    const supabase = createServiceClient();
+
+    // 1. Channex property id for this property
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: propRow } = await (supabase.from("properties") as any)
+      .select("id, channex_property_id")
+      .eq("id", propertyId)
+      .maybeSingle();
+    if (!propRow?.channex_property_id) {
+      return NextResponse.json(
+        { error: "Property not connected to Channex" },
+        { status: 400 }
+      );
+    }
+    const channexPropertyId: string = propRow.channex_property_id;
+
+    // 2. Load connected channels + their rate plans from property_channels.
+    //    We include pending_authorization channels so the user can pre-set
+    //    rates before the first live push.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: channelLinks } = await (supabase.from("property_channels") as any)
+      .select("channel_code, channel_name, status, settings")
+      .eq("property_id", propertyId)
+      .in("status", ["active", "pending_authorization"]);
+
+    // 3. Base rates for the date range (local DB only — no network call)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: baseRows } = await (supabase.from("calendar_rates") as any)
+      .select("date, base_rate, suggested_rate, applied_rate, min_stay")
+      .eq("property_id", propertyId)
+      .is("channel_code", null)
+      .gte("date", dateFrom)
+      .lte("date", dateTo);
+
+    const base: GetResponseBody["base"] = {};
+    for (const r of (baseRows ?? []) as Array<{
+      date: string;
+      base_rate: string | null;
+      suggested_rate: string | null;
+      applied_rate: string | null;
+      min_stay: number | null;
+    }>) {
+      base[r.date] = {
+        base_rate: r.base_rate != null ? Number(r.base_rate) : null,
+        suggested_rate: r.suggested_rate != null ? Number(r.suggested_rate) : null,
+        applied_rate: r.applied_rate != null ? Number(r.applied_rate) : null,
+        min_stay: r.min_stay,
+      };
+    }
+
+    // 4. Per-channel stored override rates (for mismatch comparison)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: overrideRows } = await (supabase.from("calendar_rates") as any)
+      .select("date, channel_code, applied_rate, last_channex_rate")
+      .eq("property_id", propertyId)
+      .not("channel_code", "is", null)
+      .gte("date", dateFrom)
+      .lte("date", dateTo);
+
+    const overrideLookup = new Map<string, Map<string, { applied_rate: number | null; last_channex_rate: number | null }>>();
+    for (const r of (overrideRows ?? []) as Array<{
+      date: string;
+      channel_code: string;
+      applied_rate: string | null;
+      last_channex_rate: string | null;
+    }>) {
+      if (!overrideLookup.has(r.channel_code)) overrideLookup.set(r.channel_code, new Map());
+      overrideLookup.get(r.channel_code)!.set(r.date, {
+        applied_rate: r.applied_rate != null ? Number(r.applied_rate) : null,
+        last_channex_rate: r.last_channex_rate != null ? Number(r.last_channex_rate) : null,
+      });
+    }
+
+    // 5. Fetch live bucketed restrictions from Channex — one call covers all
+    //    rate plans on the property.
+    const channex = createChannexClient();
+    let bucketedByRatePlan: Record<string, Record<string, {
+      rate?: string;
+      availability?: number;
+      min_stay_arrival?: number;
+      stop_sell?: boolean;
+    }>> = {};
+    let channexError: string | null = null;
+    try {
+      bucketedByRatePlan = await channex.getRestrictionsBucketed(
+        channexPropertyId,
+        dateFrom,
+        dateTo,
+        ["rate", "availability", "min_stay_arrival", "stop_sell"]
+      );
+    } catch (err) {
+      channexError = err instanceof Error ? err.message : "Unknown Channex error";
+      console.warn("[channels/rates GET] Channex fetch failed:", channexError);
+    }
+
+    // 6. Build per-channel blocks
+    const channels: ChannelBlock[] = [];
+    for (const link of (channelLinks ?? []) as Array<{
+      channel_code: string;
+      channel_name: string | null;
+      status: string;
+      settings: { rate_plan_id?: string; hotel_id?: string } | null;
+    }>) {
+      const code = link.channel_code;
+      const ratePlanId = link.settings?.rate_plan_id ?? null;
+      const channelName = CHANNEL_NAME[code] ?? link.channel_name ?? code;
+      const readOnly = READ_ONLY_CHANNELS.has(code);
+
+      if (!ratePlanId) {
+        // Channel linked but no rate plan set up — this is the VRBO "Setup
+        // needed" state. Show the card with a CTA rather than hiding it.
+        channels.push({
+          channel_code: code,
+          channel_name: channelName,
+          rate_plan_id: null,
+          status: link.status,
+          editable: false,
+          needs_setup: true,
+          setup_hint: "Finish channel setup to push rates.",
+          dates: {},
+        });
+        continue;
+      }
+
+      const bucket = bucketedByRatePlan[ratePlanId] ?? {};
+      const overrides = overrideLookup.get(code) ?? new Map();
+
+      const dates: Record<string, ChannelDateEntry> = {};
+      // Walk the requested date range so the UI always has an entry per date
+      for (let d = new Date(dateFrom + "T00:00:00Z"); d <= new Date(dateTo + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+        const ds = d.toISOString().split("T")[0];
+        const live = bucket[ds];
+        const override = overrides.get(ds);
+        const liveRate = live?.rate != null ? Number(live.rate) : null;
+        const storedRate = override?.applied_rate ?? null;
+        const mismatch = storedRate != null && liveRate != null && Math.abs(storedRate - liveRate) > 0.5;
+
+        dates[ds] = {
+          rate: liveRate,
+          availability: live?.availability ?? null,
+          min_stay_arrival: live?.min_stay_arrival ?? null,
+          stop_sell: live?.stop_sell === true,
+          stored_rate: storedRate,
+          mismatch,
+          source: storedRate != null ? "channex+db" : "channex",
+        };
+      }
+
+      channels.push({
+        channel_code: code,
+        channel_name: channelName,
+        rate_plan_id: ratePlanId,
+        status: link.status,
+        editable: !readOnly,
+        read_only_reason: readOnly ? "Airbnb manages its own pricing" : undefined,
+        dates,
+      });
+    }
+
+    const body: GetResponseBody = {
+      base,
+      channels,
+      fetched_at: new Date().toISOString(),
+      cache_hit: false,
+    };
+
+    if (!channexError) {
+      rateCache.set(ck, { ts: Date.now(), data: body });
+    }
+
+    return NextResponse.json({
+      ...body,
+      channex_error: channexError,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[channels/rates GET] Error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ==========================================================================
+// POST
+// ==========================================================================
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { propertyId: string } }
+) {
+  try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const body = await request.json();
+    const { date_from, date_to, channel_code, rate, min_stay_arrival } = body as {
+      date_from?: string;
+      date_to?: string;
+      channel_code?: string;
+      rate?: number;
+      min_stay_arrival?: number;
+    };
+
+    if (!date_from || !date_to || !channel_code || rate == null) {
+      return NextResponse.json(
+        { error: "date_from, date_to, channel_code, rate are required" },
+        { status: 400 }
+      );
+    }
+
+    if (READ_ONLY_CHANNELS.has(channel_code)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "airbnb_self_managed",
+        message: "Airbnb manages its own pricing — nothing to push.",
+      });
+    }
+
+    const propertyId = params.propertyId;
+    const supabase = createServiceClient();
+
+    // Resolve Channex property id + the channel's dedicated rate plan
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: propRow } = await (supabase.from("properties") as any)
+      .select("id, channex_property_id")
+      .eq("id", propertyId)
+      .maybeSingle();
+    if (!propRow?.channex_property_id) {
+      return NextResponse.json({ error: "Property not connected to Channex" }, { status: 400 });
+    }
+    const channexPropertyId: string = propRow.channex_property_id;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: link } = await (supabase.from("property_channels") as any)
+      .select("channex_channel_id, settings, status")
+      .eq("property_id", propertyId)
+      .eq("channel_code", channel_code)
+      .maybeSingle();
+    const ratePlanId: string | undefined = link?.settings?.rate_plan_id;
+    if (!ratePlanId) {
+      return NextResponse.json(
+        { error: `No rate plan configured for channel ${channel_code}. Finish channel setup first.` },
+        { status: 400 }
+      );
+    }
+
+    // Generate the date list (inclusive)
+    const dates: string[] = [];
+    for (let d = new Date(date_from + "T00:00:00Z"); d <= new Date(date_to + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+      dates.push(d.toISOString().split("T")[0]);
+    }
+    if (dates.length === 0) {
+      return NextResponse.json({ error: "Empty date range" }, { status: 400 });
+    }
+
+    // Persist per-channel override rows in calendar_rates. Strict separation:
+    // the base row (channel_code = NULL) is NOT touched — the pricing engine
+    // still owns that number.
+    const now = new Date().toISOString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const overrideRows = dates.map((d) => ({
+      property_id: propertyId,
+      date: d,
+      channel_code,
+      applied_rate: rate,
+      base_rate: rate,
+      min_stay: min_stay_arrival ?? null,
+      is_available: true,
+      rate_source: "manual_per_channel",
+      channex_rate_plan_id: ratePlanId,
+      last_pushed_at: now,
+      last_channex_rate: rate,
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: upsertErr } = await (supabase.from("calendar_rates") as any).upsert(
+      overrideRows,
+      { onConflict: "property_id,date,channel_code" }
+    );
+    if (upsertErr) {
+      console.error("[channels/rates POST] DB upsert error:", upsertErr);
+      return NextResponse.json({ error: `DB save failed: ${upsertErr.message}` }, { status: 500 });
+    }
+
+    // Push rate + (optional) min_stay to Channex. Channex expects cents.
+    // Per our earlier Pool House investigation, some BDC rate types reject
+    // min_stay_arrival pushes ("RATE_IS_A_SLAVE_RATE"); we catch and report
+    // the push error in the response so the UI can surface it.
+    const channex = createChannexClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const restrictionValues: any[] = dates.map((d) => ({
+      property_id: channexPropertyId,
+      rate_plan_id: ratePlanId,
+      date_from: d,
+      date_to: d,
+      rate: Math.round(rate * 100),
+      ...(min_stay_arrival != null ? { min_stay_arrival } : {}),
+    }));
+
+    let pushed = false;
+    let pushError: string | null = null;
+    try {
+      // Batches of 200 to match our existing pattern
+      for (let i = 0; i < restrictionValues.length; i += 200) {
+        await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+      }
+      pushed = true;
+    } catch (err) {
+      pushError = err instanceof Error ? err.message : String(err);
+      console.warn("[channels/rates POST] Channex push failed:", pushError);
+    }
+
+    invalidatePropertyCache(propertyId);
+
+    return NextResponse.json({
+      ok: true,
+      pushed,
+      push_error: pushError,
+      channel_code,
+      rate_plan_id: ratePlanId,
+      dates: dates.length,
+      date_from,
+      date_to,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[channels/rates POST] Error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

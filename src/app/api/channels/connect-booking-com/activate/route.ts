@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       const { data: moorRates } = await (supabase.from("calendar_rates") as any)
         .select("date, applied_rate, base_rate, min_stay, is_available")
         .eq("property_id", propertyId)
+        .is("channel_code", null)
         .gte("date", startStr)
         .lte("date", endStr);
 

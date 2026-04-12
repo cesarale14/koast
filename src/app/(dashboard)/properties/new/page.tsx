@@ -176,6 +176,7 @@ export default function AddPropertyPage() {
         rateEntries.push({
           property_id: propertyId,
           date: d.toISOString().split("T")[0],
+          channel_code: null,
           base_rate: baseRate,
           applied_rate: baseRate,
           min_stay: parseInt(form.min_stay) || 1,

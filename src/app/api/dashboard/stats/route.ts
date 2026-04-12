@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
         .from("calendar_rates")
         .select("applied_rate")
         .in("property_id", propIds)
+        .is("channel_code", null)
         .gte("date", start)
         .lte("date", end)
         .not("applied_rate", "is", null);

@@ -368,12 +368,13 @@ export async function POST(request: NextRequest) {
               .select("id")
               .eq("property_id", propertyId)
               .eq("date", ra.date)
+              .is("channel_code", null)
               .limit(1);
 
             if (existingRate && existingRate.length > 0) {
               await rateTable.update(rateData).eq("id", existingRate[0].id);
             } else {
-              const { error: rateErr } = await rateTable.insert(rateData);
+              const { error: rateErr } = await rateTable.insert({ ...rateData, channel_code: null });
               if (rateErr) {
                 console.error("[channex/import] Rate insert error:", JSON.stringify(rateErr));
               }

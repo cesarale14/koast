@@ -48,6 +48,7 @@ export default async function CompSetsPage() {
     .from("calendar_rates")
     .select("applied_rate, suggested_rate, base_rate")
     .eq("property_id", propertyId)
+    .is("channel_code", null)
     .gte("date", today)
     .not("applied_rate", "is", null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -141,8 +141,9 @@ export async function POST(request: NextRequest) {
                 min_stay: ra.min_stay_arrival || 1,
                 is_available: !ra.stop_sell,
                 rate_source: "manual",
+                channel_code: null,
               },
-              { onConflict: "property_id,date" }
+              { onConflict: "property_id,date,channel_code" }
             );
             rateCount++;
           }

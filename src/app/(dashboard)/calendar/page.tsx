@@ -67,6 +67,7 @@ export default async function CalendarPage() {
         "property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
       )
       .in("property_id", propertyIds)
+      .is("channel_code", null)
       .gte("date", today)
       .lte("date", end),
   ]);

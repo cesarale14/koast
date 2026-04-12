@@ -59,6 +59,7 @@ export async function POST(
       .from("calendar_rates")
       .select("base_rate, applied_rate")
       .eq("property_id", propertyId)
+      .is("channel_code", null)
       .not("base_rate", "is", null)
       .limit(1);
 
