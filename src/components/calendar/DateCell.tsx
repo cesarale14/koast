@@ -45,7 +45,7 @@ export default function DateCell({
   if (isAvailable && rate?.applied_rate && rate?.suggested_rate) {
     const diff = Math.abs(rate.suggested_rate - rate.applied_rate) / rate.applied_rate;
     if (diff > 0.08) {
-      rateColorClass = rate.suggested_rate > rate.applied_rate ? "text-emerald-600" : "text-red-500";
+      rateColorClass = rate.suggested_rate > rate.applied_rate ? "text-[#3d6b52]" : "text-red-500";
     }
   }
 

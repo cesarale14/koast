@@ -77,7 +77,7 @@ function SignalBar({ name, score, weight, reason }: { name: string; score: numbe
     <div className="mb-3">
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="font-medium text-neutral-700 capitalize">{name.replace("_", " ")}</span>
-        <span className={`font-mono font-semibold ${isPositive ? "text-emerald-600" : "text-danger"}`}>
+        <span className={`font-mono font-semibold ${isPositive ? "text-[#1a3a2a]" : "text-danger"}`}>
           {score >= 0 ? "+" : ""}{score.toFixed(2)} &times; {weight.toFixed(2)}
         </span>
       </div>
@@ -440,7 +440,7 @@ export default function PricingDashboard({
               </div>
               <span>High</span>
               <span className="mx-1 text-neutral-200">|</span>
-              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> raise</span>
+              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-[#1a3a2a] inline-block" /> raise</span>
               <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-danger inline-block" /> lower</span>
             </div>
           </div>
@@ -516,12 +516,12 @@ export default function PricingDashboard({
                         ${rate > 0 ? Math.round(rate) : "\u2014"}
                       </div>
                       {hasSuggestion && (
-                        <div className={`text-[10px] font-medium font-mono ${suggestUp ? "text-emerald-600" : "text-danger"}`}>
+                        <div className={`text-[10px] font-medium font-mono ${suggestUp ? "text-[#1a3a2a]" : "text-danger"}`}>
                           {suggestUp ? "\u2191" : "\u2193"}${Math.round(r.suggested_rate!)}
                         </div>
                       )}
                       {(suggestUp || suggestDown) && (
-                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-emerald-500" : "bg-danger"}`} />
+                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-[#1a3a2a]" : "bg-danger"}`} />
                       )}
                     </div>
                   );

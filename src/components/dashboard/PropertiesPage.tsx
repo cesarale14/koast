@@ -53,7 +53,7 @@ function StepDots({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-2">
       {[1, 2, 3, 4].map((s) => (
-        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${current >= s ? "bg-emerald-500" : "bg-neutral-200"}`} />
+        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${current >= s ? "bg-[#1a3a2a]" : "bg-neutral-200"}`} />
       ))}
     </div>
   );
@@ -76,13 +76,13 @@ function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: 
         // eslint-disable-next-line @next/next/no-img-element
         <div className="h-44 overflow-hidden"><img src={photo} alt={name} className="w-full h-full object-cover" /></div>
       ) : (
-        <div className="h-44 bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center"><Home size={36} className="text-emerald-300" strokeWidth={1.5} /></div>
+        <div className="h-44 bg-gradient-to-br from-[#eef5f0] to-[#d5e8da] flex items-center justify-center"><Home size={36} className="text-[#a8d1b4]" strokeWidth={1.5} /></div>
       )}
       <div className="p-4 space-y-3">
         {b && <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>}
         {onNameChange ? (
           <input type="text" value={name} onChange={(e) => onNameChange(e.target.value)}
-            className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
+            className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a]" />
         ) : (
           <p className="text-sm font-semibold text-neutral-800">{name}</p>
         )}
@@ -105,7 +105,7 @@ function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy,
         // eslint-disable-next-line @next/next/no-img-element
         <div className="h-40 rounded-t-xl overflow-hidden"><img src={p.cover_photo_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /></div>
       ) : (
-        <div className="h-40 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-t-xl flex items-center justify-center"><Home size={32} className="text-emerald-300" strokeWidth={1.5} /></div>
+        <div className="h-40 bg-gradient-to-br from-[#eef5f0] to-[#d5e8da] rounded-t-xl flex items-center justify-center"><Home size={32} className="text-[#a8d1b4]" strokeWidth={1.5} /></div>
       )}
       <div className="p-5">
         <h3 className="text-lg font-semibold text-neutral-800">{p.name}</h3>
@@ -312,13 +312,13 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                 onChange={(e) => { setListingUrl(e.target.value); setUrlError(null); setListingId(null); }}
                 onBlur={validateUrl} onKeyDown={handleUrlKeyDown}
                 placeholder="e.g., airbnb.com/rooms/1234567890"
-                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-neutral-300"
+                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] placeholder:text-neutral-300"
               />
               {urlError && <p className="mt-2 text-sm text-red-500">{urlError}</p>}
 
               {loading && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-8">
-                  <Loader2 size={20} className="animate-spin text-emerald-500" />
+                  <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
                   <p className="text-sm text-neutral-500">{loadMsg}</p>
                 </div>
               )}
@@ -332,7 +332,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
               <div className="mt-8 flex justify-between items-center">
                 <button onClick={() => setStep(1)} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">&larr; Back</button>
                 <button onClick={() => setStep(3)} disabled={!canAdvanceToStep3}
-                  className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="px-6 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   Next
                 </button>
               </div>
@@ -347,13 +347,13 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                 type="url" value={icalUrl}
                 onChange={(e) => setIcalUrl(e.target.value)}
                 placeholder={`e.g., airbnb.com/calendar/ical/${listingId ?? "1234567890"}.ics`}
-                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-neutral-300"
+                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] placeholder:text-neutral-300"
               />
               <IcalHelp platform={platform.code} />
 
               {importing && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-emerald-500" />
+                  <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
                   <p className="text-sm text-neutral-500">Importing property and syncing bookings...</p>
                 </div>
               )}
@@ -366,7 +366,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                     Skip for now
                   </button>
                   <button onClick={() => handleImport(false)} disabled={importing || !icalUrl.trim()}
-                    className="px-5 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                    className="px-5 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
                     {importing && <Loader2 size={16} className="animate-spin" />}
                     Import &amp; Continue
                   </button>
@@ -378,7 +378,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
           {step === 4 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center max-w-sm">
-                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-emerald-500" strokeWidth={2.5} /></div>
+                <div className="w-16 h-16 bg-[#eef5f0] rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-[#3d6b52]" strokeWidth={2.5} /></div>
                 <h2 className="text-xl font-bold text-neutral-800 mb-2">Property added!</h2>
                 {bookingCount > 0 && <p className="text-sm text-neutral-500 mb-4">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>}
                 <div className="mt-4 mb-8">
@@ -391,7 +391,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button onClick={handleAddAnother} className="px-5 py-2.5 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors">Add Another Property</button>
-                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Go to Dashboard</button>
+                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors">Go to Dashboard</button>
                 </div>
               </div>
             </div>
@@ -425,11 +425,11 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
       <div>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-lg">
-            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><Home size={32} className="text-emerald-500" strokeWidth={1.5} /></div>
+            <div className="w-16 h-16 bg-[#eef5f0] rounded-2xl flex items-center justify-center mx-auto mb-6"><Home size={32} className="text-[#3d6b52]" strokeWidth={1.5} /></div>
             <h1 className="text-2xl font-bold text-neutral-800 mb-2">Add your first property</h1>
             <p className="text-neutral-500 mb-8">Import from Airbnb, Booking.com, or VRBO to get started</p>
             <button onClick={() => setShowModal(true)}
-              className="px-6 py-3 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mx-auto">
+              className="px-6 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors flex items-center gap-2 mx-auto">
               <Plus size={16} />Add Property
             </button>
           </div>
@@ -443,7 +443,7 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
     <div>
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-bold text-neutral-800">Properties</h1>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-600 transition-colors"><Plus size={16} />Add Property</button>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors"><Plus size={16} />Add Property</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {properties.map((prop) => (

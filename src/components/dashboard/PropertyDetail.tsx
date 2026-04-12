@@ -46,7 +46,7 @@ const platformLabels: Record<string, string> = {
 };
 const platformBadgeColors: Record<string, string> = {
   airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700",
-  booking_com: "bg-brand-50 text-brand-700", direct: "bg-emerald-50 text-emerald-700",
+  booking_com: "bg-brand-50 text-brand-700", direct: "bg-[#eef5f0] text-[#1a3a2a]",
 };
 const typeLabels: Record<string, string> = {
   entire_home: "Entire Home", private_room: "Private Room", shared_room: "Shared Room",
@@ -986,7 +986,7 @@ function CalendarConnections({ propertyId, hasChannex }: { propertyId: string; h
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const platformIcons: Record<string, string> = { airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700", booking_com: "bg-brand-50 text-brand-700", direct: "bg-emerald-50 text-emerald-700" };
+  const platformIcons: Record<string, string> = { airbnb: "bg-red-50 text-red-700", vrbo: "bg-indigo-50 text-indigo-700", booking_com: "bg-brand-50 text-brand-700", direct: "bg-[#eef5f0] text-[#1a3a2a]" };
   const platformNames: Record<string, string> = { airbnb: "Airbnb", vrbo: "VRBO", booking_com: "Booking.com", direct: "Direct" };
 
   return (

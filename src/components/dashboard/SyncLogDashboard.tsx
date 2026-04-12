@@ -37,8 +37,8 @@ interface SyncLogDashboardProps {
 // ---------- Helpers ----------
 
 const EVENT_TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  booking_new: { label: "New Booking", color: "text-emerald-700", bg: "bg-emerald-50" },
-  ota_booking_created: { label: "New Booking", color: "text-emerald-700", bg: "bg-emerald-50" },
+  booking_new: { label: "New Booking", color: "text-[#1a3a2a]", bg: "bg-[#eef5f0]" },
+  ota_booking_created: { label: "New Booking", color: "text-[#1a3a2a]", bg: "bg-[#eef5f0]" },
   booking: { label: "Booking", color: "text-blue-700", bg: "bg-blue-50" },
   booking_modification: { label: "Modified", color: "text-amber-700", bg: "bg-amber-50" },
   ota_booking_modified: { label: "Modified", color: "text-amber-700", bg: "bg-amber-50" },
@@ -47,7 +47,7 @@ const EVENT_TYPE_LABELS: Record<string, { label: string; color: string; bg: stri
 };
 
 const ACTION_COLORS: Record<string, { dot: string; text: string }> = {
-  created: { dot: "bg-emerald-500", text: "text-emerald-600" },
+  created: { dot: "bg-[#1a3a2a]", text: "text-[#1a3a2a]" },
   modified: { dot: "bg-amber-500", text: "text-amber-600" },
   cancelled: { dot: "bg-red-500", text: "text-red-600" },
   skipped_self: { dot: "bg-neutral-400", text: "text-neutral-500" },
@@ -206,7 +206,7 @@ function LogEntryCard({
                 </span>
               )}
               {log.ack_sent ? (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-500">
+                <span className="flex items-center gap-1 text-[11px] text-[#3d6b52]">
                   <CheckCircle2 size={11} />
                   ACK
                 </span>
@@ -442,9 +442,9 @@ export default function SyncLogDashboard({
             <span className="font-mono font-bold text-neutral-800">{total}</span> total events
           </span>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="text-xs font-medium text-emerald-700">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#eef5f0] rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-[#1a3a2a]" />
+          <span className="text-xs font-medium text-[#1a3a2a]">
             <span className="font-mono font-bold">{stats.created}</span> created
           </span>
         </div>

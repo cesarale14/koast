@@ -408,7 +408,7 @@ export default function SettingsPage() {
       <SectionCard icon={CreditCard} title="Plan & Billing" description="Your current subscription and usage.">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700">
+            <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-[#eef5f0] text-[#1a3a2a]">
               Free
             </span>
           </div>
@@ -492,7 +492,7 @@ export default function SettingsPage() {
                 Last sync: <span className="font-medium text-neutral-700">{formatLastSync(lastSync.at)}</span>
               </span>
               <span className="text-neutral-500">
-                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                <span className="inline-flex items-center gap-1 text-[#1a3a2a] font-medium">
                   <Check size={12} strokeWidth={3} />
                   {lastSync.checked} checked
                 </span>
@@ -569,7 +569,7 @@ export default function SettingsPage() {
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       ch.status === "active"
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-[#eef5f0] text-[#1a3a2a]"
                         : "bg-neutral-100 text-neutral-500"
                     }`}
                   >
@@ -598,7 +598,7 @@ export default function SettingsPage() {
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       feed.is_active
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-[#eef5f0] text-[#1a3a2a]"
                         : "bg-neutral-100 text-neutral-500"
                     }`}
                   >

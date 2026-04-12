@@ -22,7 +22,7 @@ interface Props {
   propertyAvgRate: number;
 }
 
-const BG_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
+const BG_COLORS = ["bg-blue-500", "bg-[#1a3a2a]", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
 function letterBg(name: string | null): string {
   const s = name ?? "L";
   let hash = 0;
@@ -169,7 +169,7 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
               {/* Comp rows */}
               {sorted.map((comp) => {
                 const adrDiff = propertyAvgRate > 0 ? (comp.comp_adr ?? 0) - propertyAvgRate : 0;
-                const adrColor = adrDiff > 0 ? "text-red-500" : adrDiff < -5 ? "text-emerald-600" : "text-neutral-800";
+                const adrColor = adrDiff > 0 ? "text-red-500" : adrDiff < -5 ? "text-[#1a3a2a]" : "text-neutral-800";
                 return (
                   <tr key={comp.comp_listing_id} className="border-b border-neutral-50 hover:bg-neutral-50 transition-colors">
                     <td className="py-3 px-4">

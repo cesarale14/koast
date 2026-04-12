@@ -295,7 +295,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             <button
               onClick={backfill}
               disabled={backfilling}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
               {backfilling ? "Creating..." : "Auto-Create Tasks"}
@@ -328,7 +328,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       <button
                         onClick={() => testSMS(c.id, c.phone)}
                         disabled={sms?.status === "sending"}
-                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                        className="text-xs text-[#1a3a2a] hover:text-[#1a3a2a] font-medium disabled:opacity-50"
                       >
                         {sms?.status === "sending" ? "Sending..." : "Test SMS"}
                       </button>
@@ -336,7 +336,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                     </div>
                   </div>
                   {sms?.status === "success" && (
-                    <p className="mt-1 text-xs text-emerald-600 font-medium">✓ {sms.message}</p>
+                    <p className="mt-1 text-xs text-[#1a3a2a] font-medium">✓ {sms.message}</p>
                   )}
                   {sms?.status === "error" && (
                     <p className="mt-1 text-xs text-red-600 font-medium">✗ Failed: {sms.message}</p>
@@ -347,10 +347,10 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             {cleaners.length === 0 && <p className="text-sm text-gray-400">No cleaners added yet.</p>}
           </div>
           <div className="flex gap-2">
-            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
-            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none" />
+            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none" />
             <button onClick={addCleaner} disabled={addingCleaner || !newCleanerName || !newCleanerPhone}
-              className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              className="px-4 py-2 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors">
               {addingCleaner ? "..." : "Add"}
             </button>
           </div>
@@ -365,18 +365,18 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             onClick={() => setActiveTab(tab.key)}
             className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap ${
               activeTab === tab.key
-                ? "text-emerald-600"
+                ? "text-[#1a3a2a]"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {tab.label}
             {tab.count > 0 && (
               <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                activeTab === tab.key ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                activeTab === tab.key ? "bg-[#eef5f0] text-[#1a3a2a]" : "bg-gray-100 text-gray-500"
               }`}>{tab.count}</span>
             )}
             {activeTab === tab.key && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1a3a2a] rounded-t" />
             )}
           </button>
         ))}
@@ -496,7 +496,7 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
         <button
           onClick={onBackfill}
           disabled={backfilling}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${backfilling ? "animate-spin" : ""}`} />
           {backfilling ? "Creating..." : "Auto-Create"}
@@ -531,7 +531,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
 
   const statusBorder = task.status === "issue" ? "border-l-4 border-l-red-400"
     : task.status === "in_progress" ? "border-l-4 border-l-blue-400"
-    : task.status === "completed" ? "border-l-4 border-l-emerald-400"
+    : task.status === "completed" ? "border-l-4 border-l-[#3d6b52]"
     : "";
 
   const handleStatus = (e: React.MouseEvent, newStatus: string) => {
@@ -583,7 +583,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
             {/* Status badge */}
             {task.status === "completed" ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
                 <CheckCircle2 size={12} /> Completed
               </span>
             ) : task.status === "in_progress" ? (
@@ -598,7 +598,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
 
             {/* Cleaner pill */}
             {assignedCleaner ? (
-              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
                 {assignedCleaner.name}
               </span>
             ) : (
@@ -612,7 +612,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               <button
                 type="button"
                 onClick={handleNotify}
-                className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-[#1a3a2a] hover:bg-[#eef5f0] rounded-lg transition-colors"
                 title={`Notify ${assignedCleaner.name}`}
               >
                 <MessageSquare size={14} />
@@ -635,7 +635,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 type="button"
                 onClick={(e) => handleStatus(e, "completed")}
                 disabled={updating}
-                className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors disabled:opacity-50"
               >
                 {updating ? "..." : "Complete"}
               </button>
@@ -646,7 +646,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
         {/* Mobile bottom row: status + cleaner + actions (NOT inside the expand button) */}
         <div className="flex items-center gap-2 flex-wrap mt-3 sm:hidden">
           {task.status === "completed" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
               <CheckCircle2 size={11} /> Done
             </span>
           ) : task.status === "in_progress" ? (
@@ -660,7 +660,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           ) : null}
 
           {assignedCleaner ? (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{assignedCleaner.name}</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#1a3a2a]">{assignedCleaner.name}</span>
           ) : (
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
           )}
@@ -680,7 +680,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               type="button"
               onClick={(e) => handleStatus(e, "completed")}
               disabled={updating}
-              className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-50"
+              className="px-2.5 py-1 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg disabled:opacity-50"
             >
               {updating ? "..." : "Complete"}
             </button>
@@ -700,7 +700,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                   value={task.cleaner_id ?? ""}
                   onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none"
                 >
                   <option value="">Select cleaner...</option>
                   {cleaners.filter((c) => c.is_active).map((c) => (
@@ -710,7 +710,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 {assignedCleaner && task.status !== "completed" && (
                   <button
                     onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors flex-shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors flex-shrink-0"
                   >
                     <MessageSquare size={12} /> Notify
                   </button>
@@ -726,7 +726,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               <div className="space-y-1.5">
                 {task.checklist.map((item) => (
                   <div key={item.id} className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-emerald-500 border-emerald-500" : "border-gray-300"}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-[#1a3a2a] border-[#1a3a2a]" : "border-gray-300"}`}>
                       {item.done && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -779,7 +779,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               <button
                 onClick={() => onUpdateStatus(task.id, "completed")}
                 disabled={updating}
-                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#264d38] rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
               >
                 Mark Complete
               </button>

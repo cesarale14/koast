@@ -156,7 +156,7 @@ export default function NearbyListingsClient({
                       const n = (comp.comp_name ?? "").toLowerCase();
                       if (n.includes("sun") || n.includes("bay")) return "bg-gradient-to-br from-amber-100 to-orange-200";
                       if (n.includes("downtown") || n.includes("channel") || n.includes("river")) return "bg-gradient-to-br from-blue-100 to-cyan-200";
-                      if (n.includes("pool") || n.includes("beach") || n.includes("marina")) return "bg-gradient-to-br from-teal-100 to-emerald-200";
+                      if (n.includes("pool") || n.includes("beach") || n.includes("marina")) return "bg-gradient-to-br from-teal-100 to-[#a8d1b4]";
                       if (n.includes("hyde") || n.includes("palma") || n.includes("garden")) return "bg-gradient-to-br from-green-100 to-lime-200";
                       if (n.includes("loft") || n.includes("studio") || n.includes("modern")) return "bg-gradient-to-br from-violet-100 to-purple-200";
                       return "bg-gradient-to-br from-rose-100 to-pink-200";

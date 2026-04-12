@@ -301,8 +301,8 @@ export default function ReviewsPage() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={r.property_photo} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                             ) : (
-                              <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                                <span className="text-emerald-600 text-xs font-bold">{(r.property_name ?? "P").charAt(0)}</span>
+                              <div className="w-10 h-10 rounded-lg bg-[#eef5f0] flex items-center justify-center flex-shrink-0">
+                                <span className="text-[#1a3a2a] text-xs font-bold">{(r.property_name ?? "P").charAt(0)}</span>
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export default function ReviewsPage() {
                               <button
                                 onClick={() => generateReview(r.booking_id)}
                                 disabled={generating === r.booking_id}
-                                className="w-full py-3 text-sm font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                className="w-full py-3 text-sm font-semibold text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors disabled:opacity-50"
                               >
                                 {generating === r.booking_id ? "Writing your review..." : "✨ Generate AI Review"}
                               </button>

@@ -88,14 +88,14 @@ function timeAgo(dateStr: string): string {
 
 function demandColor(score: number | null): string {
   if (score == null) return "text-neutral-400";
-  if (score > 60) return "text-emerald-600";
+  if (score > 60) return "text-[#1a3a2a]";
   if (score > 30) return "text-amber-600";
   return "text-red-600";
 }
 
 function demandBg(score: number | null): string {
   if (score == null) return "bg-neutral-50";
-  if (score > 60) return "bg-emerald-50";
+  if (score > 60) return "bg-[#eef5f0]";
   if (score > 30) return "bg-amber-50";
   return "bg-red-50";
 }
@@ -539,9 +539,9 @@ export default function AnalyticsDashboard({
                 </p>
               </div>
               <div className="bg-success-light rounded-lg p-4">
-                <p className="text-xs text-emerald-500 font-medium">Potential Upside (Rest of {currentMonthName})</p>
-                <p className="text-3xl font-bold font-mono text-emerald-600 mt-1">${revenueStats.opportunityForward}</p>
-                <p className="text-xs text-emerald-400 mt-1">
+                <p className="text-xs text-[#3d6b52] font-medium">Potential Upside (Rest of {currentMonthName})</p>
+                <p className="text-3xl font-bold font-mono text-[#1a3a2a] mt-1">${revenueStats.opportunityForward}</p>
+                <p className="text-xs text-[#3d6b52] mt-1">
                   If all pricing suggestions are accepted
                 </p>
               </div>
@@ -565,7 +565,7 @@ export default function AnalyticsDashboard({
                   const applied = r.applied_rate ?? r.base_rate ?? 0;
                   const suggested = r.suggested_rate ?? applied;
                   const status =
-                    applied >= suggested ? "bg-emerald-200" :
+                    applied >= suggested ? "bg-[#d5e8da]" :
                     applied >= suggested * 0.9 ? "bg-amber-200" :
                     "bg-red-200";
                   return (
@@ -578,7 +578,7 @@ export default function AnalyticsDashboard({
                 })}
               </div>
               <div className="flex gap-3 mt-2 text-[10px] text-neutral-400">
-                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-emerald-200" /> At/above suggested</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-[#d5e8da]" /> At/above suggested</div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-amber-200" /> Slightly below</div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-red-200" /> Significantly below</div>
               </div>
@@ -680,10 +680,10 @@ export default function AnalyticsDashboard({
                         </a>
                       </td>
                       <td className="py-2.5 px-3 text-neutral-500">{c.comp_bedrooms ?? "—"}</td>
-                      <td className={`py-2.5 px-3 font-medium font-mono ${adrBetter ? "text-emerald-600" : "text-red-500"}`}>
+                      <td className={`py-2.5 px-3 font-medium font-mono ${adrBetter ? "text-[#1a3a2a]" : "text-red-500"}`}>
                         ${Math.round(c.comp_adr ?? 0)}
                       </td>
-                      <td className={`py-2.5 px-3 font-medium font-mono ${occBetter ? "text-emerald-600" : "text-red-500"}`}>
+                      <td className={`py-2.5 px-3 font-medium font-mono ${occBetter ? "text-[#1a3a2a]" : "text-red-500"}`}>
                         {Math.round(c.comp_occupancy ?? 0)}%
                       </td>
                       <td className="py-2.5 px-3 font-mono text-neutral-700">${Math.round(c.comp_revpar ?? 0)}</td>
@@ -702,7 +702,7 @@ export default function AnalyticsDashboard({
         <h2 className="text-sm font-bold text-neutral-900 mb-2">30-Day Demand Outlook</h2>
         <div className="flex gap-px rounded-lg overflow-hidden h-10">
           {demandCalendar.map((day) => {
-            const bg = day.demandLevel === "high" ? "bg-emerald-500" : day.demandLevel === "moderate" ? "bg-amber-400" : "bg-red-300";
+            const bg = day.demandLevel === "high" ? "bg-[#1a3a2a]" : day.demandLevel === "moderate" ? "bg-amber-400" : "bg-red-300";
             return (
               <div
                 key={day.date.toISOString()}
@@ -717,7 +717,7 @@ export default function AnalyticsDashboard({
           <span className="text-[10px] text-neutral-400">+30d</span>
         </div>
         <div className="flex gap-3 mt-1 text-[10px] text-neutral-400">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> High</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#1a3a2a]" /> High</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> Moderate</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-300" /> Low</span>
         </div>
@@ -779,7 +779,7 @@ function MarketHealthCard({ snapshot }: { snapshot: MarketSnapshot | null }) {
 
   if (!snapshot) return null;
 
-  const gradeColor = score.grade.startsWith("A") ? "text-emerald-600 bg-emerald-50"
+  const gradeColor = score.grade.startsWith("A") ? "text-[#1a3a2a] bg-[#eef5f0]"
     : score.grade.startsWith("B") ? "text-blue-600 bg-blue-50"
     : score.grade.startsWith("C") ? "text-amber-600 bg-amber-50"
     : "text-red-600 bg-red-50";
@@ -798,7 +798,7 @@ function MarketHealthCard({ snapshot }: { snapshot: MarketSnapshot | null }) {
               <div>
                 <p className="text-[10px] font-medium text-neutral-400 uppercase mb-1">Strengths</p>
                 <div className="flex flex-wrap gap-1">{score.strengths.map((s) => (
-                  <span key={s} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs rounded-full">{s}</span>
+                  <span key={s} className="px-2 py-0.5 bg-[#eef5f0] text-[#1a3a2a] text-xs rounded-full">{s}</span>
                 ))}</div>
               </div>
             )}
@@ -840,7 +840,7 @@ function DemandForecastSection({ propertyId }: { propertyId: string }) {
   if (loading) return <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6"><p className="text-sm text-neutral-400">Loading demand forecast...</p></div>;
   if (!data) return null;
 
-  const barColor = (score: number) => score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-emerald-400" : score >= 30 ? "bg-amber-400" : "bg-red-400";
+  const barColor = (score: number) => score >= 80 ? "bg-[#1a3a2a]" : score >= 60 ? "bg-[#3d6b52]" : score >= 30 ? "bg-amber-400" : "bg-red-400";
 
   return (
     <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 mb-6">
@@ -866,8 +866,8 @@ function DemandForecastSection({ propertyId }: { propertyId: string }) {
         <span>90 days</span>
       </div>
       <div className="flex gap-3 text-[10px] text-neutral-400 mb-4">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Very high</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" /> High</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#1a3a2a]" /> Very high</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#3d6b52]" /> High</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> Moderate</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400" /> Low</span>
       </div>
@@ -885,7 +885,7 @@ function DemandForecastSection({ propertyId }: { propertyId: string }) {
                   </p>
                   <p className="text-xs text-neutral-400">{p.factors.slice(0, 2).join(", ")}</p>
                 </div>
-                <span className="text-sm font-bold font-mono text-emerald-600">Score {p.avgScore}</span>
+                <span className="text-sm font-bold font-mono text-[#1a3a2a]">Score {p.avgScore}</span>
               </div>
             ))}
           </div>
@@ -931,7 +931,7 @@ function RevenueScenariosSection({ propertyId }: { propertyId: string }) {
         </div>
         <div className="text-right">
           <p className="text-xs text-neutral-400">Total potential</p>
-          <p className="text-2xl font-bold font-mono text-emerald-600">+${data.total_opportunity.toLocaleString()}<span className="text-sm font-normal text-neutral-400">/yr</span></p>
+          <p className="text-2xl font-bold font-mono text-[#1a3a2a]">+${data.total_opportunity.toLocaleString()}<span className="text-sm font-normal text-neutral-400">/yr</span></p>
         </div>
       </div>
 
@@ -947,9 +947,9 @@ function RevenueScenariosSection({ propertyId }: { propertyId: string }) {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-lg font-bold font-mono text-emerald-600">+${sc.estimated_impact.toLocaleString()}</p>
+                <p className="text-lg font-bold font-mono text-[#1a3a2a]">+${sc.estimated_impact.toLocaleString()}</p>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                  sc.confidence === "high" ? "bg-emerald-50 text-emerald-700"
+                  sc.confidence === "high" ? "bg-[#eef5f0] text-[#1a3a2a]"
                   : sc.confidence === "medium" ? "bg-amber-50 text-amber-700"
                   : "bg-neutral-100 text-neutral-500"
                 }`}>{sc.confidence} confidence</span>

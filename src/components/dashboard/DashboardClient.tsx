@@ -182,17 +182,17 @@ export default function DashboardClient() {
       <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
         {/* Quick Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-emerald-500">
-            <div className="flex items-center gap-2.5 mb-3"><Home size={22} className="text-emerald-500" /><p className="text-sm font-medium text-gray-500">Properties</p></div>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-[#1a3a2a]">
+            <div className="flex items-center gap-2.5 mb-3"><Home size={22} className="text-[#3d6b52]" /><p className="text-sm font-medium text-gray-500">Properties</p></div>
             <p className="text-3xl font-bold text-gray-900">{data.propertyCards.length}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-blue-500">
             <div className="flex items-center gap-2.5 mb-3"><TrendingUp size={22} className="text-blue-500" /><p className="text-sm font-medium text-gray-500">Occupancy</p></div>
             <p className="text-3xl font-bold text-gray-900">{data.performance.occupancyRate}%</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-emerald-500">
-            <div className="flex items-center gap-2.5 mb-3"><DollarSign size={22} className="text-emerald-500" /><p className="text-sm font-medium text-gray-500">Est. Revenue</p></div>
-            <p className="text-3xl font-bold text-emerald-600">{formatCurrency(data.performance.thisMonthRevenue)}</p>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-[#1a3a2a]">
+            <div className="flex items-center gap-2.5 mb-3"><DollarSign size={22} className="text-[#3d6b52]" /><p className="text-sm font-medium text-gray-500">Est. Revenue</p></div>
+            <p className="text-3xl font-bold text-[#1a3a2a]">{formatCurrency(data.performance.thisMonthRevenue)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-amber-500">
             <div className="flex items-center gap-2.5 mb-3"><Calendar size={22} className="text-amber-500" /><p className="text-sm font-medium text-gray-500">Upcoming Check-ins</p></div>
@@ -235,7 +235,7 @@ export default function DashboardClient() {
 // ====== Section 1: Property Status Strip ======
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  occupied: { label: "Occupied", color: "bg-emerald-500" },
+  occupied: { label: "Occupied", color: "bg-[#1a3a2a]" },
   vacant: { label: "Vacant", color: "bg-neutral-400" },
   turnover_today: { label: "Turnover today", color: "bg-amber-500" },
   checkin_today: { label: "Check-in today", color: "bg-blue-500" },
@@ -334,7 +334,7 @@ function PropertyCardComponent({
                 {formatShortDate(card.checkIn)} – {formatShortDate(card.checkOut)} ({card.nights}n)
               </span>
               {card.tonightRate != null && (
-                <span className="text-lg font-bold text-emerald-600">
+                <span className="text-lg font-bold text-[#1a3a2a]">
                   ${card.tonightRate}
                 </span>
               )}
@@ -372,7 +372,7 @@ function PropertyCardComponent({
                 <span className="text-xs text-neutral-600 flex items-center gap-1">
                   <span
                     className={`w-1.5 h-1.5 rounded-full inline-block ${
-                      card.cleanerConfirmed ? "bg-emerald-500" : "bg-neutral-300"
+                      card.cleanerConfirmed ? "bg-[#1a3a2a]" : "bg-neutral-300"
                     }`}
                   />
                   {card.cleanerName}
@@ -381,7 +381,7 @@ function PropertyCardComponent({
                 <span className="text-xs text-neutral-400">No cleaner assigned</span>
               )}
               {card.tonightRate != null && (
-                <span className="text-sm font-mono text-emerald-600 font-semibold">
+                <span className="text-sm font-mono text-[#1a3a2a] font-semibold">
                   ${card.tonightRate}
                 </span>
               )}
@@ -396,8 +396,8 @@ function PropertyCardComponent({
 // ====== Section 2: Smart Actions ======
 
 const actionTypeConfig: Record<string, { icon: typeof DollarSign; iconBg: string; iconColor: string }> = {
-  pricing: { icon: DollarSign, iconBg: "bg-emerald-100", iconColor: "text-emerald-600" },
-  revenue: { icon: TrendingUp, iconBg: "bg-emerald-100", iconColor: "text-emerald-600" },
+  pricing: { icon: DollarSign, iconBg: "bg-[#eef5f0]", iconColor: "text-[#1a3a2a]" },
+  revenue: { icon: TrendingUp, iconBg: "bg-[#eef5f0]", iconColor: "text-[#1a3a2a]" },
   cleaning: { icon: Sparkles, iconBg: "bg-amber-100", iconColor: "text-amber-600" },
   event: { icon: Calendar, iconBg: "bg-blue-100", iconColor: "text-blue-600" },
   review: { icon: Star, iconBg: "bg-yellow-100", iconColor: "text-yellow-600" },
@@ -431,8 +431,8 @@ function SmartActions({
   if (visible.length === 0 && conflicts.length === 0) {
     if (actions.length > 0) {
       return (
-        <div className="mb-6 p-4 rounded-xl bg-brand-50/50 text-center">
-          <p className="text-sm font-medium text-brand-600">You&apos;re all caught up!</p>
+        <div className="mb-6 p-4 rounded-xl bg-[#eef5f0] text-center">
+          <p className="text-sm font-medium text-[#3d6b52]">You&apos;re all caught up!</p>
         </div>
       );
     }
@@ -489,7 +489,7 @@ function SmartActions({
         {visible.slice(0, 5).map((a) => {
           const config = actionTypeConfig[a.type] ?? actionTypeConfig.event;
           const Icon = config.icon;
-          const borderColor = a.type === "cleaning" ? "border-l-amber-500" : a.type === "event" ? "border-l-blue-500" : "border-l-emerald-500";
+          const borderColor = a.type === "cleaning" ? "border-l-amber-500" : a.type === "event" ? "border-l-blue-500" : "border-l-[#1a3a2a]";
           return (
             <div
               key={a.id}
@@ -507,7 +507,7 @@ function SmartActions({
               {a.action && (
                 <Link
                   href={a.action.href}
-                  className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                  className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors"
                 >
                   {a.action.label}
                 </Link>
@@ -610,7 +610,7 @@ function PerformanceSection({
           {performance.revenueChangePct !== 0 && (
             <span
               className={`text-sm font-bold font-mono ${
-                performance.revenueChangePct > 0 ? "text-emerald-600" : "text-rose-500"
+                performance.revenueChangePct > 0 ? "text-[#1a3a2a]" : "text-rose-500"
               }`}
             >
               {performance.revenueChangePct > 0 ? "+" : ""}
@@ -640,7 +640,7 @@ function PerformanceSection({
 function MarketHealth({ market }: { market: CommandCenterData["market"] }) {
   const gradeColor =
     market.grade.startsWith("A")
-      ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+      ? "text-[#1a3a2a] bg-[#eef5f0] border-[#d5e8da]"
       : market.grade.startsWith("B")
         ? "text-blue-600 bg-blue-50 border-blue-200"
         : market.grade.startsWith("C")
@@ -730,7 +730,7 @@ function ComparisonBar({ yours, market }: { yours: number; market: number }) {
   return (
     <div className="relative h-4 bg-neutral-100 rounded-full overflow-hidden">
       <div
-        className="absolute inset-y-0 left-0 bg-brand-400 rounded-full transition-all"
+        className="absolute inset-y-0 left-0 bg-[#3d6b52] rounded-full transition-all"
         style={{ width: `${yourPct}%` }}
       />
       <div
@@ -753,7 +753,7 @@ function demandColor(score: number): string {
 
 const feedIcons: Record<string, { icon: typeof BookOpen; color: string }> = {
   booking: { icon: BookOpen, color: "text-blue-500" },
-  cleaning: { icon: CheckCircle2, color: "text-emerald-500" },
+  cleaning: { icon: CheckCircle2, color: "text-[#3d6b52]" },
   review: { icon: Star, color: "text-purple-500" },
   rate_change: { icon: TrendingUp, color: "text-amber-500" },
 };

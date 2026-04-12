@@ -164,7 +164,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   return (
                     <div key={label} className="flex items-center gap-3">
                       {isDone ? (
-                        <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-[#1a3a2a] flex items-center justify-center flex-shrink-0">
                           <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
@@ -174,7 +174,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                       ) : (
                         <div className="w-5 h-5 rounded-full border-2 border-gray-200 flex-shrink-0" />
                       )}
-                      <span className={`text-sm ${isDone ? "text-emerald-700" : isCurrent ? "text-[#222] font-medium" : "text-[#ccc]"}`}>
+                      <span className={`text-sm ${isDone ? "text-[#1a3a2a]" : isCurrent ? "text-[#222] font-medium" : "text-[#ccc]"}`}>
                         {label}
                       </span>
                     </div>
@@ -231,8 +231,8 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
             {/* ---- SUCCESS ---- */}
             {step === "success" && (
               <div className="text-center space-y-4">
-                <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-                  <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-14 h-14 rounded-full bg-[#eef5f0] flex items-center justify-center mx-auto">
+                  <svg className="w-7 h-7 text-[#1a3a2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
@@ -245,7 +245,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                 </p>
                 <button
                   onClick={() => { onConnected(); onClose(); }}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] transition-colors"
                 >
                   Done
                 </button>

@@ -653,9 +653,9 @@ export default function OnboardingPage() {
 
       {/* Success */}
       {icalResult && (
-        <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          <p className="text-sm text-emerald-700">
+        <div className="flex items-center gap-2 p-3 bg-[#eef5f0] border border-[#d5e8da] rounded-lg">
+          <Check className="w-4 h-4 text-[#1a3a2a] flex-shrink-0" />
+          <p className="text-sm text-[#1a3a2a]">
             Calendar connected! Found{" "}
             <span className="font-semibold">{icalResult.bookings}</span>{" "}
             booking{icalResult.bookings !== 1 ? "s" : ""} and{" "}

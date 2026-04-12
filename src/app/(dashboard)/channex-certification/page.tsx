@@ -155,7 +155,7 @@ export default function CertificationPage() {
             <div
               key={t.num}
               className={`bg-neutral-0 rounded-xl border p-4 transition-colors ${
-                passed ? "border-emerald-200 bg-emerald-50/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
+                passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
               }`}
             >
               <div className="flex items-start gap-3">
@@ -164,7 +164,7 @@ export default function CertificationPage() {
                   {isRunning ? (
                     <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
                   ) : passed ? (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
@@ -261,13 +261,13 @@ export default function CertificationPage() {
         const isResetting = running === -1;
         const passed = r.success && !r.error;
         return (
-          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-emerald-200 bg-emerald-50/30" : "border-[var(--border)]"}`}>
+          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : "border-[var(--border)]"}`}>
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {isResetting ? (
                   <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
                 ) : passed ? (
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
@@ -377,7 +377,7 @@ function WebhookLogViewer() {
             Test 11: Booking Webhook Events
           </h2>
           {hasAll3 && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-[#eef5f0] text-[#1a3a2a] rounded-full">
               ALL 3 RECEIVED
             </span>
           )}
@@ -427,7 +427,7 @@ function WebhookLogViewer() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[10px] text-neutral-400">{timeStr}</span>
-                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-emerald-600" : "text-red-500"}`}>
+                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-[#1a3a2a]" : "text-red-500"}`}>
                       {log.ack_sent ? "ACK sent" : "ACK pending"}
                     </span>
                     <code className="text-[10px] text-neutral-400 font-mono">{log.booking_id?.substring(0, 8)}...</code>

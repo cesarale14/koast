@@ -9,9 +9,9 @@ import PropertyAvatar from "@/components/ui/PropertyAvatar";
 const platformColors: Record<string, string> = {
   airbnb: "bg-red-50 text-red-700",
   vrbo: "bg-indigo-50 text-indigo-700",
-  booking_com: "bg-brand-50 text-brand-700",
-  booking: "bg-brand-50 text-brand-700",
-  direct: "bg-emerald-50 text-emerald-700",
+  booking_com: "bg-[#003580]/10 text-[#003580]",
+  booking: "bg-[#003580]/10 text-[#003580]",
+  direct: "bg-[#eef5f0] text-[#1a3a2a]",
 };
 
 const statusColors: Record<string, string> = {

@@ -42,7 +42,7 @@ export default function Logo({ variant = "icon", size, className = "" }: LogoPro
     <div className={`flex items-center gap-1.5 ${className}`}>
       <BeaconIcon size={iconSize} />
       <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: iconSize * 0.5 }}>
-        <span className="text-emerald-500">Stay</span>
+        <span className="text-[#3d6b52]">Stay</span>
         <span className="text-neutral-900">Command</span>
       </span>
     </div>

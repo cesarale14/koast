@@ -518,9 +518,9 @@ function RightSettingsPanel({
                   </div>
                 )}
                 {dateRate.suggested_rate != null && (
-                  <div className="bg-emerald-50 rounded px-2 py-1.5">
-                    <div className="text-[9px] text-emerald-600">Suggested</div>
-                    <div className="font-mono font-semibold text-emerald-700">${dateRate.suggested_rate}</div>
+                  <div className="bg-[#eef5f0] rounded px-2 py-1.5">
+                    <div className="text-[9px] text-[#3d6b52]">Suggested</div>
+                    <div className="font-mono font-semibold text-[#1a3a2a]">${dateRate.suggested_rate}</div>
                   </div>
                 )}
               </div>
@@ -532,7 +532,7 @@ function RightSettingsPanel({
                 type="number"
                 value={rateValue}
                 onChange={(e) => setRateValue(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                className="w-full px-2.5 py-1.5 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 focus:border-[#3d6b52]"
                 placeholder="0" min="0" step="1"
               />
             </div>
@@ -543,7 +543,7 @@ function RightSettingsPanel({
                 type="number"
                 value={minStay}
                 onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 focus:border-[#3d6b52]"
                 min="1"
               />
             </div>
@@ -551,7 +551,7 @@ function RightSettingsPanel({
             <label className="flex items-center justify-between cursor-pointer">
               <span className="text-sm text-[#333]">Available</span>
               <button type="button" role="switch" aria-checked={available} onClick={() => setAvailable(!available)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${available ? "bg-emerald-500" : "bg-gray-300"}`}>
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${available ? "bg-[#eef5f0]0" : "bg-gray-300"}`}>
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${available ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
               </button>
             </label>
@@ -559,7 +559,7 @@ function RightSettingsPanel({
 
           <div className="px-4 py-3 border-t border-gray-100">
             <button onClick={handleSave} disabled={saving}
-              className="w-full px-3 py-1.5 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+              className="w-full px-3 py-1.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] disabled:opacity-50 transition-colors">
               {saving ? "Saving..." : "Save"}
             </button>
           </div>

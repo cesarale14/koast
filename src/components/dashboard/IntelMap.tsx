@@ -141,7 +141,7 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
                         <p className="pt-1 border-t border-neutral-100 font-medium">
                           {c.adr > propertyStats.avgRate
                             ? <span className="text-amber-600">They charge ${Math.round(c.adr - propertyStats.avgRate)} more</span>
-                            : <span className="text-emerald-600">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
+                            : <span className="text-[#1a3a2a]">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
                         </p>
                       )}
                     </div>

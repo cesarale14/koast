@@ -89,8 +89,8 @@ export default function FrontdeskPage() {
       <div className="bg-neutral-0 border border-[var(--border)] rounded-xl p-8 text-center">
         {submitted ? (
           <div className="py-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle size={24} className="text-emerald-500" />
+            <div className="w-12 h-12 rounded-full bg-[#eef5f0] flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={24} className="text-[#3d6b52]" />
             </div>
             <h3 className="text-lg font-bold text-neutral-800 mb-2">You&apos;re on the list!</h3>
             <p className="text-sm text-neutral-500">We&apos;ll notify you as soon as Frontdesk is ready to launch.</p>
