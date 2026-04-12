@@ -125,35 +125,62 @@ export async function POST(request: NextRequest) {
       }, { onConflict: "id" });
     }
 
-    // Ensure rate plan exists
-    const { data: ratePlans } = await supabase
-      .from("channex_rate_plans")
-      .select("id, room_type_id")
+    // Always create a DEDICATED rate plan for the BDC channel.
+    // Reusing an existing rate plan (e.g. Airbnb's) would cause rate bleed
+    // between channels — pushing a rate update for Booking.com would also
+    // overwrite the Airbnb price.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingBdcLink } = await (supabase.from("property_channels") as any)
+      .select("settings")
       .eq("property_id", propertyId)
-      .limit(1);
+      .eq("channel_code", "BDC")
+      .maybeSingle();
 
-    let ratePlanId = ratePlans?.[0]?.id;
-    if (!ratePlanId) {
-      const rps = await channex.getRatePlans(channexPropertyId);
-      if (rps.length > 0) {
-        ratePlanId = rps[0].id;
-      } else {
-        const rp = await channex.createRatePlan({
-          property_id: channexPropertyId,
-          room_type_id: roomTypeId,
-          title: "Best Available Rate",
-          currency: "USD",
-          sell_mode: "per_room",
-          rate_mode: "manual",
-        });
-        ratePlanId = rp.id;
+    let bdcRatePlanId: string | undefined = existingBdcLink?.settings?.rate_plan_id;
+
+    // Verify the stored rate plan still exists in Channex before reusing it
+    if (bdcRatePlanId) {
+      try {
+        const rps = await channex.getRatePlans(channexPropertyId);
+        if (!rps.find((rp) => rp.id === bdcRatePlanId)) {
+          bdcRatePlanId = undefined;
+        }
+      } catch {
+        bdcRatePlanId = undefined;
       }
+    }
+
+    if (!bdcRatePlanId) {
+      const rp = await channex.createRatePlan({
+        property_id: channexPropertyId,
+        room_type_id: roomTypeId,
+        title: `${property.name ?? "Pool House"} BDC Rate`,
+        currency: "USD",
+        sell_mode: "per_room",
+        rate_mode: "manual",
+        options: [{
+          occupancy: 8,
+          is_primary: true,
+          inherit_rate: false,
+          inherit_min_stay_arrival: false,
+          inherit_min_stay_through: false,
+          inherit_max_stay: false,
+          inherit_closed_to_arrival: false,
+          inherit_closed_to_departure: false,
+          inherit_stop_sell: false,
+          inherit_availability_offset: false,
+          inherit_max_availability: false,
+        }],
+      });
+      bdcRatePlanId = rp.id;
+      console.log(`[connect-bdc] Created dedicated BDC rate plan ${bdcRatePlanId}`);
+
       const now = new Date().toISOString();
       await supabase.from("channex_rate_plans").upsert({
-        id: ratePlanId,
+        id: bdcRatePlanId,
         property_id: propertyId,
         room_type_id: roomTypeId,
-        title: "Best Available Rate",
+        title: `${property.name ?? "BDC"} BDC Rate`,
         sell_mode: "per_room",
         currency: "USD",
         rate_mode: "manual",
@@ -162,34 +189,34 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Find or create Booking.com channel
+    //    Match on (a) channels already mapped to this property OR (b) same hotel_id.
+    //    Never reuse an arbitrary BDC channel from another property — that was the
+    //    original bug that linked Pool House to Villa Jamaica's BDC channel.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allChannels = await channex.getAllChannels();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bdcChannel = (allChannels.data ?? []).find((ch: any) =>
-      ch.attributes?.channel === "BookingCom"
-    );
+    const bdcChannel = (allChannels.data ?? []).find((ch: any) => {
+      if (ch.attributes?.channel !== "BookingCom") return false;
+      const chProps: string[] = ch.attributes?.properties ?? [];
+      const chHotelId: string | undefined = ch.attributes?.settings?.hotel_id;
+      return chProps.includes(channexPropertyId) || chHotelId === hotelId;
+    });
 
     let channelId: string;
 
     if (bdcChannel) {
       channelId = bdcChannel.id;
-      const existingProps: string[] = bdcChannel.attributes?.properties ?? [];
-      if (!existingProps.includes(channexPropertyId)) {
-        await channex.updateChannel(channelId, {
-          properties: [...existingProps, channexPropertyId],
-          settings: { hotel_id: hotelId },
-        });
-        console.log(`[connect-bdc] Added property ${channexPropertyId} to existing BDC channel ${channelId}`);
-      } else {
-        await channex.updateChannel(channelId, {
-          settings: { hotel_id: hotelId },
-        });
-        console.log(`[connect-bdc] Updated hotel_id on existing BDC channel ${channelId}`);
-      }
+      // Replace properties with ONLY this one — BDC channels should be
+      // 1:1 with properties (one hotel_id = one property).
+      await channex.updateChannel(channelId, {
+        properties: [channexPropertyId],
+        settings: { hotel_id: hotelId },
+      });
+      console.log(`[connect-bdc] Reconfigured existing BDC channel ${channelId} → ${channexPropertyId} (hotel ${hotelId})`);
     } else {
       const channelRes = await channex.createChannel({
         channel: "BookingCom",
-        title: "Booking.com",
+        title: `${property.name ?? "Property"} - Booking.com`,
         properties: [channexPropertyId],
         settings: { hotel_id: hotelId },
       });
@@ -197,7 +224,27 @@ export async function POST(request: NextRequest) {
       console.log(`[connect-bdc] Created new BDC channel ${channelId}`);
     }
 
-    // 5. Save to property_channels (status pending — needs authorization test)
+    // 5. Link the BDC-specific rate plan to the Channex channel so Channex
+    //    syncs rates/availability from that rate plan (not a shared Airbnb one).
+    //    The rate_plan_code/room_type_code values come back from Channex after
+    //    the first successful sync and Channex auto-updates them.
+    try {
+      await channex.updateChannel(channelId, {
+        rate_plans: [{
+          settings: {
+            readonly: false,
+            occupancy: 8,
+            primary_occ: true,
+          },
+          rate_plan_id: bdcRatePlanId,
+        }],
+      });
+    } catch (rpErr) {
+      console.warn(`[connect-bdc] Could not link rate plan to channel immediately (will retry on activation):`, rpErr instanceof Error ? rpErr.message : rpErr);
+    }
+
+    // 6. Save to property_channels — include the dedicated rate_plan_id
+    //    in settings so pricing/push can target only this channel's plan.
     const now = new Date().toISOString();
     await supabase.from("property_channels").upsert(
       {
@@ -206,7 +253,7 @@ export async function POST(request: NextRequest) {
         channel_code: "BDC",
         channel_name: property.name ?? "Booking.com",
         status: "pending_authorization",
-        settings: { hotel_id: hotelId },
+        settings: { hotel_id: hotelId, rate_plan_id: bdcRatePlanId },
         last_sync_at: now,
         updated_at: now,
       },

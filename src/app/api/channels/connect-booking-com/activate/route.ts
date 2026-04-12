@@ -37,7 +37,18 @@ export async function POST(request: NextRequest) {
 
     const channexPropertyId = property.channex_property_id;
 
-    // 1. Push initial availability (365 days open, then block booked dates)
+    // Look up the BDC-specific rate plan for this property so we can push
+    // rates + restrictions (not just availability) to the channel. Without
+    // rates, Booking.com displays the listing as "closed / not bookable".
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: pc } = await (supabase.from("property_channels") as any)
+      .select("settings")
+      .eq("property_id", propertyId)
+      .eq("channex_channel_id", channelId)
+      .maybeSingle();
+    const bdcRatePlanId: string | undefined = pc?.settings?.rate_plan_id;
+
+    // 1. Push initial availability + rates for 365 days
     const roomTypes = await channex.getRoomTypes(channexPropertyId);
     if (roomTypes.length > 0) {
       const startStr = new Date().toISOString().split("T")[0];
@@ -45,40 +56,90 @@ export async function POST(request: NextRequest) {
       endAvail.setDate(endAvail.getDate() + 365);
       const endStr = endAvail.toISOString().split("T")[0];
 
-      const availValues = roomTypes.map((rt) => ({
-        property_id: channexPropertyId,
-        room_type_id: rt.id,
-        date_from: startStr,
-        date_to: endStr,
-        availability: 1,
-      }));
-      await channex.updateAvailability(availValues);
-      console.log(`[connect-bdc/activate] Pushed availability=1 for ${startStr} to ${endStr}`);
+      // Load Moora's rates for the next 365 days
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: moorRates } = await (supabase.from("calendar_rates") as any)
+        .select("date, applied_rate, base_rate, min_stay, is_available")
+        .eq("property_id", propertyId)
+        .gte("date", startStr)
+        .lte("date", endStr);
 
-      // Block booked dates
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rateByDate = new Map<string, any>();
+      for (const r of (moorRates ?? [])) rateByDate.set(r.date, r);
+
+      // Build booked-date set so we can mark stop_sell=true
       const { data: bookings } = await supabase
         .from("bookings")
         .select("check_in, check_out")
         .eq("property_id", propertyId)
         .in("status", ["confirmed", "pending"])
         .gte("check_out", startStr);
-
-      if (bookings && bookings.length > 0) {
-        const blockValues = [];
-        for (const b of bookings) {
-          for (const rt of roomTypes) {
-            blockValues.push({
-              property_id: channexPropertyId,
-              room_type_id: rt.id,
-              date_from: b.check_in,
-              date_to: b.check_out,
-              availability: 0,
-            });
-          }
+      const blockedDates = new Set<string>();
+      for (const b of (bookings ?? []) as Array<{ check_in: string; check_out: string }>) {
+        const s = new Date(b.check_in + "T00:00:00Z");
+        const e = new Date(b.check_out + "T00:00:00Z");
+        for (let d = new Date(s); d < e; d.setUTCDate(d.getUTCDate() + 1)) {
+          blockedDates.add(d.toISOString().split("T")[0]);
         }
-        if (blockValues.length > 0) {
-          await channex.updateAvailability(blockValues);
-          console.log(`[connect-bdc/activate] Blocked ${blockValues.length} booking date ranges`);
+      }
+
+      // Push restrictions (rate + availability + min_stay + stop_sell) to
+      // the BDC-specific rate plan. If there's no rate plan (legacy), fall
+      // back to pushing only availability to all room types.
+      if (bdcRatePlanId) {
+        const restrictionValues: Array<{
+          property_id: string;
+          rate_plan_id: string;
+          date_from: string;
+          date_to: string;
+          rate?: number;
+          min_stay_arrival: number;
+          stop_sell: boolean;
+          availability?: number;
+        }> = [];
+        for (let d = new Date(startStr + "T00:00:00Z"); d <= new Date(endStr + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+          const ds = d.toISOString().split("T")[0];
+          const r = rateByDate.get(ds);
+          const isBlocked = blockedDates.has(ds);
+          restrictionValues.push({
+            property_id: channexPropertyId,
+            rate_plan_id: bdcRatePlanId,
+            date_from: ds,
+            date_to: ds,
+            rate: r?.applied_rate ? Math.round(Number(r.applied_rate) * 100) : undefined,
+            min_stay_arrival: r?.min_stay ?? 1,
+            stop_sell: isBlocked || r?.is_available === false,
+            availability: isBlocked ? 0 : 1,
+          });
+        }
+        for (let i = 0; i < restrictionValues.length; i += 200) {
+          await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+        }
+        console.log(`[connect-bdc/activate] Pushed ${restrictionValues.length} restrictions to BDC rate plan ${bdcRatePlanId}`);
+      } else {
+        // Legacy path — push availability only
+        const availValues = roomTypes.map((rt) => ({
+          property_id: channexPropertyId,
+          room_type_id: rt.id,
+          date_from: startStr,
+          date_to: endStr,
+          availability: 1,
+        }));
+        await channex.updateAvailability(availValues);
+        console.log(`[connect-bdc/activate] Pushed availability=1 for ${startStr} to ${endStr}`);
+
+        if (blockedDates.size > 0) {
+          const blockValues: Array<{ property_id: string; room_type_id: string; date_from: string; date_to: string; availability: number }> = [];
+          blockedDates.forEach((ds) => {
+            for (const rt of roomTypes) {
+              blockValues.push({ property_id: channexPropertyId, room_type_id: rt.id, date_from: ds, date_to: ds, availability: 0 });
+            }
+          });
+          for (let i = 0; i < blockValues.length; i += 200) {
+            await channex.updateAvailability(blockValues.slice(i, i + 200));
+          }
+          console.log(`[connect-bdc/activate] Blocked ${blockValues.length} date slots`);
         }
       }
     }

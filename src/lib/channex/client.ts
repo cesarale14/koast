@@ -604,6 +604,9 @@ class ChannexClient {
     properties?: string[];
     settings?: Record<string, unknown>;
     is_active?: boolean;
+    title?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rate_plans?: any[];
   }): Promise<AnyResponse> {
     const res = await this.request(`/channels/${channelId}`, {
       method: "PUT",

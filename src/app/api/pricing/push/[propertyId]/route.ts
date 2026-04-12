@@ -58,20 +58,53 @@ export async function POST(
 
     const channex = createChannexClient();
 
-    // Get rate plans for this property
-    const ratePlans = await channex.getRatePlans(property.channex_property_id);
-    if (ratePlans.length === 0) {
-      return NextResponse.json(
-        { error: "No rate plans found in Channex for this property" },
-        { status: 400 }
-      );
+    // Resolve which rate plans to push to.
+    //
+    // Preferred: use per-channel rate plans registered in property_channels
+    // so each channel gets its own rate (different Airbnb vs Booking.com
+    // prices are supported and channels don't overwrite each other).
+    //
+    // Fallback: if the user hasn't connected any channels through the
+    // dedicated flow yet, fall back to pushing to every rate plan on the
+    // Channex property (legacy behavior for properties that were imported
+    // directly from Channex without going through connect-booking-com).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: channelLinks } = await (supabase.from("property_channels") as any)
+      .select("channel_code, channel_name, settings, status")
+      .eq("property_id", propertyId)
+      .eq("status", "active");
+
+    type RatePlanTarget = { id: string; channel: string };
+    const targets: RatePlanTarget[] = [];
+
+    for (const link of (channelLinks ?? []) as Array<{
+      channel_code: string;
+      channel_name: string;
+      settings: { rate_plan_id?: string } | null;
+    }>) {
+      const rpId = link.settings?.rate_plan_id;
+      if (rpId) targets.push({ id: rpId, channel: link.channel_code });
     }
 
-    // Push rates for ALL rate plans
+    if (targets.length === 0) {
+      // Legacy fallback — push to every rate plan on the Channex property
+      const ratePlans = await channex.getRatePlans(property.channex_property_id);
+      if (ratePlans.length === 0) {
+        return NextResponse.json(
+          { error: "No rate plans found in Channex for this property" },
+          { status: 400 }
+        );
+      }
+      for (const rp of ratePlans) targets.push({ id: rp.id, channel: "legacy" });
+    }
+
+    // Push rates to each targeted rate plan. Currently all channels get the
+    // same applied_rate — per-channel pricing multipliers would go here
+    // (e.g. BDC gets 1.15x to cover commission) if the user configures them.
     const restrictionValues = rates.flatMap((r) =>
-      ratePlans.map((rp) => ({
+      targets.map((t) => ({
         property_id: property.channex_property_id,
-        rate_plan_id: rp.id,
+        rate_plan_id: t.id,
         date_from: r.date,
         date_to: r.date,
         rate: Math.round(r.applied_rate * 100), // Channex uses cents
@@ -80,7 +113,6 @@ export async function POST(
       }))
     );
 
-    // Push in batches of 200
     let pushed = 0;
     for (let i = 0; i < restrictionValues.length; i += 200) {
       const batch = restrictionValues.slice(i, i + 200);
@@ -91,7 +123,8 @@ export async function POST(
     return NextResponse.json({
       pushed,
       channex_property_id: property.channex_property_id,
-      ratePlans: ratePlans.length,
+      ratePlans: targets.length,
+      targets: targets.map((t) => t.channel),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
