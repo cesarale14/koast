@@ -7,9 +7,6 @@ import type { RateData } from "./DateCell";
 const TOTAL_MONTHS = 24;
 const GAP = 3;
 
-const platformColors: Record<string, string> = {
-  airbnb: "#333333", vrbo: "#3B5998", booking_com: "#003580", booking: "#003580", direct: "#10B981",
-};
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
 };
@@ -94,22 +91,33 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
     const nights = getNights(booking.check_in, booking.check_out);
     const isPast = booking.check_out <= todayStr;
 
+    // The bar covers "nights" — i.e. every date from check_in (inclusive)
+    // through check_out minus one (inclusive). A 3-night stay 4/12→4/15
+    // highlights 4/12, 4/13, 4/14. Compute the last-night date in YYYY-MM-DD
+    // form so we can clip cleanly against the current month's edges.
+    const coDate = new Date(booking.check_out + "T00:00:00Z");
+    coDate.setUTCDate(coDate.getUTCDate() - 1);
+    const lastNight = `${coDate.getUTCFullYear()}-${pad2(coDate.getUTCMonth() + 1)}-${pad2(coDate.getUTCDate())}`;
+
+    // Skip entirely if the last night is before this month starts.
+    if (lastNight < monthStart) continue;
+
     // Bar start in this month
-    let barStartDay: number, isStart: boolean, capLeft: boolean;
+    let barStartDay: number, isStart: boolean;
     if (booking.check_in < monthStart) {
-      barStartDay = 1; isStart = false; capLeft = true; // month-break cap
+      barStartDay = 1; isStart = false; // continues from previous month
     } else {
       barStartDay = parseInt(booking.check_in.slice(8, 10));
-      isStart = true; capLeft = true;
+      isStart = true;
     }
 
-    // Bar end in this month
-    let barEndDay: number, isEnd: boolean, capRight: boolean;
-    if (booking.check_out > monthEnd) {
-      barEndDay = totalDays; isEnd = false; capRight = true; // month-break cap
+    // Bar end in this month — the LAST NIGHT, not the checkout day
+    let barEndDay: number, isEnd: boolean;
+    if (lastNight > monthEnd) {
+      barEndDay = totalDays; isEnd = false; // continues into next month
     } else {
-      barEndDay = parseInt(booking.check_out.slice(8, 10));
-      isEnd = true; capRight = true;
+      barEndDay = parseInt(lastNight.slice(8, 10));
+      isEnd = true;
     }
 
     // Grid positions
@@ -123,12 +131,17 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
     for (let row = sRow; row <= eRow; row++) {
       const sc = row === sRow ? sCol : 0;
       const ec = row === eRow ? eCol : 6;
+      // capLeft: round the left edge of the bar only at the true start
+      //   (check-in within this month on the first row).
+      // capRight: round the right edge only at the true end (last night
+      //   within this month on the last row). Continuation rows across
+      //   week boundaries get flat edges so the bar reads as "continues".
       segments.push({
         booking, startCol: sc, endCol: ec, row,
         isStart: row === sRow && isStart,
         isEnd: row === eRow && isEnd,
-        capLeft: row === sRow ? capLeft : false,
-        capRight: row === eRow ? capRight : false,
+        capLeft: row === sRow && isStart,
+        capRight: row === eRow && isEnd,
         nights, isPast,
         lane: 0,
         conflict: conflictBookingIds.has(booking.id),
@@ -471,43 +484,47 @@ export default function MonthlyView({
                   );
                 })}
 
-                {/* Booking bars — positioned by grid row/col using calc with --col */}
+                {/* Booking bars — full-width across the nights they cover,
+                    stacked into lanes within a row when bookings overlap. */}
                 {segments.map((seg, si) => {
                   const span = seg.endCol - seg.startCol + 1;
-                  const startFrac = seg.isStart ? 0.3 : 0;
-                  const endFrac = seg.isEnd ? 0.65 : 0;
 
-                  const left = startFrac > 0
-                    ? `calc(var(--col) * ${seg.startCol} + var(--cell) * ${startFrac})`
-                    : `calc(var(--col) * ${seg.startCol})`;
-                  const subs = [`${GAP}px`];
-                  if (startFrac > 0) subs.push(`var(--cell) * ${startFrac}`);
-                  if (endFrac > 0) subs.push(`var(--cell) * ${endFrac}`);
-                  const width = `calc(var(--col) * ${span} - ${subs.join(" - ")})`;
+                  // Full-cell span: left edge of first night cell → right
+                  // edge of last night cell. No fractional insets.
+                  const left = `calc(var(--col) * ${seg.startCol})`;
+                  const width = `calc(var(--col) * ${span} - ${GAP}px)`;
 
-                  // Position bar at bottom of its row; stack higher lanes
-                  // upward so conflicting bookings are visible side-by-side
-                  // stacked, not overdrawing each other.
-                  const BAR_H = 30;
-                  const LANE_GAP = 2;
+                  // Lane stacking. BAR_H must match the rendered bar height
+                  // (32px desktop) and include LANE_GAP so stacked bars are
+                  // visibly separated.
+                  const BAR_H = 32;
+                  const LANE_GAP = 4;
                   const laneOffset = seg.lane * (BAR_H + LANE_GAP);
                   const rowUnit = cellH + GAP;
-                  const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 3 - laneOffset}px` : "0px";
+                  const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 4 - laneOffset}px` : "0px";
 
-                  const color = platformColors[seg.booking.platform] ?? "#333333";
+                  // Color: dark neutral by default; Booking.com uses the
+                  // brand dark blue so the two platforms are distinguishable
+                  // at a glance.
+                  const isBooking = seg.booking.platform === "booking_com" || seg.booking.platform === "booking";
+                  const color = isBooking ? "#003580" : "#1f2937"; // gray-800
                   const logo = platformLogos[seg.booking.platform] ?? null;
-                  const firstName = seg.booking.guest_name?.split(" ")[0] ?? "Guest";
-                  const effectiveSpan = span - startFrac - endFrac;
-                  const showText = effectiveSpan >= 1.0;
 
-                  const rL = seg.capLeft ? "14px" : "0";
-                  const rR = seg.capRight ? "14px" : "0";
-                  const shadow = seg.isStart
-                    ? "-3px 1px 3px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)"
-                    : "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+                  // Label rules: guest name when we have one, otherwise
+                  // "Booked". No night count. Show only if there's enough
+                  // horizontal room (>1 full cell) — the logo fills short
+                  // bars on its own.
+                  const rawName = seg.booking.guest_name?.trim() ?? "";
+                  const hasRealName = rawName.length > 0 && rawName !== "Airbnb Guest" && rawName !== "Guest" && rawName !== "Reserved";
+                  const label = hasRealName ? rawName : "Booked";
+                  const showText = span >= 2;
 
-                  // Red diagonal stripe overlay signals the booking overlaps
-                  // another one somewhere on the calendar.
+                  const rL = seg.capLeft ? "10px" : "0";
+                  const rR = seg.capRight ? "10px" : "0";
+                  const shadow = "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+
+                  // Red diagonal stripe overlay + red border when the bar is
+                  // part of a conflict somewhere in the loaded bookings.
                   const conflictOverlay = seg.conflict
                     ? "repeating-linear-gradient(45deg, rgba(239,68,68,0.55) 0 6px, rgba(239,68,68,0) 6px 12px)"
                     : undefined;
@@ -518,24 +535,23 @@ export default function MonthlyView({
                   return (
                     <div
                       key={`${seg.booking.id}-${seg.row}-${si}`}
-                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
+                      className="absolute flex items-center gap-1.5 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
                       style={{
                         left, width, top, transform: "translateY(-100%)",
                         backgroundColor: color,
                         backgroundImage: conflictOverlay,
                         borderRadius: `${rL} ${rR} ${rR} ${rL}`,
-                        zIndex: seg.conflict ? 3 : seg.isStart ? 2 : 1,
+                        zIndex: seg.conflict ? 3 : seg.lane + 1,
                         paddingLeft: seg.capLeft ? "3px" : "4px",
                         paddingRight: seg.capRight ? "10px" : "4px",
                         opacity: seg.isPast ? 0.7 : 1,
                         border,
-                        borderTop: seg.conflict ? undefined : "1px solid rgba(255,255,255,0.1)",
                         boxShadow: shadow,
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = shadow; }}
                       onClick={(e) => { e.stopPropagation(); onBookingClick(seg.booking); }}
-                      title={`${seg.booking.guest_name} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
+                      title={`${label} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
                     >
                       {seg.capLeft && logo && (
                         <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
@@ -546,8 +562,7 @@ export default function MonthlyView({
                       )}
                       {showText && (
                         <span className="truncate text-[11px] md:text-[12px] font-medium">
-                          {seg.booking.guest_name ?? firstName}
-                          {effectiveSpan >= 2 ? ` · ${seg.nights}n` : ""}
+                          {label}
                         </span>
                       )}
                     </div>
