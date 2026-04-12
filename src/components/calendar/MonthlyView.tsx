@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 3;
+const GAP = 2;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -429,10 +429,10 @@ export default function MonthlyView({
   return (
     <div className="bg-white flex flex-col flex-1 min-h-0">
       {/* Month pills — desktop only */}
-      <div className="hidden md:flex gap-1.5 px-3 py-2 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
+      <div className="hidden md:flex gap-1 px-3 py-1 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button key={m.key} onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
-            className={`px-2 py-0.5 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors flex-shrink-0 ${
+            className={`px-1.5 py-0.5 text-[10px] font-medium rounded whitespace-nowrap transition-colors flex-shrink-0 ${
               activeMonth === m.key ? "bg-[#222] text-white" : "text-[#999] hover:text-[#555] hover:bg-[#f5f5f5]"
             }`}>{m.abbr}</button>
         ))}
@@ -440,9 +440,9 @@ export default function MonthlyView({
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#e8e8e8]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[2px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l, i) => (
-            <div key={`${l}-${i}`} className="py-1 md:py-1.5 text-center text-[11px] font-medium uppercase tracking-widest text-[#999]">
+            <div key={`${l}-${i}`} className="py-0.5 md:py-1 text-center text-[10px] font-medium uppercase tracking-widest text-[#999]">
               <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
               <span className="hidden md:inline">{l}</span>
             </div>
@@ -454,8 +454,8 @@ export default function MonthlyView({
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              <div className="sticky top-[27px] md:top-[29px] z-[9] bg-white px-1 pt-6 md:pt-10 pb-1.5 md:pb-2">
-                <span className="text-lg md:text-xl font-bold text-[#222]">{m.label}</span>
+              <div className="sticky top-[23px] md:top-[25px] z-[9] bg-white px-1 pt-3 md:pt-5 pb-1 md:pb-1.5">
+                <span className="text-sm md:text-base font-bold text-[#222]">{m.label}</span>
               </div>
 
               {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
@@ -473,7 +473,7 @@ export default function MonthlyView({
                     <div
                       key={day.date}
                       data-cell
-                      className={`relative aspect-square cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-[10px] ${
+                      className={`relative aspect-[5/4] cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-lg ${
                         isConflict ? "bg-red-50 ring-2 ring-red-400" : day.isPast ? "bg-[#f9f9f7]" : isGap ? "bg-amber-50" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
                       }`}
                       style={{
@@ -484,13 +484,13 @@ export default function MonthlyView({
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
                       title={isConflict ? "Overbooking — two bookings on this night" : undefined}
                     >
-                      <div className="p-1 md:p-[6px] flex flex-col justify-between h-full">
+                      <div className="p-0.5 md:p-1 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between">
                           <div>
                             {day.isToday ? (
-                              <span className={`inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-full ${isConflict ? "bg-red-500" : "bg-emerald-500"} text-white text-[12px] md:text-[13px] font-semibold leading-none`}>{day.dayNum}</span>
+                              <span className={`inline-flex items-center justify-center w-4 h-4 md:w-5 md:h-5 rounded-full ${isConflict ? "bg-red-500" : "bg-emerald-500"} text-white text-[10px] md:text-[11px] font-semibold leading-none`}>{day.dayNum}</span>
                             ) : (
-                              <span className={`text-[12px] md:text-[13px] font-semibold leading-none ${isConflict ? "text-red-600" : day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
+                              <span className={`text-[10px] md:text-[11px] font-semibold leading-none ${isConflict ? "text-red-600" : day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
                             )}
                           </div>
                           {/* Event dot indicator */}
@@ -516,7 +516,7 @@ export default function MonthlyView({
                           if (applied && suggested && Math.abs(suggested - applied) / applied > 0.08) {
                             rateColor = suggested > applied ? "text-emerald-500" : "text-red-400";
                           }
-                          return <span className={`self-end text-[10px] md:text-[11px] font-mono ${rateColor} leading-none`}>${rawRate}</span>;
+                          return <span className={`self-end text-[9px] md:text-[10px] font-mono ${rateColor} leading-none`}>${rawRate}</span>;
                         })()}
                       </div>
                     </div>
@@ -536,8 +536,8 @@ export default function MonthlyView({
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
                   // visibly separated.
-                  const BAR_H = 32;
-                  const LANE_GAP = 4;
+                  const BAR_H = 26;
+                  const LANE_GAP = 3;
                   const laneOffset = seg.lane * (BAR_H + LANE_GAP);
                   const rowUnit = cellH + GAP;
                   const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 4 - laneOffset}px` : "0px";
@@ -561,8 +561,8 @@ export default function MonthlyView({
                   // Bars are 28px (mobile) / 32px (desktop) tall. A radius
                   // of 16px caps the capped ends into a full semicircle so
                   // the bar reads as a pill; continuation edges stay flat.
-                  const rL = seg.capLeft ? "16px" : "0";
-                  const rR = seg.capRight ? "16px" : "0";
+                  const rL = seg.capLeft ? "13px" : "0";
+                  const rR = seg.capRight ? "13px" : "0";
                   const shadow = "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
 
                   // Red diagonal stripe overlay + red border when the bar is
@@ -577,7 +577,7 @@ export default function MonthlyView({
                   return (
                     <div
                       key={`${seg.booking.id}-${seg.row}-${si}`}
-                      className="absolute flex items-center gap-1.5 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[28px] md:h-[32px]"
+                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[22px] md:h-[26px]"
                       style={{
                         left, width, top, transform: "translateY(-100%)",
                         backgroundColor: color,
@@ -596,14 +596,14 @@ export default function MonthlyView({
                       title={`${label} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
                     >
                       {seg.capLeft && logo && (
-                        <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[22px] h-[22px] md:w-[24px] md:h-[24px]"
+                        <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[16px] h-[16px] md:w-[18px] md:h-[18px]"
                           style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={logo} alt="" className="w-[14px] h-[14px] md:w-[16px] md:h-[16px]" />
+                          <img src={logo} alt="" className="w-[10px] h-[10px] md:w-[12px] md:h-[12px]" />
                         </div>
                       )}
                       {showText && (
-                        <span className="truncate text-[11px] md:text-[12px] font-medium">
+                        <span className="truncate text-[9px] md:text-[10px] font-medium">
                           {label}
                         </span>
                       )}
