@@ -1,4 +1,4 @@
-# StayCommand — CLAUDE.md
+# Moora (StayCommand) — CLAUDE.md
 
 ## FIRST STEPS FOR EVERY SESSION
 1. Read this file completely before any work
@@ -6,12 +6,30 @@
 3. If repomix is stale: `cd ~/staycommand && repomix`
 4. Never run `npm run build` on VPS — use `npx tsc --noEmit` then `git push` (Vercel builds)
 
+## Prompt Format
+Every prompt to Claude Code must start with:
+"Read ~/staycommand/CLAUDE.md and repomix-output.txt first."
+
+## Planning Mode
+- Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API+UI+DB changes)
+- Skip ultraplan for small fixes (1-3 files, UI tweaks, single bug fixes)
+- Examples that warrant /ultraplan: design system rollout, channel connection flows, direct booking website, owner portal
+- Examples to skip: fix a logo, change a color, add a button, fix a single API endpoint
+
+## Code Rules
+- **Never use sub-agents** — write all code directly
+- Always run `npx tsc --noEmit` before committing
+- Always push to main after committing
+- Return actual error messages in API responses — never return empty 500s
+- Wrap all API handlers in try/catch
+- Never run `npm run build` on VPS (times out, insufficient RAM)
+- ESLint: unused variables cause Vercel build failures — always check before push
+
 ## Product Overview
-StayCommand is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. It competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have.
+Moora (formerly StayCommand) is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. It competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have.
 
 **Live URL:** https://staycommand.vercel.app
 **GitHub:** cesarale14/staycommand
-**Logo:** Beacon mark (upward chevron + signal pulse) in emerald
 
 ## Tech Stack
 - **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS
@@ -24,6 +42,44 @@ StayCommand is a unified STR (short-term rental) operating system with AI-powere
 - **SMS:** Twilio
 - **Events:** Ticketmaster API
 - **Weather:** Weather.gov API (free, no key)
+- **Font:** Plus Jakarta Sans (via @fontsource-variable)
+
+## Canopy Design System (ACTIVE)
+The app uses the "Canopy" design direction — deep forest green, warm brass, soft linen.
+
+### Color Palette
+| Token | Hex | Use |
+|-------|-----|-----|
+| Forest | #1a3a2a | Primary, sidebar bg, headings, stat values |
+| Forest Light | #264d38 | Sidebar hover, secondary surfaces |
+| Forest Muted | #3d6b52 | Icons, secondary text |
+| Brass | #c9a96e | Accents, active states, sidebar active indicators |
+| Brass Light | #d4bc8a | Light accent backgrounds |
+| Linen | #f8f6f1 | Page background |
+| Linen Dark | #efe9dd | Borders, card backgrounds, dividers |
+| Danger | #c44040 | Error states, overbooking alerts |
+| Warning | #b8860b | Cleaning assignments, urgency |
+| Info | #2a5a8a | Informational badges |
+
+### Typography
+- Font: Plus Jakarta Sans Variable
+- Stat numbers: -0.03em letter-spacing, 700 weight
+- Section labels: 11px, 700 weight, +0.06em tracking, uppercase, brass color
+- Page headings: 20px, 700 weight, forest color
+
+### Sidebar
+- Dark forest green (#1a3a2a) background
+- Brass (#c9a96e) active indicator bar + text
+- Muted linen-green (#a8c4b4) inactive text
+- "M Moora" brass logo mark
+
+### Borders & Shadows
+- All borders: linen-toned (#efe9dd), never gray
+- Shadows: warm forest-tinted rgba(26,58,42,...)
+- Stat cards: forest green gradient top border via ::before
+
+### CSS Variables
+All colors are defined as CSS variables in `globals.css` (:root). Components reference them via `var(--forest)`, `var(--brass)`, `var(--linen)`, etc. Tailwind config maps these to utility classes (`bg-forest`, `text-brass`, `bg-linen`).
 
 ## Key Infrastructure
 - VPS SSH: `C:\Users\cesar\Downloads\LightsailDefaultKey-us-east-1.pem`
@@ -32,8 +88,8 @@ StayCommand is a unified STR (short-term rental) operating system with AI-powere
 - Logs: `/var/log/staycommand/`
 - Workers status: `~/staycommand-workers/status.sh`
 
-## Database (20+ tables)
-properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, weather_cache, channex_webhook_log, channex_sync_state, user_preferences
+## Database (25 tables)
+properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, user_preferences, property_channels, channex_room_types, channex_rate_plans, notifications, weather_cache
 
 ## Channex Integration (PRODUCTION)
 - Current state: FRESH START — 0 properties in StayCommand, 4 properties in Channex (can't be deleted while mapped to Airbnb channel)
@@ -46,6 +102,12 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
 - IMPORTANT: Scaffold rate plans must NOT have a default rate — Airbnb manages its own pricing.
+
+### Booking.com Self-Service Connection
+- Flow: User enters Hotel ID → API creates Channex BDC channel → tests connection → if Booking.com hasn't authorized Channex, shows instructions (admin.booking.com → Account → Connectivity Provider → search "Channex") → retry → on success, pushes availability + activates
+- API routes: `/api/channels/connect-booking-com` (create), `/api/channels/connect-booking-com/test` (test auth), `/api/channels/connect-booking-com/activate` (push avail + activate)
+- UI: `BookingComConnect.tsx` modal with form → progress → authorization → success states
+- Channex client methods: `createChannel`, `updateChannel`, `testChannelConnection`
 
 ## 9-Signal Pricing Engine
 Weights (sum = 1.0):
@@ -61,15 +123,15 @@ Weights (sum = 1.0):
 
 ## Sidebar Structure
 ```
-(no label): Dashboard, Calendar, Inbox
-MANAGE: Properties, Pricing, Reviews, Turnover
-GROW: Frontdesk (coming soon), Market Explorer, Nearby Listings, Comp Sets, Revenue Check ↗
-Bottom: Settings, User avatar
+(no label): Dashboard, Calendar, Messages
+MANAGE: Properties, Pricing, Reviews, Cleaning
+INSIGHTS: Market Intel, Nearby Listings, Comp Sets
+Bottom: Settings, User avatar (Cesar)
 ```
 
 ## Key Pages & Features
 - **Dashboard:** Visual command center with property status cards (photos + live status), smart actions, events bar, portfolio performance, activity feed
-- **Calendar:** Airbnb-style monthly grid, 24-month continuous scroll, booking bars with platform logos, 3D shadows, checkout/checkin overlap, event dots, demand coloring, gap highlights
+- **Calendar:** Airbnb-style monthly grid (ONLY monthly view — timeline removed), 24-month continuous scroll, booking bars with platform logos, check-in/checkout overlap, Airbnb-style partial-cell offsets, conflict detection with red stripes, full-width layout with property sidebar (left) and rate/availability settings panel (right)
 - **Pricing:** 9-signal engine, heatmap, signal breakdown, push to OTAs
 - **Market Explorer:** Analytics + interactive Leaflet map (properties, comps, events)
 - **Nearby Listings:** AirDNA-style browse with real Airbnb photos from AirROI
@@ -80,6 +142,18 @@ Bottom: Settings, User avatar
 - **Revenue Check:** Public lead gen tool at /revenue-check
 - **Frontdesk:** Direct booking website builder (placeholder, coming soon)
 - **Channex Certification:** /channex-certification (14 test runner)
+
+## Calendar Architecture
+- `CalendarGrid.tsx` — Main container, monthly-only (timeline removed), manages state
+- `MonthlyView.tsx` — 24-month scrolling grid with sticky month headers
+- `BookingBar.tsx` — Airbnb-style partial-cell bars (check-in at 50%, checkout at 40%)
+- `CalendarToolbar.tsx` — Thin header bar with title + Today button
+- `DateCell.tsx` — Individual cell with rate display
+- `BookingSidePanel.tsx` — Booking details slide-out
+- Right settings panel: always-visible price/availability settings, date-specific editing on click
+- Booking bars use floatStart/floatEnd fractional cell coordinates for Airbnb-style check-in/checkout offsets
+- Turnover detection: follower/predecessor sets drive 10% overlap seam on same-day handoffs
+- Conflict detection: separate from visual overlap — real overbookings get red diagonal stripes
 
 ## Property Photos
 - User properties: auto-pulled from Airbnb via OG image tag (listing ID from iCal URL)
@@ -92,14 +166,6 @@ Bottom: Settings, User avatar
 - market_sync.py: AirROI market data collection
 - All use direct PostgreSQL (psycopg2), not HTTP API routes
 - Systemd services with timers
-
-## Design System
-- Brand color: Emerald (#10b981 scale)
-- Font: Nunito Variable (rounded, Airbnb-like)
-- Sidebar: 60px collapsed (icon-only with tooltips), 240px expanded
-- Cards: rounded-xl, 24px padding, shadow-only (no border)
-- Content max-width: 1200px centered
-- Logo: Beacon mark (src/components/ui/Logo.tsx)
 
 ## Development Workflow
 1. Make changes in ~/staycommand
@@ -116,6 +182,9 @@ Bottom: Settings, User avatar
 - iCal feeds: Airbnb has listing ID in URL, Booking.com uses opaque UUID (can't get photos)
 - ESLint: unused variables cause Vercel build failures — always check before push
 - Auth middleware: /revenue-check and /clean are public routes (no auth required)
+- Calendar: GAP constant in MonthlyView.tsx must match --col CSS variable formula: `calc((100% + GAP) / 7)`
+- Calendar bars: width = `calc(var(--col) * span - GAP)` to prevent overflow
+- Booking.com connection requires hotel owner to authorize Channex at admin.booking.com → Account → Connectivity Provider
 
 ## Current Priorities
 1. Get 5 real hosts on free tier
@@ -124,6 +193,14 @@ Bottom: Settings, User avatar
 4. Connect Villa Jamaica to production Channex + real OTAs
 5. Polish UI based on user feedback
 6. Build intelligent map with layers
+
+## Future
+- Direct booking website builder
+- Owner portal / multi-user access
+- Channex rate pushing from pricing engine (Pro tier feature)
+- Revenue Check landing page for lead gen
+- DESIGN_SYSTEM.md skill file for Claude Code
+- VRBO self-service connection (same pattern as Booking.com)
 
 ## Properties in Database
 - FRESH START: 0 properties (full reset for onboarding flow test)
@@ -143,7 +220,7 @@ Key differentiator: 9-signal pricing + market intelligence + operations in one p
 ## Strategic Decision Framework
 
 ### Prime Directive
-Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move StayCommand closer to being the best PMS on the market?"
+Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move Moora closer to being the best PMS on the market?"
 
 ### Decision Criteria (in priority order)
 1. Host Time Savings — Will this reduce manual work for hosts? Quantify minutes saved per week if possible.
@@ -151,25 +228,17 @@ Every feature, architecture choice, and UX decision must be evaluated against on
 3. Competitive Moat — Does this create something Hospitable, Hostaway, or Guesty can't easily replicate? (9-signal engine, market intelligence, AI-powered operations)
 4. Scalability — Will this work for 1 property AND 50 properties without redesign?
 5. User Delight — Is the UX so good hosts would screenshot it and share in STR Facebook groups?
-6. Data Flywheel — Does this generate data that makes StayCommand smarter over time? (pricing outcomes, booking patterns, market trends)
-
-### Competitive Benchmarking
-Before building any major feature, answer:
-- How does Hospitable handle this? (messaging/automation leader)
-- How does Hostaway handle this? (channel management leader)
-- How does Guesty handle this? (enterprise PMS leader)
-- How does PriceLabs/Wheelhouse handle this? (pricing leader)
-- How will StayCommand do it better?
-
-### Channex Production
-- Production API: app.channex.io/api/v1 (NOT staging)
-- Whitelabel access: ACTIVE
-- All new Channex integration work should target production endpoints
-- Villa Jamaica should be migrated from staging to production
+6. Data Flywheel — Does this generate data that makes Moora smarter over time? (pricing outcomes, booking patterns, market trends)
 
 ### Build Philosophy
 - Ship features that are 90% polished, not 60% shipped fast
 - Every screen should look like it belongs in a $50M SaaS product
 - If a feature doesn't clearly serve the Prime Directive, defer it
 - Prefer deep integration over surface-level features (e.g., don't just show data — act on it automatically)
-- Always consider: "What would make a host switch FROM their current PMS TO StayCommand?"
+- Always consider: "What would make a host switch FROM their current PMS TO Moora?"
+
+### Channex Production
+- Production API: app.channex.io/api/v1 (NOT staging)
+- Whitelabel access: ACTIVE
+- All new Channex integration work should target production endpoints
+- Villa Jamaica should be migrated from staging to production
