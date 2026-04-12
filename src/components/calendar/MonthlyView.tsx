@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 2;
+const GAP = 1;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -224,8 +224,8 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
 }
 
 const gridVars = {
-  "--col": `calc((100% + ${GAP}px) / 7)`,
-  "--cell": `calc((100% + ${GAP}px) / 7 - ${GAP}px)`,
+  "--col": `calc(100% / 7)`,
+  "--cell": `calc(100% / 7 - ${GAP}px)`,
 } as React.CSSProperties;
 
 export default function MonthlyView({
@@ -252,6 +252,7 @@ export default function MonthlyView({
   }, []);
 
   // Calendar intelligence — fetch events + cleaning tasks client-side
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [calEvents, setCalEvents] = useState<Map<string, { name: string; impact: number }>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [calClean, setCalClean] = useState<Map<string, string>>(new Map()); // date → status (future use)
@@ -378,7 +379,8 @@ export default function MonthlyView({
     return map;
   }, [months, bookings, conflictBookingIds, followerIds, predecessorIds, todayStr]);
 
-  // Gap night detection — 1-2 available nights between bookings
+  // Gap night detection — 1-2 available nights between bookings (kept for future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const gapDates = useMemo(() => {
     const gaps = new Set<string>();
     const sorted = [...bookings]
@@ -429,10 +431,10 @@ export default function MonthlyView({
   return (
     <div className="bg-white flex flex-col flex-1 min-h-0">
       {/* Month pills — desktop only */}
-      <div className="hidden md:flex gap-1 px-3 py-1 border-b border-[#e8e8e8] overflow-x-auto flex-shrink-0">
+      <div className="hidden md:flex gap-0.5 px-3 py-1.5 border-b border-[#e5e5e5] overflow-x-auto flex-shrink-0">
         {months.map((m) => (
           <button key={m.key} onClick={() => { scrollToMonth(m.key); setActiveMonth(m.key); }}
-            className={`px-1.5 py-0.5 text-[10px] font-medium rounded whitespace-nowrap transition-colors flex-shrink-0 ${
+            className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap transition-colors flex-shrink-0 ${
               activeMonth === m.key ? "bg-[#222] text-white" : "text-[#999] hover:text-[#555] hover:bg-[#f5f5f5]"
             }`}>{m.abbr}</button>
         ))}
@@ -440,9 +442,9 @@ export default function MonthlyView({
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[2px] border-b border-[#e8e8e8]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-[#e0e0e0]">
           {DAY_LABELS.map((l, i) => (
-            <div key={`${l}-${i}`} className="py-0.5 md:py-1 text-center text-[10px] font-medium uppercase tracking-widest text-[#999]">
+            <div key={`${l}-${i}`} className="py-1 text-center text-[11px] font-medium text-[#999]">
               <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
               <span className="hidden md:inline">{l}</span>
             </div>
@@ -454,8 +456,8 @@ export default function MonthlyView({
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              <div className="sticky top-[23px] md:top-[25px] z-[9] bg-white px-1 pt-3 md:pt-5 pb-1 md:pb-1.5">
-                <span className="text-sm md:text-base font-bold text-[#222]">{m.label}</span>
+              <div className="sticky top-[25px] md:top-[29px] z-[9] bg-white px-2 pt-4 md:pt-6 pb-1.5">
+                <span className="text-base md:text-lg font-bold text-[#222]">{m.label}</span>
               </div>
 
               {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
@@ -463,61 +465,40 @@ export default function MonthlyView({
                 {m.days.map((day, i) => {
                   const rate = rates.get(day.date);
                   const isAvail = rate?.is_available !== false;
-                  const rawRate = rate?.suggested_rate ?? rate?.applied_rate ?? rate?.base_rate ?? null;
+                  const rawRate = rate?.applied_rate ?? rate?.base_rate ?? null;
                   const isBooked = bookedDates.has(day.date);
                   const isBlocked = !isAvail && !isBooked;
-                  const isGap = gapDates.has(day.date);
                   const isConflict = conflictDates.has(day.date);
 
                   return (
                     <div
                       key={day.date}
                       data-cell
-                      className={`relative aspect-[5/4] cursor-pointer transition-colors flex flex-col justify-between rounded-md md:rounded-lg ${
-                        isConflict ? "bg-red-50 ring-2 ring-red-400" : day.isPast ? "bg-[#f9f9f7]" : isGap ? "bg-amber-50" : isBlocked ? "bg-[#f5f5f5]" : day.isToday ? "bg-white" : "bg-white hover:bg-[#fafafa]"
+                      className={`relative cursor-pointer transition-colors ${
+                        isConflict ? "bg-red-50" : day.isPast ? "bg-[#fafafa]" : isBlocked ? "bg-[#f7f7f7]" : "bg-white hover:bg-[#f5f5f5]"
                       }`}
                       style={{
-                        border: isConflict ? "1px solid #fca5a5" : "1px solid #e8e8e8",
+                        minHeight: "58px",
+                        borderRight: "1px solid #e5e5e5",
+                        borderBottom: "1px solid #e5e5e5",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
-                        ...(isBlocked && !day.isPast ? { backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,0,0,0.015) 4px, rgba(0,0,0,0.015) 5px)" } : {}),
                       }}
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
-                      title={isConflict ? "Overbooking — two bookings on this night" : undefined}
                     >
-                      <div className="p-0.5 md:p-1 flex flex-col justify-between h-full">
+                      <div className="px-1.5 pt-1 pb-0.5 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between">
-                          <div>
-                            {day.isToday ? (
-                              <span className={`inline-flex items-center justify-center w-4 h-4 md:w-5 md:h-5 rounded-full ${isConflict ? "bg-red-500" : "bg-emerald-500"} text-white text-[10px] md:text-[11px] font-semibold leading-none`}>{day.dayNum}</span>
-                            ) : (
-                              <span className={`text-[10px] md:text-[11px] font-semibold leading-none ${isConflict ? "text-red-600" : day.isPast ? "text-[#bbb]" : "text-[#333]"}`}>{day.dayNum}</span>
-                            )}
-                          </div>
-                          {/* Event dot indicator */}
-                          {!day.isPast && calEvents.has(day.date) && (() => {
-                            const ev = calEvents.get(day.date)!;
-                            const dotColor = ev.impact > 0.6 ? "bg-red-400" : ev.impact > 0.3 ? "bg-amber-400" : "bg-neutral-300";
-                            return <span className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} title={ev.name} />;
-                          })()}
-                          {/* Gap night indicator */}
-                          {isGap && !day.isPast && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-200 flex-shrink-0" title="Gap night — hard to fill" />
+                          {day.isToday ? (
+                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${isConflict ? "bg-red-500" : "bg-red-500"} text-white text-[11px] font-semibold leading-none`}>{day.dayNum}</span>
+                          ) : (
+                            <span className={`text-[12px] font-medium leading-none pt-0.5 ${isConflict ? "text-red-600" : day.isPast ? "text-[#ccc]" : "text-[#333]"}`}>{day.dayNum}</span>
                           )}
-                          {/* Overbooking warning */}
                           {isConflict && (
-                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex-shrink-0" title="Overbooking conflict">!</span>
+                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex-shrink-0">!</span>
                           )}
                         </div>
-                        {/* Rate with comparison color */}
-                        {!isBooked && !day.isPast && rawRate !== null && isAvail && (() => {
-                          const applied = rate?.applied_rate;
-                          const suggested = rate?.suggested_rate;
-                          let rateColor = "text-[#999]";
-                          if (applied && suggested && Math.abs(suggested - applied) / applied > 0.08) {
-                            rateColor = suggested > applied ? "text-emerald-500" : "text-red-400";
-                          }
-                          return <span className={`self-end text-[9px] md:text-[10px] font-mono ${rateColor} leading-none`}>${rawRate}</span>;
-                        })()}
+                        {!isBooked && !day.isPast && rawRate !== null && isAvail && (
+                          <span className="text-[11px] font-mono text-[#888] leading-none">${rawRate}</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -536,8 +517,8 @@ export default function MonthlyView({
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
                   // visibly separated.
-                  const BAR_H = 26;
-                  const LANE_GAP = 3;
+                  const BAR_H = 24;
+                  const LANE_GAP = 2;
                   const laneOffset = seg.lane * (BAR_H + LANE_GAP);
                   const rowUnit = cellH + GAP;
                   const top = cellH > 0 ? `${seg.row * rowUnit + cellH - 4 - laneOffset}px` : "0px";
@@ -546,24 +527,18 @@ export default function MonthlyView({
                   // brand dark blue so the two platforms are distinguishable
                   // at a glance.
                   const isBooking = seg.booking.platform === "booking_com" || seg.booking.platform === "booking";
-                  const color = isBooking ? "#003580" : "#1f2937"; // gray-800
+                  const color = isBooking ? "#003580" : "#222222";
                   const logo = platformLogos[seg.booking.platform] ?? null;
 
-                  // Label rules: guest name when we have one, otherwise
-                  // "Booked". No night count. Show only if there's enough
-                  // horizontal room (>1 full cell) — the logo fills short
-                  // bars on its own.
                   const rawName = seg.booking.guest_name?.trim() ?? "";
-                  const hasRealName = rawName.length > 0 && rawName !== "Airbnb Guest" && rawName !== "Guest" && rawName !== "Reserved";
-                  const label = hasRealName ? rawName : "Booked";
-                  const showText = cellSpan >= 2;
+                  const firstName = rawName.split(" ")[0];
+                  const hasRealName = firstName.length > 0 && firstName !== "Airbnb" && firstName !== "Guest" && firstName !== "Reserved";
+                  const label = hasRealName ? `${firstName} + ${seg.nights}` : `Booked + ${seg.nights}`;
+                  const showText = cellSpan >= 1.5;
 
-                  // Bars are 28px (mobile) / 32px (desktop) tall. A radius
-                  // of 16px caps the capped ends into a full semicircle so
-                  // the bar reads as a pill; continuation edges stay flat.
-                  const rL = seg.capLeft ? "13px" : "0";
-                  const rR = seg.capRight ? "13px" : "0";
-                  const shadow = "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
+                  const rL = seg.capLeft ? "12px" : "0";
+                  const rR = seg.capRight ? "12px" : "0";
+                  const shadow = "0 1px 3px rgba(0,0,0,0.12)";
 
                   // Red diagonal stripe overlay + red border when the bar is
                   // part of a conflict somewhere in the loaded bookings.
@@ -572,12 +547,12 @@ export default function MonthlyView({
                     : undefined;
                   const border = seg.conflict
                     ? "2px solid #ef4444"
-                    : "1px solid rgba(0,0,0,0.15)";
+                    : "none";
 
                   return (
                     <div
                       key={`${seg.booking.id}-${seg.row}-${si}`}
-                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:-translate-y-px h-[22px] md:h-[26px]"
+                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:brightness-110 h-[22px] md:h-[24px]"
                       style={{
                         left, width, top, transform: "translateY(-100%)",
                         backgroundColor: color,
