@@ -246,13 +246,16 @@ export async function POST(request: NextRequest) {
       await supabase.from("bookings").update(bookingRecord).eq("id", existingBooking.id);
       console.log(`[webhook] Updated existing booking ${bookingId} (action: ${action})`);
     } else if (bookingStatus !== "cancelled") {
-      // Dedup against iCal placeholder rows. Airbnb's iCal feed mirrors
-      // every OTA reservation as a generic "Airbnb Guest" blocked slot,
-      // so we'd otherwise double-count each Channex booking.
+      // Dedup scope: only same-platform exact-date matches are
+      // duplicates. Different platforms at overlapping dates are
+      // cross-platform overbookings (e.g. Airbnb guest X and
+      // Booking.com guest Y on the same night) and must be left alone
+      // so /api/bookings/conflicts can surface them.
       const { data: exact } = await supabase
         .from("bookings")
         .select("id")
         .eq("property_id", propertyId)
+        .eq("platform", platform)
         .eq("check_in", ba.arrival_date)
         .eq("check_out", ba.departure_date)
         .is("channex_booking_id", null)
@@ -264,26 +267,6 @@ export async function POST(request: NextRequest) {
         await supabase.from("bookings").update(bookingRecord).eq("id", exactRow.id);
         console.log(`[webhook] Promoted iCal placeholder ${exactRow.id} with Channex data for ${bookingId}`);
       } else {
-        const { data: placeholders } = await supabase
-          .from("bookings")
-          .select("id")
-          .eq("property_id", propertyId)
-          .lt("check_in", ba.departure_date)
-          .gt("check_out", ba.arrival_date)
-          .is("channex_booking_id", null)
-          .eq("status", "confirmed");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const p of ((placeholders ?? []) as any[])) {
-          await supabase
-            .from("bookings")
-            .update({
-              status: "cancelled",
-              notes: `[auto] superseded by Channex booking ${bookingId}`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", p.id);
-          console.log(`[webhook] Cancelled overlapping iCal placeholder ${p.id}`);
-        }
         const { error: insertErr } = await supabase.from("bookings").insert(bookingRecord);
         if (insertErr) console.error(`[webhook] Insert error:`, insertErr);
         else console.log(`[webhook] Inserted new booking ${bookingId}`);

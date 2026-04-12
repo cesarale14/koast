@@ -146,15 +146,19 @@ export async function GET() {
               if (isCancelled && wasConfirmed) cancelled++;
             }
           } else if (!isCancelled) {
-            // Dedup against iCal placeholder rows. Channex and the Airbnb
-            // iCal feed both report the same reservation: Channex via the
-            // real API, iCal as a "blocked" Airbnb Guest entry. Before
-            // inserting a fresh Channex row, check for an overlapping
-            // placeholder (no channex_booking_id) and either promote it
-            // in-place (exact match) or cancel it (inexact overlap).
+            // Dedup scope: Channex pulls a given reservation from an OTA
+            // (e.g. Airbnb OAuth, Booking.com via Channex). For that
+            // SAME OTA, the iCal feed may also be importing the same
+            // reservation — Channex and iCal would then produce two
+            // rows for one stay. The only safe dedup is exact-match on
+            // (property_id, platform, check_in, check_out). Different
+            // platforms at overlapping dates are CROSS-PLATFORM
+            // OVERBOOKINGS, not duplicates — those must be left alone
+            // so conflict detection can surface them.
             const { data: exact } = await bookTable
               .select("id")
               .eq("property_id", prop.id)
+              .eq("platform", platform)
               .eq("check_in", ba.arrival_date)
               .eq("check_out", ba.departure_date)
               .is("channex_booking_id", null)
@@ -169,28 +173,6 @@ export async function GET() {
                 updated++;
               }
             } else {
-              // Look for overlapping placeholder rows (iCal) and cancel
-              // them — they're stale references to the same underlying
-              // reservation from a different OTA.
-              const { data: placeholders } = await bookTable
-                .select("id")
-                .eq("property_id", prop.id)
-                .lt("check_in", ba.departure_date)
-                .gt("check_out", ba.arrival_date)
-                .is("channex_booking_id", null)
-                .eq("status", "confirmed");
-              if (placeholders && placeholders.length > 0) {
-                for (const p of placeholders) {
-                  await bookTable
-                    .update({
-                      status: "cancelled",
-                      notes: `[auto] superseded by Channex booking ${b.id}`,
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq("id", p.id);
-                }
-              }
-
               const { error } = await bookTable.insert(bookingRecord);
               if (error) {
                 console.error(`[sync-bookings] insert ${b.id}:`, error.message);

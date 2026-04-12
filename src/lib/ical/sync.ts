@@ -139,27 +139,6 @@ async function syncFeedBookings(
         continue;
       }
 
-      // Stronger dedup: Airbnb's iCal mirrors every OTA reservation
-      // including Booking.com ones, so if a Channex-originated booking
-      // (channex_booking_id IS NOT NULL) overlaps this iCal range at
-      // all, skip the import. The Channex row is the authoritative
-      // source.
-      const channexOverlap = await db.select({ id: bookings.id })
-        .from(bookings)
-        .where(and(
-          eq(bookings.propertyId, propertyId),
-          sql`${bookings.channexBookingId} IS NOT NULL`,
-          sql`${bookings.checkIn} < ${entry.checkOut}`,
-          sql`${bookings.checkOut} > ${entry.checkIn}`,
-          sql`${bookings.status} != 'cancelled'`
-        ))
-        .limit(1);
-
-      if (channexOverlap.length > 0) {
-        console.log(`[iCal] Skipping: overlapping Channex booking exists for ${propertyId} ${entry.checkIn}-${entry.checkOut}`);
-        continue;
-      }
-
       // Insert new booking
       await db.insert(bookings).values({
         propertyId,
