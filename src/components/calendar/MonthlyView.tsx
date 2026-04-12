@@ -594,8 +594,11 @@ export default function MonthlyView({
                   const label = hasRealName ? rawName : "Booked";
                   const showText = cellSpan >= 2;
 
-                  const rL = seg.capLeft ? "10px" : "0";
-                  const rR = seg.capRight ? "10px" : "0";
+                  // Bars are 28px (mobile) / 32px (desktop) tall. A radius
+                  // of 16px caps the capped ends into a full semicircle so
+                  // the bar reads as a pill; continuation edges stay flat.
+                  const rL = seg.capLeft ? "16px" : "0";
+                  const rR = seg.capRight ? "16px" : "0";
                   const shadow = "0 1px 2px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)";
 
                   // Red diagonal stripe overlay + red border when the bar is
