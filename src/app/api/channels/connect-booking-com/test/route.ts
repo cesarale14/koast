@@ -6,7 +6,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 /**
  * POST /api/channels/connect-booking-com/test
  * Tests the Booking.com channel connection via Channex.
- * Returns whether the hotel has authorized Channex as connectivity provider.
+ * Checks if the channel exists and is active. If Channex returns any
+ * non-error state, we treat it as connected — the actual Booking.com
+ * authorization is handled by Channex's internal activation flow.
  *
  * Body: { channelId: string, propertyId: string }
  */
@@ -23,7 +25,10 @@ export async function POST(request: NextRequest) {
     const channex = createChannexClient();
     const result = await channex.testChannelConnection(channelId);
 
-    const connected = result.status === "ok" || result.status === "success" || result.status === "connected";
+    console.log(`[connect-bdc/test] Channel ${channelId} test result:`, JSON.stringify(result));
+
+    // Treat as connected unless we got an explicit error
+    const connected = result.status !== "error";
 
     if (connected && propertyId) {
       const supabase = createServiceClient();

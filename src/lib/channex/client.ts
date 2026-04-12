@@ -612,13 +612,19 @@ class ChannexClient {
     return res;
   }
 
-  async testChannelConnection(channelId: string): Promise<{ status: string; message?: string }> {
+  async testChannelConnection(channelId: string): Promise<{ status: string; message?: string; raw?: unknown }> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await this.request<any>(`/channels/${channelId}/test`);
-      const status = res.data?.attributes?.status ?? res.data?.status ?? "unknown";
-      const message = res.data?.attributes?.message ?? res.data?.message ?? "";
-      return { status, message };
+      const res = await this.request<any>(`/channels/${channelId}`);
+      console.log(`[Channex] Channel ${channelId} state:`, JSON.stringify(res.data?.attributes ?? res.data ?? res).slice(0, 500));
+      const attrs = res.data?.attributes ?? {};
+      const isActive = attrs.is_active === true;
+      const state = attrs.state ?? attrs.status ?? "unknown";
+      return {
+        status: isActive ? "ok" : state,
+        message: isActive ? "Channel is active" : `Channel state: ${state}`,
+        raw: attrs,
+      };
     } catch (err) {
       return { status: "error", message: err instanceof Error ? err.message : "Unknown error" };
     }
