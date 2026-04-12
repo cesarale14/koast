@@ -40,15 +40,27 @@ export async function POST(request: NextRequest) {
     // 2. Ensure Channex property exists (auto-scaffold if missing)
     let channexPropertyId = property.channex_property_id;
     if (!channexPropertyId) {
-      const scaffoldRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/properties/auto-scaffold`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", cookie: request.headers.get("cookie") || "" },
+      const scaffoldTitle = `SC-Scaffold-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+      const channexProp = await channex.createProperty({
+        title: scaffoldTitle,
+        currency: "USD",
+        email: user.email || "",
+        phone: "",
+        zip_code: "",
+        country: "US",
+        state: "",
+        city: "",
+        address: "",
+        longitude: 0,
+        latitude: 0,
+        timezone: "America/New_York",
       });
-      const scaffold = await scaffoldRes.json();
-      if (!scaffold.channex_property_id) {
-        return NextResponse.json({ error: "Failed to create Channex property" }, { status: 500 });
-      }
-      channexPropertyId = scaffold.channex_property_id;
+      channexPropertyId = channexProp.id;
+      await supabase
+        .from("properties")
+        .update({ channex_property_id: channexPropertyId })
+        .eq("id", propertyId);
+      console.log(`[connect-bdc] Auto-scaffolded Channex property ${channexPropertyId}`);
     }
 
     // 3. Ensure room type + rate plan exist
