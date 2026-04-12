@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 3;
+const GAP = 2;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -441,7 +441,7 @@ export default function MonthlyView({
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[3px] border-b border-[#efe9dd]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[2px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l, i) => (
             <div key={`${l}-${i}`} className="py-1 text-center text-[11px] font-medium text-[#999]">
               <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
@@ -455,8 +455,8 @@ export default function MonthlyView({
           const segments = segmentsByMonth.get(m.key) ?? [];
           return (
             <div key={m.key} ref={(el) => { if (el) monthRefs.current.set(m.key, el); }} data-month={m.key}>
-              <div className="sticky top-[25px] md:top-[29px] z-[9] bg-white px-2 pt-4 md:pt-6 pb-1.5">
-                <span className="text-base md:text-lg font-bold text-[#222]">{m.label}</span>
+              <div className="sticky top-[25px] md:top-[27px] z-[9] bg-white px-1 pt-5 md:pt-8 pb-2">
+                <span className="text-xl md:text-2xl font-bold text-[#222]">{m.label}</span>
               </div>
 
               {/* Single flat grid — cells auto-wrap, day 1 placed via gridColumnStart */}
@@ -473,11 +473,12 @@ export default function MonthlyView({
                     <div
                       key={day.date}
                       data-cell
-                      className={`relative aspect-square cursor-pointer transition-colors rounded-lg ${
-                        isConflict ? "bg-red-50 ring-1 ring-red-300" : day.isPast ? "bg-[#f5f3ee]" : isBlocked ? "bg-[#f0ede6]" : "bg-white hover:bg-[#faf8f4]"
+                      className={`relative cursor-pointer transition-colors rounded ${
+                        isConflict ? "bg-red-50 ring-1 ring-red-300" : day.isPast ? "bg-[#f9f8f5]" : isBlocked ? "bg-[#f5f3ee]" : "bg-white hover:bg-[#faf9f6]"
                       }`}
                       style={{
-                        border: "1px solid #efe9dd",
+                        aspectRatio: "3 / 2",
+                        border: "1px solid #e8e8e8",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
                       }}
                       onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
