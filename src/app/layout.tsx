@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import "@fontsource-variable/nunito";
+import "@fontsource-variable/plus-jakarta-sans";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StayCommand",
+  title: "Moora",
   description: "Property management for short-term rentals",
   icons: {
     icon: [

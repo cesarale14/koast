@@ -9,12 +9,31 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["'Nunito Variable'", "system-ui", "sans-serif"],
-        mono: ["'Nunito Variable'", "system-ui", "sans-serif"],
+        sans: ["'Plus Jakarta Sans Variable'", "'Plus Jakarta Sans'", "system-ui", "sans-serif"],
+        mono: ["'Plus Jakarta Sans Variable'", "'Plus Jakarta Sans'", "system-ui", "sans-serif"],
       },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        forest: {
+          DEFAULT: "var(--forest)",
+          light: "var(--forest-light)",
+          muted: "var(--forest-muted)",
+        },
+        brass: {
+          DEFAULT: "var(--brass)",
+          light: "var(--brass-light)",
+          dark: "var(--brass-dark)",
+        },
+        linen: {
+          DEFAULT: "var(--linen)",
+          dark: "var(--linen-dark)",
+        },
+        ink: {
+          DEFAULT: "var(--ink)",
+          secondary: "var(--ink-secondary)",
+          muted: "var(--ink-muted)",
+        },
         brand: {
           50: "var(--brand-50)",
           100: "var(--brand-100)",
