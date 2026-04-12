@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
+import BookingComConnect from "./BookingComConnect";
 
 interface Booking {
   id: string;
@@ -35,6 +36,7 @@ interface PropertyDetailProps {
   calendarBookings: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   calendarRates: any[];
+  channels?: { channel_code: string; status: string; settings?: Record<string, unknown> }[];
 }
 
 const tabs = ["Overview", "Calendar", "Bookings", "Settings"];
@@ -51,13 +53,15 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function PropertyDetail({
-  property, listings, allBookings: initialBookings, stats, calendarBookings, calendarRates,
+  property, listings, allBookings: initialBookings, stats, calendarBookings, calendarRates, channels = [],
 }: PropertyDetailProps) {
   const [tab, setTab] = useState("Overview");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+  const [showBdcConnect, setShowBdcConnect] = useState(false);
+  const bdcChannel = channels.find((c) => c.channel_code === "BDC");
 
   // Scenario 1: Full Sync state
   const [syncing, setSyncing] = useState(false);
@@ -476,7 +480,7 @@ export default function PropertyDetail({
 
           <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6">
             <h2 className="text-lg font-semibold text-neutral-800 mb-4">Connected Platforms</h2>
-            {listings.length === 0 ? (
+            {listings.length === 0 && !bdcChannel ? (
               <p className="text-sm text-neutral-400">No platforms connected yet.</p>
             ) : (
               <div className="space-y-3">
@@ -495,9 +499,44 @@ export default function PropertyDetail({
                     </span>
                   </div>
                 ))}
+                {bdcChannel && (
+                  <div className="flex items-center justify-between py-2 border-b border-neutral-50 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#003580]/10 text-[#003580]">Booking.com</span>
+                      {bdcChannel.settings?.hotel_id != null && (
+                        <span className="text-xs text-neutral-400 font-mono">Hotel {String(bdcChannel.settings.hotel_id)}</span>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded ${bdcChannel.status === "active" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"}`}>
+                      {bdcChannel.status === "active" ? "active" : "pending"}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Connect Booking.com — only shown if not already connected */}
+            {!bdcChannel && (
+              <button
+                onClick={() => setShowBdcConnect(true)}
+                className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-[#003580] bg-[#003580]/5 border border-[#003580]/20 rounded-lg hover:bg-[#003580]/10 transition-colors"
+              >
+                <div className="w-5 h-5 rounded bg-[#003580] flex items-center justify-center">
+                  <span className="text-white text-[9px] font-bold">B.</span>
+                </div>
+                Connect Booking.com
+              </button>
+            )}
           </div>
+
+          {showBdcConnect && (
+            <BookingComConnect
+              propertyId={property.id}
+              propertyName={property.name}
+              onClose={() => setShowBdcConnect(false)}
+              onConnected={() => { toast("Booking.com connected!"); window.location.reload(); }}
+            />
+          )}
         </div>
       )}
 

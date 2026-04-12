@@ -37,7 +37,7 @@ export default async function PropertyDetailPage({
   const svc = createServiceClient();
   const [listingsRes, channelsRes] = await Promise.all([
     supabase.from("listings").select("id, platform, platform_listing_id, listing_url, status").eq("property_id", params.id),
-    svc.from("property_channels").select("id, channel_code, channel_name, status").eq("property_id", params.id),
+    svc.from("property_channels").select("id, channel_code, channel_name, status, settings").eq("property_id", params.id),
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let listings = (listingsRes.data ?? []) as any[];
@@ -111,6 +111,13 @@ export default async function PropertyDetailPage({
     .gte("date", today)
     .lte("date", end60);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channels = ((channelsRes.data ?? []) as any[]).map((ch) => ({
+    channel_code: ch.channel_code as string,
+    status: ch.status as string,
+    settings: (ch.settings ?? {}) as Record<string, unknown>,
+  }));
+
   return (
     <PropertyDetail
       property={property}
@@ -119,6 +126,7 @@ export default async function PropertyDetailPage({
       stats={{ occupancy, revenue, adr, totalBookings: totalBookingsCount }}
       calendarBookings={(calBookingsRes.data ?? []) as never[]}
       calendarRates={(calRatesRes.data ?? []) as never[]}
+      channels={channels}
     />
   );
 }

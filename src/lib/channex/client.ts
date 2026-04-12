@@ -581,6 +581,49 @@ class ChannexClient {
     return this.request(`/channels?filter[property_id]=${propertyId}`);
   }
 
+  async getAllChannels(): Promise<AnyResponse> {
+    return this.request("/channels");
+  }
+
+  async createChannel(data: {
+    channel: string;
+    title: string;
+    properties: string[];
+    settings?: Record<string, unknown>;
+    group_id?: string;
+  }): Promise<AnyResponse> {
+    const res = await this.request("/channels", {
+      method: "POST",
+      body: JSON.stringify({ channel: data }),
+    });
+    console.log(`[Channex] Created channel: ${res.data?.id}`);
+    return res;
+  }
+
+  async updateChannel(channelId: string, data: {
+    properties?: string[];
+    settings?: Record<string, unknown>;
+    is_active?: boolean;
+  }): Promise<AnyResponse> {
+    const res = await this.request(`/channels/${channelId}`, {
+      method: "PUT",
+      body: JSON.stringify({ channel: data }),
+    });
+    return res;
+  }
+
+  async testChannelConnection(channelId: string): Promise<{ status: string; message?: string }> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await this.request<any>(`/channels/${channelId}/test`);
+      const status = res.data?.attributes?.status ?? res.data?.status ?? "unknown";
+      const message = res.data?.attributes?.message ?? res.data?.message ?? "";
+      return { status, message };
+    } catch (err) {
+      return { status: "error", message: err instanceof Error ? err.message : "Unknown error" };
+    }
+  }
+
   // ==================== One-Time Token ====================
 
   async createOneTimeToken(propertyId: string, groupId?: string): Promise<{ token: string }> {
