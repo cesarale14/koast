@@ -20,6 +20,17 @@ interface PropertyRowProps {
   gaps?: Set<string>;
 }
 
+const CELL = 80;
+// Airbnb-style partial-cell offsets. Non-turnover check-in starts at 50%
+// of the cell (afternoon 3pm arrival visual); non-turnover checkout ends
+// at 40% of the cell (11am departure visual). On a turnover day the
+// outgoing bar runs to 50% and the incoming bar starts at 40%, creating
+// a 10% overlap seam in the middle of the cell.
+const CHECKIN_OFFSET = 0.5;
+const CHECKOUT_EXT = 0.4;
+const TURNOVER_CHECKIN_OFFSET = 0.4;
+const TURNOVER_CHECKOUT_EXT = 0.5;
+
 export default function PropertyRow({
   property,
   dates,
@@ -37,6 +48,22 @@ export default function PropertyRow({
   gaps,
 }: PropertyRowProps) {
   const visibleDates = dates.slice(visibleStart, visibleEnd);
+
+  // Turnover detection: a booking has a "follower" if another booking
+  // checks in on its checkout date. Mirror set for predecessors.
+  const followerIds = new Set<string>();
+  const predecessorIds = new Set<string>();
+  const byCheckIn = new Map<string, BookingBarData>();
+  for (const b of bookings) {
+    if (!byCheckIn.has(b.check_in)) byCheckIn.set(b.check_in, b);
+  }
+  for (const b of bookings) {
+    const next = byCheckIn.get(b.check_out);
+    if (next && next.id !== b.id) {
+      followerIds.add(b.id);
+      predecessorIds.add(next.id);
+    }
+  }
 
   const getCoverage = (date: string): "full" | "checkin" | "checkout" | "turnover" | "booked" => {
     let isCheckIn = false;
@@ -60,31 +87,16 @@ export default function PropertyRow({
           const absIdx = visibleStart + i;
           const coverage = getCoverage(date);
 
-          if (coverage === "booked") {
+          // Middle booked nights and turnover days are covered by the
+          // booking bars themselves — render an empty cell so the bar
+          // visuals land on a clean background.
+          if (coverage === "booked" || coverage === "turnover") {
             return (
               <div
                 key={date}
                 className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0"
                 style={{ position: "absolute", left: `${absIdx * 80}px` }}
               />
-            );
-          }
-
-          if (coverage === "turnover") {
-            return (
-              <div
-                key={date}
-                className="w-[80px] h-full border-r border-neutral-100 flex-shrink-0 relative overflow-hidden"
-                style={{ position: "absolute", left: `${absIdx * 80}px` }}
-              >
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, transparent 48%, var(--neutral-300) 48%, var(--neutral-300) 52%, transparent 52%)",
-                  }}
-                />
-              </div>
             );
           }
 
@@ -123,17 +135,27 @@ export default function PropertyRow({
           const endDate = booking.check_out;
           let endIdx = dates.findIndex((d) => d >= endDate);
           if (endIdx === -1) endIdx = dates.length;
-          const span = endIdx - startIdx;
+          const nights = endIdx - startIdx;
 
-          if (span <= 0) return null;
-          if (startIdx >= visibleEnd || startIdx + span <= visibleStart) return null;
+          if (nights <= 0) return null;
+          if (startIdx >= visibleEnd || endIdx <= visibleStart) return null;
+
+          const hasFollower = followerIds.has(booking.id);
+          const hasPredecessor = predecessorIds.has(booking.id);
+          const leftOffsetCells = hasPredecessor ? TURNOVER_CHECKIN_OFFSET : CHECKIN_OFFSET;
+          const rightExtCells = hasFollower ? TURNOVER_CHECKOUT_EXT : CHECKOUT_EXT;
+
+          const left = (startIdx + leftOffsetCells) * CELL;
+          const width = (nights + rightExtCells - leftOffsetCells) * CELL - 2;
 
           return (
             <BookingBar
               key={booking.id}
               booking={booking}
-              startCol={startIdx}
-              span={span}
+              left={left}
+              width={width}
+              hasFollower={hasFollower}
+              hasPredecessor={hasPredecessor}
               onClick={onBookingClick}
             />
           );

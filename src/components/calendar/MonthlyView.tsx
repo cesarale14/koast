@@ -21,12 +21,28 @@ interface DayInfo { date: string; dayNum: number; isToday: boolean; isPast: bool
 interface BarSegment {
   booking: BookingBarData;
   startCol: number; endCol: number; row: number;
+  // Fractional cell coordinates for Airbnb-style partial-cell rendering.
+  // floatStart/floatEnd are in "cell widths" from the left edge of column 0
+  // on this row — e.g. 0.5 means "halfway through column 0", 2.4 means
+  // "40% into column 2". Lane packing still uses integer startCol/endCol.
+  floatStart: number; floatEnd: number;
   isStart: boolean; isEnd: boolean; // actual checkin/checkout (gets offset)
   capLeft: boolean; capRight: boolean; // rounded cap (month break or actual start/end)
   nights: number; isPast: boolean;
   lane: number; // vertical lane within the row (0 = bottom, stacking upward for conflicts)
   conflict: boolean; // true if this booking overlaps another in the calendar's bookings
+  hasFollower: boolean; // another booking checks in on this booking's checkout day
+  hasPredecessor: boolean; // another booking checked out on this booking's check-in day
 }
+
+// Airbnb-style partial-cell offsets. Non-turnover check-in starts at 50%
+// of the cell, non-turnover checkout ends at 40% of the cell. On a
+// turnover day the outgoing bar runs to 50% and the incoming bar starts
+// at 40%, creating a 10% overlap seam in the middle of the cell.
+const CHECKIN_OFFSET = 0.5;
+const CHECKOUT_EXT = 0.4;
+const TURNOVER_CHECKIN_OFFSET = 0.4;
+const TURNOVER_CHECKOUT_EXT = 0.5;
 
 interface MonthData {
   year: number; month: number; label: string; abbr: string; key: string;
@@ -77,7 +93,7 @@ function buildMonthDays(year: number, month: number, todayStr: string): { days: 
   return { days, startDow, totalDays };
 }
 
-function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<string>, year: number, month: number, startDow: number, totalDays: number, todayStr: string): BarSegment[] {
+function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<string>, followerIds: Set<string>, predecessorIds: Set<string>, year: number, month: number, startDow: number, totalDays: number, todayStr: string): BarSegment[] {
   const monthStart = toDateStr(year, month, 1);
   const monthEnd = toDateStr(year, month, totalDays);
   const nm = month === 11 ? 0 : month + 1;
@@ -90,6 +106,8 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
 
     const nights = getNights(booking.check_in, booking.check_out);
     const isPast = booking.check_out <= todayStr;
+    const hasFollower = followerIds.has(booking.id);
+    const hasPredecessor = predecessorIds.has(booking.id);
 
     // The bar covers "nights" — i.e. every date from check_in (inclusive)
     // through check_out minus one (inclusive). A 3-night stay 4/12→4/15
@@ -128,9 +146,43 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
     const eRow = Math.floor(endGridPos / 7);
     const eCol = endGridPos % 7;
 
+    // Grid position of the checkout day, if it still lives in this month.
+    // We use this to decide whether the last row can absorb a partial
+    // "checkout nub" into the checkout day cell without crossing a week
+    // boundary. Cross-row wraps keep the old cell-edge visual to avoid
+    // competing with lane-packed neighbors on the next row.
+    let checkoutRow = -1;
+    let checkoutColSameRow = false;
+    if (isEnd && barEndDay + 1 <= totalDays) {
+      const coGridPos = barEndDay + 1 - 1 + startDow;
+      checkoutRow = Math.floor(coGridPos / 7);
+      checkoutColSameRow = checkoutRow === eRow;
+    }
+
     for (let row = sRow; row <= eRow; row++) {
       const sc = row === sRow ? sCol : 0;
       const ec = row === eRow ? eCol : 6;
+      const isStartRow = row === sRow && isStart;
+      const isEndRow = row === eRow && isEnd;
+
+      // Default: bar covers whole cell(s) from sc to ec+1 (exclusive right).
+      let floatStart = sc;
+      let floatEnd = ec + 1;
+
+      // Check-in inset on the first row. Turnover (another booking
+      // checked out on this check-in day) starts 10% earlier to create
+      // the overlap seam with the outgoing bar.
+      if (isStartRow) {
+        floatStart = sc + (hasPredecessor ? TURNOVER_CHECKIN_OFFSET : CHECKIN_OFFSET);
+      }
+
+      // Checkout extension on the last row — only when the checkout
+      // day lives on the same grid row (no week wrap). Turnover extends
+      // 10% further so it meets the incoming bar at its start offset.
+      if (isEndRow && checkoutColSameRow) {
+        floatEnd = ec + 1 + (hasFollower ? TURNOVER_CHECKOUT_EXT : CHECKOUT_EXT);
+      }
+
       // capLeft: round the left edge of the bar only at the true start
       //   (check-in within this month on the first row).
       // capRight: round the right edge only at the true end (last night
@@ -138,13 +190,16 @@ function buildBarSegments(bookings: BookingBarData[], conflictBookingIds: Set<st
       //   week boundaries get flat edges so the bar reads as "continues".
       segments.push({
         booking, startCol: sc, endCol: ec, row,
-        isStart: row === sRow && isStart,
-        isEnd: row === eRow && isEnd,
-        capLeft: row === sRow && isStart,
-        capRight: row === eRow && isEnd,
+        floatStart, floatEnd,
+        isStart: isStartRow,
+        isEnd: isEndRow,
+        capLeft: isStartRow,
+        capRight: isEndRow,
         nights, isPast,
         lane: 0,
         conflict: conflictBookingIds.has(booking.id),
+        hasFollower,
+        hasPredecessor,
       });
     }
   }
@@ -309,11 +364,31 @@ export default function MonthlyView({
     return { conflictDates: dates, conflictBookingIds: ids, conflictPairs: pairs };
   }, [bookings]);
 
+  // Turnover detection: A has a "follower" when another booking checks
+  // in on A's checkout date. The mirror set records predecessors. These
+  // drive the Airbnb-style overlap seam on the turnover cell.
+  const { followerIds, predecessorIds } = useMemo(() => {
+    const f = new Set<string>();
+    const p = new Set<string>();
+    const byCheckIn = new Map<string, BookingBarData>();
+    for (const b of bookings) {
+      if (!byCheckIn.has(b.check_in)) byCheckIn.set(b.check_in, b);
+    }
+    for (const b of bookings) {
+      const next = byCheckIn.get(b.check_out);
+      if (next && next.id !== b.id) {
+        f.add(b.id);
+        p.add(next.id);
+      }
+    }
+    return { followerIds: f, predecessorIds: p };
+  }, [bookings]);
+
   const segmentsByMonth = useMemo(() => {
     const map = new Map<string, BarSegment[]>();
-    for (const m of months) map.set(m.key, buildBarSegments(bookings, conflictBookingIds, m.year, m.month, m.startDow, m.totalDays, todayStr));
+    for (const m of months) map.set(m.key, buildBarSegments(bookings, conflictBookingIds, followerIds, predecessorIds, m.year, m.month, m.startDow, m.totalDays, todayStr));
     return map;
-  }, [months, bookings, conflictBookingIds, todayStr]);
+  }, [months, bookings, conflictBookingIds, followerIds, predecessorIds, todayStr]);
 
   // Gap night detection — 1-2 available nights between bookings
   const gapDates = useMemo(() => {
@@ -487,12 +562,12 @@ export default function MonthlyView({
                 {/* Booking bars — full-width across the nights they cover,
                     stacked into lanes within a row when bookings overlap. */}
                 {segments.map((seg, si) => {
-                  const span = seg.endCol - seg.startCol + 1;
-
-                  // Full-cell span: left edge of first night cell → right
-                  // edge of last night cell. No fractional insets.
-                  const left = `calc(var(--col) * ${seg.startCol})`;
-                  const width = `calc(var(--col) * ${span} - ${GAP}px)`;
+                  // Airbnb-style partial-cell span. floatStart/floatEnd
+                  // encode check-in/checkout offsets into the grid's
+                  // --col width so the bar meets the cell edge cleanly.
+                  const cellSpan = seg.floatEnd - seg.floatStart;
+                  const left = `calc(var(--col) * ${seg.floatStart})`;
+                  const width = `calc(var(--col) * ${cellSpan} - ${GAP}px)`;
 
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
@@ -517,7 +592,7 @@ export default function MonthlyView({
                   const rawName = seg.booking.guest_name?.trim() ?? "";
                   const hasRealName = rawName.length > 0 && rawName !== "Airbnb Guest" && rawName !== "Guest" && rawName !== "Reserved";
                   const label = hasRealName ? rawName : "Booked";
-                  const showText = span >= 2;
+                  const showText = cellSpan >= 2;
 
                   const rL = seg.capLeft ? "10px" : "0";
                   const rR = seg.capRight ? "10px" : "0";
