@@ -325,7 +325,7 @@ export default function CalendarGrid({
       {/* Main content fills remaining viewport height */}
       <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white overflow-hidden">
         {/* Left property panel — desktop only */}
-        <aside className="hidden md:flex flex-col w-[200px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
+        <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
           <div className="p-3">
             <div className="space-y-0.5">
               {properties.map((p) => {
@@ -571,7 +571,7 @@ function RightSettingsPanel({
   return (
     <>
       {/* Desktop: always-visible sidebar */}
-      <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+      <aside className="hidden md:flex flex-col w-[280px] flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
         {panelContent}
       </aside>
 

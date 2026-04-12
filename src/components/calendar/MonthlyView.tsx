@@ -5,7 +5,7 @@ import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 
 const TOTAL_MONTHS = 24;
-const GAP = 2;
+const GAP = 5;
 
 const platformLogos: Record<string, string> = {
   airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
@@ -441,7 +441,7 @@ export default function MonthlyView({
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}
-        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[2px] border-b border-[#e8e8e8]">
+        <div className="sticky top-0 z-10 bg-white grid grid-cols-7 gap-[5px] border-b border-[#e8e8e8]">
           {DAY_LABELS.map((l, i) => (
             <div key={`${l}-${i}`} className="py-1 text-center text-[11px] font-medium text-[#999]">
               <span className="md:hidden">{DAY_LABELS_SHORT[i]}</span>
@@ -473,11 +473,11 @@ export default function MonthlyView({
                     <div
                       key={day.date}
                       data-cell
-                      className={`relative cursor-pointer transition-colors rounded ${
+                      className={`relative cursor-pointer transition-colors rounded-xl ${
                         isConflict ? "bg-red-50 ring-1 ring-red-300" : day.isPast ? "bg-[#f9f8f5]" : isBlocked ? "bg-[#f5f3ee]" : "bg-white hover:bg-[#faf9f6]"
                       }`}
                       style={{
-                        aspectRatio: "3 / 2",
+                        aspectRatio: "6 / 5",
                         border: "1px solid #e8e8e8",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
                       }}
@@ -515,7 +515,7 @@ export default function MonthlyView({
                   // Lane stacking. BAR_H must match the rendered bar height
                   // (32px desktop) and include LANE_GAP so stacked bars are
                   // visibly separated.
-                  const BAR_H = 24;
+                  const BAR_H = 30;
                   const LANE_GAP = 2;
                   const laneOffset = seg.lane * (BAR_H + LANE_GAP);
                   const rowUnit = cellH + GAP;
@@ -534,8 +534,8 @@ export default function MonthlyView({
                   const label = hasRealName ? `${firstName} + ${seg.nights}` : `Booked + ${seg.nights}`;
                   const showText = cellSpan >= 1.5;
 
-                  const rL = seg.capLeft ? "12px" : "0";
-                  const rR = seg.capRight ? "12px" : "0";
+                  const rL = seg.capLeft ? "15px" : "0";
+                  const rR = seg.capRight ? "15px" : "0";
                   const shadow = "0 1px 3px rgba(0,0,0,0.12)";
 
                   // Red diagonal stripe overlay + red border when the bar is
@@ -550,7 +550,7 @@ export default function MonthlyView({
                   return (
                     <div
                       key={`${seg.booking.id}-${seg.row}-${si}`}
-                      className="absolute flex items-center gap-1 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:brightness-110 h-[22px] md:h-[24px]"
+                      className="absolute flex items-center gap-1.5 text-white overflow-hidden whitespace-nowrap cursor-pointer transition-all duration-150 ease-out hover:brightness-110 h-[26px] md:h-[30px]"
                       style={{
                         left, width, top, transform: "translateY(-100%)",
                         backgroundColor: color,
@@ -569,14 +569,14 @@ export default function MonthlyView({
                       title={`${label} · ${seg.nights} night${seg.nights !== 1 ? "s" : ""} · ${seg.booking.platform}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
                     >
                       {seg.capLeft && logo && (
-                        <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[16px] h-[16px] md:w-[18px] md:h-[18px]"
+                        <div className="flex-shrink-0 rounded-full bg-white flex items-center justify-center w-[20px] h-[20px] md:w-[22px] md:h-[22px]"
                           style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={logo} alt="" className="w-[10px] h-[10px] md:w-[12px] md:h-[12px]" />
+                          <img src={logo} alt="" className="w-[12px] h-[12px] md:w-[14px] md:h-[14px]" />
                         </div>
                       )}
                       {showText && (
-                        <span className="truncate text-[9px] md:text-[10px] font-medium">
+                        <span className="truncate text-[10px] md:text-[11px] font-medium">
                           {label}
                         </span>
                       )}
