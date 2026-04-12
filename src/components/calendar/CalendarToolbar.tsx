@@ -34,22 +34,25 @@ export default function CalendarToolbar({
   showAllOption,
 }: CalendarToolbarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-      {/* Left: view toggle — hidden on mobile (monthly only) */}
-      <div className="hidden md:flex bg-neutral-100 rounded-lg p-0.5">
-        {(["timeline", "monthly"] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => onViewChange(mode)}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-              viewMode === mode
-                ? "bg-neutral-0 text-neutral-800 shadow-sm"
-                : "text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            {mode}
-          </button>
-        ))}
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+      {/* Left: title + view toggle */}
+      <div className="flex items-center gap-4">
+        <h1 className="text-sm font-bold text-neutral-800 hidden md:block">Calendar</h1>
+        <div className="hidden md:flex bg-neutral-100 rounded-lg p-0.5">
+          {(["timeline", "monthly"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => onViewChange(mode)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize ${
+                viewMode === mode
+                  ? "bg-white text-neutral-800 shadow-sm"
+                  : "text-neutral-500 hover:text-neutral-700"
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Center: navigation */}
@@ -57,16 +60,16 @@ export default function CalendarToolbar({
         {viewMode === "timeline" && (
           <button
             onClick={onPrev}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+            className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
         )}
         <button
           onClick={onToday}
-          className="px-3 py-1.5 text-sm font-medium text-neutral-600 bg-neutral-0 border border-[var(--border)] rounded-lg hover:bg-neutral-50 transition-colors"
+          className="px-2.5 py-1 text-xs font-medium text-neutral-600 bg-white border border-gray-200 rounded-lg hover:bg-neutral-50 transition-colors"
         >
           Today
         </button>
@@ -74,24 +77,24 @@ export default function CalendarToolbar({
           <>
             <button
               onClick={onNext}
-              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+              className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            <span className="text-sm font-medium text-neutral-700 ml-1">
+            <span className="text-xs font-medium text-neutral-600 ml-1">
               {formatRange(startDate, endDate)}
             </span>
           </>
         )}
       </div>
 
-      {/* Right: property selector — hidden on desktop for monthly (panel handles it) */}
+      {/* Right: property selector */}
       <select
         value={selectedPropertyId ?? ""}
         onChange={(e) => onPropertyChange(e.target.value || null)}
-        className={`h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors ${
+        className={`h-8 px-2.5 text-xs border border-gray-200 rounded-lg bg-white text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors ${
           !showAllOption ? "md:hidden" : ""
         }`}
       >

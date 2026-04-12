@@ -413,8 +413,60 @@ export default function CalendarGrid({
     return { nextCheckIn, occupancy, avgRate };
   }, [monthlyPropertyId, bookingLookup, rateLookup, todayStr]);
 
+  // ---------- Conflict pairs (monthly banner) ----------
+  const monthlyConflictPairs = useMemo(() => {
+    if (viewMode !== "monthly") return [];
+    const propBookings = bookingLookup.get(monthlyPropertyId) ?? [];
+    const confirmed = propBookings.filter((b) => !b.status || b.status === "confirmed");
+    const sorted = [...confirmed].sort((x, y) =>
+      x.check_in === y.check_in ? x.check_out.localeCompare(y.check_out) : x.check_in.localeCompare(y.check_in),
+    );
+    const pairs: { a: BookingBarData; b: BookingBarData; start: string; end: string; nights: number }[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (sorted[j].check_in >= sorted[i].check_out) continue;
+        if (sorted[i].check_out === sorted[j].check_in || sorted[j].check_out === sorted[i].check_in) continue;
+        const start = sorted[i].check_in > sorted[j].check_in ? sorted[i].check_in : sorted[j].check_in;
+        const end = sorted[i].check_out < sorted[j].check_out ? sorted[i].check_out : sorted[j].check_out;
+        const nights = Math.round(
+          (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
+            Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
+            86400000,
+        );
+        if (nights === 0) continue;
+        pairs.push({ a: sorted[i], b: sorted[j], start, end, nights });
+      }
+    }
+    return pairs;
+  }, [viewMode, monthlyPropertyId, bookingLookup]);
+
+  const handleConflictResolve = useCallback(
+    (a: BookingBarData, b: BookingBarData) => {
+      const toConflictBooking = (x: BookingBarData): ConflictBooking => ({
+        id: x.id, property_id: x.property_id, guest_name: x.guest_name,
+        check_in: x.check_in, check_out: x.check_out, platform: x.platform,
+        total_price: x.total_price, channex_booking_id: null,
+        platform_booking_id: null, status: x.status,
+      });
+      const start = a.check_in > b.check_in ? a.check_in : b.check_in;
+      const end = a.check_out < b.check_out ? a.check_out : b.check_out;
+      const nights = Math.round(
+        (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
+          Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
+          86400000,
+      );
+      setActiveConflict({
+        property_id: monthlyPropertyId,
+        property_name: properties.find((p) => p.id === monthlyPropertyId)?.name ?? "Property",
+        booking1: toConflictBooking(a), booking2: toConflictBooking(b),
+        overlap_start: start, overlap_end: end, overlap_nights: nights,
+      });
+    },
+    [monthlyPropertyId, properties],
+  );
+
   return (
-    <div className="relative">
+    <div className="flex flex-col h-full relative bg-white">
       <CalendarToolbar
         viewMode={viewMode}
         onViewChange={handleViewChange}
@@ -433,207 +485,206 @@ export default function CalendarGrid({
         showAllOption={viewMode === "timeline"}
       />
 
-      {/* ============ TIMELINE VIEW ============ */}
-      {viewMode === "timeline" && (
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden">
-          {/* Header: date labels */}
-          <div className="flex border-b border-[var(--border)]">
-            <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-50 border-r border-[var(--border)] px-4 py-2 sticky left-0 z-20">
-              <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-                Property
-              </span>
-            </div>
-
-            <div
-              className="flex-1 overflow-x-auto scroll-smooth"
-              ref={scrollRef}
-              onScroll={handleScroll}
-            >
-              <div className="flex" style={{ width: `${allDates.length * 80}px` }}>
-                {allDates.map((date, i) => {
-                  if (i < visibleColStart - 1 || i > visibleColEnd + 1) {
-                    return <div key={date} className="w-[80px] flex-shrink-0" />;
-                  }
-                  const d = new Date(date + "T00:00:00");
-                  const isToday = date === todayStr;
-                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                  const isFirstOfMonth = d.getDate() === 1;
-                  return (
-                    <div
-                      key={date}
-                      className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
-                        isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-25" : ""
-                      } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
-                    >
-                      {isFirstOfMonth && (
-                        <div className="text-[9px] text-brand-500 font-semibold uppercase tracking-wider mb-0.5">
-                          {d.toLocaleDateString("en-US", { month: "short" })}
-                        </div>
-                      )}
-                      <div
-                        className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}
-                      >
-                        {d.toLocaleDateString("en-US", { weekday: "short" })}
-                      </div>
-                      <div
-                        className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}
-                      >
-                        {d.getDate()}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+      {/* Conflict banner — full width between toolbar and calendar */}
+      {viewMode === "monthly" && monthlyConflictPairs.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-2 border-b border-red-100 bg-red-50">
+          <div className="flex flex-wrap items-center gap-2">
+            {monthlyConflictPairs.map((p, i) => {
+              const s = new Date(p.start + "T00:00:00");
+              const e = new Date(p.end + "T00:00:00");
+              const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+              const sMonth = s.toLocaleDateString("en-US", { month: "short" });
+              const eMonth = e.toLocaleDateString("en-US", { month: "short" });
+              const range = sameMonth
+                ? `${sMonth} ${s.getDate()}–${e.getDate()}`
+                : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
+              const label = `${monthlyConflictPairs.length > 1 ? `#${i + 1} ` : ""}${p.nights} night${p.nights === 1 ? "" : "s"} overlap ${range}`;
+              return (
+                <button
+                  key={`${p.a.id}-${p.b.id}`}
+                  onClick={() => handleConflictResolve(p.a, p.b)}
+                  className="inline-flex items-center gap-2 px-3 h-7 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200 hover:bg-red-200 transition-colors"
+                  title={`${p.a.guest_name ?? "Guest"} × ${p.b.guest_name ?? "Guest"}`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-red-500 text-white inline-flex items-center justify-center text-[10px] font-bold">!</span>
+                  <span>{label}</span>
+                  <span className="text-red-600/80 font-normal">· Click to resolve</span>
+                </button>
+              );
+            })}
           </div>
+        </div>
+      )}
 
-          {/* Property rows */}
-          {filteredProperties.map((prop) => (
-            <div key={prop.id} className="flex">
-              {/* Sticky property name with avatar */}
-              <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-0 border-r border-[var(--border)] px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
-                <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={40} />
-                <span className="text-sm font-medium text-neutral-700 truncate">
-                  {prop.name}
+      {/* Main content fills remaining viewport height */}
+      <div className="flex-1 min-h-0">
+        {/* ============ TIMELINE VIEW ============ */}
+        {viewMode === "timeline" && (
+          <div className="h-full overflow-hidden bg-white">
+            {/* Header: date labels */}
+            <div className="flex border-b border-gray-100">
+              <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-neutral-50 border-r border-gray-100 px-4 py-2 sticky left-0 z-20">
+                <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
+                  Property
                 </span>
               </div>
 
-              {/* Scrollable row content */}
-              <div className="flex-1 overflow-hidden">
-                <div
-                  style={{
-                    transform: `translateX(-${scrollLeft}px)`,
-                    width: `${allDates.length * 80}px`,
-                  }}
-                >
-                  <PropertyRow
-                    property={prop}
-                    dates={allDates}
-                    bookings={bookingLookup.get(prop.id) ?? []}
-                    rates={rateLookup.get(prop.id) ?? new Map()}
-                    todayStr={todayStr}
-                    visibleStart={visibleColStart}
-                    visibleEnd={visibleColEnd}
-                    selectedDates={dragPropertyId === prop.id ? selectedDates : new Set()}
-                    onBookingClick={setSelectedBooking}
-                    onDateClick={handleDateClick}
-                    onDragStart={handleDragStart}
-                    onDragEnter={handleDragEnter}
-                    events={eventLookup.get(prop.id) ?? new Map()}
-                    gaps={gapLookup.get(prop.id) ?? new Set()}
-                  />
+              <div
+                className="flex-1 overflow-x-auto scroll-smooth"
+                ref={scrollRef}
+                onScroll={handleScroll}
+              >
+                <div className="flex" style={{ width: `${allDates.length * 80}px` }}>
+                  {allDates.map((date, i) => {
+                    if (i < visibleColStart - 1 || i > visibleColEnd + 1) {
+                      return <div key={date} className="w-[80px] flex-shrink-0" />;
+                    }
+                    const d = new Date(date + "T00:00:00");
+                    const isToday = date === todayStr;
+                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                    const isFirstOfMonth = d.getDate() === 1;
+                    return (
+                      <div
+                        key={date}
+                        className={`w-[80px] flex-shrink-0 text-center py-2 border-r border-neutral-100 ${
+                          isToday ? "bg-brand-50" : isWeekend ? "bg-neutral-25" : ""
+                        } ${isFirstOfMonth ? "border-l-2 border-l-neutral-300" : ""}`}
+                      >
+                        {isFirstOfMonth && (
+                          <div className="text-[9px] text-brand-500 font-semibold uppercase tracking-wider mb-0.5">
+                            {d.toLocaleDateString("en-US", { month: "short" })}
+                          </div>
+                        )}
+                        <div
+                          className={`text-[10px] uppercase ${isToday ? "text-brand-500 font-semibold" : "text-neutral-400"}`}
+                        >
+                          {d.toLocaleDateString("en-US", { weekday: "short" })}
+                        </div>
+                        <div
+                          className={`text-sm ${isToday ? "font-bold text-brand-500" : "font-semibold text-neutral-800"}`}
+                        >
+                          {d.getDate()}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
-          ))}
 
-          {filteredProperties.length === 0 && (
-            <div className="p-12 text-center text-neutral-400 text-sm">
-              No properties to display.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ============ MONTHLY VIEW ============ */}
-      {viewMode === "monthly" && (
-        <div
-          className="flex flex-col md:flex-row md:rounded-xl md:border md:border-[#e8e8e8] overflow-hidden bg-white"
-          style={{ maxHeight: "calc(100vh - 160px)" }}
-        >
-          {/* Left property panel — desktop only */}
-          <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
-            <div className="p-4">
-              <div className="space-y-0.5">
-                {properties.map((p) => {
-                  const isActive = monthlyPropertyId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setMonthlyPropertyId(p.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2.5 ${
-                        isActive ? "bg-[#f5f5f5]" : "hover:bg-[#fafafa]"
-                      }`}
-                      style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
-                    >
-                      <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={28} />
-                      <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
-                        {p.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick stats */}
-            <div className="border-t border-[#e8e8e8] p-4 mt-auto">
-              <h3 className="text-[11px] font-medium uppercase tracking-widest text-[#999] mb-3">
-                Quick Stats
-              </h3>
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[#999]">Next check-in</span>
-                  <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#999]">Occupancy</span>
-                  <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#999]">Avg rate</span>
-                  <span className="font-mono font-medium text-[#333]">
-                    {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
+            {/* Property rows */}
+            {filteredProperties.map((prop) => (
+              <div key={prop.id} className="flex">
+                <div className="w-[140px] md:w-52 min-w-[140px] md:min-w-[208px] flex-shrink-0 bg-white border-r border-gray-100 px-3 md:px-4 flex items-center gap-2.5 sticky left-0 z-20 border-b border-neutral-100">
+                  <PropertyAvatar name={prop.name} photoUrl={prop.cover_photo_url} size={40} />
+                  <span className="text-sm font-medium text-neutral-700 truncate">
+                    {prop.name}
                   </span>
                 </div>
-              </div>
-            </div>
-          </aside>
 
-          {/* Calendar grid — flex-col so MonthlyView can fill height */}
-          <div className="flex-1 min-w-0 flex flex-col" style={{ maxWidth: "900px" }}>
-            <MonthlyView
-              propertyId={monthlyPropertyId}
-              bookings={bookingLookup.get(monthlyPropertyId) ?? []}
-              rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
-              todayStr={todayStr}
-              todayTrigger={monthlyTodayTrigger}
-              onBookingClick={setSelectedBooking}
-              onDateClick={handleDateClick}
-              onConflictResolve={(a, b) => {
-                const toConflictBooking = (x: BookingBarData): ConflictBooking => ({
-                  id: x.id,
-                  property_id: x.property_id,
-                  guest_name: x.guest_name,
-                  check_in: x.check_in,
-                  check_out: x.check_out,
-                  platform: x.platform,
-                  total_price: x.total_price,
-                  channex_booking_id: null,
-                  platform_booking_id: null,
-                  status: x.status,
-                });
-                const start = a.check_in > b.check_in ? a.check_in : b.check_in;
-                const end = a.check_out < b.check_out ? a.check_out : b.check_out;
-                const nights = Math.round(
-                  (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
-                    Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
-                    86400000
-                );
-                setActiveConflict({
-                  property_id: monthlyPropertyId,
-                  property_name: properties.find((p) => p.id === monthlyPropertyId)?.name ?? "Property",
-                  booking1: toConflictBooking(a),
-                  booking2: toConflictBooking(b),
-                  overlap_start: start,
-                  overlap_end: end,
-                  overlap_nights: nights,
-                });
-              }}
-            />
+                <div className="flex-1 overflow-hidden">
+                  <div
+                    style={{
+                      transform: `translateX(-${scrollLeft}px)`,
+                      width: `${allDates.length * 80}px`,
+                    }}
+                  >
+                    <PropertyRow
+                      property={prop}
+                      dates={allDates}
+                      bookings={bookingLookup.get(prop.id) ?? []}
+                      rates={rateLookup.get(prop.id) ?? new Map()}
+                      todayStr={todayStr}
+                      visibleStart={visibleColStart}
+                      visibleEnd={visibleColEnd}
+                      selectedDates={dragPropertyId === prop.id ? selectedDates : new Set()}
+                      onBookingClick={setSelectedBooking}
+                      onDateClick={handleDateClick}
+                      onDragStart={handleDragStart}
+                      onDragEnter={handleDragEnter}
+                      events={eventLookup.get(prop.id) ?? new Map()}
+                      gaps={gapLookup.get(prop.id) ?? new Set()}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filteredProperties.length === 0 && (
+              <div className="p-12 text-center text-neutral-400 text-sm">
+                No properties to display.
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ============ MONTHLY VIEW ============ */}
+        {viewMode === "monthly" && (
+          <div className="h-full flex flex-col md:flex-row bg-white overflow-hidden">
+            {/* Left property panel — desktop only */}
+            <aside className="hidden md:flex flex-col w-[200px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
+              <div className="p-3">
+                <div className="space-y-0.5">
+                  {properties.map((p) => {
+                    const isActive = monthlyPropertyId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setMonthlyPropertyId(p.id)}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                          isActive ? "bg-gray-100" : "hover:bg-gray-50"
+                        }`}
+                        style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
+                      >
+                        <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={26} />
+                        <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
+                          {p.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div className="border-t border-gray-100 p-3 mt-auto">
+                <h3 className="text-[10px] font-medium uppercase tracking-widest text-[#999] mb-2">
+                  Quick Stats
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-[#999]">Next check-in</span>
+                    <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#999]">Occupancy</span>
+                    <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#999]">Avg rate</span>
+                    <span className="font-mono font-medium text-[#333]">
+                      {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            {/* Calendar grid fills remaining space */}
+            <div className="flex-1 min-w-0 flex flex-col min-h-0">
+              <MonthlyView
+                propertyId={monthlyPropertyId}
+                bookings={bookingLookup.get(monthlyPropertyId) ?? []}
+                rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
+                todayStr={todayStr}
+                todayTrigger={monthlyTodayTrigger}
+                onBookingClick={setSelectedBooking}
+                onDateClick={handleDateClick}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Booking side panel */}
       <BookingSidePanel

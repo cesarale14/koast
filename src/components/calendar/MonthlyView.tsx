@@ -57,7 +57,6 @@ export interface MonthlyViewProps {
   todayTrigger: number;
   onBookingClick: (booking: BookingBarData) => void;
   onDateClick: (propertyId: string, date: string, rate: RateData | null) => void;
-  onConflictResolve?: (booking1: BookingBarData, booking2: BookingBarData) => void;
 }
 
 function pad2(n: number): string { return String(n).padStart(2, "0"); }
@@ -65,17 +64,6 @@ function toDateStr(y: number, m: number, d: number): string { return `${y}-${pad
 function getNights(ci: string, co: string): number {
   return Math.round((Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10)) -
     Date.UTC(+ci.slice(0, 4), +ci.slice(5, 7) - 1, +ci.slice(8, 10))) / 86400000);
-}
-
-function formatPillRange(start: string, end: string): string {
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
-  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
-  const sMonth = s.toLocaleDateString("en-US", { month: "short" });
-  const eMonth = e.toLocaleDateString("en-US", { month: "short" });
-  return sameMonth
-    ? `${sMonth} ${s.getDate()}–${e.getDate()}`
-    : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
 }
 
 function buildMonthDays(year: number, month: number, todayStr: string): { days: DayInfo[]; startDow: number; totalDays: number } {
@@ -241,7 +229,7 @@ const gridVars = {
 } as React.CSSProperties;
 
 export default function MonthlyView({
-  propertyId, bookings, rates, todayStr, todayTrigger, onBookingClick, onDateClick, onConflictResolve,
+  propertyId, bookings, rates, todayStr, todayTrigger, onBookingClick, onDateClick,
 }: MonthlyViewProps) {
   const thisYear = new Date().getFullYear();
   const thisMonth = new Date().getMonth();
@@ -323,7 +311,7 @@ export default function MonthlyView({
   // span the same night, plus the set of booking IDs involved in any
   // overlap and the pairwise conflict ranges shown in the summary pill.
   // Computed locally from the bookings the calendar already has.
-  const { conflictDates, conflictBookingIds, conflictPairs } = useMemo(() => {
+  const { conflictDates, conflictBookingIds } = useMemo(() => {
     const confirmed = bookings.filter((b) => !b.status || b.status === "confirmed");
     const dateToCount = new Map<string, number>();
     for (const b of confirmed) {
@@ -449,30 +437,6 @@ export default function MonthlyView({
             }`}>{m.abbr}</button>
         ))}
       </div>
-
-      {/* Conflict summary pill — pinned above the scroll area so it stays
-          visible regardless of month scrolled to. */}
-      {conflictPairs.length > 0 && (
-        <div className="flex-shrink-0 px-3 py-2 border-b border-red-100 bg-red-50">
-          <div className="flex flex-wrap items-center gap-2">
-            {conflictPairs.map((p, i) => {
-              const label = `${conflictPairs.length > 1 ? `#${i + 1} ` : ""}${p.nights} night${p.nights === 1 ? "" : "s"} overlap ${formatPillRange(p.start, p.end)}`;
-              return (
-                <button
-                  key={`${p.a.id}-${p.b.id}`}
-                  onClick={() => onConflictResolve?.(p.a, p.b)}
-                  className="inline-flex items-center gap-2 px-3 h-8 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200 hover:bg-red-200 transition-colors"
-                  title={`${p.a.guest_name ?? "Guest"} × ${p.b.guest_name ?? "Guest"}`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-red-500 text-white inline-flex items-center justify-center text-[10px] font-bold">!</span>
-                  <span>{label}</span>
-                  <span className="text-red-600/80 font-normal">· Click to resolve</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div ref={(el) => { containerRef.current = el; measureElRef.current = el; }} className="overflow-y-auto flex-1 min-h-0 bg-white px-2 md:px-0">
         {/* Sticky day header */}

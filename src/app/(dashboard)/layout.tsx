@@ -283,7 +283,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <main className="flex-1 overflow-auto">
             <ToastProvider>
-              <div className="max-w-[1200px] mx-auto p-4 md:p-8 page-enter">{children}</div>
+              {pathname === "/calendar" ? (
+                <div className="h-full page-enter">{children}</div>
+              ) : (
+                <div className="max-w-[1200px] mx-auto p-4 md:p-8 page-enter">{children}</div>
+              )}
             </ToastProvider>
           </main>
         </div>

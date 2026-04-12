@@ -98,18 +98,11 @@ export default async function CalendarPage() {
   }[];
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Calendar</h1>
-        <p className="text-sm text-neutral-500">Multi-property availability calendar</p>
-      </div>
-
-      <CalendarGrid
-        properties={properties}
-        bookings={bookings}
-        rates={rates}
-        totalDays={TOTAL_DAYS}
-      />
-    </div>
+    <CalendarGrid
+      properties={properties}
+      bookings={bookings}
+      rates={rates}
+      totalDays={TOTAL_DAYS}
+    />
   );
 }
