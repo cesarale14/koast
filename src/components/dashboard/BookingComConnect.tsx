@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 
-type Step = "form" | "connecting" | "authorization" | "activating" | "success" | "error";
+type Step = "form" | "connecting" | "authorization" | "activating" | "success" | "ical" | "error";
 
 interface BookingComConnectProps {
   propertyId: string;
@@ -25,6 +25,9 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
   const [channelId, setChannelId] = useState("");
   const [progressIdx, setProgressIdx] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [icalUrl, setIcalUrl] = useState("");
+  const [icalLoading, setIcalLoading] = useState(false);
+  const [icalResult, setIcalResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const doActivate = useCallback(async (chId: string) => {
     setStep("activating");
@@ -39,7 +42,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
     if (!actRes.ok) throw new Error(actData.error || "Failed to activate");
 
     setProgressIdx(4);
-    setStep("success");
+    setStep("ical");
   }, [propertyId]);
 
   const handleConnect = useCallback(async () => {
@@ -228,6 +231,92 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
               </div>
             )}
 
+            {/* ---- ICAL — import existing bookings ---- */}
+            {step === "ical" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#eef5f0] flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-[#1a3a2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#222]">Channel Connected</h3>
+                    <p className="text-[11px] text-[#999]">Hotel ID: {hotelId}</p>
+                  </div>
+                </div>
+
+                <div className="bg-[#f8f6f1] rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-[#222] mb-1.5">Import existing bookings</h4>
+                  <p className="text-[12px] text-[#666] leading-relaxed mb-3">
+                    Paste your Booking.com iCal URL to import existing reservations into your calendar.
+                  </p>
+                  <ol className="space-y-1.5 text-[12px] text-[#555] mb-3">
+                    <li className="flex gap-2">
+                      <span className="font-bold text-[#222] flex-shrink-0">1.</span>
+                      <span>Log into <strong>admin.booking.com</strong></span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-bold text-[#222] flex-shrink-0">2.</span>
+                      <span>Go to <strong>Rates &amp; Availability → Sync calendars</strong></span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-bold text-[#222] flex-shrink-0">3.</span>
+                      <span>Click <strong>Export</strong> and copy the iCal URL</span>
+                    </li>
+                  </ol>
+                  <input
+                    type="url"
+                    value={icalUrl}
+                    onChange={(e) => { setIcalUrl(e.target.value); setIcalResult(null); }}
+                    placeholder="https://admin.booking.com/...ics"
+                    className="w-full px-3 py-2 text-sm border border-[#efe9dd] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/20 focus:border-[#1a3a2a] bg-white"
+                  />
+                  {icalResult && (
+                    <p className={`text-xs mt-1.5 ${icalResult.ok ? "text-[#3d6b52]" : "text-[#c44040]"}`}>
+                      {icalResult.message}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={async () => {
+                    if (!icalUrl.trim()) { setStep("success"); return; }
+                    setIcalLoading(true);
+                    try {
+                      const res = await fetch("/api/ical/add", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ propertyId, url: icalUrl.trim(), platform: "booking_com" }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setIcalResult({ ok: true, message: `Imported ${data.bookings_found ?? 0} bookings` });
+                        setTimeout(() => setStep("success"), 1200);
+                      } else {
+                        setIcalResult({ ok: false, message: data.error || "Failed to import" });
+                      }
+                    } catch {
+                      setIcalResult({ ok: false, message: "Network error" });
+                    } finally {
+                      setIcalLoading(false);
+                    }
+                  }}
+                  disabled={icalLoading}
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[#003580] rounded-lg hover:bg-[#00265c] disabled:opacity-50 transition-colors"
+                >
+                  {icalLoading ? "Importing..." : icalUrl.trim() ? "Import Bookings" : "Skip for now"}
+                </button>
+
+                <button
+                  onClick={() => setStep("success")}
+                  className="w-full py-2 text-sm font-medium text-[#999] hover:text-[#666] transition-colors"
+                >
+                  Skip — I&apos;ll do this later
+                </button>
+              </div>
+            )}
+
             {/* ---- SUCCESS ---- */}
             {step === "success" && (
               <div className="text-center space-y-4">
@@ -241,7 +330,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   <p className="text-sm text-[#999] mt-1">Hotel ID: {hotelId}</p>
                 </div>
                 <p className="text-[13px] text-[#666] leading-relaxed">
-                  Bookings from Booking.com will now sync automatically. Calendar availability is being managed by StayCommand.
+                  New bookings will sync automatically via Channex. Calendar availability is managed by Moora.
                 </p>
                 <button
                   onClick={() => { onConnected(); onClose(); }}
