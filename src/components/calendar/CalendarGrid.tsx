@@ -401,14 +401,16 @@ export default function CalendarGrid({
           onCloseDate={() => setRatePanel(null)}
           onOpenDefault={() => {
             // "Price settings" / "Availability settings" header click —
-            // open the date editor with today's date on the first visible
-            // property. Noop if there are no properties.
-            if (properties.length === 0) return;
+            // open the date editor with today's date on the CURRENTLY
+            // selected property (the one the user is viewing in the
+            // sidebar), not just properties[0]. Falls back to the first
+            // property only if there is no active selection.
+            const activeId = monthlyPropertyId || properties[0]?.id;
+            if (!activeId) return;
             const today = getToday();
-            const firstProp = properties[0];
-            const propLookup = rateLookup.get(firstProp.id);
+            const propLookup = rateLookup.get(activeId);
             const rate = propLookup?.get(today) ?? null;
-            setRatePanel({ propertyId: firstProp.id, dates: [today], rate });
+            setRatePanel({ propertyId: activeId, dates: [today], rate });
           }}
         />
       </div>

@@ -152,13 +152,19 @@ export async function GET(
     // 2b. Auto-discover rate plans from Channex for property_channels rows
     //     that don't have settings.rate_plan_id populated (common for rows
     //     created via the import flow rather than the BDC connect flow).
-    //     This queries the Channex /channels endpoint for channels that
-    //     include this Channex property and reads each channel's first
-    //     rate_plan_id.
+    //     We need to intersect each channel's rate_plans with THIS property's
+    //     rate plans, because multi-property channels (e.g. the user's
+    //     single Airbnb channel for all their listings) expose every rate
+    //     plan from every linked property in one rate_plans array.
     const channexRatePlanByCode: Record<string, string> = {};
     const channexCodeMap: Record<string, string> = { "AirBNB": "ABB", "BookingCom": "BDC", "VRBO": "VRBO" };
     try {
       const channex = createChannexClient();
+      // First: get the set of rate plan IDs that belong to this Channex
+      // property so we can filter out rate plans from sibling properties.
+      const propRatePlans = await channex.getRatePlans(channexPropertyId);
+      const propertyRatePlanIds = new Set(propRatePlans.map((rp) => rp.id));
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chRes: any = await channex.getChannels(channexPropertyId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,7 +172,13 @@ export async function GET(
         const channexChannelType = ch.attributes?.channel;
         const pmsCode = channexCodeMap[channexChannelType];
         if (!pmsCode) continue;
-        const rp = ch.attributes?.rate_plans?.[0]?.rate_plan_id;
+        // Find the first rate plan in this channel that belongs to this
+        // specific property (not a sibling property sharing the channel).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const matching = (ch.attributes?.rate_plans ?? []).find((rp: any) =>
+          rp?.rate_plan_id && propertyRatePlanIds.has(rp.rate_plan_id)
+        );
+        const rp = matching?.rate_plan_id;
         if (rp && !channexRatePlanByCode[pmsCode]) {
           channexRatePlanByCode[pmsCode] = rp;
         }
