@@ -119,17 +119,24 @@ export async function GET(
 
     const supabase = createServiceClient();
 
-    // 1. Channex property id for this property
+    // 1. Channex property id for this property. If the property isn't
+    //    linked to Channex yet, return an empty state instead of an error
+    //    so the UI can show "No channels connected" rather than a scary
+    //    red banner — this is the normal state for manually-created
+    //    properties that haven't gone through the import/connect flows.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: propRow } = await (supabase.from("properties") as any)
       .select("id, channex_property_id")
       .eq("id", propertyId)
       .maybeSingle();
     if (!propRow?.channex_property_id) {
-      return NextResponse.json(
-        { error: "Property not connected to Channex" },
-        { status: 400 }
-      );
+      const empty: GetResponseBody = {
+        base: {},
+        channels: [],
+        fetched_at: new Date().toISOString(),
+        cache_hit: false,
+      };
+      return NextResponse.json(empty);
     }
     const channexPropertyId: string = propRow.channex_property_id;
 
