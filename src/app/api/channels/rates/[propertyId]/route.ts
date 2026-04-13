@@ -27,7 +27,10 @@ import { createChannexClient } from "@/lib/channex/client";
 // query param bypasses it for manual force-refresh.
 type CacheEntry = { ts: number; data: GetResponseBody };
 const rateCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// 60s TTL — enough to dedupe rapid clicks on the same date but short
+// enough that a stale response from a previous deploy (e.g. before the
+// Channex auto-discovery was added) doesn't persist.
+const CACHE_TTL_MS = 60 * 1000;
 
 function cacheKey(propertyId: string, dateFrom: string, dateTo: string) {
   return `${propertyId}|${dateFrom}|${dateTo}`;
@@ -157,22 +160,28 @@ export async function GET(
     //     plan from every linked property in one rate_plans array.
     const channexRatePlanByCode: Record<string, string> = {};
     const channexCodeMap: Record<string, string> = { "AirBNB": "ABB", "BookingCom": "BDC", "VRBO": "VRBO" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const debug: Record<string, any> = {};
     try {
       const channex = createChannexClient();
-      // First: get the set of rate plan IDs that belong to this Channex
-      // property so we can filter out rate plans from sibling properties.
       const propRatePlans = await channex.getRatePlans(channexPropertyId);
       const propertyRatePlanIds = new Set(propRatePlans.map((rp) => rp.id));
+      debug.property_rate_plans = Array.from(propertyRatePlanIds);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chRes: any = await channex.getChannels(channexPropertyId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      debug.channex_channels = (chRes?.data ?? []).map((ch: any) => ({
+        id: ch.id,
+        channel: ch.attributes?.channel,
+        rate_plans: (ch.attributes?.rate_plans ?? []).map((rp: any) => rp?.rate_plan_id),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const ch of (chRes?.data ?? []) as any[]) {
         const channexChannelType = ch.attributes?.channel;
         const pmsCode = channexCodeMap[channexChannelType];
         if (!pmsCode) continue;
-        // Find the first rate plan in this channel that belongs to this
-        // specific property (not a sibling property sharing the channel).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const matching = (ch.attributes?.rate_plans ?? []).find((rp: any) =>
           rp?.rate_plan_id && propertyRatePlanIds.has(rp.rate_plan_id)
@@ -182,8 +191,11 @@ export async function GET(
           channexRatePlanByCode[pmsCode] = rp;
         }
       }
+      debug.discovered = channexRatePlanByCode;
     } catch (err) {
-      console.warn("[channels/rates GET] Channex channel discovery failed:", err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      debug.error = msg;
+      console.warn("[channels/rates GET] Channex channel discovery failed:", msg);
     }
 
     // 2c. If property_channels has no rows at all but Channex shows
@@ -361,6 +373,7 @@ export async function GET(
     return NextResponse.json({
       ...body,
       channex_error: channexError,
+      _debug: debug,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
