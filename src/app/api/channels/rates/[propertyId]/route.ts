@@ -16,8 +16,8 @@ import { createChannexClient } from "@/lib/channex/client";
  * POST /api/channels/rates/[propertyId]
  *      Body: { date_from, date_to, channel_code, rate, min_stay_arrival? }
  *      Saves a per-channel override to calendar_rates and pushes the new
- *      rate/restriction to the corresponding Channex rate plan. Airbnb is
- *      a no-op because Airbnb manages its own pricing per CLAUDE.md.
+ *      rate/restriction to the corresponding Channex rate plan. Every
+ *      connected channel (Airbnb, Booking.com, Vrbo) receives the push.
  */
 
 // ---------- In-memory cache ----------
@@ -76,10 +76,9 @@ const CHANNEL_NAME: Record<string, string> = {
   DIRECT: "Direct",
 };
 
-// Airbnb rates are managed inside Airbnb itself — we read them from Channex
-// for display but never push back. Keeping this as a set so other channels
-// can be added later if needed (per CLAUDE.md guidance).
-const READ_ONLY_CHANNELS = new Set(["ABB"]);
+// Every connected channel is editable — Moora pushes rates to all of
+// them via their dedicated Channex rate plans.
+const READ_ONLY_CHANNELS = new Set<string>();
 
 // ==========================================================================
 // GET
@@ -344,7 +343,6 @@ export async function GET(
         rate_plan_id: ratePlanId,
         status: link.status,
         editable: !readOnly,
-        read_only_reason: readOnly ? "Airbnb manages its own pricing" : undefined,
         dates,
       });
     }
@@ -400,15 +398,6 @@ export async function POST(
         { error: "date_from, date_to, channel_code, rate are required" },
         { status: 400 }
       );
-    }
-
-    if (READ_ONLY_CHANNELS.has(channel_code)) {
-      return NextResponse.json({
-        ok: true,
-        skipped: true,
-        reason: "airbnb_self_managed",
-        message: "Airbnb manages its own pricing — nothing to push.",
-      });
     }
 
     const propertyId = params.propertyId;

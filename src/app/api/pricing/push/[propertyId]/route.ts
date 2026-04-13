@@ -108,16 +108,14 @@ export async function POST(
     type RatePlanTarget = { id: string; channel: string };
     const targets: RatePlanTarget[] = [];
 
-    // Airbnb is read-only — we don't push rates to it (Airbnb manages its
-    // own pricing per CLAUDE.md). Skip its rate plan even if it's linked.
-    const READ_ONLY_CHANNELS = new Set(["ABB"]);
-
+    // Push to every connected channel — Airbnb, Booking.com, Vrbo all get
+    // rates via their dedicated Channex rate plans. Moora is the single
+    // source of truth for pricing.
     for (const link of (channelLinks ?? []) as Array<{
       channel_code: string;
       channel_name: string;
       settings: { rate_plan_id?: string } | null;
     }>) {
-      if (READ_ONLY_CHANNELS.has(link.channel_code)) continue;
       const rpId = link.settings?.rate_plan_id;
       if (rpId) targets.push({ id: rpId, channel: link.channel_code });
     }

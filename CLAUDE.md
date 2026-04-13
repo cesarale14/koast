@@ -101,7 +101,7 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - Availability: StayCommand controls availability. On import, pushes avail=1 for 365 days then blocks booked dates
 - API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
-- IMPORTANT: Scaffold rate plans must NOT have a default rate — Airbnb manages its own pricing.
+- IMPORTANT: Moora pushes rates to ALL connected channels including Airbnb via Channex rate plans. The calendar's per-channel rate editor can target Airbnb, Booking.com, and Vrbo independently; saving pushes to the channel's dedicated Channex rate plan.
 
 ### Booking.com Self-Service Connection
 - Flow: User enters Hotel ID → API creates Channex BDC channel → tests connection → if Booking.com hasn't authorized Channex, shows instructions (admin.booking.com → Account → Connectivity Provider → search "Channex") → retry → on success, pushes availability + activates
