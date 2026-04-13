@@ -481,7 +481,7 @@ export default function MonthlyView({
                         border: "1px solid #e8e8e8",
                         ...(i === 0 && m.startDow > 0 ? { gridColumnStart: m.startDow + 1 } : {}),
                       }}
-                      onClick={() => { if (!isBooked && !day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
+                      onClick={() => { if (!day.isPast) onDateClick(propertyId, day.date, rate ?? null); }}
                     >
                       <div className="px-1.5 pt-1 pb-0.5 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between">
