@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createChannexClient } from "@/lib/channex/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,15 +14,49 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient();
+    const channex = createChannexClient();
     const userId = user.id;
 
-    // Get all user's property IDs
+    // Get all user's property IDs AND Channex linkage info so we can
+    // clean up Channex resources before destroying the local rows.
     const { data: userProps } = await supabase
       .from("properties")
-      .select("id")
+      .select("id, channex_property_id")
       .eq("user_id", userId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const propertyIds = ((userProps ?? []) as any[]).map((p) => p.id);
+    const propertyRows = ((userProps ?? []) as Array<{ id: string; channex_property_id: string | null }>);
+    const propertyIds = propertyRows.map((p) => p.id);
+
+    // Channex cleanup — best-effort, doesn't block local delete.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: channelRows } = await (supabase.from("property_channels") as any)
+      .select("channex_channel_id, channel_code, settings, property_id")
+      .in("property_id", propertyIds.length > 0 ? propertyIds : ["__none__"]);
+    for (const ch of ((channelRows ?? []) as Array<{ channex_channel_id: string; channel_code: string; settings: { rate_plan_id?: string } | null }>)) {
+      if (ch.channex_channel_id.startsWith("auto-")) continue;
+      try {
+        await channex.deleteChannel(ch.channex_channel_id);
+      } catch (err) {
+        console.warn(`[delete-account] Channex channel ${ch.channex_channel_id} delete failed:`, err instanceof Error ? err.message : err);
+      }
+      const ratePlanId = ch.settings?.rate_plan_id;
+      if (ratePlanId) {
+        try {
+          await channex.deleteRatePlan(ratePlanId);
+        } catch (err) {
+          console.warn(`[delete-account] Channex rate plan ${ratePlanId} delete failed:`, err instanceof Error ? err.message : err);
+        }
+      }
+    }
+    // Delete Channex properties owned only by this user.
+    for (const p of propertyRows) {
+      if (!p.channex_property_id) continue;
+      try {
+        await channex.deleteProperty(p.channex_property_id);
+      } catch (err) {
+        console.warn(`[delete-account] Channex property ${p.channex_property_id} delete failed:`, err instanceof Error ? err.message : err);
+      }
+    }
 
     if (propertyIds.length > 0) {
       // Delete all property-scoped data
@@ -40,6 +75,9 @@ export async function POST(request: NextRequest) {
         "bookings",
         "listings",
         "property_details",
+        "property_channels",
+        "channex_room_types",
+        "channex_rate_plans",
       ];
 
       for (const table of tables) {

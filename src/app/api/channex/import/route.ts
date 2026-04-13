@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServerClient } from "@supabase/ssr";
 import { createChannexClient } from "@/lib/channex/client";
+import { acquireLock, releaseLock } from "@/lib/concurrency/locks";
 
 /**
  * Normalize a property name for strict matching.
@@ -261,8 +262,20 @@ export async function POST(request: NextRequest) {
           console.error("[channex/import] Room types error:", rtErr);
         }
 
-        // 3b. If migrating from scaffold, update room types, rate plans, and BDC channel
+        // 3b. If migrating from scaffold, update room types, rate plans, and BDC channel.
+        //     Acquire the same bdc_connect lock the connect-booking-com flow
+        //     uses so a migration can't race against a concurrent connect
+        //     on the same property (which would leave the channel pointing
+        //     at the stale scaffold ID).
         if (migratedFromScaffold && oldChannexPropertyId) {
+          const migrationLockKey = `bdc_connect:${propertyId}`;
+          const migrationLockAcquired = await acquireLock(supabase, migrationLockKey, 60);
+          if (!migrationLockAcquired) {
+            console.warn(`[channex/import] Skipping scaffold migration for ${propertyId} — BDC connect in progress. Will retry on next import.`);
+            // Fall through — don't mutate scaffold state while someone
+            // else is in the middle of BDC connect. The next import will
+            // run the migration cleanly.
+          } else {
           try {
             const realRoomTypes = await channex.getRoomTypes(channexId);
             const realRatePlans = await channex.getRatePlans(channexId);
@@ -349,7 +362,10 @@ export async function POST(request: NextRequest) {
           } catch (migErr) {
             console.error("[channex/import] Scaffold migration error:", migErr);
             // Non-fatal — property import continues
+          } finally {
+            await releaseLock(supabase, migrationLockKey);
           }
+          } // end of `if (migrationLockAcquired)`
         }
 
         // 4. Fetch bookings for next 90 days. Track per-booking failures so

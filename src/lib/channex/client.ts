@@ -646,6 +646,32 @@ class ChannexClient {
     return res;
   }
 
+  /**
+   * Activate a BDC channel via Channex's dedicated activation endpoint.
+   * `PUT /channels/{id} { is_active: true }` silently no-ops for newly
+   * created BookingCom channels — we discovered this the hard way during
+   * Villa Jamaica setup. The correct endpoint is POST /channels/{id}/activate
+   * which Channex documents separately.
+   */
+  async activateChannel(channelId: string): Promise<AnyResponse> {
+    return this.request(`/channels/${channelId}/activate`, { method: "POST" });
+  }
+
+  /**
+   * Delete a Channex channel. Used on property deletion and compensating
+   * rollback in the BDC connect flow.
+   */
+  async deleteChannel(channelId: string): Promise<AnyResponse> {
+    return this.request(`/channels/${channelId}`, { method: "DELETE" });
+  }
+
+  /**
+   * Delete a Channex rate plan. Used in compensating rollback.
+   */
+  async deleteRatePlan(ratePlanId: string): Promise<AnyResponse> {
+    return this.request(`/rate_plans/${ratePlanId}`, { method: "DELETE" });
+  }
+
   async updateChannel(channelId: string, data: {
     properties?: string[];
     settings?: Record<string, unknown>;
