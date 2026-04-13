@@ -226,40 +226,117 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   <div className="flex items-start gap-2.5">
                     <span className="text-amber-500 text-lg flex-shrink-0">⚠</span>
                     <div>
-                      <h3 className="text-sm font-semibold text-amber-800 mb-1.5">Authorization Required</h3>
+                      <h3 className="text-sm font-semibold text-amber-800 mb-1.5">Authorize Channex.io in Booking.com</h3>
                       <p className="text-[13px] text-amber-700 leading-relaxed">
-                        Booking.com requires you to authorize Channex as your connectivity provider.
+                        Booking.com requires one-time authorization before we can sync rates, availability, and reservations for hotel ID <strong>{hotelId}</strong>.
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <ol className="space-y-2.5 text-[13px] text-[#555]">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wide text-[#3d6b52] mb-3">
+                    Step-by-step
+                  </h4>
+                  <ol className="space-y-3 text-[13px] text-[#555]">
                     <li className="flex gap-2">
-                      <span className="font-bold text-[#222] flex-shrink-0">1.</span>
-                      <span>Log into <strong className="text-[#003580]">admin.booking.com</strong></span>
+                      <span className="font-bold text-[#222] flex-shrink-0 w-5">1.</span>
+                      <div className="flex-1">
+                        <a
+                          href="https://admin.booking.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#003580] font-semibold underline hover:no-underline"
+                        >
+                          Open admin.booking.com
+                        </a>{" "}
+                        in a new tab and log in to the account for hotel <strong>{hotelId}</strong>.
+                      </div>
                     </li>
                     <li className="flex gap-2">
-                      <span className="font-bold text-[#222] flex-shrink-0">2.</span>
-                      <span>Go to <strong>Account → Connectivity Provider</strong></span>
+                      <span className="font-bold text-[#222] flex-shrink-0 w-5">2.</span>
+                      <div className="flex-1">
+                        Click your profile icon (top right) → <strong>Account</strong> → <strong>Connectivity provider</strong>.
+                        <p className="text-[11px] text-[#999] mt-0.5">
+                          On some accounts the path is <strong>Inbox → Connectivity</strong> or <strong>Settings → Connectivity provider</strong>.
+                        </p>
+                      </div>
                     </li>
                     <li className="flex gap-2">
-                      <span className="font-bold text-[#222] flex-shrink-0">3.</span>
-                      <span>Search for <strong>&quot;Channex&quot;</strong> and confirm the connection</span>
+                      <span className="font-bold text-[#222] flex-shrink-0 w-5">3.</span>
+                      <div className="flex-1">
+                        Search for <strong>&ldquo;Channex.io&rdquo;</strong> (or <strong>&ldquo;Channex&rdquo;</strong>) in the provider list.
+                      </div>
                     </li>
                     <li className="flex gap-2">
-                      <span className="font-bold text-[#222] flex-shrink-0">4.</span>
-                      <span>Come back here and click <strong>Retry Connection</strong></span>
+                      <span className="font-bold text-[#222] flex-shrink-0 w-5">4.</span>
+                      <div className="flex-1">
+                        Click <strong>Select</strong> → agree to the terms → confirm. Booking.com will show{" "}
+                        <strong>&ldquo;You currently have an active connection with: Channex.io&rdquo;</strong> when done.
+                      </div>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-bold text-[#222] flex-shrink-0 w-5">5.</span>
+                      <div className="flex-1">
+                        Return to this tab and click <strong>Retry connection</strong> below.
+                        <p className="text-[11px] text-[#999] mt-0.5">
+                          Booking.com may take up to 60 seconds to propagate the authorization.
+                        </p>
+                      </div>
                     </li>
                   </ol>
                 </div>
+
+                {/* MFA / access-blocked fallback — the situation that happened
+                    with Modern House. If the user can't complete BDC's
+                    connectivity provider flow because of MFA or missing
+                    permissions, they can still sync availability via iCal
+                    to prevent overbookings. */}
+                <details className="bg-[#f8f6f1] border border-[#efe9dd] rounded-lg p-3">
+                  <summary className="text-[12px] font-semibold text-[#3d6b52] cursor-pointer hover:text-[#1a3a2a]">
+                    Can&apos;t complete authorization? (MFA, missing permissions, or blocked account)
+                  </summary>
+                  <div className="mt-3 text-[12px] text-[#555] leading-relaxed space-y-2">
+                    <p>
+                      If Booking.com&apos;s connectivity provider page is blocked by MFA, or
+                      your admin account doesn&apos;t have permission to change connectivity
+                      providers, you have two options:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 ml-2">
+                      <li>
+                        Ask the primary hotel owner or account admin (whoever set up the
+                        Booking.com listing) to complete steps 1–4 above on your behalf.
+                      </li>
+                      <li>
+                        In the meantime, use the <strong>Booking.com iCal feed</strong> to
+                        import reservations and prevent overbookings. From
+                        admin.booking.com: <strong>Rates & Availability → Sync calendars →
+                        Export calendar</strong>, copy the URL, and paste it in Moora&apos;s
+                        property settings → Calendar Connections. Moora will pull BDC
+                        bookings every 15 minutes and automatically block those dates on
+                        Airbnb and Vrbo.
+                      </li>
+                    </ol>
+                    <p className="text-[11px] text-[#999]">
+                      Note: iCal is one-way (Moora reads BDC bookings) and doesn&apos;t
+                      push rates to Booking.com — you&apos;ll still need to manage pricing
+                      from the Booking.com extranet until the Channex connection is
+                      authorized.
+                    </p>
+                  </div>
+                </details>
 
                 <button
                   onClick={handleRetryTest}
                   className="w-full py-2.5 text-sm font-medium text-white bg-[#003580] rounded-lg hover:bg-[#00265c] transition-colors"
                 >
-                  Retry Connection
+                  Retry connection
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full py-2 text-[12px] font-medium text-[#666] hover:text-[#222] transition-colors"
+                >
+                  I&apos;ll finish this later
                 </button>
               </div>
             )}
