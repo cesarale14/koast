@@ -174,6 +174,7 @@ export async function GET(
       debug.channex_channels = (chRes?.data ?? []).map((ch: any) => ({
         id: ch.id,
         channel: ch.attributes?.channel,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rate_plans: (ch.attributes?.rate_plans ?? []).map((rp: any) => rp?.rate_plan_id),
       }));
 
