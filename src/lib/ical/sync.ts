@@ -167,12 +167,19 @@ async function syncFeedBookings(
     }
   }
 
-  // Cancel bookings no longer in feed (only iCal-originated bookings for this platform)
-  // Skip bookings with channex_booking_id — those are managed by Channex, not iCal
+  // Cancel bookings no longer in feed. We cancel BOTH iCal-originated rows
+  // AND Channex-linked rows when their UID has disappeared from the feed —
+  // if the OTA removed the booking from its iCal, it's gone regardless of
+  // who originally created the DB row. Previously we skipped rows with
+  // channex_booking_id here, which left ghost bookings live in Moora after
+  // an Airbnb/VRBO cancellation that wasn't picked up by the Channex
+  // webhook (e.g. Channex channel not yet active).
   const existingBookings = await db.select({
     id: bookings.id,
     platformBookingId: bookings.platformBookingId,
     channexBookingId: bookings.channexBookingId,
+    checkIn: bookings.checkIn,
+    checkOut: bookings.checkOut,
   })
     .from(bookings)
     .where(and(
@@ -182,12 +189,36 @@ async function syncFeedBookings(
     ));
 
   for (const b of existingBookings) {
-    // Only cancel iCal-originated bookings (no channex_booking_id) that disappeared from the feed
-    if (b.platformBookingId && !feedUids.has(b.platformBookingId) && !b.channexBookingId) {
-      await db.update(bookings)
-        .set({ status: "cancelled" })
-        .where(eq(bookings.id, b.id));
-      cancelledCount++;
+    if (!b.platformBookingId) continue;
+    if (feedUids.has(b.platformBookingId)) continue;
+    // Booking's UID is no longer in the feed → cancel it. For Channex-linked
+    // rows, also unblock the affected dates so availability stays accurate
+    // across channels.
+    await db.update(bookings)
+      .set({ status: "cancelled" })
+      .where(eq(bookings.id, b.id));
+    cancelledCount++;
+
+    if (b.channexBookingId && b.checkIn && b.checkOut) {
+      const start = new Date(b.checkIn + "T00:00:00Z");
+      const end = new Date(b.checkOut + "T00:00:00Z");
+      for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
+        const ds = d.toISOString().split("T")[0];
+        const existing = await db
+          .select({ id: calendarRates.id })
+          .from(calendarRates)
+          .where(and(
+            eq(calendarRates.propertyId, propertyId),
+            eq(calendarRates.date, ds),
+            isNull(calendarRates.channelCode),
+          ))
+          .limit(1);
+        if (existing.length > 0) {
+          await db.update(calendarRates)
+            .set({ isAvailable: true })
+            .where(eq(calendarRates.id, existing[0].id));
+        }
+      }
     }
   }
 

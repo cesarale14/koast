@@ -118,7 +118,11 @@ export default function AddPropertyPage() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) { toast("Not authenticated", "error"); setSaving(false); return; }
 
-      // Check free tier limit (1 property)
+      // Advisory client-side free-tier check for fast UX feedback.
+      // The authoritative enforcement lives in the enforce_property_quota
+      // DB trigger (see supabase/migrations/20260413010000_free_tier...) —
+      // it will reject the INSERT with a check_violation if two concurrent
+      // attempts race past this check.
       const { count } = await supabase
         .from("properties")
         .select("id", { count: "exact", head: true })
@@ -150,7 +154,17 @@ export default function AddPropertyPage() {
         .select("id")
         .single();
 
-      if (propError) throw propError;
+      if (propError) {
+        // Surface the DB-trigger quota error in friendly wording instead of
+        // leaking "property_quota_exceeded" to the toast.
+        const raw = propError.message ?? "";
+        if (raw.includes("property_quota_exceeded") || raw.includes("free_tier_limit_exceeded")) {
+          toast("Free plan limited to 1 property. Upgrade to Pro to add more.", "error");
+          setSaving(false);
+          return;
+        }
+        throw propError;
+      }
       const propertyId = (property as { id: string }).id;
 
       // Insert listings for enabled platforms

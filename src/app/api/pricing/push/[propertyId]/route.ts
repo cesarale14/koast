@@ -164,18 +164,53 @@ export async function POST(
       }
     }
 
+    // Push in batches of 200 with per-batch error handling. Previously a
+    // failure in batch N silently aborted batches N+1..end and reported
+    // `pushed` as the partial count without any error signal. Now we track
+    // every batch, collect errors, and surface a partial-failure response
+    // when anything went wrong.
     let pushed = 0;
+    const failedBatches: Array<{ batch_index: number; date_range: string; error: string; size: number }> = [];
     for (let i = 0; i < restrictionValues.length; i += 200) {
       const batch = restrictionValues.slice(i, i + 200);
-      await channex.updateRestrictions(batch);
-      pushed += batch.length;
+      const firstDate = batch[0]?.date_from ?? "?";
+      const lastDate = batch[batch.length - 1]?.date_to ?? "?";
+      try {
+        await channex.updateRestrictions(batch);
+        pushed += batch.length;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failedBatches.push({
+          batch_index: Math.floor(i / 200),
+          date_range: `${firstDate}..${lastDate}`,
+          error: msg,
+          size: batch.length,
+        });
+        console.error(`[pricing/push] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+      }
     }
 
-    // Summarize: which channels had overrides actually applied for any date?
     const channelsWithOverrides = Array.from(overrides.keys());
+
+    // If any batch failed, respond with 207 (Multi-Status) semantics via
+    // a partial_failure flag so the UI can surface the problem instead of
+    // claiming success.
+    if (failedBatches.length > 0) {
+      return NextResponse.json({
+        partial_failure: true,
+        pushed,
+        total_intended: restrictionValues.length,
+        failed_batches: failedBatches,
+        channex_property_id: property.channex_property_id,
+        ratePlans: targets.length,
+        targets: targets.map((t) => t.channel),
+        channels_with_overrides: channelsWithOverrides,
+      }, { status: 207 });
+    }
 
     return NextResponse.json({
       pushed,
+      total_intended: restrictionValues.length,
       channex_property_id: property.channex_property_id,
       ratePlans: targets.length,
       targets: targets.map((t) => t.channel),

@@ -184,13 +184,17 @@ export async function GET(
       console.warn("[channels/rates GET] Channex channel discovery failed:", msg);
     }
 
-    // 2c. If property_channels has no rows at all but Channex shows
-    //     connected channels, synthesize entries so the user sees cards
-    //     for channels that were linked via import/OAuth but never went
-    //     through the explicit connect flow.
+    // 2c. Merge property_channels rows with Channex-discovered rate plans,
+    //     AND persist the discovered rate_plan_ids back to the DB so
+    //     subsequent GET/POST calls don't have to re-query Channex. Also
+    //     create property_channels entries for channels Channex knows about
+    //     but the DB is missing (e.g. Airbnb auto-linked via Channex OAuth).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mergedLinks: Array<{ channel_code: string; channel_name: string | null; status: string; settings: { rate_plan_id?: string; hotel_id?: string } | null }> = [];
     const seenCodes = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const persistTargets: Array<{ propertyId: string; channel_code: string; channel_name: string; settings: Record<string, unknown>; needsInsert: boolean }> = [];
+    const now = new Date().toISOString();
     for (const link of (channelLinks ?? []) as Array<{
       channel_code: string;
       channel_name: string | null;
@@ -198,15 +202,28 @@ export async function GET(
       settings: { rate_plan_id?: string; hotel_id?: string } | null;
     }>) {
       seenCodes.add(link.channel_code);
-      const resolvedRp = link.settings?.rate_plan_id ?? channexRatePlanByCode[link.channel_code];
+      const storedRp = link.settings?.rate_plan_id;
+      const discoveredRp = channexRatePlanByCode[link.channel_code];
+      const resolvedRp = storedRp ?? discoveredRp;
       mergedLinks.push({
         ...link,
         settings: resolvedRp
           ? { ...(link.settings ?? {}), rate_plan_id: resolvedRp }
           : link.settings,
       });
+      // If the DB row was missing rate_plan_id but we discovered one, persist it.
+      if (!storedRp && discoveredRp) {
+        persistTargets.push({
+          propertyId,
+          channel_code: link.channel_code,
+          channel_name: link.channel_name ?? CHANNEL_NAME[link.channel_code] ?? link.channel_code,
+          settings: { ...(link.settings ?? {}), rate_plan_id: discoveredRp },
+          needsInsert: false,
+        });
+      }
     }
     // Channels known to Channex but not in property_channels — synthesize
+    // AND persist so the next call sees them in the DB directly.
     for (const [code, rp] of Object.entries(channexRatePlanByCode)) {
       if (seenCodes.has(code)) continue;
       mergedLinks.push({
@@ -215,6 +232,44 @@ export async function GET(
         status: "active",
         settings: { rate_plan_id: rp },
       });
+      persistTargets.push({
+        propertyId,
+        channel_code: code,
+        channel_name: CHANNEL_NAME[code] ?? code,
+        settings: { rate_plan_id: rp },
+        needsInsert: true,
+      });
+    }
+    // Fire-and-forget DB writes — don't block the response. Any errors are
+    // logged but don't fail the request; the next GET will just re-discover.
+    if (persistTargets.length > 0) {
+      (async () => {
+        for (const t of persistTargets) {
+          try {
+            if (t.needsInsert) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase.from("property_channels") as any).upsert({
+                property_id: t.propertyId,
+                channex_channel_id: `auto-${t.channel_code.toLowerCase()}-${t.propertyId}`,
+                channel_code: t.channel_code,
+                channel_name: t.channel_name,
+                status: "active",
+                settings: t.settings,
+                last_sync_at: now,
+                updated_at: now,
+              }, { onConflict: "property_id,channex_channel_id" });
+            } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase.from("property_channels") as any)
+                .update({ settings: t.settings, updated_at: now })
+                .eq("property_id", t.propertyId)
+                .eq("channel_code", t.channel_code);
+            }
+          } catch (err) {
+            console.warn("[channels/rates GET] persist rate_plan_id failed:", err instanceof Error ? err.message : err);
+          }
+        }
+      })();
     }
 
     // 3. Base rates for the date range (local DB only — no network call)

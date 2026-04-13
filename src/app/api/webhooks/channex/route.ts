@@ -125,6 +125,41 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Idempotency: Channex retries webhooks on network failures. If we've
+    // already processed this revision (or booking+event combo when no
+    // revision_id is sent), ack and return without re-processing. This
+    // prevents duplicate bookings and double-pushed availability updates.
+    if (revisionId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: dup } = await (supabase.from("channex_webhook_log") as any)
+        .select("id, action_taken")
+        .eq("revision_id", revisionId)
+        .in("action_taken", ["created", "modified", "cancelled", "skipped_self"])
+        .limit(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (dup && (dup as any[]).length > 0) {
+        console.log(`[webhook] Duplicate revision ${revisionId} — already processed, skipping`);
+        try {
+          await supabase.from("channex_webhook_log").insert({
+            event_type: event,
+            booking_id: bookingId,
+            revision_id: revisionId,
+            channex_property_id: channexPropertyId,
+            payload: rawPayload as Record<string, unknown>,
+            action_taken: "skipped_duplicate",
+            ack_sent: false,
+            ack_response: null,
+          });
+        } catch { /* non-critical */ }
+        // Re-ack to Channex so it stops retrying this revision
+        try {
+          const channexClient = createChannexClient();
+          await channexClient.acknowledgeBookingRevision(revisionId);
+        } catch { /* ignore */ }
+        return NextResponse.json({ status: "ok", action: "skipped_duplicate", revision_id: revisionId });
+      }
+    }
+
     // Verify property exists in our DB
     const { data: propData } = await supabase
       .from("properties")

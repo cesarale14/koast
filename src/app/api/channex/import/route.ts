@@ -273,15 +273,50 @@ export async function POST(request: NextRequest) {
               });
               console.log(`[channex/import] Migrated BDC channel ${bdcChannel.id} from scaffold ${oldChannexPropertyId} → ${channexId}`);
             }
+
+            // Finally, delete the orphaned scaffold property in Channex
+            // itself so it doesn't clutter the host's Channex account
+            // forever. Non-fatal if Channex rejects the delete (e.g. the
+            // scaffold is still referenced by some other channel we don't
+            // know about) — log and continue.
+            try {
+              await channex.deleteProperty(oldChannexPropertyId);
+              console.log(`[channex/import] Deleted orphan scaffold ${oldChannexPropertyId}`);
+            } catch (delErr) {
+              console.warn(`[channex/import] Could not delete scaffold ${oldChannexPropertyId}:`, delErr instanceof Error ? delErr.message : delErr);
+            }
+
+            // Also update any property_channels rows still pointing at the
+            // scaffold rate plan so the per-channel rate editor targets the
+            // real plan going forward.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: staleChannels } = await (supabase.from("property_channels") as any)
+              .select("id, channel_code, settings")
+              .eq("property_id", propertyId);
+            for (const sc of (staleChannels ?? []) as Array<{ id: string; channel_code: string; settings: { rate_plan_id?: string } | null }>) {
+              if (sc.settings?.rate_plan_id && !realRatePlans.find((rp) => rp.id === sc.settings?.rate_plan_id)) {
+                const newSettings = { ...(sc.settings ?? {}), rate_plan_id: realRpId };
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase.from("property_channels") as any)
+                  .update({ settings: newSettings, updated_at: new Date().toISOString() })
+                  .eq("id", sc.id);
+                console.log(`[channex/import] Retargeted property_channels ${sc.channel_code} → ${realRpId}`);
+              }
+            }
           } catch (migErr) {
             console.error("[channex/import] Scaffold migration error:", migErr);
             // Non-fatal — property import continues
           }
         }
 
-        // 4. Fetch bookings for next 90 days
+        // 4. Fetch bookings for next 90 days. Track per-booking failures so
+        //    we can surface them in the response — previously we swallowed
+        //    insert errors and reported "success" with an understated count,
+        //    leading to phantom overbookings when a booking didn't land.
         console.log(`[channex/import] Fetching bookings for ${channexId}...`);
         let bookingsImported = 0;
+        let bookingsFailed = 0;
+        const bookingErrors: string[] = [];
         try {
           const bookings = await channex.getBookings({
             propertyId: channexId,
@@ -327,18 +362,26 @@ export async function POST(request: NextRequest) {
               .eq("channex_booking_id", booking.id)
               .limit(1);
 
-            if (existingBooking && existingBooking.length > 0) {
-              await bookTable.update(bookingData).eq("id", existingBooking[0].id);
-            } else {
-              const { error: bookErr } = await bookTable.insert(bookingData);
-              if (bookErr) {
-                console.error("[channex/import] Booking insert error:", JSON.stringify(bookErr));
+            try {
+              if (existingBooking && existingBooking.length > 0) {
+                const { error: updateErr } = await bookTable.update(bookingData).eq("id", existingBooking[0].id);
+                if (updateErr) throw new Error(updateErr.message);
+              } else {
+                const { error: bookErr } = await bookTable.insert(bookingData);
+                if (bookErr) throw new Error(bookErr.message);
               }
+              bookingsImported++;
+            } catch (err) {
+              bookingsFailed++;
+              const msg = err instanceof Error ? err.message : String(err);
+              bookingErrors.push(`booking ${booking.id}: ${msg}`);
+              console.error("[channex/import] Booking upsert failed:", booking.id, msg);
             }
-            bookingsImported++;
           }
         } catch (bErr) {
-          console.error("[channex/import] Bookings error:", bErr);
+          const msg = bErr instanceof Error ? bErr.message : String(bErr);
+          bookingErrors.push(`fetch-bookings: ${msg}`);
+          console.error("[channex/import] Bookings fetch error:", msg);
         }
 
         // 5. Fetch rates → populate calendar_rates
@@ -392,9 +435,13 @@ export async function POST(request: NextRequest) {
           channex_id: channexId,
           property_id: propertyId,
           name: attrs.title,
-          status: "imported",
+          // If any bookings failed to import, flag the result as partial so
+          // the UI can warn the user instead of reporting a clean success.
+          status: bookingsFailed > 0 ? "imported_with_errors" : "imported",
           rooms: roomsImported,
           bookings: bookingsImported,
+          bookings_failed: bookingsFailed,
+          booking_errors: bookingErrors.slice(0, 10),
           rates: ratesImported,
         });
       } catch (err) {

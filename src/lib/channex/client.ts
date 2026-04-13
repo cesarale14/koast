@@ -100,6 +100,15 @@ class ChannexClient {
     return res.data;
   }
 
+  /**
+   * Delete a Channex property. Used to clean up orphaned scaffold
+   * properties that were auto-created by the BDC connect flow when the
+   * user later imports the real Channex property via OAuth.
+   */
+  async deleteProperty(propertyId: string): Promise<AnyResponse> {
+    return this.request(`/properties/${propertyId}`, { method: "DELETE" });
+  }
+
   // ==================== Room Types ====================
 
   async getRoomTypes(propertyId: string): Promise<ChannexRoomType[]> {

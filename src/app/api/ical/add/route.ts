@@ -16,6 +16,12 @@ function detectPlatform(url: string): string {
   return "direct";
 }
 
+// Sentinel value the onboarding/property-create form uses when it wants to
+// validate an iCal URL BEFORE the user has saved the property. We accept
+// this instead of a real UUID and run the flow in "preview mode" which
+// parses and counts bookings without writing anything to the DB.
+const PREVIEW_PROPERTY_ID = "preview";
+
 export async function POST(request: NextRequest) {
   try {
     const { user } = await getAuthenticatedUser();
@@ -27,13 +33,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "property_id and feed_url required" }, { status: 400 });
     }
 
-    const isOwner = await verifyPropertyOwnership(user.id, property_id);
-    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const isPreview = property_id === PREVIEW_PROPERTY_ID;
+    if (!isPreview) {
+      const isOwner = await verifyPropertyOwnership(user.id, property_id);
+      if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Validate by fetching
     let parsed;
     try {
-      const res = await fetch(feed_url, { headers: { "User-Agent": "StayCommand/1.0" } });
+      // AbortController-based timeout so a slow/hung iCal feed doesn't
+      // tie up the Next.js handler for 30s. 15s is plenty for iCal export
+      // endpoints at Airbnb/Vrbo/Booking.com.
+      const ctl = new AbortController();
+      const timeout = setTimeout(() => ctl.abort(), 15_000);
+      let res: Response;
+      try {
+        res = await fetch(feed_url, { headers: { "User-Agent": "StayCommand/1.0" }, signal: ctl.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       if (!validateICalUrl(text)) {
@@ -43,12 +62,27 @@ export async function POST(request: NextRequest) {
       }
       parsed = await parseICalFeed(feed_url);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       return NextResponse.json({
-        error: `Could not fetch calendar: ${err instanceof Error ? err.message : String(err)}`,
+        error: msg.includes("aborted")
+          ? "Calendar fetch timed out after 15 seconds. Check the URL and try again."
+          : `Could not fetch calendar: ${msg}`,
       }, { status: 400 });
     }
 
     const detectedPlatform = platform ?? detectPlatform(feed_url);
+
+    // Preview mode — return booking/blocked counts without writing to DB.
+    // Used by the property-create form's "Test" button so the user can
+    // validate their iCal URL before committing to saving the property.
+    if (isPreview) {
+      return NextResponse.json({
+        preview: true,
+        platform: detectedPlatform,
+        bookings_found: parsed.filter((b) => !b.isBlocked).length,
+        blocked_dates: parsed.filter((b) => b.isBlocked).length,
+      });
+    }
 
     // Upsert feed — check existing then insert or update
     const [existing] = await db.select({ id: icalFeeds.id })
