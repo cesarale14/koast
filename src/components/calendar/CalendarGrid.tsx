@@ -395,6 +395,17 @@ export default function CalendarGrid({
           rateLookup={rateLookup}
           onSave={handleSaveRate}
           onCloseDate={() => setRatePanel(null)}
+          onOpenDefault={() => {
+            // "Price settings" / "Availability settings" header click —
+            // open the date editor with today's date on the first visible
+            // property. Noop if there are no properties.
+            if (properties.length === 0) return;
+            const today = new Date().toISOString().split("T")[0];
+            const firstProp = properties[0];
+            const propLookup = rateLookup.get(firstProp.id);
+            const rate = propLookup?.get(today) ?? null;
+            setRatePanel({ propertyId: firstProp.id, dates: [today], rate });
+          }}
         />
       </div>
 
@@ -423,12 +434,14 @@ function RightSettingsPanel({
   rateLookup,
   onSave,
   onCloseDate,
+  onOpenDefault,
 }: {
   monthlyStats: { nextCheckIn: string; occupancy: number; avgRate: number };
   ratePanel: { propertyId: string; dates: string[]; rate: RateData | null } | null;
   rateLookup: Map<string, Map<string, RateData>>;
   onSave: (updates: { dates: string[]; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
   onCloseDate: () => void;
+  onOpenDefault: () => void;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -470,8 +483,12 @@ function RightSettingsPanel({
 
   const panelContent = (
     <div className="flex flex-col h-full">
-      {/* Price settings — always visible */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      {/* Price settings — click opens the editor for today on the first property */}
+      <button
+        type="button"
+        onClick={onOpenDefault}
+        className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-[#f8f6f1] transition-colors focus:outline-none focus-visible:bg-[#f8f6f1]"
+      >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-[#222]">Price settings</h3>
           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,10 +499,14 @@ function RightSettingsPanel({
           <div>${monthlyStats.avgRate > 0 ? monthlyStats.avgRate : "—"} per night</div>
           <div>{monthlyStats.occupancy}% occupancy (30d)</div>
         </div>
-      </div>
+      </button>
 
-      {/* Availability settings — always visible */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      {/* Availability settings — click opens the same editor */}
+      <button
+        type="button"
+        onClick={onOpenDefault}
+        className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-[#f8f6f1] transition-colors focus:outline-none focus-visible:bg-[#f8f6f1]"
+      >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-[#222]">Availability settings</h3>
           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,7 +516,7 @@ function RightSettingsPanel({
         <div className="text-[13px] text-[#555] space-y-0.5">
           <div>Next check-in: {monthlyStats.nextCheckIn}</div>
         </div>
-      </div>
+      </button>
 
       {/* Date-specific editing — shown when a date is clicked */}
       {ratePanel && (
