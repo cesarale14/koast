@@ -75,15 +75,28 @@ export async function parseICalFeed(url: string): Promise<ICalBooking[]> {
 
     const lower = summary.toLowerCase();
     const platformBookings = PLATFORM_BOOKING_SUMMARIES[platform] ?? [];
-    const isPlatformBooking = platformBookings.includes(lower);
+    // Booking.com iCal feeds emit a single "CLOSED - Not available for
+    // check-in" (or similar) summary for every real reservation. We
+    // treat every BDC iCal event as a booking so availability can be
+    // pushed back through Channex to block the other channels. Same
+    // for Vrbo where the summary is typically "Reserved" or "Blocked".
+    const isBdcBooking = platform === "booking_com";
+    const isVrboBooking = platform === "vrbo" && (lower.includes("reserved") || lower.includes("blocked"));
+    const isAirbnbBooking = platformBookings.includes(lower);
+    const isPlatformBooking = isAirbnbBooking || isBdcBooking || isVrboBooking;
 
     const isBlocked = !isPlatformBooking && (
       BLOCKED_SUMMARIES.some((b) => lower.includes(b))
       || summary === ""
     );
 
-    // "Reserved" on Airbnb = booking with masked name
-    const guestName = isBlocked ? null : (isPlatformBooking ? "Airbnb Guest" : summary || null);
+    // iCal feeds never carry guest info; synthesize a platform-specific
+    // placeholder so the row has SOMETHING for the calendar UI.
+    let guestName: string | null = null;
+    if (isBdcBooking) guestName = "Booking.com Guest";
+    else if (isAirbnbBooking) guestName = "Airbnb Guest";
+    else if (isVrboBooking) guestName = "Vrbo Guest";
+    else if (!isBlocked) guestName = summary || null;
 
     bookings.push({
       uid,

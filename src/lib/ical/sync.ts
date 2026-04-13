@@ -1,9 +1,10 @@
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { parseICalFeed } from "./parser";
-import { icalFeeds, bookings, calendarRates } from "@/lib/db/schema";
+import { icalFeeds, bookings, calendarRates, properties } from "@/lib/db/schema";
 import type { ICalBooking } from "./types";
 import { createCleaningTask } from "@/lib/turnover/auto-create";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createChannexClient } from "@/lib/channex/client";
 
 interface SyncResult {
   feedId: string;
@@ -79,6 +80,12 @@ async function syncFeedBookings(
   let blockedCount = 0;
 
   const feedUids = new Set<string>();
+  // Track every check_in/check_out range that needs an availability push
+  // back to Channex at the end of the sync. Bookings added AND cancelled
+  // during this sync both go here (with different actions) so overbookings
+  // can't slip through when a BDC iCal entry lands but the Channex BDC
+  // channel isn't wired up (e.g. the Modern House MFA situation).
+  const channexAvailUpdates: Array<{ action: "created" | "cancelled"; checkIn: string; checkOut: string }> = [];
 
   for (const entry of parsed) {
     feedUids.add(entry.uid);
@@ -170,6 +177,7 @@ async function syncFeedBookings(
         notes: entry.description,
       });
       newCount++;
+      channexAvailUpdates.push({ action: "created", checkIn: entry.checkIn, checkOut: entry.checkOut });
 
       // Auto-create cleaning task for new booking. Non-fatal — if the
       // task creation fails, we keep the booking and surface the failure
@@ -218,13 +226,17 @@ async function syncFeedBookings(
   for (const b of existingBookings) {
     if (!b.platformBookingId) continue;
     if (feedUids.has(b.platformBookingId)) continue;
-    // Booking's UID is no longer in the feed → cancel it. For Channex-linked
-    // rows, also unblock the affected dates so availability stays accurate
-    // across channels.
+    // Booking's UID is no longer in the feed → cancel it. Track the
+    // cancellation so the availability unblock can go out to Channex
+    // along with this sync's new-booking pushes.
     await db.update(bookings)
       .set({ status: "cancelled" })
       .where(eq(bookings.id, b.id));
     cancelledCount++;
+
+    if (b.checkIn && b.checkOut) {
+      channexAvailUpdates.push({ action: "cancelled", checkIn: b.checkIn, checkOut: b.checkOut });
+    }
 
     if (b.channexBookingId && b.checkIn && b.checkOut) {
       const start = new Date(b.checkIn + "T00:00:00Z");
@@ -246,6 +258,54 @@ async function syncFeedBookings(
             .where(eq(calendarRates.id, existing[0].id));
         }
       }
+    }
+  }
+
+  // Push the aggregated availability updates to Channex so OTHER connected
+  // channels (Airbnb, Vrbo) block the booked dates automatically. This is
+  // the critical path: without it, an iCal booking (e.g. a BDC reservation
+  // that arrived via iCal because the BDC channel isn't connected to
+  // Channex yet) would never block the sibling OTAs and overbookings
+  // would happen.
+  if (channexAvailUpdates.length > 0) {
+    try {
+      const [prop] = await db.select({
+        channexPropertyId: properties.channexPropertyId,
+      }).from(properties).where(eq(properties.id, propertyId)).limit(1);
+
+      if (prop?.channexPropertyId) {
+        const channex = createChannexClient();
+        const roomTypes = await channex.getRoomTypes(prop.channexPropertyId);
+        if (roomTypes.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const availValues: any[] = [];
+          for (const u of channexAvailUpdates) {
+            const avail = u.action === "created" ? 0 : 1;
+            const start = new Date(u.checkIn + "T00:00:00Z");
+            const end = new Date(u.checkOut + "T00:00:00Z");
+            for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
+              const ds = d.toISOString().split("T")[0];
+              for (const rt of roomTypes) {
+                availValues.push({
+                  property_id: prop.channexPropertyId,
+                  room_type_id: rt.id,
+                  date_from: ds,
+                  date_to: ds,
+                  availability: avail,
+                });
+              }
+            }
+          }
+          for (let i = 0; i < availValues.length; i += 200) {
+            await channex.updateAvailability(availValues.slice(i, i + 200));
+          }
+          console.log(`[iCal] Pushed ${availValues.length} availability entries to Channex for property ${propertyId}`);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`channex availability push failed: ${msg}`);
+      console.warn(`[iCal] Channex availability push failed for ${propertyId}: ${msg}`);
     }
   }
 
