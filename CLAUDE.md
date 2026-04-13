@@ -1,10 +1,12 @@
-# Moora (StayCommand) — CLAUDE.md
+# Koast (StayCommand) — CLAUDE.md
 
 ## FIRST STEPS FOR EVERY SESSION
 1. Read this file completely before any work
-2. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure
-3. If repomix is stale: `cd ~/staycommand && repomix`
-4. Never run `npm run build` on VPS — use `npx tsc --noEmit` then `git push` (Vercel builds)
+2. **Read `DESIGN_SYSTEM.md` before any UI work.** Every component, color, shadow, animation, and spacing must match the design system exactly.
+3. **Read `KOAST_PRODUCT_SPEC.md` for feature requirements.** Any new feature must be checked against the product spec before implementation.
+4. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure
+5. If repomix is stale: `cd ~/staycommand && repomix`
+6. Never run `npm run build` on VPS — use `npx tsc --noEmit` then `git push` (Vercel builds)
 
 ## Prompt Format
 Every prompt to Claude Code must start with:
@@ -26,7 +28,7 @@ Every prompt to Claude Code must start with:
 - ESLint: unused variables cause Vercel build failures — always check before push
 
 ## Product Overview
-Moora (formerly StayCommand) is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. It competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have.
+Koast (formerly Moora / StayCommand) is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. It competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have.
 
 **Live URL:** https://staycommand.vercel.app
 **GitHub:** cesarale14/staycommand
@@ -44,42 +46,20 @@ Moora (formerly StayCommand) is a unified STR (short-term rental) operating syst
 - **Weather:** Weather.gov API (free, no key)
 - **Font:** Plus Jakarta Sans (via @fontsource-variable)
 
-## Canopy Design System (ACTIVE)
-The app uses the "Canopy" design direction — deep forest green, warm brass, soft linen.
+## Design System — see DESIGN_SYSTEM.md
 
-### Color Palette
-| Token | Hex | Use |
-|-------|-----|-----|
-| Forest | #1a3a2a | Primary, sidebar bg, headings, stat values |
-| Forest Light | #264d38 | Sidebar hover, secondary surfaces |
-| Forest Muted | #3d6b52 | Icons, secondary text |
-| Brass | #c9a96e | Accents, active states, sidebar active indicators |
-| Brass Light | #d4bc8a | Light accent backgrounds |
-| Linen | #f8f6f1 | Page background |
-| Linen Dark | #efe9dd | Borders, card backgrounds, dividers |
-| Danger | #c44040 | Error states, overbooking alerts |
-| Warning | #b8860b | Cleaning assignments, urgency |
-| Info | #2a5a8a | Informational badges |
+**IMPORTANT: Read `DESIGN_SYSTEM.md` before any UI work.** It is the authoritative spec for Koast's visual language. Every component, color, shadow, animation, and spacing must match the design system exactly.
 
-### Typography
-- Font: Plus Jakarta Sans Variable
-- Stat numbers: -0.03em letter-spacing, 700 weight
-- Section labels: 11px, 700 weight, +0.06em tracking, uppercase, brass color
-- Page headings: 20px, 700 weight, forest color
+The design system ("Koast" direction) replaces the older Canopy tokens. Key references:
 
-### Sidebar
-- Dark forest green (#1a3a2a) background
-- Brass (#c9a96e) active indicator bar + text
-- Muted linen-green (#a8c4b4) inactive text
-- "M Moora" brass logo mark
+- **Color palette**: coastal greens (`--deep-sea`, `--coastal`, `--mangrove`, `--tideline`), golden accents (`--golden`, `--driftwood`, `--sandbar`), sandy neutrals (`--shore`, `--dry-sand`, `--shell`), and semantic tokens (`--coral-reef` danger, `--amber-tide` warning, `--lagoon` success, `--deep-water` info). NEVER use default Tailwind grays.
+- **Font**: Plus Jakarta Sans Variable. Stat numbers use `-0.03em` letter-spacing with 700 weight; section labels are 11px / 700 / uppercase / `+0.06em` tracking in `--golden`.
+- **Shadows**: only the exact stacks defined in DESIGN_SYSTEM.md — never `shadow-md` / `shadow-lg` / other default Tailwind shadows.
+- **Borders**: always use `--dry-sand` / `--shell`, never gray.
+- **Radius**: use the specific radius tokens from the spec, not generic `rounded-md` / `rounded-lg`.
+- **Platform icons**: see `PLATFORM_ICONS.md`. Use the real brand SVGs under `public/icons/platforms/` — never approximate logos with colored circles + letters.
 
-### Borders & Shadows
-- All borders: linen-toned (#efe9dd), never gray
-- Shadows: warm forest-tinted rgba(26,58,42,...)
-- Stat cards: forest green gradient top border via ::before
-
-### CSS Variables
-All colors are defined as CSS variables in `globals.css` (:root). Components reference them via `var(--forest)`, `var(--brass)`, `var(--linen)`, etc. Tailwind config maps these to utility classes (`bg-forest`, `text-brass`, `bg-linen`).
+All tokens live as CSS variables in `globals.css` (:root). Tailwind utility classes map to them (`bg-coastal`, `text-golden`, `bg-shore`, etc).
 
 ## Key Infrastructure
 - VPS SSH: `C:\Users\cesar\Downloads\LightsailDefaultKey-us-east-1.pem`
@@ -101,7 +81,7 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - Availability: StayCommand controls availability. On import, pushes avail=1 for 365 days then blocks booked dates
 - API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
-- IMPORTANT: Moora pushes rates to ALL connected channels including Airbnb via Channex rate plans. The calendar's per-channel rate editor can target Airbnb, Booking.com, and Vrbo independently; saving pushes to the channel's dedicated Channex rate plan.
+- IMPORTANT: Koast pushes rates to ALL connected channels including Airbnb via Channex rate plans. The calendar's per-channel rate editor can target Airbnb, Booking.com, and Vrbo independently; saving pushes to the channel's dedicated Channex rate plan.
 - IMPORTANT: To block specific dates on BDC, use availability=0 (BookingLimit=0) at the room type level — NOT stop_sell=true, which BDC interprets as closing the entire room/property. Ensure rates are pushed for the full bookable window (today through 18+ months out) — any date with $0 rate triggers "missing prices" warnings in the BDC extranet.
 - IMPORTANT: BDC child/slave rates reject all pushes with RATE_IS_A_SLAVE_RATE. Always identify and target the parent rate code (brute-force candidates around the rate code Channex first reports if needed). Use `POST /channels/{id}/activate` to activate BDC channels — `PUT is_active: true` does not work.
 - IMPORTANT: Channex property and rate plan IDs for new channels come from `GET /rate_plans?filter[property_id]=X` intersected with the channel's `rate_plans` array. Multi-property channels (single Airbnb account covering many listings) expose every linked property's rate plans, so filtering by the property-owned ID set is required to avoid picking the wrong rate plan.
@@ -114,7 +94,7 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - Channel creation is atomic: a compensating-rollback try/catch tracks every Channex resource created (scaffold property, rate plan, channel) and deletes them on later failure so orphaned entities don't accumulate.
 - Per-property mutex via `concurrency_locks` table prevents two simultaneous connect requests from racing.
 - Connect flow creates a DEDICATED BDC rate plan — it never reuses an existing one, which prevents rate bleed between Airbnb and Booking.com.
-- Name matching (Moora ↔ Channex) uses strict normalized equality (strips " - X" / " in X" / Airbnb rating noise). Ambiguous matches surface as candidates instead of auto-picking.
+- Name matching (Koast ↔ Channex) uses strict normalized equality (strips " - X" / " in X" / Airbnb rating noise). Ambiguous matches surface as candidates instead of auto-picking.
 
 ## Reliability Infrastructure
 - **Webhook idempotency**: Every incoming Channex webhook is dedup'd via `channex_webhook_log.revision_id`. Duplicate deliveries (Channex network retries) are acked and skipped without re-processing — no more duplicate bookings or double availability pushes.
@@ -122,7 +102,7 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - **BDC connect mutex**: 60-second advisory locks in `concurrency_locks` table keyed `bdc_connect:{propertyId}`. Concurrent requests return 409 `connect_in_progress`. Released on both success and failure paths.
 - **Atomic BDC channel creation**: Compensating rollback on failure deletes scaffold properties, rate plans, and channels that were created before the error. The orphan-scaffold problem that gave us Pool House's misrouted BDC channel is prevented at source.
 - **Rate push partial failure handling**: `/api/pricing/push` wraps each 200-entry batch in try/catch, collects per-batch failures with date ranges, and returns HTTP 207 Multi-Status with `partial_failure: true` instead of silently claiming success after batch N fails.
-- **Scaffold cleanup on import**: When a Channex import matches a Moora property that was previously linked to a scaffold Channex property, the import retargets all `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
+- **Scaffold cleanup on import**: When a Channex import matches a Koast property that was previously linked to a scaffold Channex property, the import retargets all `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
 - **iCal preview mode**: `POST /api/ical/add` with `property_id: "preview"` runs the parse/validate flow without writing to the DB and without ownership checks — used by the properties-new Test button. 15-second AbortController timeout prevents hung feeds.
 - **iCal ghost booking cleanup**: Sync cancels bookings whose UID disappears from the feed regardless of whether they were originally iCal-sourced or Channex-sourced. For Channex-linked rows, it also unblocks the affected `calendar_rates` dates so cross-channel availability stays accurate.
 
@@ -238,7 +218,7 @@ Key differentiator: 9-signal pricing + market intelligence + operations in one p
 ## Strategic Decision Framework
 
 ### Prime Directive
-Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move Moora closer to being the best PMS on the market?"
+Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move Koast closer to being the best PMS on the market?"
 
 ### Decision Criteria (in priority order)
 1. Host Time Savings — Will this reduce manual work for hosts? Quantify minutes saved per week if possible.
@@ -246,14 +226,14 @@ Every feature, architecture choice, and UX decision must be evaluated against on
 3. Competitive Moat — Does this create something Hospitable, Hostaway, or Guesty can't easily replicate? (9-signal engine, market intelligence, AI-powered operations)
 4. Scalability — Will this work for 1 property AND 50 properties without redesign?
 5. User Delight — Is the UX so good hosts would screenshot it and share in STR Facebook groups?
-6. Data Flywheel — Does this generate data that makes Moora smarter over time? (pricing outcomes, booking patterns, market trends)
+6. Data Flywheel — Does this generate data that makes Koast smarter over time? (pricing outcomes, booking patterns, market trends)
 
 ### Build Philosophy
 - Ship features that are 90% polished, not 60% shipped fast
 - Every screen should look like it belongs in a $50M SaaS product
 - If a feature doesn't clearly serve the Prime Directive, defer it
 - Prefer deep integration over surface-level features (e.g., don't just show data — act on it automatically)
-- Always consider: "What would make a host switch FROM their current PMS TO Moora?"
+- Always consider: "What would make a host switch FROM their current PMS TO Koast?"
 
 ### Channex Production
 - Production API: app.channex.io/api/v1 (NOT staging)
