@@ -140,14 +140,73 @@ export async function GET(
     }
     const channexPropertyId: string = propRow.channex_property_id;
 
-    // 2. Load connected channels + their rate plans from property_channels.
-    //    We include pending_authorization channels so the user can pre-set
-    //    rates before the first live push.
+    // 2. Load connected channels from property_channels. We include
+    //    pending_authorization channels so the user can pre-set rates
+    //    before the first live push.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: channelLinks } = await (supabase.from("property_channels") as any)
       .select("channel_code, channel_name, status, settings")
       .eq("property_id", propertyId)
       .in("status", ["active", "pending_authorization"]);
+
+    // 2b. Auto-discover rate plans from Channex for property_channels rows
+    //     that don't have settings.rate_plan_id populated (common for rows
+    //     created via the import flow rather than the BDC connect flow).
+    //     This queries the Channex /channels endpoint for channels that
+    //     include this Channex property and reads each channel's first
+    //     rate_plan_id.
+    const channexRatePlanByCode: Record<string, string> = {};
+    const channexCodeMap: Record<string, string> = { "AirBNB": "ABB", "BookingCom": "BDC", "VRBO": "VRBO" };
+    try {
+      const channex = createChannexClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chRes: any = await channex.getChannels(channexPropertyId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const ch of (chRes?.data ?? []) as any[]) {
+        const channexChannelType = ch.attributes?.channel;
+        const pmsCode = channexCodeMap[channexChannelType];
+        if (!pmsCode) continue;
+        const rp = ch.attributes?.rate_plans?.[0]?.rate_plan_id;
+        if (rp && !channexRatePlanByCode[pmsCode]) {
+          channexRatePlanByCode[pmsCode] = rp;
+        }
+      }
+    } catch (err) {
+      console.warn("[channels/rates GET] Channex channel discovery failed:", err instanceof Error ? err.message : err);
+    }
+
+    // 2c. If property_channels has no rows at all but Channex shows
+    //     connected channels, synthesize entries so the user sees cards
+    //     for channels that were linked via import/OAuth but never went
+    //     through the explicit connect flow.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mergedLinks: Array<{ channel_code: string; channel_name: string | null; status: string; settings: { rate_plan_id?: string; hotel_id?: string } | null }> = [];
+    const seenCodes = new Set<string>();
+    for (const link of (channelLinks ?? []) as Array<{
+      channel_code: string;
+      channel_name: string | null;
+      status: string;
+      settings: { rate_plan_id?: string; hotel_id?: string } | null;
+    }>) {
+      seenCodes.add(link.channel_code);
+      const resolvedRp = link.settings?.rate_plan_id ?? channexRatePlanByCode[link.channel_code];
+      mergedLinks.push({
+        ...link,
+        settings: resolvedRp
+          ? { ...(link.settings ?? {}), rate_plan_id: resolvedRp }
+          : link.settings,
+      });
+    }
+    // Channels known to Channex but not in property_channels — synthesize
+    for (const [code, rp] of Object.entries(channexRatePlanByCode)) {
+      if (seenCodes.has(code)) continue;
+      mergedLinks.push({
+        channel_code: code,
+        channel_name: null,
+        status: "active",
+        settings: { rate_plan_id: rp },
+      });
+    }
 
     // 3. Base rates for the date range (local DB only — no network call)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,7 +258,7 @@ export async function GET(
 
     // 5. Fetch live bucketed restrictions from Channex — one call covers all
     //    rate plans on the property.
-    const channex = createChannexClient();
+    const channexForRates = createChannexClient();
     let bucketedByRatePlan: Record<string, Record<string, {
       rate?: string;
       availability?: number;
@@ -208,7 +267,7 @@ export async function GET(
     }>> = {};
     let channexError: string | null = null;
     try {
-      bucketedByRatePlan = await channex.getRestrictionsBucketed(
+      bucketedByRatePlan = await channexForRates.getRestrictionsBucketed(
         channexPropertyId,
         dateFrom,
         dateTo,
@@ -219,14 +278,9 @@ export async function GET(
       console.warn("[channels/rates GET] Channex fetch failed:", channexError);
     }
 
-    // 6. Build per-channel blocks
+    // 6. Build per-channel blocks from the merged (property_channels ∪ Channex-discovered) list
     const channels: ChannelBlock[] = [];
-    for (const link of (channelLinks ?? []) as Array<{
-      channel_code: string;
-      channel_name: string | null;
-      status: string;
-      settings: { rate_plan_id?: string; hotel_id?: string } | null;
-    }>) {
+    for (const link of mergedLinks) {
       const code = link.channel_code;
       const ratePlanId = link.settings?.rate_plan_id ?? null;
       const channelName = CHANNEL_NAME[code] ?? link.channel_name ?? code;
