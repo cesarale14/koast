@@ -20,26 +20,17 @@ import { createChannexClient } from "@/lib/channex/client";
  *      connected channel (Airbnb, Booking.com, Vrbo) receives the push.
  */
 
-// ---------- In-memory cache ----------
-// Keyed by `${propertyId}|${dateFrom}|${dateTo}`. 5-minute TTL. Serverless
-// warm containers share this within the same lambda instance; cold starts
-// just refetch. Good enough for typical click-through cadence; a "refresh"
-// query param bypasses it for manual force-refresh.
-type CacheEntry = { ts: number; data: GetResponseBody };
-const rateCache = new Map<string, CacheEntry>();
-// 60s TTL — enough to dedupe rapid clicks on the same date but short
-// enough that a stale response from a previous deploy (e.g. before the
-// Channex auto-discovery was added) doesn't persist.
-const CACHE_TTL_MS = 60 * 1000;
-
-function cacheKey(propertyId: string, dateFrom: string, dateTo: string) {
-  return `${propertyId}|${dateFrom}|${dateTo}`;
-}
-
+// ---------- Cache (disabled) ----------
+// The in-memory cache was causing stale responses across deploys —
+// warm Vercel lambdas were serving pre-auto-discovery payloads for
+// minutes after a fix shipped. The client-side hook already dedupes
+// in-flight requests for the same (propertyId, dateFrom, dateTo), and
+// Channex responds in well under a second, so the server-side cache
+// was premature optimization.
 function invalidatePropertyCache(propertyId: string) {
-  for (const key of Array.from(rateCache.keys())) {
-    if (key.startsWith(`${propertyId}|`)) rateCache.delete(key);
-  }
+  // no-op — retained so call sites don't have to change if we bring
+  // the cache back later.
+  void propertyId;
 }
 
 // ---------- Response types ----------
@@ -111,14 +102,8 @@ export async function GET(
     }
 
     const propertyId = params.propertyId;
-    const ck = cacheKey(propertyId, dateFrom, dateTo);
-    if (!refresh) {
-      const hit = rateCache.get(ck);
-      if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
-        return NextResponse.json({ ...hit.data, cache_hit: true });
-      }
-    }
-
+    // Cache intentionally disabled — see comment at the top of the file.
+    void refresh;
     const supabase = createServiceClient();
 
     // 1. Channex property id for this property. If the property isn't
@@ -366,10 +351,6 @@ export async function GET(
       fetched_at: new Date().toISOString(),
       cache_hit: false,
     };
-
-    if (!channexError) {
-      rateCache.set(ck, { ts: Date.now(), data: body });
-    }
 
     return NextResponse.json({
       ...body,
