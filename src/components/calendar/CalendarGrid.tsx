@@ -57,7 +57,11 @@ interface CalendarGridProps {
 }
 
 function getToday(): string {
-  return new Date().toISOString().split("T")[0];
+  // Use the user's LOCAL calendar day, not UTC. toISOString() converts to
+  // UTC which gives a wrong "today" for users west of UTC during the
+  // evening (e.g. 8pm PST = 4am UTC next day).
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function CalendarGrid({
@@ -218,7 +222,7 @@ export default function CalendarGrid({
     const days = 30;
     for (let i = 0; i < days; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
-      const ds = d.toISOString().split("T")[0];
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       if (propBookings.some((b) => ds >= b.check_in && ds < b.check_out)) bookedNights++;
     }
     const occupancy = Math.round((bookedNights / days) * 100);
@@ -400,7 +404,7 @@ export default function CalendarGrid({
             // open the date editor with today's date on the first visible
             // property. Noop if there are no properties.
             if (properties.length === 0) return;
-            const today = new Date().toISOString().split("T")[0];
+            const today = getToday();
             const firstProp = properties[0];
             const propLookup = rateLookup.get(firstProp.id);
             const rate = propLookup?.get(today) ?? null;

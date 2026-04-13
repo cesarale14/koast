@@ -9,7 +9,13 @@ export default async function CalendarPage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const today = new Date().toISOString().split("T")[0];
+  // Server runs in UTC; clients can be in any timezone. Pad the fetch
+  // window by 1 day backward so users west of UTC still see their local
+  // "today" data (otherwise a user in PST loads the page at 8pm local =
+  // 4am UTC next day, and we'd miss their "today" row entirely).
+  const yesterdayUtc = new Date();
+  yesterdayUtc.setUTCDate(yesterdayUtc.getUTCDate() - 1);
+  const today = yesterdayUtc.toISOString().split("T")[0];
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + TOTAL_DAYS);
   const end = endDate.toISOString().split("T")[0];
