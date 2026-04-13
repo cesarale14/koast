@@ -431,7 +431,51 @@ export async function POST(
       .eq("property_id", propertyId)
       .eq("channel_code", channel_code)
       .maybeSingle();
-    const ratePlanId: string | undefined = link?.settings?.rate_plan_id;
+
+    let ratePlanId: string | undefined = link?.settings?.rate_plan_id;
+
+    // Auto-discover the rate plan from Channex if property_channels.settings
+    // doesn't have it (common for rows created via the import flow). Once
+    // discovered, persist it back to property_channels so future calls skip
+    // the discovery round-trip.
+    if (!ratePlanId) {
+      try {
+        const channex = createChannexClient();
+        const propRatePlans = await channex.getRatePlans(channexPropertyId);
+        const propertyRatePlanIds = new Set(propRatePlans.map((rp) => rp.id));
+        const channexCodeMap: Record<string, string> = { "AirBNB": "ABB", "BookingCom": "BDC", "VRBO": "VRBO" };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chRes: any = await channex.getChannels(channexPropertyId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const ch of (chRes?.data ?? []) as any[]) {
+          const channexChannelType = ch.attributes?.channel;
+          const pmsCode = channexCodeMap[channexChannelType];
+          if (pmsCode !== channel_code) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const matching = (ch.attributes?.rate_plans ?? []).find((rp: any) =>
+            rp?.rate_plan_id && propertyRatePlanIds.has(rp.rate_plan_id)
+          );
+          if (matching?.rate_plan_id) {
+            ratePlanId = matching.rate_plan_id;
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn("[channels/rates POST] Rate plan discovery failed:", err instanceof Error ? err.message : err);
+      }
+
+      if (ratePlanId && link) {
+        // Persist the discovered rate plan id so future requests don't
+        // repeat the lookup.
+        const mergedSettings = { ...(link.settings ?? {}), rate_plan_id: ratePlanId };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from("property_channels") as any)
+          .update({ settings: mergedSettings, updated_at: new Date().toISOString() })
+          .eq("property_id", propertyId)
+          .eq("channel_code", channel_code);
+      }
+    }
+
     if (!ratePlanId) {
       return NextResponse.json(
         { error: `No rate plan configured for channel ${channel_code}. Finish channel setup first.` },
