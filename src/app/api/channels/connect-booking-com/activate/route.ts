@@ -184,13 +184,14 @@ export async function POST(request: NextRequest) {
       console.warn("[connect-bdc/activate] Channel activation failed:", activationError);
     }
 
-    // 4. Auto-discover the parent BDC rate plan code. The first rate plan
-    //    code Channex auto-populates is often a child/slave rate that
-    //    rejects pushes with RATE_IS_A_SLAVE_RATE. We test each candidate
-    //    code by pushing a tiny probe restriction and watching the most
-    //    recent sync event's log. The first code that syncs successfully
-    //    gets cached in property_channels.settings.parent_rate_plan_code.
-    let parentRateCode: number | null = null;
+    // 4. Mark channel active and kick off the parent-rate probe in the
+    //    background. The probe loop is slow (up to ~70s across 21
+    //    candidate rate codes with a sync-wait between each) — blocking
+    //    the user's /activate request on that is terrible UX. Instead we
+    //    flip status to "active" + "rate_discovery: in_progress" and run
+    //    the probe as fire-and-forget. The UI polls the status endpoint
+    //    at /api/channels/connect-booking-com/status/[propertyId] until
+    //    rate_discovery flips to "complete" or "failed".
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: pcRow } = await (supabase.from("property_channels") as any)
       .select("settings")
@@ -199,97 +200,16 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     const storedParentCode: number | undefined = pcRow?.settings?.parent_rate_plan_code;
 
-    if (!storedParentCode && bdcRatePlanId) {
-      // Grab the channel's current rate_plan_code so we know where to
-      // start probing. Channex returns a single code per channel rate
-      // plan — our candidates are the one it gave us plus its immediate
-      // neighbors (since BDC parent codes are usually within a few of
-      // the child codes).
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chRes: any = await channex.request(`/channels/${channelId}`);
-        const seedCode = chRes?.data?.attributes?.rate_plans?.[0]?.settings?.rate_plan_code;
-        if (typeof seedCode === "number") {
-          const candidates = [seedCode];
-          for (let delta = -1; delta >= -10; delta--) candidates.push(seedCode + delta);
-          for (let delta = 1; delta <= 10; delta++) candidates.push(seedCode + delta);
-          const roomTypeCode = chRes?.data?.attributes?.rate_plans?.[0]?.settings?.room_type_code;
-
-          // Grab a future date to probe against (today + 30 days).
-          const probe = new Date();
-          probe.setUTCDate(probe.getUTCDate() + 30);
-          const probeDate = probe.toISOString().split("T")[0];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const baseSettings = chRes?.data?.attributes?.rate_plans?.[0]?.settings ?? {};
-
-          for (const candidate of candidates) {
-            // Update channel to use this candidate code
-            try {
-              await channex.updateChannel(channelId, {
-                rate_plans: [{
-                  settings: { ...baseSettings, rate_plan_code: candidate, room_type_code: roomTypeCode },
-                  rate_plan_id: bdcRatePlanId,
-                }],
-              });
-            } catch { continue; }
-
-            // Push a probe restriction
-            try {
-              await channex.updateRestrictions([{
-                property_id: channexPropertyId,
-                rate_plan_id: bdcRatePlanId,
-                date_from: probeDate,
-                date_to: probeDate,
-                rate: 10000, // probe value in cents
-              }]);
-            } catch { continue; }
-
-            // Give Channex a couple seconds to run the sync event
-            await new Promise((r) => setTimeout(r, 3500));
-
-            // Check the most recent sync event for this channel
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const ev: any = await channex.request(
-                `/channel_events?filter[channel_id]=${channelId}&filter[name]=sync&pagination[per_page]=1&order[inserted_at]=desc`
-              );
-              const latest = ev?.data?.[0];
-              const result = latest?.attributes?.payload?.result;
-              if (result === "success") {
-                parentRateCode = candidate;
-                console.log(`[connect-bdc/activate] Parent rate code discovered: ${candidate}`);
-                break;
-              }
-              // If it errored, check if the error is slave-rate (try next) or
-              // "not active for room" (try next) vs something else (stop).
-              if (latest?.id) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const logs: any = await channex.request(`/channel_events/${latest.id}/logs`);
-                const firstErr = logs?.data?.logs?.[0]?.data?.errors?.[0]?.code;
-                if (firstErr && firstErr !== "rate_is_a_slave_rate" && firstErr !== "rate_not_active_for_room") {
-                  console.warn(`[connect-bdc/activate] Parent rate probe hit unexpected error ${firstErr}; stopping`);
-                  break;
-                }
-              }
-            } catch { /* continue probing */ }
-          }
-        }
-      } catch (err) {
-        console.warn("[connect-bdc/activate] Parent rate discovery failed:", err instanceof Error ? err.message : err);
-      }
-    }
-
-    // 5. Update property_channels to active (include discovered parent code)
     const now = new Date().toISOString();
-    const mergedSettings = {
+    const baseMergedSettings = {
       ...(pcRow?.settings ?? {}),
-      ...(parentRateCode != null ? { parent_rate_plan_code: parentRateCode } : {}),
+      ...(storedParentCode == null && bdcRatePlanId ? { rate_discovery: "in_progress" } : {}),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("property_channels") as any)
       .update({
         status: activationError ? "activation_failed" : "active",
-        settings: mergedSettings,
+        settings: baseMergedSettings,
         last_sync_at: now,
         updated_at: now,
       })
@@ -304,14 +224,146 @@ export async function POST(request: NextRequest) {
       }, { status: 502 });
     }
 
+    // Fire-and-forget parent rate discovery. We intentionally don't
+    // await — the response returns while the background probe runs.
+    // Any failures are persisted to property_channels.settings.rate_discovery.
+    if (!storedParentCode && bdcRatePlanId) {
+      discoverParentRateInBackground({
+        supabase,
+        channex,
+        channelId,
+        channexPropertyId,
+        propertyId,
+        bdcRatePlanId,
+        existingSettings: pcRow?.settings ?? {},
+      }).catch((err) => {
+        console.error("[connect-bdc/activate] Background probe crashed:", err instanceof Error ? err.message : err);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       status: "active",
-      parent_rate_plan_code: parentRateCode,
+      rate_discovery: storedParentCode != null ? "complete" : (bdcRatePlanId ? "in_progress" : "not_needed"),
+      parent_rate_plan_code: storedParentCode ?? null,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[connect-bdc/activate]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ===========================================================================
+// Background parent-rate discovery
+// ===========================================================================
+
+/**
+ * Probes candidate BDC rate_plan_codes to find the parent code that
+ * Booking.com will accept pushes to. Runs as a detached async task so
+ * the /activate endpoint returns immediately and the UI polls the status
+ * endpoint instead of blocking.
+ *
+ * Writes state to property_channels.settings.rate_discovery:
+ *   "in_progress"  → probing
+ *   "complete"     → found a parent code (see parent_rate_plan_code)
+ *   "failed"       → tried every candidate, none worked
+ */
+async function discoverParentRateInBackground(opts: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  channex: any;
+  channelId: string;
+  channexPropertyId: string;
+  propertyId: string;
+  bdcRatePlanId: string;
+  existingSettings: Record<string, unknown>;
+}): Promise<void> {
+  const { supabase, channex, channelId, channexPropertyId, propertyId, bdcRatePlanId, existingSettings } = opts;
+  let parentRateCode: number | null = null;
+  let rateDiscoveryStatus: "complete" | "failed" = "failed";
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chRes: any = await channex.request(`/channels/${channelId}`);
+    const seedCode = chRes?.data?.attributes?.rate_plans?.[0]?.settings?.rate_plan_code;
+    if (typeof seedCode !== "number") {
+      console.warn("[connect-bdc/activate bg] No seed rate code on channel; aborting probe");
+      return;
+    }
+    const candidates: number[] = [seedCode];
+    for (let delta = -1; delta >= -10; delta--) candidates.push(seedCode + delta);
+    for (let delta = 1; delta <= 10; delta++) candidates.push(seedCode + delta);
+    const roomTypeCode = chRes?.data?.attributes?.rate_plans?.[0]?.settings?.room_type_code;
+    const baseSettings = chRes?.data?.attributes?.rate_plans?.[0]?.settings ?? {};
+
+    const probe = new Date();
+    probe.setUTCDate(probe.getUTCDate() + 30);
+    const probeDate = probe.toISOString().split("T")[0];
+
+    for (const candidate of candidates) {
+      try {
+        await channex.updateChannel(channelId, {
+          rate_plans: [{
+            settings: { ...baseSettings, rate_plan_code: candidate, room_type_code: roomTypeCode },
+            rate_plan_id: bdcRatePlanId,
+          }],
+        });
+      } catch { continue; }
+
+      try {
+        await channex.updateRestrictions([{
+          property_id: channexPropertyId,
+          rate_plan_id: bdcRatePlanId,
+          date_from: probeDate,
+          date_to: probeDate,
+          rate: 10000,
+        }]);
+      } catch { continue; }
+
+      await new Promise((r) => setTimeout(r, 3500));
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ev: any = await channex.request(
+          `/channel_events?filter[channel_id]=${channelId}&filter[name]=sync&pagination[per_page]=1&order[inserted_at]=desc`
+        );
+        const latest = ev?.data?.[0];
+        const result = latest?.attributes?.payload?.result;
+        if (result === "success") {
+          parentRateCode = candidate;
+          rateDiscoveryStatus = "complete";
+          console.log(`[connect-bdc/activate bg] Parent rate code discovered: ${candidate}`);
+          break;
+        }
+        if (latest?.id) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const logs: any = await channex.request(`/channel_events/${latest.id}/logs`);
+          const firstErr = logs?.data?.logs?.[0]?.data?.errors?.[0]?.code;
+          if (firstErr && firstErr !== "rate_is_a_slave_rate" && firstErr !== "rate_not_active_for_room") {
+            console.warn(`[connect-bdc/activate bg] Stopping probe on unexpected error ${firstErr}`);
+            break;
+          }
+        }
+      } catch { /* continue */ }
+    }
+  } catch (err) {
+    console.warn("[connect-bdc/activate bg] Probe failed:", err instanceof Error ? err.message : err);
+  } finally {
+    // Persist final status so the UI poller can stop.
+    const mergedSettings = {
+      ...existingSettings,
+      rate_discovery: rateDiscoveryStatus,
+      ...(parentRateCode != null ? { parent_rate_plan_code: parentRateCode } : {}),
+    };
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from("property_channels") as any)
+        .update({ settings: mergedSettings, updated_at: new Date().toISOString() })
+        .eq("property_id", propertyId)
+        .eq("channex_channel_id", channelId);
+    } catch (err) {
+      console.error("[connect-bdc/activate bg] Failed to persist final state:", err instanceof Error ? err.message : err);
+    }
   }
 }

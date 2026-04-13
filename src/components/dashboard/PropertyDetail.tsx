@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -59,9 +60,14 @@ export default function PropertyDetail({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [showBdcConnect, setShowBdcConnect] = useState(false);
   const bdcChannel = channels.find((c) => c.channel_code === "BDC");
+  // Delete property modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // Scenario 1: Full Sync state
   const [syncing, setSyncing] = useState(false);
@@ -212,6 +218,29 @@ export default function PropertyDetail({
       const locMsg = lat ? ` Location: ${editForm.city || "found"}, ${editForm.state || ""}` : "";
       toast(`Property updated!${locMsg}`);
       setEditing(false);
+    }
+  };
+
+  const handleDeleteProperty = async () => {
+    if (deleteConfirmName !== property.name) {
+      toast("Property name doesn't match — type the name exactly to confirm", "error");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/properties/${property.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      if (data.channex_cleanup_warnings?.length > 0) {
+        console.warn("[delete-property] Channex cleanup warnings:", data.channex_cleanup_warnings);
+      }
+      toast("Property deleted. Channel connections removed.", "success");
+      router.push("/properties");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Delete failed", "error");
+      setDeleting(false);
     }
   };
 
@@ -914,6 +943,81 @@ export default function PropertyDetail({
             </div>
           )}
         </div>
+
+        {/* Danger zone — intentionally muted so users don't click it
+            by accident, but findable when they need it. Uses the
+            Canopy danger token (#c44040). */}
+        <div className="mt-8 rounded-lg border border-[#c44040]/20 bg-[#c44040]/[0.03] p-5">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#c44040] mb-2">
+            Danger Zone
+          </h3>
+          <p className="text-sm text-[#555] mb-3">
+            Deleting this property will disconnect all channels, remove all bookings,
+            rates, and cleaning tasks from Moora, and remove the Channex channel on
+            your behalf. This cannot be undone.
+          </p>
+          <button
+            type="button"
+            onClick={() => { setDeleteConfirmName(""); setShowDeleteModal(true); }}
+            className="text-sm font-medium text-[#c44040] border border-[#c44040]/40 rounded-lg px-4 py-2 hover:bg-[#c44040]/10 transition-colors"
+          >
+            Delete property
+          </button>
+        </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#c44040]/10 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-[#c44040]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#1a3a2a]">Delete {property.name}?</h2>
+                <p className="text-sm text-[#555] mt-1">
+                  This will permanently delete all data for this property including{" "}
+                  bookings, calendar, rates, and channel connections. Channex channels
+                  and rate plans will be removed. This cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <label className="block text-xs font-medium text-[#555] mb-1">
+              Type <span className="font-mono font-semibold text-[#c44040]">{property.name}</span> to confirm:
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#efe9dd] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c44040]/30 focus:border-[#c44040] mb-4"
+              placeholder={property.name}
+              autoFocus
+            />
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-[#555] hover:text-[#1a3a2a] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProperty}
+                disabled={deleting || deleteConfirmName !== property.name}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#c44040] hover:bg-[#a83232] rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {deleting ? "Deleting…" : "Delete property"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -18,11 +18,15 @@ interface ImportResult {
   channex_id: string;
   property_id?: string;
   name?: string;
-  status: string;
+  status: "imported" | "imported_with_errors" | "error" | "unmatched";
   rooms?: number;
   bookings?: number;
+  bookings_failed?: number;
+  booking_errors?: string[];
   rates?: number;
   error?: string;
+  reason?: "multiple_candidates" | string;
+  candidates?: Array<{ id: string; name: string }>;
 }
 
 export default function ImportPage() {
@@ -255,26 +259,7 @@ export default function ImportPage() {
 
             <div className="space-y-3 mb-6">
               {results.map((r) => (
-                <div key={r.channex_id} className="flex items-center justify-between p-3 border border-neutral-100 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-800">{r.name ?? r.channex_id}</p>
-                    {r.status === "imported" && (
-                      <p className="text-xs text-neutral-400">
-                        {r.rooms ?? 0} rooms · {r.bookings ?? 0} bookings · {r.rates ?? 0} rate entries
-                      </p>
-                    )}
-                    {r.error && <p className="text-xs text-red-500">{r.error}</p>}
-                  </div>
-                  <span
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      r.status === "imported"
-                        ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-700"
-                    }`}
-                  >
-                    {r.status}
-                  </span>
-                </div>
+                <ResultRow key={r.channex_id} result={r} />
               ))}
             </div>
 
@@ -287,6 +272,123 @@ export default function ImportPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Per-result rendering
+// ===========================================================================
+
+function ResultRow({ result: r }: { result: ImportResult }) {
+  const [expanded, setExpanded] = useState(false);
+  const isQuotaError =
+    typeof r.error === "string" &&
+    (r.error.includes("property_quota_exceeded") || r.error.includes("free_tier_limit_exceeded"));
+
+  // Status-specific color and label
+  let pillClass = "bg-neutral-100 text-neutral-600";
+  let pillLabel: string = r.status;
+  if (r.status === "imported") { pillClass = "bg-[#eef5f0] text-[#1a3a2a]"; pillLabel = "Imported"; }
+  else if (r.status === "imported_with_errors") { pillClass = "bg-[#fff4d6] text-[#b8860b]"; pillLabel = "Imported with warnings"; }
+  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[#fff4d6] text-[#b8860b]" : "bg-[#c44040]/10 text-[#c44040]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
+  else if (r.status === "unmatched") { pillClass = "bg-[#eef5f0] text-[#3d6b52]"; pillLabel = "Needs your input"; }
+
+  return (
+    <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+      <div className="flex items-start justify-between p-3 gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-neutral-800 truncate">{r.name ?? r.channex_id}</p>
+
+          {/* Clean success */}
+          {r.status === "imported" && (
+            <p className="text-xs text-neutral-400 mt-0.5">
+              {r.rooms ?? 0} rooms · {r.bookings ?? 0} bookings · {r.rates ?? 0} rate entries
+            </p>
+          )}
+
+          {/* Imported but with booking failures */}
+          {r.status === "imported_with_errors" && (
+            <>
+              <p className="text-xs text-[#b8860b] mt-0.5">
+                {r.bookings ?? 0} of {(r.bookings ?? 0) + (r.bookings_failed ?? 0)} bookings imported
+                {r.bookings_failed ? ` — ${r.bookings_failed} failed` : ""}
+              </p>
+              {r.booking_errors && r.booking_errors.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((e) => !e)}
+                  className="text-[11px] text-[#b8860b] underline hover:no-underline mt-1"
+                >
+                  {expanded ? "Hide" : "Show"} {r.booking_errors.length} error{r.booking_errors.length === 1 ? "" : "s"}
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Quota-exceeded error gets an upgrade CTA */}
+          {r.status === "error" && isQuotaError && (
+            <>
+              <p className="text-xs text-[#b8860b] mt-0.5">
+                Your plan doesn&apos;t allow more properties.
+              </p>
+              <Link
+                href="/settings"
+                className="inline-block text-[11px] font-semibold text-white bg-[#c9a96e] hover:bg-[#d4bc8a] rounded px-2 py-1 mt-1.5"
+              >
+                Upgrade to Pro
+              </Link>
+            </>
+          )}
+
+          {/* Generic error */}
+          {r.status === "error" && !isQuotaError && r.error && (
+            <p className="text-xs text-[#c44040] mt-0.5 break-all">{r.error}</p>
+          )}
+
+          {/* Unmatched / multiple candidates — user needs to pick */}
+          {r.status === "unmatched" && (
+            <>
+              <p className="text-xs text-[#3d6b52] mt-0.5">
+                {r.reason === "multiple_candidates"
+                  ? "Multiple Moora properties match this name. Pick the right one or import as a new property."
+                  : "This property couldn't be auto-matched."}
+              </p>
+              {r.candidates && r.candidates.length > 0 && (
+                <div className="mt-2">
+                  <label className="block text-[10px] text-[#3d6b52] mb-1">Link to:</label>
+                  <select
+                    className="text-xs border border-[#efe9dd] rounded px-2 py-1 bg-white"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choose a property…</option>
+                    {r.candidates.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-[#999] mt-1">
+                    (Manual linking is coming soon — for now, rename one of the conflicting properties and re-import.)
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full flex-shrink-0 ${pillClass}`}>
+          {pillLabel}
+        </span>
+      </div>
+
+      {/* Expanded booking errors list */}
+      {expanded && r.booking_errors && (
+        <div className="border-t border-[#efe9dd] bg-[#fff4d6]/30 px-3 py-2">
+          <ul className="list-disc list-inside space-y-0.5">
+            {r.booking_errors.map((err, i) => (
+              <li key={i} className="text-[11px] text-[#b8860b] break-all">{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

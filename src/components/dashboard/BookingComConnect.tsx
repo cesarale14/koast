@@ -28,6 +28,30 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
   const [icalUrl, setIcalUrl] = useState("");
   const [icalLoading, setIcalLoading] = useState(false);
   const [icalResult, setIcalResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [rateDiscovery, setRateDiscovery] = useState<"not_needed" | "in_progress" | "complete" | "failed">("not_needed");
+  const [parentRateCode, setParentRateCode] = useState<number | null>(null);
+
+  // Poll the BDC status endpoint while the background parent-rate
+  // discovery is running, so Sarah sees progress instead of a dead modal.
+  // Stops on complete/failed/not_needed, or after 2 minutes as a safety
+  // net in case the background task crashes.
+  const pollRateDiscovery = useCallback(async () => {
+    const start = Date.now();
+    while (Date.now() - start < 120_000) {
+      try {
+        const res = await fetch(`/api/channels/connect-booking-com/status/${propertyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRateDiscovery(data.rate_discovery);
+          setParentRateCode(data.parent_rate_plan_code);
+          if (data.rate_discovery === "complete" || data.rate_discovery === "failed" || data.rate_discovery === "not_needed") {
+            return;
+          }
+        }
+      } catch { /* keep polling */ }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }, [propertyId]);
 
   const doActivate = useCallback(async (chId: string) => {
     setStep("activating");
@@ -41,9 +65,18 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
     const actData = await actRes.json();
     if (!actRes.ok) throw new Error(actData.error || "Failed to activate");
 
+    // /activate returns immediately now. If the server kicked off an
+    // async parent-rate probe, start polling the status endpoint. Don't
+    // block the ical step on this — the poll runs alongside.
+    setRateDiscovery(actData.rate_discovery ?? "not_needed");
+    setParentRateCode(actData.parent_rate_plan_code ?? null);
+    if (actData.rate_discovery === "in_progress") {
+      pollRateDiscovery().catch(() => { /* swallow */ });
+    }
+
     setProgressIdx(4);
     setStep("ical");
-  }, [propertyId]);
+  }, [propertyId, pollRateDiscovery]);
 
   const handleConnect = useCallback(async () => {
     if (!hotelId.trim()) return;
@@ -332,6 +365,48 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                 <p className="text-[13px] text-[#666] leading-relaxed">
                   New bookings will sync automatically via Channex. Calendar availability is managed by Moora.
                 </p>
+
+                {/* Parent rate discovery progress — runs in the background
+                    after /activate. Shows a small live status so Sarah
+                    knows what's happening without blocking the modal. */}
+                {rateDiscovery === "in_progress" && (
+                  <div className="rounded-lg border border-[#efe9dd] bg-[#f8f6f1] px-3 py-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 border-2 border-[#3d6b52] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[12px] font-semibold text-[#1a3a2a]">Discovering rate configuration…</span>
+                    </div>
+                    <p className="text-[11px] text-[#3d6b52] mt-1 leading-snug">
+                      Finding the right Booking.com rate plan code. This takes up to 90 seconds and runs in the background — you can close this modal and keep working.
+                    </p>
+                  </div>
+                )}
+                {rateDiscovery === "complete" && parentRateCode != null && (
+                  <div className="rounded-lg border border-[#eef5f0] bg-[#eef5f0]/40 px-3 py-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[#1a3a2a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-[12px] font-semibold text-[#1a3a2a]">Rate configuration ready</span>
+                    </div>
+                    <p className="text-[11px] text-[#3d6b52] mt-1">
+                      Using parent rate plan {parentRateCode}. Pushes will sync to Booking.com.
+                    </p>
+                  </div>
+                )}
+                {rateDiscovery === "failed" && (
+                  <div className="rounded-lg border border-[#b8860b]/30 bg-[#b8860b]/5 px-3 py-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[#b8860b]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.515 2.625H3.72c-1.345 0-2.188-1.458-1.515-2.625L8.485 2.495zM10 6a1 1 0 011 1v3a1 1 0 11-2 0V7a1 1 0 011-1zm0 8a1 1 0 100-2 1 1 0 000 2z" />
+                      </svg>
+                      <span className="text-[12px] font-semibold text-[#b8860b]">Rate plan setup needs attention</span>
+                    </div>
+                    <p className="text-[11px] text-[#b8860b]/90 mt-1">
+                      We couldn&apos;t automatically find the right parent rate code. Rates won&apos;t sync to Booking.com until this is resolved — please contact support.
+                    </p>
+                  </div>
+                )}
+
                 <button
                   onClick={() => { onConnected(); onClose(); }}
                   className="w-full py-2.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] transition-colors"
