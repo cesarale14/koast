@@ -95,7 +95,10 @@ export function PerChannelRateEditor({ propertyId, dates, baseRate }: Props) {
         <div className="space-y-2">
           {data.channels.map((ch) => (
             <ChannelCard
-              key={ch.channel_code}
+              // Key includes propertyId + date range so the card remounts
+              // (and resets its local rate/markup state) whenever the user
+              // switches property or selects a different date range.
+              key={`${propertyId}:${ch.channel_code}:${dateFrom}:${dateTo}`}
               propertyId={propertyId}
               channel={ch}
               dates={dates}

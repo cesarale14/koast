@@ -205,6 +205,23 @@ export default function CalendarGrid({
     [ratePanel, toast],
   );
 
+  // ---------- Property switch sync ----------
+  // When the user switches property via the sidebar, re-anchor any open
+  // rate panel to the new property so it doesn't show stale data from
+  // the previous selection.
+  useEffect(() => {
+    setRatePanel((prev) => {
+      if (!prev) return prev;
+      if (prev.propertyId === monthlyPropertyId) return prev;
+      const propLookup = rateLookup.get(monthlyPropertyId);
+      const rate = prev.dates.length === 1
+        ? propLookup?.get(prev.dates[0]) ?? null
+        : null;
+      return { propertyId: monthlyPropertyId, dates: prev.dates, rate };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthlyPropertyId]);
+
   // ---------- Monthly property stats ----------
   const monthlyStats = useMemo(() => {
     if (!monthlyPropertyId) return { nextCheckIn: "—", occupancy: 0, avgRate: 0 };
