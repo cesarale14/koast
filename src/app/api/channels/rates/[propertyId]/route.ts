@@ -320,7 +320,13 @@ export async function GET(
         const ds = d.toISOString().split("T")[0];
         const live = bucket[ds];
         const override = overrides.get(ds);
-        const liveRate = live?.rate != null ? Number(live.rate) : null;
+        // Channex returns rate="0.00" for dates where no rate has ever
+        // been pushed to the rate plan (past dates, newly created plans).
+        // A $0 nightly rate is never legitimate for a vacation rental, so
+        // treat 0 as "unset" — the UI falls back to the base rate for
+        // display and the user can type a real number to push.
+        const rawLive = live?.rate != null ? Number(live.rate) : null;
+        const liveRate = rawLive != null && rawLive > 0 ? rawLive : null;
         const storedRate = override?.applied_rate ?? null;
         const mismatch = storedRate != null && liveRate != null && Math.abs(storedRate - liveRate) > 0.5;
 
