@@ -88,8 +88,8 @@ All colors are defined as CSS variables in `globals.css` (:root). Components ref
 - Logs: `/var/log/staycommand/`
 - Workers status: `~/staycommand-workers/status.sh`
 
-## Database (25 tables)
-properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, user_preferences, property_channels, channex_room_types, channex_rate_plans, notifications, weather_cache
+## Database (28 tables)
+properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, user_preferences, property_channels, channex_room_types, channex_rate_plans, notifications, weather_cache, channex_webhook_log, user_subscriptions, concurrency_locks
 
 ## Channex Integration (PRODUCTION)
 - Current state: FRESH START — 0 properties in StayCommand, 4 properties in Channex (can't be deleted while mapped to Airbnb channel)
@@ -102,12 +102,29 @@ properties, listings, bookings, calendar_rates, market_comps, market_snapshots, 
 - API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
 - IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
 - IMPORTANT: Moora pushes rates to ALL connected channels including Airbnb via Channex rate plans. The calendar's per-channel rate editor can target Airbnb, Booking.com, and Vrbo independently; saving pushes to the channel's dedicated Channex rate plan.
+- IMPORTANT: To block specific dates on BDC, use availability=0 (BookingLimit=0) at the room type level — NOT stop_sell=true, which BDC interprets as closing the entire room/property. Ensure rates are pushed for the full bookable window (today through 18+ months out) — any date with $0 rate triggers "missing prices" warnings in the BDC extranet.
+- IMPORTANT: BDC child/slave rates reject all pushes with RATE_IS_A_SLAVE_RATE. Always identify and target the parent rate code (brute-force candidates around the rate code Channex first reports if needed). Use `POST /channels/{id}/activate` to activate BDC channels — `PUT is_active: true` does not work.
+- IMPORTANT: Channex property and rate plan IDs for new channels come from `GET /rate_plans?filter[property_id]=X` intersected with the channel's `rate_plans` array. Multi-property channels (single Airbnb account covering many listings) expose every linked property's rate plans, so filtering by the property-owned ID set is required to avoid picking the wrong rate plan.
 
 ### Booking.com Self-Service Connection
 - Flow: User enters Hotel ID → API creates Channex BDC channel → tests connection → if Booking.com hasn't authorized Channex, shows instructions (admin.booking.com → Account → Connectivity Provider → search "Channex") → retry → on success, pushes availability + activates
 - API routes: `/api/channels/connect-booking-com` (create), `/api/channels/connect-booking-com/test` (test auth), `/api/channels/connect-booking-com/activate` (push avail + activate)
 - UI: `BookingComConnect.tsx` modal with form → progress → authorization → success states
-- Channex client methods: `createChannel`, `updateChannel`, `testChannelConnection`
+- Channex client methods: `createChannel`, `updateChannel`, `testChannelConnection`, `deleteProperty`, `getRestrictionsBucketed`
+- Channel creation is atomic: a compensating-rollback try/catch tracks every Channex resource created (scaffold property, rate plan, channel) and deletes them on later failure so orphaned entities don't accumulate.
+- Per-property mutex via `concurrency_locks` table prevents two simultaneous connect requests from racing.
+- Connect flow creates a DEDICATED BDC rate plan — it never reuses an existing one, which prevents rate bleed between Airbnb and Booking.com.
+- Name matching (Moora ↔ Channex) uses strict normalized equality (strips " - X" / " in X" / Airbnb rating noise). Ambiguous matches surface as candidates instead of auto-picking.
+
+## Reliability Infrastructure
+- **Webhook idempotency**: Every incoming Channex webhook is dedup'd via `channex_webhook_log.revision_id`. Duplicate deliveries (Channex network retries) are acked and skipped without re-processing — no more duplicate bookings or double availability pushes.
+- **Free-tier enforcement**: `enforce_property_quota` DB trigger (`supabase/migrations/20260413010000_free_tier_property_quota.sql`) blocks at-limit property inserts atomically. Client-side count check remains for fast UX but the trigger is authoritative. Per-tier limits: free=1, pro=15, business=unlimited. Tiers live in `user_subscriptions` (default free for new rows).
+- **BDC connect mutex**: 60-second advisory locks in `concurrency_locks` table keyed `bdc_connect:{propertyId}`. Concurrent requests return 409 `connect_in_progress`. Released on both success and failure paths.
+- **Atomic BDC channel creation**: Compensating rollback on failure deletes scaffold properties, rate plans, and channels that were created before the error. The orphan-scaffold problem that gave us Pool House's misrouted BDC channel is prevented at source.
+- **Rate push partial failure handling**: `/api/pricing/push` wraps each 200-entry batch in try/catch, collects per-batch failures with date ranges, and returns HTTP 207 Multi-Status with `partial_failure: true` instead of silently claiming success after batch N fails.
+- **Scaffold cleanup on import**: When a Channex import matches a Moora property that was previously linked to a scaffold Channex property, the import retargets all `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
+- **iCal preview mode**: `POST /api/ical/add` with `property_id: "preview"` runs the parse/validate flow without writing to the DB and without ownership checks — used by the properties-new Test button. 15-second AbortController timeout prevents hung feeds.
+- **iCal ghost booking cleanup**: Sync cancels bookings whose UID disappears from the feed regardless of whether they were originally iCal-sourced or Channex-sourced. For Channex-linked rows, it also unblocks the affected `calendar_rates` dates so cross-channel availability stays accurate.
 
 ## 9-Signal Pricing Engine
 Weights (sum = 1.0):
@@ -131,7 +148,7 @@ Bottom: Settings, User avatar (Cesar)
 
 ## Key Pages & Features
 - **Dashboard:** Visual command center with property status cards (photos + live status), smart actions, events bar, portfolio performance, activity feed
-- **Calendar:** Airbnb-style monthly grid (ONLY monthly view — timeline removed), 24-month continuous scroll, booking bars with platform logos, check-in/checkout overlap, Airbnb-style partial-cell offsets, conflict detection with red stripes, full-width layout with property sidebar (left) and rate/availability settings panel (right)
+- **Calendar:** Airbnb-style monthly grid (ONLY monthly view — timeline removed), 24-month continuous scroll, booking bars with platform logos, check-in/checkout overlap, Airbnb-style partial-cell offsets, conflict detection with red stripes, full-width layout with property sidebar (left) and rate/availability settings panel (right). Per-channel rate editor in the right panel shows LIVE rates fetched from Channex per connected channel with sync status indicators (in-sync green check / out-of-sync amber warning), supports per-channel rate overrides stored in `calendar_rates.channel_code`, and includes markup % helpers that auto-derive from the engine base rate.
 - **Pricing:** 9-signal engine, heatmap, signal breakdown, push to OTAs
 - **Market Explorer:** Analytics + interactive Leaflet map (properties, comps, events)
 - **Nearby Listings:** AirDNA-style browse with real Airbnb photos from AirROI
@@ -203,8 +220,9 @@ Bottom: Settings, User avatar (Cesar)
 - VRBO self-service connection (same pattern as Booking.com)
 
 ## Properties in Database
-- FRESH START: 0 properties (full reset for onboarding flow test)
-- 4 Airbnb listings available via Channex OAuth: Villa Jamaica, Cozy Loft, Modern House, Pool Home
+- Pool House - Tampa: live on Airbnb (listing 1610418232676616622, rate plan c0f71fee) + Booking.com (hotel 12213286, rate plan 40c81f09, channel 80940967). Parent BDC rate code: 45645116.
+- Villa Jamaica: live on Airbnb (listing 1240054136658113220, rate plan 3070d2ad) + Booking.com (hotel 12783847, rate plan 7439f86d, channel 4c7852e8). Parent BDC rate code: 48257326. VRBO channel exists but inactive.
+- Cozy Loft - Tampa, Modern House - Tampa, Stadium Loft - Tampa: manually created, no Channex link yet.
 
 ## External API Keys (in .env.local + Vercel)
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
