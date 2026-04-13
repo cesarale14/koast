@@ -4,6 +4,23 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 
 /**
+ * Strict property-name normalization — matches the implementation in
+ * /api/channex/import so both name-matching paths behave identically.
+ */
+function normalizePropertyName(name: string): string {
+  if (!name) return "";
+  let n = name.toLowerCase().trim();
+  const dashIdx = n.lastIndexOf(" - ");
+  if (dashIdx > 0) n = n.slice(0, dashIdx);
+  const inIdx = n.lastIndexOf(" in ");
+  if (inIdx > 0) n = n.slice(0, inIdx);
+  n = n.replace(/^home\b/, "").trim();
+  n = n.replace(/[·•★].*$/, "").trim();
+  n = n.replace(/\s+/g, " ").trim();
+  return n;
+}
+
+/**
  * POST /api/channels/connect-booking-com
  * Creates (or reuses) a Channex BDC channel, links the property, and
  * pushes initial availability. The caller must separately test the
@@ -37,24 +54,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
+    // 1b. Per-property mutex. Two concurrent BDC connects for the same
+    //     property can race — one creates a scaffold while the other
+    //     creates a channel, then both overwrite each other's
+    //     property_channels row. Acquire a short-lived advisory lock in
+    //     the concurrency_locks table before doing any Channex work.
+    const lockKey = `bdc_connect:${propertyId}`;
+    // Opportunistically clean up stale locks (cheap).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.rpc as any)("release_stale_locks").catch(() => { /* ignore */ });
+    const lockExpires = new Date(Date.now() + 60_000).toISOString(); // 60s TTL
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: lockRow, error: lockErr } = await (supabase.from("concurrency_locks") as any)
+      .insert({ lock_key: lockKey, expires_at: lockExpires })
+      .select("lock_key")
+      .maybeSingle();
+    if (lockErr || !lockRow) {
+      return NextResponse.json(
+        { error: "connect_in_progress", message: "Another Booking.com connect request is already running for this property. Try again in a moment." },
+        { status: 409 }
+      );
+    }
+
+    // Track Channex entities we create so we can roll them back on failure.
+    const createdChannexResources: Array<{ type: "property" | "rate_plan" | "channel"; id: string }> = [];
+    const rollback = async () => {
+      for (const r of createdChannexResources.reverse()) {
+        try {
+          if (r.type === "property") await channex.deleteProperty(r.id);
+          // rate_plan and channel deletes are best-effort; Channex's delete
+          // endpoints may require specific ordering, so log and continue.
+          else if (r.type === "channel") await channex.request(`/channels/${r.id}`, { method: "DELETE" });
+          else if (r.type === "rate_plan") await channex.request(`/rate_plans/${r.id}`, { method: "DELETE" });
+        } catch (e) {
+          console.warn(`[connect-bdc] rollback ${r.type} ${r.id} failed:`, e instanceof Error ? e.message : e);
+        }
+      }
+    };
+    const releaseLock = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from("concurrency_locks") as any).delete().eq("lock_key", lockKey);
+      } catch { /* ignore */ }
+    };
+
+    try {
+
     // 2. Ensure Channex property exists
     //    First try to find a matching Channex property from the user's account
     //    (e.g., from Airbnb OAuth) before falling back to scaffold creation.
     let channexPropertyId = property.channex_property_id;
     if (!channexPropertyId) {
-      // Search existing Channex properties for a name match
+      // Strict name matching: normalize both sides (strip generic " - X" /
+      // " in X" suffixes, Airbnb star/rating noise, whitespace) and require
+      // exact equality on the normalized form. Substring contains led to
+      // false positives like "Pool" → "Pool House in Tampa".
       const allChannexProps = await channex.getProperties();
-      const propName = (property.name || "").toLowerCase().replace(/\s*-\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
-      const matched = allChannexProps.find((p) => {
-        const cTitle = (p.attributes?.title || "").toLowerCase().trim();
-        // Match if either name contains the other (handles "Pool House" vs "Pool Home in Tampa")
-        const cBase = cTitle.replace(/\s*(in|-)?\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
-        return (
-          cBase === propName ||
-          cBase.includes(propName) ||
-          propName.includes(cBase)
-        );
-      });
+      const propName = normalizePropertyName(property.name || "");
+      const exactMatches = allChannexProps
+        .filter((p) => normalizePropertyName(p.attributes?.title || "") === propName);
+      const matched = exactMatches.length === 1 ? exactMatches[0] : null;
+
+      if (exactMatches.length > 1) {
+        return NextResponse.json({
+          error: "multiple_channex_property_matches",
+          message: "Multiple Channex properties share this name. Import the right one from Properties → Import first, then connect Booking.com.",
+          candidates: exactMatches.map((m) => ({ id: m.id, title: m.attributes?.title })),
+        }, { status: 409 });
+      }
 
       if (matched) {
         channexPropertyId = matched.id;
@@ -81,6 +148,7 @@ export async function POST(request: NextRequest) {
           timezone: "America/New_York",
         });
         channexPropertyId = channexProp.id;
+        createdChannexResources.push({ type: "property", id: channexPropertyId });
         await supabase
           .from("properties")
           .update({ channex_property_id: channexPropertyId })
@@ -173,6 +241,7 @@ export async function POST(request: NextRequest) {
         }],
       });
       bdcRatePlanId = rp.id;
+      createdChannexResources.push({ type: "rate_plan", id: bdcRatePlanId });
       console.log(`[connect-bdc] Created dedicated BDC rate plan ${bdcRatePlanId}`);
 
       const now = new Date().toISOString();
@@ -221,6 +290,7 @@ export async function POST(request: NextRequest) {
         settings: { hotel_id: hotelId },
       });
       channelId = channelRes.data?.id;
+      createdChannexResources.push({ type: "channel", id: channelId });
       console.log(`[connect-bdc] Created new BDC channel ${channelId}`);
     }
 
@@ -260,6 +330,7 @@ export async function POST(request: NextRequest) {
       { onConflict: "property_id,channex_channel_id" }
     );
 
+    await releaseLock();
     return NextResponse.json({
       success: true,
       channelId,
@@ -267,6 +338,15 @@ export async function POST(request: NextRequest) {
       hotelId,
       status: "pending_authorization",
     });
+    } catch (err) {
+      // Roll back any Channex entities we created during this flow so
+      // the user's Channex account doesn't accumulate half-configured
+      // channels/rate plans when the later steps fail.
+      console.error("[connect-bdc] flow failed, rolling back Channex creates:", err instanceof Error ? err.message : err);
+      await rollback();
+      await releaseLock();
+      throw err;
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[connect-bdc]", msg);

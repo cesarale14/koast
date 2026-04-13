@@ -13,6 +13,11 @@ interface SyncResult {
   cancelled: number;
   blocked: number;
   error?: string;
+  // Non-fatal warnings accumulated during the sync (e.g. cleaning task
+  // creation failures). The booking is considered successfully synced
+  // even if a warning is present, but the user sees it in the response
+  // so they know to investigate.
+  warnings?: string[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +72,7 @@ async function syncFeedBookings(
   feed: any,
   parsed: ICalBooking[]
 ): Promise<SyncResult> {
+  const warnings: string[] = [];
   let newCount = 0;
   let updatedCount = 0;
   let cancelledCount = 0;
@@ -121,21 +127,34 @@ async function syncFeedBookings(
         updatedCount++;
       }
     } else {
-      // Dedup: check if a booking already exists for same property + dates + platform
-      // (e.g. from Channex webhook) to avoid duplicates between iCal and Channex
-      const dupCheck = await db.select({ id: bookings.id })
+      // Cross-source dedup: the iCal UID didn't match anything, but a
+      // Channex-sourced row with the same dates may already exist (webhook
+      // inserted it without an iCal UID). We want to PROMOTE that row by
+      // stamping in the iCal UID rather than either skipping silently or
+      // creating a duplicate.
+      //
+      // CRITICAL: only consider rows with platform_booking_id IS NULL as
+      // candidates. A row with a different non-null platform_booking_id is
+      // a distinct legitimate booking (e.g. two real reservations that
+      // happen to share dates) and must not be deduped.
+      const dupCheck = await db.select({ id: bookings.id, platformBookingId: bookings.platformBookingId })
         .from(bookings)
         .where(and(
           eq(bookings.propertyId, propertyId),
           eq(bookings.checkIn, entry.checkIn),
           eq(bookings.checkOut, entry.checkOut),
           eq(bookings.platform, entry.platform),
-          sql`${bookings.status} != 'cancelled'`
+          sql`${bookings.status} != 'cancelled'`,
+          sql`${bookings.platformBookingId} IS NULL`,
         ))
         .limit(1);
 
       if (dupCheck.length > 0) {
-        console.log(`[iCal] Skipping duplicate: booking already exists for ${propertyId} ${entry.checkIn}-${entry.checkOut} (${entry.platform})`);
+        await db.update(bookings)
+          .set({ platformBookingId: entry.uid, guestName: entry.guestName })
+          .where(eq(bookings.id, dupCheck[0].id));
+        console.log(`[iCal] Promoted Channex-sourced row ${dupCheck[0].id} with iCal UID ${entry.uid}`);
+        updatedCount++;
         continue;
       }
 
@@ -152,17 +171,25 @@ async function syncFeedBookings(
       });
       newCount++;
 
-      // Auto-create cleaning task for new booking
+      // Auto-create cleaning task for new booking. Non-fatal — if the
+      // task creation fails, we keep the booking and surface the failure
+      // in the sync warnings so the user knows to create the task by hand.
       const supabase = createServiceClient();
       const [inserted] = await db.select({ id: bookings.id }).from(bookings)
         .where(and(eq(bookings.propertyId, propertyId), eq(bookings.platformBookingId, entry.uid)))
         .limit(1);
       if (inserted) {
-        await createCleaningTask(supabase, {
-          id: inserted.id,
-          property_id: propertyId,
-          check_out: entry.checkOut,
-        });
+        try {
+          await createCleaningTask(supabase, {
+            id: inserted.id,
+            property_id: propertyId,
+            check_out: entry.checkOut,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          warnings.push(`cleaning task creation failed for booking ${inserted.id} (${entry.guestName ?? "iCal"} ${entry.checkIn}→${entry.checkOut}): ${msg}`);
+          console.warn(`[iCal] Cleaning task failure for ${inserted.id}: ${msg}`);
+        }
       }
     }
   }
@@ -229,5 +256,6 @@ async function syncFeedBookings(
     updated: updatedCount,
     cancelled: cancelledCount,
     blocked: blockedCount,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }

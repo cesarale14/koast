@@ -3,6 +3,32 @@ import { createClient } from "@/lib/supabase/server";
 import { createServerClient } from "@supabase/ssr";
 import { createChannexClient } from "@/lib/channex/client";
 
+/**
+ * Normalize a property name for strict matching.
+ * Strips common location suffixes so "Pool House - Tampa" and
+ * "Pool House in Miami" both normalize to "pool house", without
+ * hardcoding a city list. Generic approach: everything after the
+ * last " - " or " in " is considered a location suffix and dropped.
+ * Also lowercases and collapses whitespace.
+ */
+function normalizePropertyName(name: string): string {
+  if (!name) return "";
+  let n = name.toLowerCase().trim();
+  // Strip the last " - <suffix>" segment (works for "Pool House - Tampa")
+  const dashIdx = n.lastIndexOf(" - ");
+  if (dashIdx > 0) n = n.slice(0, dashIdx);
+  // Strip " in <suffix>" (works for "Pool Home in Tampa")
+  const inIdx = n.lastIndexOf(" in ");
+  if (inIdx > 0) n = n.slice(0, inIdx);
+  // Also strip a leading "Home in" Airbnb auto-title prefix ("Home in Tampa · ...")
+  n = n.replace(/^home\b/, "").trim();
+  // Strip Airbnb star ratings and separators ("· ★4.82 · 4 bedrooms")
+  n = n.replace(/[·•★].*$/, "").trim();
+  // Collapse whitespace
+  n = n.replace(/\s+/g, " ").trim();
+  return n;
+}
+
 // Create a service-role client that bypasses RLS
 function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -131,27 +157,32 @@ export async function POST(request: NextRequest) {
           }
           console.log(`[channex/import] Updated existing property ${propertyId}`);
         } else {
-          // No exact channex_property_id match — check for a name match
-          // (catches properties created via onboarding that later connected
-          // BDC with a scaffold, or properties without any Channex link)
-          const propName = (attrs.title || "").toLowerCase()
-            .replace(/\s*(in|-)?\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
+          // No exact channex_property_id match — check for a STRICT name
+          // match (catches properties created via onboarding that later
+          // connected BDC with a scaffold). The previous implementation
+          // did substring containment which caused "Pool" to match
+          // "Pool House in Tampa" — too loose. Now we normalize both
+          // sides (strip location suffixes like " - Tampa" / " in Miami"
+          // generically) and require exact equality.
+          const propName = normalizePropertyName(attrs.title || "");
           const { data: nameMatches } = await propTable
             .select("id, name, channex_property_id")
             .eq("user_id", userId);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const nameMatch = (nameMatches ?? []).find((p: any) => {
-            const mName = (p.name || "").toLowerCase()
-              .replace(/\s*-\s*(tampa|orlando|miami|jacksonville|st\.?\s*pete).*$/i, "").trim();
-            return (
-              mName === propName ||
-              mName.includes(propName) ||
-              propName.includes(mName)
-            );
-          });
+          const candidates = ((nameMatches ?? []) as any[]).map((p: any) => ({
+            ...p,
+            normalizedName: normalizePropertyName(p.name || ""),
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const exactMatches = candidates.filter((p: any) => p.normalizedName === propName);
+          // Only auto-link when there's exactly ONE unambiguous match. Zero
+          // matches → new property. Multiple matches → surface as unmatched
+          // so the user can manually pick instead of us guessing.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const nameMatch: any = exactMatches.length === 1 ? exactMatches[0] : null;
 
           if (nameMatch) {
-            // Found a Moora property by name — update it with the real Channex ID
+            // Unambiguous single match — safe to auto-link
             propertyId = nameMatch.id;
             oldChannexPropertyId = nameMatch.channex_property_id;
             migratedFromScaffold = !!oldChannexPropertyId && oldChannexPropertyId !== channexId;
@@ -163,6 +194,18 @@ export async function POST(request: NextRequest) {
               throw new Error(`Property update failed: ${updateErr.message}`);
             }
             console.log(`[channex/import] Matched by name "${nameMatch.name}" → updating with real Channex ID ${channexId}${migratedFromScaffold ? ` (was scaffold ${oldChannexPropertyId})` : ""}`);
+          } else if (exactMatches.length > 1) {
+            // Ambiguous — multiple Moora properties normalize to the same
+            // name. Don't guess; surface as unmatched and let the UI ask
+            // the user to pick which one to link manually.
+            results.push({
+              channex_id: channexId,
+              name: attrs.title,
+              status: "unmatched",
+              reason: "multiple_candidates",
+              candidates: exactMatches.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })),
+            });
+            continue;
           } else {
             // No match at all — insert new property
             const { data: newProp, error: insertErr } = await propTable
