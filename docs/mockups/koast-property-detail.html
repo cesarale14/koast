@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Pool House</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-sea: #132e20; --coastal: #17392a; --mangrove: #1f4d38; --tideline: #3d6b52;
+  --golden: #c49a5a; --driftwood: #d4b47a; --sandbar: #e8d5b0;
+  --shore: #f7f3ec; --dry-sand: #ede7db; --shell: #e2dace;
+  --coral-reef: #c44040; --lagoon: #1a7a5a; --deep-water: #2a5a8a; --amber-tide: #d4960b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--shore); color:var(--deep-sea); display:flex; min-height:100vh; overflow:hidden; }
+
+/* SIDEBAR */
+.sidebar { width:220px; flex-shrink:0; background:linear-gradient(180deg,var(--deep-sea),#0e2218); padding:24px 14px; display:flex; flex-direction:column; box-shadow:4px 0 40px rgba(0,0,0,0.3); position:relative; z-index:10; }
+.sidebar::after { content:''; position:absolute; top:0; right:0; bottom:0; width:1px; background:linear-gradient(180deg,rgba(196,154,90,0.3),rgba(196,154,90,0.05)); }
+.logo { font-size:20px; font-weight:800; letter-spacing:-0.03em; color:var(--golden); margin-bottom:36px; padding:0 10px; display:flex; align-items:center; gap:10px; }
+.logo-mark { width:30px; height:30px; background:linear-gradient(135deg,var(--golden),#a87d3a); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--deep-sea); box-shadow:0 2px 12px rgba(196,154,90,0.4); }
+.nav-item { padding:9px 10px; border-radius:8px; font-size:12.5px; font-weight:500; color:rgba(168,191,174,0.6); cursor:pointer; transition:all 0.2s; position:relative; margin-bottom:1px; }
+.nav-item:hover { color:rgba(168,191,174,0.9); background:rgba(255,255,255,0.03); }
+.nav-item.active { color:var(--golden); background:rgba(196,154,90,0.08); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 2px 2px 0; background:var(--golden); }
+.nav-label { font-size:9px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--tideline); padding:0 10px; margin:16px 0 6px; }
+
+/* MAIN */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* PROPERTY HERO */
+.hero {
+  height: 200px; position: relative; flex-shrink: 0;
+  background-size: cover; background-position: center;
+}
+.hero::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%);
+}
+.hero-content {
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 24px 36px;
+  z-index: 2; display: flex; align-items: flex-end; justify-content: space-between;
+}
+.hero-info {}
+.hero-back {
+  font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.7);
+  margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;
+  transition: color 0.15s;
+}
+.hero-back:hover { color: #fff; }
+.hero-name { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.hero-location { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+.hero-channels {
+  display: flex; gap: 6px; align-items: center;
+}
+.hero-channel {
+  height: 30px; border-radius: 8px; padding: 0 10px;
+  display: flex; align-items: center; gap: 6px;
+  backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2);
+  font-size: 11px; font-weight: 600; color: #fff;
+}
+.hero-channel.airbnb { background: rgba(255,56,92,0.6); }
+.hero-channel.bdc { background: rgba(0,53,128,0.6); }
+.hero-channel svg { width: 12px; height: 12px; }
+.hero-add-channel {
+  height: 30px; border-radius: 8px; padding: 0 10px;
+  display: flex; align-items: center; gap: 4px;
+  backdrop-filter: blur(12px); border: 1px dashed rgba(255,255,255,0.35);
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.7);
+  cursor: pointer; transition: all 0.15s;
+}
+.hero-add-channel:hover { border-color: rgba(255,255,255,0.6); color: #fff; background: rgba(255,255,255,0.08); }
+
+/* TAB BAR */
+.tab-bar {
+  display: flex; gap: 0; background: #fff;
+  border-bottom: 1px solid var(--dry-sand);
+  padding: 0 36px; flex-shrink: 0;
+}
+.tab {
+  padding: 14px 20px; font-size: 13px; font-weight: 600;
+  color: var(--tideline); cursor: pointer; position: relative;
+  transition: color 0.15s; border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--coastal); }
+.tab.active { color: var(--coastal); border-bottom-color: var(--golden); }
+
+/* TAB CONTENT */
+.tab-content { flex: 1; overflow-y: auto; }
+
+/* ===== OVERVIEW TAB ===== */
+.overview { padding: 28px 36px; }
+.section-label { font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--golden); margin-bottom:14px; }
+
+/* Status banner */
+.status-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; border-radius: 14px; margin-bottom: 24px;
+  background: linear-gradient(135deg, rgba(26,122,90,0.08), rgba(26,122,90,0.02));
+  border: 1px solid rgba(26,122,90,0.12);
+}
+.status-banner.turnover {
+  background: linear-gradient(135deg, rgba(212,150,11,0.08), rgba(212,150,11,0.02));
+  border-color: rgba(212,150,11,0.12);
+}
+.status-banner.vacant {
+  background: linear-gradient(135deg, rgba(196,154,90,0.08), rgba(196,154,90,0.02));
+  border-color: rgba(196,154,90,0.12);
+}
+.status-dot-lg { width: 10px; height: 10px; border-radius: 50%; background: var(--lagoon); flex-shrink: 0; }
+.status-banner.turnover .status-dot-lg { background: var(--amber-tide); }
+.status-banner.vacant .status-dot-lg { background: var(--golden); }
+.status-text { font-size: 14px; font-weight: 600; color: var(--coastal); }
+.status-sub { font-size: 12px; color: var(--tideline); margin-top: 1px; }
+.status-action {
+  margin-left: auto; padding: 7px 14px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; border: 1px solid var(--dry-sand);
+  background: #fff; color: var(--coastal); cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.status-action:hover { background: var(--shore); }
+
+/* Metrics */
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px;
+}
+.metric-card {
+  border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden;
+  background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(247,243,236,0.85) 50%, rgba(237,231,219,0.7));
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 1px 1px rgba(19,46,32,0.02), 0 4px 8px rgba(19,46,32,0.04), 0 12px 36px rgba(19,46,32,0.06), inset 0 1px 0 #fff;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.metric-card:hover { transform: translateY(-2px); }
+.metric-card::before { content:''; position:absolute; top:0; left:0; right:0; height:50%; background:linear-gradient(180deg,rgba(255,255,255,0.35),transparent); border-radius:14px 14px 0 0; pointer-events:none; }
+.metric-val { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--coastal); position: relative; z-index: 1; }
+.metric-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--golden); margin-top: 3px; position: relative; z-index: 1; }
+.metric-trend { font-size: 11px; font-weight: 600; margin-top: 6px; position: relative; z-index: 1; }
+.trend-up { color: var(--lagoon); }
+.trend-down { color: var(--coral-reef); }
+
+/* Two column */
+.two-col { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; margin-bottom: 28px; }
+.card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 1px 3px rgba(19,46,32,0.06), 0 4px 16px rgba(19,46,32,0.03); }
+
+/* Upcoming bookings */
+.booking-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid rgba(237,231,219,0.4);
+}
+.booking-row:last-child { border-bottom: none; }
+.booking-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--mangrove), var(--tideline));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.booking-info { flex: 1; }
+.booking-name { font-size: 13px; font-weight: 600; color: var(--coastal); display: flex; align-items: center; gap: 6px; }
+.booking-dates { font-size: 11px; color: var(--tideline); margin-top: 1px; }
+.booking-amount { font-size: 14px; font-weight: 700; color: var(--coastal); letter-spacing: -0.02em; text-align: right; }
+.booking-nights { font-size: 11px; color: var(--tideline); text-align: right; }
+.platform-pill { height: 16px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; font-size: 9px; font-weight: 600; }
+.pill-airbnb { background: rgba(255,56,92,0.1); color: #FF385C; }
+.pill-bdc { background: rgba(0,53,128,0.1); color: #003580; }
+
+/* Channel performance */
+.channel-perf-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid rgba(237,231,219,0.4);
+}
+.channel-perf-item:last-child { border-bottom: none; }
+.channel-perf-logo { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.channel-perf-logo svg { width: 16px; height: 16px; }
+.channel-perf-name { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.channel-perf-sub { font-size: 11px; color: var(--tideline); }
+.channel-perf-stats { margin-left: auto; text-align: right; }
+.channel-perf-rev { font-size: 14px; font-weight: 700; color: var(--coastal); letter-spacing: -0.02em; }
+.channel-perf-pct { font-size: 11px; color: var(--tideline); }
+
+/* AI section */
+.ai-card {
+  border-radius: 16px; padding: 22px; position: relative; overflow: hidden;
+  background: linear-gradient(135deg, var(--deep-sea), #0e2218);
+  color: var(--shore);
+}
+.ai-card::before { content:''; position:absolute; top:-50%; right:-30%; width:260px; height:260px; border-radius:50%; background:radial-gradient(circle,rgba(196,154,90,0.1),transparent 70%); }
+.ai-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:16px; font-size:10px; font-weight:600; background:rgba(196,154,90,0.15); color:var(--golden); border:1px solid rgba(196,154,90,0.2); margin-bottom:12px; }
+.ai-badge-dot { width:5px; height:5px; border-radius:50%; background:var(--golden); }
+.ai-title { font-size:15px; font-weight:700; color:#fff; margin-bottom:6px; }
+.ai-text { font-size:12px; line-height:1.6; color:rgba(168,191,174,0.8); margin-bottom:14px; }
+.ai-btn { padding:7px 16px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; border:none; background:var(--golden); color:var(--deep-sea); }
+.ai-btn:hover { background:var(--driftwood); }
+
+/* ===== SETTINGS TAB ===== */
+.settings-layout { padding: 28px 36px; max-width: 900px; }
+.settings-group { margin-bottom: 28px; }
+.settings-group-title { font-size: 16px; font-weight: 700; color: var(--coastal); margin-bottom: 4px; }
+.settings-group-sub { font-size: 12px; color: var(--tideline); margin-bottom: 16px; }
+.settings-card {
+  background: #fff; border-radius: 14px; padding: 0;
+  box-shadow: 0 1px 3px rgba(19,46,32,0.06), 0 4px 16px rgba(19,46,32,0.03);
+  overflow: hidden;
+}
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid rgba(237,231,219,0.4);
+  transition: background 0.12s;
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row:hover { background: rgba(237,231,219,0.2); }
+.settings-row-label { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.settings-row-sub { font-size: 11px; color: var(--tideline); margin-top: 1px; }
+.settings-row-val { font-size: 13px; font-weight: 600; color: var(--tideline); display: flex; align-items: center; gap: 6px; }
+.settings-edit { font-size: 12px; font-weight: 600; color: var(--golden); cursor: pointer; }
+.settings-edit:hover { color: var(--driftwood); }
+
+.toggle-sm { width:38px; height:20px; border-radius:10px; background:var(--shell); position:relative; cursor:pointer; transition:background 0.2s; }
+.toggle-sm.on { background:var(--lagoon); }
+.toggle-sm-knob { width:16px; height:16px; border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.15); }
+.toggle-sm.on .toggle-sm-knob { transform:translateX(18px); }
+
+/* Platform settings header */
+.platform-header {
+  display: flex; align-items: center; gap: 10px; padding: 16px 20px;
+  border-bottom: 1px solid var(--dry-sand); background: var(--shore);
+}
+.platform-header-logo { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.platform-header-logo svg { width: 15px; height: 15px; }
+.platform-header-name { font-size: 14px; font-weight: 700; color: var(--coastal); }
+.platform-header-status { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--lagoon); display: flex; align-items: center; gap: 4px; }
+.platform-header-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lagoon); }
+
+/* Danger zone */
+.danger-zone { margin-top: 40px; }
+.danger-card {
+  background: #fff; border-radius: 14px; padding: 20px;
+  border: 1px solid rgba(196,64,64,0.15);
+  box-shadow: 0 1px 3px rgba(196,64,64,0.05);
+}
+.danger-title { font-size: 14px; font-weight: 700; color: var(--coral-reef); margin-bottom: 4px; }
+.danger-sub { font-size: 12px; color: var(--tideline); margin-bottom: 14px; }
+.danger-btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: rgba(196,64,64,0.08); color: var(--coral-reef);
+  border: 1px solid rgba(196,64,64,0.15); cursor: pointer; transition: all 0.15s;
+}
+.danger-btn:hover { background: rgba(196,64,64,0.15); }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.overview > * { animation: fadeUp 0.4s ease-out both; }
+.overview > *:nth-child(1) { animation-delay:0.02s; }
+.overview > *:nth-child(2) { animation-delay:0.06s; }
+.overview > *:nth-child(3) { animation-delay:0.1s; }
+.overview > *:nth-child(4) { animation-delay:0.14s; }
+.overview > *:nth-child(5) { animation-delay:0.18s; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">K</div> Koast</div>
+  <div class="nav-item">Dashboard</div>
+  <div class="nav-item">Calendar</div>
+  <div class="nav-item">Messages</div>
+  <div class="nav-label">Manage</div>
+  <div class="nav-item active">Properties</div>
+  <div class="nav-item">Pricing</div>
+  <div class="nav-item">Reviews</div>
+  <div class="nav-item">Cleaning</div>
+  <div class="nav-label">Insights</div>
+  <div class="nav-item">Market Intel</div>
+  <div class="nav-item">Comp Sets</div>
+</aside>
+
+<div class="main">
+  <!-- HERO -->
+  <div class="hero" style="background-image:url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=1200&q=80');">
+    <div class="hero-content">
+      <div class="hero-info">
+        <div class="hero-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          All properties
+        </div>
+        <div class="hero-name">Pool House</div>
+        <div class="hero-location">3304 W Cherry St, Tampa, FL 33607</div>
+      </div>
+      <div class="hero-channels">
+        <div class="hero-channel airbnb">
+          <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+          Airbnb
+        </div>
+        <div class="hero-channel bdc">
+          <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg>
+          Booking.com
+        </div>
+        <div class="hero-add-channel">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          Connect listing
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <div class="tab active" onclick="showTab('overview')">Overview</div>
+    <div class="tab" onclick="showTab('calendar')">Calendar</div>
+    <div class="tab" onclick="showTab('pricing')">Pricing</div>
+    <div class="tab" onclick="showTab('availability')">Availability</div>
+    <div class="tab" onclick="showTab('settings')">Settings</div>
+  </div>
+
+  <!-- TAB CONTENT -->
+  <div class="tab-content">
+
+    <!-- ===== OVERVIEW ===== -->
+    <div id="tab-overview" class="overview">
+
+      <!-- Status banner -->
+      <div class="status-banner">
+        <div class="status-dot-lg"></div>
+        <div>
+          <div class="status-text">David K. is currently in house</div>
+          <div class="status-sub">Checking out Apr 17 at 11:00 AM — 4 nights via Airbnb</div>
+        </div>
+        <button class="status-action">View booking</button>
+      </div>
+
+      <!-- Metrics -->
+      <div class="section-label">This month</div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-val">$4,200</div>
+          <div class="metric-label">Revenue</div>
+          <div class="metric-trend trend-up">+22% vs Mar</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val">92%</div>
+          <div class="metric-label">Occupancy</div>
+          <div class="metric-trend trend-up">+8% vs Mar</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val">$230</div>
+          <div class="metric-label">Avg rate</div>
+          <div class="metric-trend trend-down">-3% vs Mar</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val">4.9</div>
+          <div class="metric-label">Rating</div>
+          <div class="metric-trend trend-up">+0.1 vs Mar</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val">3.2</div>
+          <div class="metric-label">Avg nights</div>
+          <div class="metric-trend trend-up">+0.4 vs Mar</div>
+        </div>
+      </div>
+
+      <!-- Two columns: bookings + channels -->
+      <div class="two-col">
+        <div>
+          <div class="section-label">Upcoming bookings</div>
+          <div class="card">
+            <div class="booking-row">
+              <div class="booking-avatar">DK</div>
+              <div class="booking-info">
+                <div class="booking-name">David K. <span class="platform-pill pill-airbnb">Airbnb</span></div>
+                <div class="booking-dates">Apr 13 — Apr 17 (in house)</div>
+              </div>
+              <div>
+                <div class="booking-amount">$920</div>
+                <div class="booking-nights">4 nights</div>
+              </div>
+            </div>
+            <div class="booking-row">
+              <div class="booking-avatar">MS</div>
+              <div class="booking-info">
+                <div class="booking-name">Myanna S. <span class="platform-pill pill-bdc">BDC</span></div>
+                <div class="booking-dates">Apr 22 — Apr 26</div>
+              </div>
+              <div>
+                <div class="booking-amount">$1,060</div>
+                <div class="booking-nights">4 nights</div>
+              </div>
+            </div>
+            <div class="booking-row">
+              <div class="booking-avatar">JM</div>
+              <div class="booking-info">
+                <div class="booking-name">Jennie M. <span class="platform-pill pill-airbnb">Airbnb</span></div>
+                <div class="booking-dates">Apr 26 — May 1</div>
+              </div>
+              <div>
+                <div class="booking-amount">$1,150</div>
+                <div class="booking-nights">5 nights</div>
+              </div>
+            </div>
+            <div class="booking-row">
+              <div class="booking-avatar">JT</div>
+              <div class="booking-info">
+                <div class="booking-name">James T. <span class="platform-pill pill-airbnb">Airbnb</span></div>
+                <div class="booking-dates">May 3 — May 6</div>
+              </div>
+              <div>
+                <div class="booking-amount">$690</div>
+                <div class="booking-nights">3 nights</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">Channel performance</div>
+          <div class="card">
+            <div class="channel-perf-item">
+              <div class="channel-perf-logo" style="background:#FF385C;">
+                <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+              </div>
+              <div>
+                <div class="channel-perf-name">Airbnb</div>
+                <div class="channel-perf-sub">18 bookings this month</div>
+              </div>
+              <div class="channel-perf-stats">
+                <div class="channel-perf-rev">$2,760</div>
+                <div class="channel-perf-pct">66% of revenue</div>
+              </div>
+            </div>
+            <div class="channel-perf-item">
+              <div class="channel-perf-logo" style="background:#003580;">
+                <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg>
+              </div>
+              <div>
+                <div class="channel-perf-name">Booking.com</div>
+                <div class="channel-perf-sub">4 bookings this month</div>
+              </div>
+              <div class="channel-perf-stats">
+                <div class="channel-perf-rev">$1,440</div>
+                <div class="channel-perf-pct">34% of revenue</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI insight -->
+          <div style="margin-top:16px;">
+            <div class="section-label">AI insight</div>
+            <div class="ai-card">
+              <div class="ai-badge"><span class="ai-badge-dot"></span> Koast AI</div>
+              <div class="ai-title">Gap night opportunity</div>
+              <div class="ai-text">Apr 17-22 is open between David K. and Myanna S. Consider lowering the minimum stay to 2 nights or reducing the rate to $195 to capture a short booking.</div>
+              <button class="ai-btn">Apply 2-night min + $195</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div id="tab-settings" class="settings-layout" style="display:none;">
+
+      <div class="settings-group">
+        <div class="section-label">General</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div><div class="settings-row-label">Property name</div><div class="settings-row-sub">Displayed internally in Koast</div></div>
+            <div class="settings-row-val">Pool House <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Address</div></div>
+            <div class="settings-row-val">3304 W Cherry St, Tampa, FL <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Property type</div></div>
+            <div class="settings-row-val">Entire home <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Bedrooms / Bathrooms</div></div>
+            <div class="settings-row-val">4 bed / 2 bath <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Max guests</div></div>
+            <div class="settings-row-val">8 <span class="settings-edit">Edit</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Airbnb settings -->
+      <div class="settings-group">
+        <div class="section-label">Airbnb settings</div>
+        <div class="settings-card">
+          <div class="platform-header">
+            <div class="platform-header-logo" style="background:#FF385C;">
+              <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+            </div>
+            <div class="platform-header-name">Airbnb</div>
+            <div class="platform-header-status"><span class="platform-header-dot"></span> Connected</div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Listing title</div><div class="settings-row-sub">Synced from Airbnb</div></div>
+            <div class="settings-row-val" style="max-width:280px; text-align:right;">Luxury Style Townhome with Pool <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Instant Book</div><div class="settings-row-sub">Allow guests to book without approval</div></div>
+            <div class="toggle-sm on" onclick="this.classList.toggle('on')"><div class="toggle-sm-knob"></div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Check-in time</div></div>
+            <div class="settings-row-val">3:00 PM <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Checkout time</div></div>
+            <div class="settings-row-val">11:00 AM <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Cancellation policy</div></div>
+            <div class="settings-row-val">Moderate <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Cleaning fee</div></div>
+            <div class="settings-row-val">$220 <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Minimum stay</div></div>
+            <div class="settings-row-val">2 nights <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Maximum stay</div></div>
+            <div class="settings-row-val">30 nights <span class="settings-edit">Edit</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BDC settings -->
+      <div class="settings-group">
+        <div class="section-label">Booking.com settings</div>
+        <div class="settings-card">
+          <div class="platform-header">
+            <div class="platform-header-logo" style="background:#003580;">
+              <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg>
+            </div>
+            <div class="platform-header-name">Booking.com</div>
+            <div class="platform-header-status"><span class="platform-header-dot"></span> Connected</div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Hotel ID</div></div>
+            <div class="settings-row-val">12213286</div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Rate plan</div><div class="settings-row-sub">Parent rate used for pushes</div></div>
+            <div class="settings-row-val">Standard Rate (48257326)</div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Cancellation policy</div></div>
+            <div class="settings-row-val">Free cancellation 48h <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Cleaning fee</div></div>
+            <div class="settings-row-val">$220 <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Minimum stay</div></div>
+            <div class="settings-row-val">2 nights <span class="settings-edit">Edit</span></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-row-label">Commission</div></div>
+            <div class="settings-row-val">15%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger zone -->
+      <div class="danger-zone">
+        <div class="section-label" style="color:var(--coral-reef);">Danger zone</div>
+        <div class="danger-card">
+          <div class="danger-title">Delete this property</div>
+          <div class="danger-sub">This will disconnect all channels, remove all bookings, and delete all data. This action cannot be undone.</div>
+          <button class="danger-btn">Delete property</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Placeholder tabs -->
+    <div id="tab-calendar" style="display:none; padding:60px 36px; text-align:center; color:var(--tideline);">
+      <div style="font-size:18px; font-weight:700; color:var(--coastal); margin-bottom:8px;">Calendar</div>
+      <div style="font-size:13px;">Full Airbnb-style calendar grid as designed in the calendar mockup. Single property view with right-panel rate editor.</div>
+    </div>
+    <div id="tab-pricing" style="display:none; padding:60px 36px; text-align:center; color:var(--tideline);">
+      <div style="font-size:18px; font-weight:700; color:var(--coastal); margin-bottom:8px;">Pricing</div>
+      <div style="font-size:13px;">9-signal engine visualization. Rate heatmap, signal breakdown, push to OTAs controls.</div>
+    </div>
+    <div id="tab-availability" style="display:none; padding:60px 36px; text-align:center; color:var(--tideline);">
+      <div style="font-size:18px; font-weight:700; color:var(--coastal); margin-bottom:8px;">Availability</div>
+      <div style="font-size:13px;">Channel-level availability controls, booking windows, preparation time, advance notice settings.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+  document.getElementById('tab-' + id).style.display = '';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+document.querySelectorAll('.toggle-sm').forEach(t => {
+  t.addEventListener('click', function() { this.classList.toggle('on'); });
+});
+</script>
+</body>
+</html>

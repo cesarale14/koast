@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Calendar v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-sea: #132e20;
+  --coastal: #17392a;
+  --mangrove: #1f4d38;
+  --tideline: #3d6b52;
+  --golden: #c49a5a;
+  --driftwood: #d4b47a;
+  --sandbar: #e8d5b0;
+  --shore: #f7f3ec;
+  --dry-sand: #ede7db;
+  --shell: #e2dace;
+  --coral-reef: #c44040;
+  --lagoon: #1a7a5a;
+  --deep-water: #2a5a8a;
+  --amber-tide: #d4960b;
+  --bar-dark: #2c2c2a;
+  --bar-airbnb: #222222;
+  --bar-bdc: #1a1a2e;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--shore);
+  color: var(--deep-sea);
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== SIDEBAR NAV ===== */
+.sidebar {
+  width: 220px;
+  background: linear-gradient(180deg, var(--deep-sea) 0%, #0e2218 100%);
+  padding: 24px 14px;
+  display: flex; flex-direction: column;
+  position: relative; z-index: 10;
+  box-shadow: 4px 0 40px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+.sidebar::after {
+  content:''; position:absolute; top:0; right:0; bottom:0; width:1px;
+  background: linear-gradient(180deg, rgba(196,154,90,0.3) 0%, rgba(196,154,90,0.05) 100%);
+}
+.logo {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.03em;
+  color: var(--golden); margin-bottom: 36px; padding: 0 10px;
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-mark {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--golden), #a87d3a);
+  border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: var(--deep-sea);
+  box-shadow: 0 2px 12px rgba(196,154,90,0.4);
+}
+.nav-item {
+  padding: 9px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 500;
+  color: rgba(168,191,174,0.6); cursor: pointer; transition: all 0.2s;
+  position: relative; margin-bottom: 1px;
+}
+.nav-item:hover { color: rgba(168,191,174,0.9); background: rgba(255,255,255,0.03); }
+.nav-item.active { color: var(--golden); background: rgba(196,154,90,0.08); }
+.nav-item.active::before {
+  content:''; position:absolute; left:0; top:7px; bottom:7px; width:3px;
+  border-radius: 0 2px 2px 0; background: var(--golden); box-shadow: 0 0 10px rgba(196,154,90,0.5);
+}
+.nav-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--tideline); padding: 0 10px; margin: 16px 0 6px;
+}
+
+/* ===== PROPERTY LIST ===== */
+.prop-list {
+  width: 80px; background: #fff; border-right: 1px solid var(--dry-sand);
+  display: flex; flex-direction: column; flex-shrink: 0; padding-top: 76px;
+  align-items: center; gap: 6px;
+}
+.prop-thumb-wrap {
+  width: 56px; height: 56px; border-radius: 12px;
+  background-size: cover; background-position: center;
+  cursor: pointer; transition: all 0.2s; position: relative;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 2px solid transparent;
+}
+.prop-thumb-wrap:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.prop-thumb-wrap.active { border-color: var(--golden); box-shadow: 0 0 0 3px rgba(196,154,90,0.2), 0 2px 8px rgba(0,0,0,0.1); }
+.prop-channels-row {
+  position: absolute; bottom: -4px; right: -4px;
+  display: flex; gap: 2px;
+}
+.platform-logo-tiny {
+  width: 16px; height: 16px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #fff;
+}
+.platform-logo-tiny svg { width: 10px; height: 10px; }
+
+/* ===== CALENDAR ===== */
+.calendar-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.cal-toolbar {
+  padding: 18px 24px; display: flex; align-items: center;
+  justify-content: space-between; background: #fff;
+  border-bottom: 1px solid var(--dry-sand);
+}
+.cal-month-nav { display: flex; align-items: center; gap: 12px; }
+.cal-month-title { font-size: 22px; font-weight: 700; color: var(--coastal); min-width: 140px; }
+.cal-nav-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--dry-sand);
+  background: #fff; cursor: pointer; font-size: 16px; color: var(--coastal);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.cal-nav-btn:hover { background: var(--shore); border-color: var(--shell); }
+.cal-today-btn {
+  padding: 6px 14px; border-radius: 20px; border: 1px solid var(--dry-sand);
+  background: #fff; font-size: 12px; font-weight: 600; color: var(--coastal);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.cal-today-btn:hover { background: var(--shore); }
+
+.cal-scroll { flex:1; overflow-y: auto; background: #fff; }
+.cal-day-headers {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  position: sticky; top: 0; background: #fff; z-index: 5;
+  border-bottom: 1px solid var(--dry-sand);
+}
+.cal-day-header {
+  padding: 12px 0; text-align: center; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--tideline);
+}
+
+/* Grid with square-ish cells */
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  position: relative;
+}
+.cal-cell {
+  aspect-ratio: 1 / 0.85;
+  border-right: 1px solid rgba(237,231,219,0.5);
+  border-bottom: 1px solid rgba(237,231,219,0.5);
+  padding: 8px 10px;
+  position: relative; cursor: pointer; transition: background 0.12s;
+  display: flex; flex-direction: column;
+}
+.cal-cell:nth-child(7n) { border-right: none; }
+.cal-cell:hover { background: rgba(196,154,90,0.03); }
+.cal-cell.selected { background: rgba(196,154,90,0.06); box-shadow: inset 0 0 0 2px var(--golden); z-index: 2; }
+.cal-cell.other-month { opacity: 0.25; }
+.cal-date {
+  font-size: 13px; font-weight: 600; color: var(--coastal); line-height: 1;
+}
+.cal-cell.today .cal-date {
+  background: #FF385C; color: #fff; width: 24px; height: 24px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; margin: -2px 0 0 -2px;
+}
+.cal-rate {
+  font-size: 12px; font-weight: 500; color: var(--tideline); margin-top: 2px;
+}
+
+/* ===== BOOKING BARS (Airbnb-style) ===== */
+.booking-bar {
+  position: absolute; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; padding: 0 8px; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #fff;
+  cursor: pointer; transition: all 0.2s; z-index: 3;
+  overflow: hidden; white-space: nowrap;
+}
+.booking-bar:hover { filter: brightness(1.15); transform: translateY(-1px); z-index: 10; }
+.booking-bar.dark { background: var(--bar-dark); }
+.booking-bar .platform-icon {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.booking-bar .platform-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.booking-bar .guest-avatar {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+}
+.bar-text { overflow: hidden; text-overflow: ellipsis; }
+
+/* ===== RIGHT PANEL ===== */
+.rate-panel {
+  width: 310px; background: #fff; border-left: 1px solid var(--dry-sand);
+  display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+}
+.rate-panel-header {
+  padding: 20px 20px 16px; border-bottom: 1px solid var(--dry-sand);
+}
+.rate-panel-date { font-size: 18px; font-weight: 700; color: var(--coastal); }
+.rate-panel-dow { font-size: 12px; color: var(--tideline); margin-top: 2px; }
+.rate-section { padding: 16px 20px; border-bottom: 1px solid rgba(237,231,219,0.5); }
+.rate-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--golden); margin-bottom: 12px;
+}
+
+/* Booking Info (clean, no colored header) */
+.booking-detail {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.booking-guest-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--mangrove), var(--tideline));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.booking-guest-info { flex: 1; }
+.booking-guest-name {
+  font-size: 15px; font-weight: 700; color: var(--coastal);
+  display: flex; align-items: center; gap: 8px;
+}
+.booking-guest-name .platform-pill {
+  height: 18px; border-radius: 4px; display: flex; align-items: center;
+  gap: 4px; padding: 0 6px; font-size: 10px; font-weight: 600;
+}
+.platform-pill.airbnb-pill { background: rgba(255,56,92,0.1); color: #FF385C; }
+.platform-pill.bdc-pill { background: rgba(0,53,128,0.1); color: #003580; }
+.booking-guest-dates { font-size: 12px; color: var(--tideline); margin-top: 2px; }
+.booking-meta {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+}
+.booking-meta-item {
+  padding: 10px 12px; border-radius: 10px; background: var(--shore);
+}
+.booking-meta-val { font-size: 16px; font-weight: 700; color: var(--coastal); letter-spacing: -0.02em; }
+.booking-meta-label { font-size: 10px; font-weight: 600; color: var(--tideline); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+/* Base Rate */
+.base-rate-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.base-rate-val { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--coastal); }
+.signal-badge {
+  padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+  background: linear-gradient(135deg, rgba(26,122,90,0.12), rgba(26,122,90,0.04));
+  color: var(--lagoon); border: 1px solid rgba(26,122,90,0.15);
+}
+.base-rate-sub { font-size: 11px; color: var(--tideline); margin-top: 6px; }
+
+/* Channel Rate Cards — glossy redesign */
+.ch-rate {
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 8px;
+  position: relative; overflow: hidden;
+  background: linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(247,243,236,0.8) 100%);
+  border: 1px solid rgba(237,231,219,0.8);
+  box-shadow: 0 1px 3px rgba(19,46,32,0.04), 0 4px 16px rgba(19,46,32,0.03),
+    inset 0 1px 0 rgba(255,255,255,1);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.ch-rate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(19,46,32,0.06), 0 8px 28px rgba(19,46,32,0.07),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+.ch-rate::before {
+  content:''; position: absolute; top:0; left:0; right:0; height: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 100%);
+  border-radius: 14px 14px 0 0; pointer-events: none;
+}
+.ch-rate-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.ch-rate-platform {
+  display: flex; align-items: center; gap: 8px;
+}
+.ch-platform-icon {
+  width: 22px; height: 22px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ch-platform-icon img { width: 100%; height: 100%; border-radius: 6px; }
+.ch-rate-name { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.ch-sync { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; }
+.ch-sync-dot { width: 6px; height: 6px; border-radius: 50%; }
+.ch-sync.ok .ch-sync-dot { background: var(--lagoon); box-shadow: 0 0 6px rgba(26,122,90,0.4); }
+.ch-sync.ok { color: var(--lagoon); }
+.ch-sync.warn .ch-sync-dot { background: var(--amber-tide); }
+.ch-sync.warn { color: var(--amber-tide); }
+.ch-rate-body { display: flex; align-items: center; gap: 10px; }
+.ch-input-wrap { position: relative; flex: 1; }
+.ch-input-prefix {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 14px; font-weight: 600; color: var(--tideline);
+}
+.ch-input {
+  width: 100%; padding: 9px 10px 9px 24px;
+  border: 1.5px solid var(--dry-sand); border-radius: 10px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 17px; font-weight: 700; color: var(--coastal);
+  background: rgba(255,255,255,0.7); outline: none; transition: all 0.2s;
+  letter-spacing: -0.02em;
+}
+.ch-input:focus { border-color: var(--golden); box-shadow: 0 0 0 3px rgba(196,154,90,0.12); }
+.ch-markup {
+  font-size: 11px; font-weight: 600; padding: 5px 8px; border-radius: 8px;
+  background: var(--shore); color: var(--tideline); white-space: nowrap;
+}
+.ch-save {
+  width: 100%; padding: 9px; border: none; border-radius: 10px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  margin-top: 8px; background: var(--coastal); color: var(--shore);
+}
+.ch-save:hover { background: var(--mangrove); transform: translateY(-1px); }
+
+/* Settings */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 12px 0;
+}
+.setting-label { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.setting-sub { font-size: 11px; color: var(--tideline); }
+.toggle { width: 42px; height: 22px; border-radius: 11px; background: var(--shell); position: relative; cursor: pointer; transition: background 0.2s; }
+.toggle.on { background: var(--lagoon); box-shadow: 0 0 10px rgba(26,122,90,0.3); }
+.toggle-knob { width: 18px; height: 18px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.toggle.on .toggle-knob { transform: translateX(20px); }
+.minstay-ctrl { display: flex; align-items: center; gap: 8px; }
+.ms-btn {
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--dry-sand);
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px; color: var(--coastal); transition: all 0.15s;
+}
+.ms-btn:hover { border-color: var(--golden); background: var(--shore); }
+.ms-val { font-size: 18px; font-weight: 700; color: var(--coastal); min-width: 28px; text-align: center; }
+
+@keyframes fadeIn { from { opacity:0; transform: translateX(8px); } to { opacity:1; transform: translateX(0); } }
+.rate-panel { animation: fadeIn 0.25s ease-out; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">K</div> Koast</div>
+  <div class="nav-item">Dashboard</div>
+  <div class="nav-item active">Calendar</div>
+  <div class="nav-item">Messages</div>
+  <div class="nav-label">Manage</div>
+  <div class="nav-item">Properties</div>
+  <div class="nav-item">Pricing</div>
+  <div class="nav-item">Cleaning</div>
+  <div class="nav-label">Insights</div>
+  <div class="nav-item">Market Intel</div>
+  <div class="nav-item">Comp Sets</div>
+</aside>
+
+<!-- PROPERTY THUMBS -->
+<div class="prop-list">
+  <div class="prop-thumb-wrap active" style="background-image:url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=100&q=80');">
+    <div class="prop-channels-row">
+      <div class="platform-logo-tiny" style="background:#FF385C;">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.5c-1.1 0-2.1.4-2.9 1.2L3.4 12c-.5.7-.4 1.6.2 2.2l5.7 5.7c.6.6 1.5.7 2.2.2l8.3-5.7c.8-.8 1.2-1.8 1.2-2.9C21 7.4 16.9 2.5 12 2.5z"/></svg>
+      </div>
+      <div class="platform-logo-tiny" style="background:#003580;">
+        <svg viewBox="0 0 24 24" fill="#fff"><text x="4" y="17" font-size="14" font-weight="800" font-family="sans-serif">B</text></svg>
+      </div>
+    </div>
+  </div>
+  <div class="prop-thumb-wrap" style="background-image:url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=100&q=80');">
+    <div class="prop-channels-row">
+      <div class="platform-logo-tiny" style="background:#FF385C;">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.5c-1.1 0-2.1.4-2.9 1.2L3.4 12c-.5.7-.4 1.6.2 2.2l5.7 5.7c.6.6 1.5.7 2.2.2l8.3-5.7c.8-.8 1.2-1.8 1.2-2.9C21 7.4 16.9 2.5 12 2.5z"/></svg>
+      </div>
+      <div class="platform-logo-tiny" style="background:#003580;">
+        <svg viewBox="0 0 24 24" fill="#fff"><text x="4" y="17" font-size="14" font-weight="800" font-family="sans-serif">B</text></svg>
+      </div>
+    </div>
+  </div>
+  <div class="prop-thumb-wrap" style="background-image:url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=100&q=80');">
+    <div class="prop-channels-row">
+      <div class="platform-logo-tiny" style="background:#FF385C;">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.5c-1.1 0-2.1.4-2.9 1.2L3.4 12c-.5.7-.4 1.6.2 2.2l5.7 5.7c.6.6 1.5.7 2.2.2l8.3-5.7c.8-.8 1.2-1.8 1.2-2.9C21 7.4 16.9 2.5 12 2.5z"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="prop-thumb-wrap" style="background-image:url('https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=100&q=80');">
+    <div class="prop-channels-row">
+      <div class="platform-logo-tiny" style="background:#FF385C;">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.5c-1.1 0-2.1.4-2.9 1.2L3.4 12c-.5.7-.4 1.6.2 2.2l5.7 5.7c.6.6 1.5.7 2.2.2l8.3-5.7c.8-.8 1.2-1.8 1.2-2.9C21 7.4 16.9 2.5 12 2.5z"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CALENDAR -->
+<div class="calendar-area">
+  <div class="cal-toolbar">
+    <div class="cal-month-nav">
+      <button class="cal-nav-btn">&#8249;</button>
+      <div class="cal-month-title">April</div>
+      <button class="cal-nav-btn">&#8250;</button>
+    </div>
+    <button class="cal-today-btn">Today</button>
+  </div>
+  <div class="cal-scroll">
+    <div class="cal-day-headers">
+      <div class="cal-day-header">Sun</div><div class="cal-day-header">Mon</div>
+      <div class="cal-day-header">Tue</div><div class="cal-day-header">Wed</div>
+      <div class="cal-day-header">Thu</div><div class="cal-day-header">Fri</div>
+      <div class="cal-day-header">Sat</div>
+    </div>
+
+    <div class="cal-grid" id="calGrid">
+      <!-- Row 1 -->
+      <div class="cal-cell other-month"><div class="cal-date">29</div></div>
+      <div class="cal-cell other-month"><div class="cal-date">30</div></div>
+      <div class="cal-cell other-month"><div class="cal-date">31</div></div>
+      <div class="cal-cell"><div class="cal-date">1</div><div class="cal-rate">$230</div></div>
+      <div class="cal-cell"><div class="cal-date">2</div></div>
+      <div class="cal-cell"><div class="cal-date">3</div></div>
+      <div class="cal-cell"><div class="cal-date">4</div></div>
+      <!-- Row 2 -->
+      <div class="cal-cell"><div class="cal-date">5</div></div>
+      <div class="cal-cell"><div class="cal-date">6</div></div>
+      <div class="cal-cell"><div class="cal-date">7</div><div class="cal-rate">$165</div></div>
+      <div class="cal-cell"><div class="cal-date">8</div></div>
+      <div class="cal-cell"><div class="cal-date">9</div></div>
+      <div class="cal-cell"><div class="cal-date">10</div></div>
+      <div class="cal-cell"><div class="cal-date">11</div></div>
+      <!-- Row 3 -->
+      <div class="cal-cell"><div class="cal-date">12</div><div class="cal-rate">$183</div></div>
+      <div class="cal-cell today selected"><div class="cal-date">13</div><div class="cal-rate">$183</div></div>
+      <div class="cal-cell"><div class="cal-date">14</div><div class="cal-rate">$184</div></div>
+      <div class="cal-cell"><div class="cal-date">15</div><div class="cal-rate">$185</div></div>
+      <div class="cal-cell"><div class="cal-date">16</div><div class="cal-rate">$186</div></div>
+      <div class="cal-cell"><div class="cal-date">17</div></div>
+      <div class="cal-cell"><div class="cal-date">18</div></div>
+      <!-- Row 4 -->
+      <div class="cal-cell"><div class="cal-date">19</div></div>
+      <div class="cal-cell"><div class="cal-date">20</div><div class="cal-rate">$189</div></div>
+      <div class="cal-cell"><div class="cal-date">21</div><div class="cal-rate">$190</div></div>
+      <div class="cal-cell"><div class="cal-date">22</div><div class="cal-rate">$180</div></div>
+      <div class="cal-cell"><div class="cal-date">23</div><div class="cal-rate">$181</div></div>
+      <div class="cal-cell"><div class="cal-date">24</div></div>
+      <div class="cal-cell"><div class="cal-date">25</div></div>
+      <!-- Row 5 -->
+      <div class="cal-cell"><div class="cal-date">26</div></div>
+      <div class="cal-cell"><div class="cal-date">27</div><div class="cal-rate">$185</div></div>
+      <div class="cal-cell"><div class="cal-date">28</div></div>
+      <div class="cal-cell"><div class="cal-date">29</div></div>
+      <div class="cal-cell"><div class="cal-date">30</div></div>
+      <div class="cal-cell other-month"><div class="cal-date">1</div></div>
+      <div class="cal-cell other-month"><div class="cal-date">2</div></div>
+    </div>
+
+    <!-- Booking bars positioned over grid -->
+    <div style="position:relative; margin-top:-445px; height:445px; pointer-events:none; z-index:4;">
+      <!-- Bassem: Apr 1-4 (Airbnb) -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:12px; left:calc(3 * 100%/7 + 4px); width:calc(4 * 100%/7 - 6px);">
+        <div class="guest-avatar" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        <span class="bar-text">Bassem Mohammed &middot; 7</span>
+      </div>
+      <!-- Yazan: Apr 3-7 (BDC) - overlaps checkout -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:12px; left:calc(5.9 * 100%/7); width:calc(3.1 * 100%/7 - 4px); border-radius: 0 8px 8px 0;">
+        <div class="guest-avatar" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><text x="3" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        <span class="bar-text">Yazan &middot; 7</span>
+      </div>
+      <!-- Hillary: Apr 8-11 (Airbnb) -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:100px; left:calc(0.1 * 100%/7); width:calc(6.9 * 100%/7); border-radius: 0 8px 8px 0;">
+        <div class="guest-avatar" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        <span class="bar-text">Hillary &middot; 6</span>
+      </div>
+      <!-- Bryce: Apr 10-14 (BDC) overlap -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:100px; left:calc(5.9 * 100%/7); width:calc(3.1 * 100%/7 - 4px); border-radius: 0 8px 8px 0;">
+        <div class="guest-avatar" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><text x="3" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        <span class="bar-text">Bryce &middot; 7</span>
+      </div>
+      <!-- Michael: Apr 17-21 (Airbnb) -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:192px; left:calc(5 * 100%/7 + 4px); width:calc(2 * 100%/7 - 6px);">
+        <div class="guest-avatar" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        <span class="bar-text">Michael &middot; 7</span>
+      </div>
+      <!-- Michael continues into row 4 -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:280px; left:calc(0.1 * 100%/7); width:calc(0.9 * 100%/7); border-radius: 0 8px 8px 0;"></div>
+      <!-- Shatara: Apr 24-28 (BDC) -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:280px; left:calc(4.9 * 100%/7); width:calc(2.1 * 100%/7 - 4px); border-radius: 0 8px 8px 0;">
+        <div class="guest-avatar" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><text x="3" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        <span class="bar-text">Shatara &middot; 5</span>
+      </div>
+      <!-- Jennie: Apr 26-28 (Airbnb) -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:370px; left:4px; width:calc(2 * 100%/7 - 6px);">
+        <div class="guest-avatar" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        <span class="bar-text">Jennie &middot; 7</span>
+      </div>
+      <!-- James: Apr 28-30 -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:370px; left:calc(2 * 100%/7 + 4px); width:calc(2 * 100%/7 - 6px);">
+        <div class="guest-avatar" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        <span class="bar-text">James &middot; 3</span>
+      </div>
+      <!-- Jessie: Apr 29- -->
+      <div class="booking-bar dark" style="pointer-events:auto; top:370px; left:calc(3.9 * 100%/7); width:calc(3.1 * 100%/7 - 4px); border-radius: 0 8px 8px 0;">
+        <div class="guest-avatar" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff" width="12" height="12"><text x="3" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        <span class="bar-text">Jessie &middot; 5</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="rate-panel">
+  <div class="rate-panel-header">
+    <div class="rate-panel-date">April 13, 2026</div>
+    <div class="rate-panel-dow">Monday &middot; Pool House</div>
+  </div>
+
+  <!-- Booking Info -->
+  <div class="rate-section">
+    <div class="rate-section-label">Current booking</div>
+    <div class="booking-detail">
+      <div class="booking-guest-avatar">DK</div>
+      <div class="booking-guest-info">
+        <div class="booking-guest-name">
+          David K.
+          <span class="platform-pill airbnb-pill">
+            <svg viewBox="0 0 20 20" fill="#FF385C" width="10" height="10"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+            Airbnb
+          </span>
+        </div>
+        <div class="booking-guest-dates">Apr 13 — Apr 17 &middot; 4 nights &middot; 2 guests</div>
+      </div>
+    </div>
+    <div class="booking-meta">
+      <div class="booking-meta-item">
+        <div class="booking-meta-val">$920</div>
+        <div class="booking-meta-label">Total payout</div>
+      </div>
+      <div class="booking-meta-item">
+        <div class="booking-meta-val">$230</div>
+        <div class="booking-meta-label">Per night</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Base Rate -->
+  <div class="rate-section">
+    <div class="rate-section-label">Base rate</div>
+    <div class="base-rate-row">
+      <div class="base-rate-val">$230</div>
+      <div class="signal-badge">9-signal</div>
+    </div>
+    <div class="base-rate-sub">High demand &middot; Event detected nearby</div>
+  </div>
+
+  <!-- Channel Rates (glossy) -->
+  <div class="rate-section">
+    <div class="rate-section-label">Channel rates</div>
+
+    <div class="ch-rate">
+      <div class="ch-rate-header">
+        <div class="ch-rate-platform">
+          <div class="ch-platform-icon" style="background:#FF385C; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+            <svg viewBox="0 0 20 20" fill="#fff" width="14" height="14"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+          </div>
+          <div class="ch-rate-name">Airbnb</div>
+        </div>
+        <div class="ch-sync ok"><span class="ch-sync-dot"></span> In sync</div>
+      </div>
+      <div class="ch-rate-body">
+        <div class="ch-input-wrap">
+          <span class="ch-input-prefix">$</span>
+          <input type="text" class="ch-input" value="230" />
+        </div>
+        <div class="ch-markup">Base</div>
+      </div>
+      <button class="ch-save">Save & push</button>
+    </div>
+
+    <div class="ch-rate">
+      <div class="ch-rate-header">
+        <div class="ch-rate-platform">
+          <div class="ch-platform-icon" style="background:#003580; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+            <svg viewBox="0 0 20 20" fill="#fff" width="14" height="14"><text x="3" y="15" font-size="14" font-weight="800" font-family="sans-serif">B</text></svg>
+          </div>
+          <div class="ch-rate-name">Booking.com</div>
+        </div>
+        <div class="ch-sync ok"><span class="ch-sync-dot"></span> In sync</div>
+      </div>
+      <div class="ch-rate-body">
+        <div class="ch-input-wrap">
+          <span class="ch-input-prefix">$</span>
+          <input type="text" class="ch-input" value="265" />
+        </div>
+        <div class="ch-markup">+15%</div>
+      </div>
+      <button class="ch-save">Save & push</button>
+    </div>
+
+    <div class="ch-rate">
+      <div class="ch-rate-header">
+        <div class="ch-rate-platform">
+          <div class="ch-platform-icon" style="background:var(--golden); border-radius:6px; display:flex; align-items:center; justify-content:center;">
+            <svg viewBox="0 0 20 20" fill="var(--deep-sea)" width="14" height="14"><text x="4" y="15" font-size="14" font-weight="800" font-family="sans-serif">K</text></svg>
+          </div>
+          <div class="ch-rate-name">Direct</div>
+        </div>
+        <div class="ch-sync warn"><span class="ch-sync-dot"></span> Not set</div>
+      </div>
+      <div class="ch-rate-body">
+        <div class="ch-input-wrap">
+          <span class="ch-input-prefix">$</span>
+          <input type="text" class="ch-input" value="210" />
+        </div>
+        <div class="ch-markup">-9%</div>
+      </div>
+      <button class="ch-save">Save & push</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="rate-section">
+    <div class="rate-section-label">Settings</div>
+    <div class="setting-row">
+      <div><div class="setting-label">Available</div><div class="setting-sub">Open on all channels</div></div>
+      <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="setting-row" style="border-top:1px solid var(--dry-sand);padding-top:12px;">
+      <div><div class="setting-label">Min stay</div><div class="setting-sub">All channels</div></div>
+      <div class="minstay-ctrl">
+        <button class="ms-btn">-</button>
+        <div class="ms-val">2</div>
+        <button class="ms-btn">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.cal-cell').forEach(cell => {
+  cell.addEventListener('click', function() {
+    document.querySelectorAll('.cal-cell.selected').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+  });
+});
+document.querySelectorAll('.prop-thumb-wrap').forEach(t => {
+  t.addEventListener('click', function() {
+    document.querySelectorAll('.prop-thumb-wrap.active').forEach(a => a.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

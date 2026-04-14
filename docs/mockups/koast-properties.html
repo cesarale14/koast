@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Properties</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-sea: #132e20;
+  --coastal: #17392a;
+  --mangrove: #1f4d38;
+  --tideline: #3d6b52;
+  --golden: #c49a5a;
+  --driftwood: #d4b47a;
+  --sandbar: #e8d5b0;
+  --shore: #f7f3ec;
+  --dry-sand: #ede7db;
+  --shell: #e2dace;
+  --coral-reef: #c44040;
+  --lagoon: #1a7a5a;
+  --deep-water: #2a5a8a;
+  --amber-tide: #d4960b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--shore);
+  color: var(--deep-sea);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--deep-sea) 0%, #0e2218 100%);
+  padding: 24px 14px; display: flex; flex-direction: column;
+  box-shadow: 4px 0 40px rgba(0,0,0,0.3); position: relative; z-index: 10;
+}
+.sidebar::after { content:''; position:absolute; top:0; right:0; bottom:0; width:1px; background: linear-gradient(180deg, rgba(196,154,90,0.3), rgba(196,154,90,0.05)); }
+.logo { font-size:20px; font-weight:800; letter-spacing:-0.03em; color:var(--golden); margin-bottom:36px; padding:0 10px; display:flex; align-items:center; gap:10px; }
+.logo-mark { width:30px; height:30px; background:linear-gradient(135deg,var(--golden),#a87d3a); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--deep-sea); box-shadow:0 2px 12px rgba(196,154,90,0.4); }
+.nav-item { padding:9px 10px; border-radius:8px; font-size:12.5px; font-weight:500; color:rgba(168,191,174,0.6); cursor:pointer; transition:all 0.2s; position:relative; margin-bottom:1px; }
+.nav-item:hover { color:rgba(168,191,174,0.9); background:rgba(255,255,255,0.03); }
+.nav-item.active { color:var(--golden); background:rgba(196,154,90,0.08); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 2px 2px 0; background:var(--golden); box-shadow:0 0 10px rgba(196,154,90,0.5); }
+.nav-label { font-size:9px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--tideline); padding:0 10px; margin:16px 0 6px; }
+
+/* MAIN */
+.main { flex: 1; padding: 32px 40px; overflow-y: auto; position: relative; }
+.main::before { content:''; position:absolute; top:0; left:0; right:0; height:260px; background:linear-gradient(180deg, rgba(23,57,42,0.05), transparent); pointer-events:none; }
+
+/* PAGE HEADER */
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 28px; position: relative;
+}
+.page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--coastal); }
+.page-sub { font-size: 14px; color: var(--tideline); margin-top: 4px; }
+.page-actions { display: flex; gap: 8px; align-items: center; }
+.btn-primary {
+  padding: 10px 20px; border-radius: 10px; border: none;
+  background: var(--coastal); color: var(--shore);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-primary:hover { background: var(--mangrove); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(19,46,32,0.15); }
+.btn-secondary {
+  padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--dry-sand); background: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--coastal);
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-secondary:hover { background: var(--shore); border-color: var(--shell); }
+
+/* PORTFOLIO STATS (top row) */
+.portfolio-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  margin-bottom: 32px;
+}
+.port-stat {
+  border-radius: 18px; padding: 20px 22px; position: relative; overflow: hidden;
+  background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(247,243,236,0.85) 50%, rgba(237,231,219,0.7));
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 1px 1px rgba(19,46,32,0.02), 0 4px 8px rgba(19,46,32,0.04), 0 12px 36px rgba(19,46,32,0.06), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(19,46,32,0.04);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.port-stat:hover { transform: translateY(-3px) scale(1.005); }
+.port-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:50%; background:linear-gradient(180deg, rgba(255,255,255,0.4), transparent); border-radius:18px 18px 0 0; pointer-events:none; }
+.port-stat-val { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--coastal); position: relative; z-index: 1; }
+.port-stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--golden); margin-top: 4px; position: relative; z-index: 1; }
+
+/* SECTION LABEL */
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--golden); margin-bottom: 16px; }
+
+/* VIEW TOGGLE */
+.view-toggle { display: flex; gap: 2px; background: var(--dry-sand); border-radius: 8px; padding: 2px; }
+.view-btn {
+  padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  color: var(--tideline); cursor: pointer; transition: all 0.15s; border: none; background: none;
+  font-family: inherit;
+}
+.view-btn.active { background: #fff; color: var(--coastal); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+/* PROPERTIES GRID */
+.props-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.props-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px; margin-bottom: 32px;
+}
+
+/* PROPERTY CARD (enhanced) */
+.prop-card {
+  border-radius: 16px; overflow: hidden; background: #fff;
+  box-shadow: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
+  transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+  cursor: pointer; position: relative;
+}
+.prop-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);
+}
+.prop-card:active { transform: translateY(-2px) scale(0.995); }
+
+.prop-photo {
+  height: 180px; background-size: cover; background-position: center;
+  position: relative;
+}
+.prop-photo::after {
+  content:''; position:absolute; bottom:0; left:0; right:0; height:80px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.45));
+}
+.prop-photo-overlay {
+  position: absolute; bottom: 12px; left: 14px; right: 14px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  z-index: 2;
+}
+.prop-photo-name { font-size: 17px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+.prop-photo-location { font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 1px; }
+.prop-channels {
+  display: flex; gap: 4px;
+}
+.prop-channel-badge {
+  width: 26px; height: 26px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);
+}
+.prop-channel-badge.airbnb { background: rgba(255,56,92,0.75); }
+.prop-channel-badge.bdc { background: rgba(0,53,128,0.75); }
+.prop-channel-badge svg { width: 13px; height: 13px; }
+
+/* Status bar */
+.prop-status-bar {
+  padding: 8px 14px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--dry-sand); font-size: 12px; font-weight: 600;
+}
+.prop-status-dot { width: 7px; height: 7px; border-radius: 50%; }
+.status-occupied .prop-status-dot { background: var(--lagoon); box-shadow: 0 0 6px rgba(26,122,90,0.4); }
+.status-occupied { color: var(--lagoon); }
+.status-vacant .prop-status-dot { background: var(--golden); }
+.status-vacant { color: var(--golden); }
+.status-turnover .prop-status-dot { background: var(--amber-tide); box-shadow: 0 0 6px rgba(212,150,11,0.4); }
+.status-turnover { color: var(--amber-tide); }
+
+.prop-status-right {
+  margin-left: auto; font-size: 11px; font-weight: 500; color: var(--tideline);
+}
+
+/* Metrics */
+.prop-metrics {
+  padding: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+}
+.prop-metric {
+  text-align: center; padding: 8px 0; position: relative;
+}
+.prop-metric:not(:last-child)::after {
+  content:''; position:absolute; right:0; top:6px; bottom:6px; width:1px; background:var(--dry-sand);
+}
+.prop-metric-val { font-size: 17px; font-weight: 700; letter-spacing: -0.03em; color: var(--coastal); }
+.prop-metric-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--golden); margin-top: 2px; }
+
+/* Quick actions row */
+.prop-actions-row {
+  padding: 0 14px 14px; display: flex; gap: 6px;
+}
+.prop-quick-btn {
+  flex: 1; padding: 7px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  text-align: center; cursor: pointer; transition: all 0.15s;
+  border: 1px solid var(--dry-sand); background: #fff; color: var(--tideline);
+}
+.prop-quick-btn:hover { background: var(--shore); border-color: var(--shell); color: var(--coastal); }
+
+/* ADD PROPERTY CARD */
+.add-prop-card {
+  border-radius: 16px; overflow: hidden; border: 2px dashed var(--dry-sand);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 340px; cursor: pointer; transition: all 0.3s;
+  background: rgba(255,255,255,0.5);
+}
+.add-prop-card:hover {
+  border-color: var(--golden); background: rgba(196,154,90,0.04);
+  transform: translateY(-3px);
+}
+.add-prop-icon {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, rgba(196,154,90,0.12), rgba(196,154,90,0.04));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--golden); margin-bottom: 14px;
+  border: 1px solid rgba(196,154,90,0.15);
+}
+.add-prop-title { font-size: 15px; font-weight: 700; color: var(--coastal); margin-bottom: 4px; }
+.add-prop-sub { font-size: 12px; color: var(--tideline); text-align: center; max-width: 200px; line-height: 1.5; }
+
+/* TABLE VIEW (alternative) */
+.props-table {
+  width: 100%; background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(19,46,32,0.06), 0 4px 16px rgba(19,46,32,0.03);
+}
+.props-table-header {
+  display: grid; grid-template-columns: 56px 1.5fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 80px;
+  padding: 12px 18px; border-bottom: 1px solid var(--dry-sand);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--tideline);
+  align-items: center;
+}
+.props-table-row {
+  display: grid; grid-template-columns: 56px 1.5fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 80px;
+  padding: 12px 18px; align-items: center;
+  border-bottom: 1px solid rgba(237,231,219,0.4);
+  transition: background 0.12s; cursor: pointer;
+}
+.props-table-row:hover { background: rgba(237,231,219,0.3); }
+.props-table-row:last-child { border-bottom: none; }
+.table-thumb {
+  width: 44px; height: 44px; border-radius: 10px;
+  background-size: cover; background-position: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.table-name { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.table-sub { font-size: 11px; color: var(--tideline); margin-top: 1px; }
+.table-channels { display: flex; gap: 4px; }
+.table-channel {
+  width: 20px; height: 20px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+}
+.table-channel svg { width: 11px; height: 11px; }
+.table-val { font-size: 14px; font-weight: 700; color: var(--coastal); letter-spacing: -0.02em; }
+.table-status { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; }
+.table-actions {
+  display: flex; gap: 4px; justify-content: flex-end;
+}
+.table-action-btn {
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--dry-sand); background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; font-size: 12px; color: var(--tideline);
+}
+.table-action-btn:hover { background: var(--shore); border-color: var(--shell); }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(20px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.prop-card, .add-prop-card { animation: fadeUp 0.5s ease-out both; }
+.prop-card:nth-child(1) { animation-delay:0.05s; }
+.prop-card:nth-child(2) { animation-delay:0.1s; }
+.prop-card:nth-child(3) { animation-delay:0.15s; }
+.prop-card:nth-child(4) { animation-delay:0.2s; }
+.add-prop-card { animation-delay:0.25s; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">K</div> Koast</div>
+  <div class="nav-item">Dashboard</div>
+  <div class="nav-item">Calendar</div>
+  <div class="nav-item">Messages</div>
+  <div class="nav-label">Manage</div>
+  <div class="nav-item active">Properties</div>
+  <div class="nav-item">Pricing</div>
+  <div class="nav-item">Reviews</div>
+  <div class="nav-item">Cleaning</div>
+  <div class="nav-label">Insights</div>
+  <div class="nav-item">Market Intel</div>
+  <div class="nav-item">Comp Sets</div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Properties</div>
+      <div class="page-sub">4 properties across 2 channels</div>
+    </div>
+    <div class="page-actions">
+      <div class="view-toggle">
+        <button class="view-btn active" onclick="showGrid()">Grid</button>
+        <button class="view-btn" onclick="showTable()">Table</button>
+      </div>
+      <button class="btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add property
+      </button>
+    </div>
+  </div>
+
+  <!-- Portfolio stats -->
+  <div class="portfolio-stats">
+    <div class="port-stat">
+      <div class="port-stat-val">$12,450</div>
+      <div class="port-stat-label">Monthly revenue</div>
+    </div>
+    <div class="port-stat">
+      <div class="port-stat-val">88%</div>
+      <div class="port-stat-label">Avg occupancy</div>
+    </div>
+    <div class="port-stat">
+      <div class="port-stat-val">4.85</div>
+      <div class="port-stat-label">Avg rating</div>
+    </div>
+    <div class="port-stat">
+      <div class="port-stat-val">12</div>
+      <div class="port-stat-label">Active bookings</div>
+    </div>
+  </div>
+
+  <!-- Grid View -->
+  <div id="gridView">
+    <div class="props-toolbar">
+      <div class="section-label">All properties</div>
+    </div>
+    <div class="props-grid">
+
+      <!-- Pool House -->
+      <div class="prop-card">
+        <div class="prop-photo" style="background-image:url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&q=80');">
+          <div class="prop-photo-overlay">
+            <div>
+              <div class="prop-photo-name">Pool House</div>
+              <div class="prop-photo-location">Tampa, FL</div>
+            </div>
+            <div class="prop-channels">
+              <div class="prop-channel-badge airbnb">
+                <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+              </div>
+              <div class="prop-channel-badge bdc">
+                <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="prop-status-bar status-occupied">
+          <span class="prop-status-dot"></span>
+          David K. — checking out Apr 17
+          <span class="prop-status-right">Next: Myanna S. Apr 22</span>
+        </div>
+        <div class="prop-metrics">
+          <div class="prop-metric">
+            <div class="prop-metric-val">$4.2k</div>
+            <div class="prop-metric-label">Revenue</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">92%</div>
+            <div class="prop-metric-label">Occupancy</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">4.9</div>
+            <div class="prop-metric-label">Rating</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">$230</div>
+            <div class="prop-metric-label">ADR</div>
+          </div>
+        </div>
+        <div class="prop-actions-row">
+          <div class="prop-quick-btn">Calendar</div>
+          <div class="prop-quick-btn">Pricing</div>
+          <div class="prop-quick-btn">Settings</div>
+        </div>
+      </div>
+
+      <!-- Villa Jamaica -->
+      <div class="prop-card">
+        <div class="prop-photo" style="background-image:url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80');">
+          <div class="prop-photo-overlay">
+            <div>
+              <div class="prop-photo-name">Villa Jamaica</div>
+              <div class="prop-photo-location">Tampa, FL</div>
+            </div>
+            <div class="prop-channels">
+              <div class="prop-channel-badge airbnb">
+                <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+              </div>
+              <div class="prop-channel-badge bdc">
+                <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="prop-status-bar status-turnover">
+          <span class="prop-status-dot"></span>
+          Turnover today — Maria confirmed
+          <span class="prop-status-right">Next: Michael T. Apr 17</span>
+        </div>
+        <div class="prop-metrics">
+          <div class="prop-metric">
+            <div class="prop-metric-val">$3.8k</div>
+            <div class="prop-metric-label">Revenue</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">87%</div>
+            <div class="prop-metric-label">Occupancy</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">4.8</div>
+            <div class="prop-metric-label">Rating</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">$210</div>
+            <div class="prop-metric-label">ADR</div>
+          </div>
+        </div>
+        <div class="prop-actions-row">
+          <div class="prop-quick-btn">Calendar</div>
+          <div class="prop-quick-btn">Pricing</div>
+          <div class="prop-quick-btn">Settings</div>
+        </div>
+      </div>
+
+      <!-- Modern House -->
+      <div class="prop-card">
+        <div class="prop-photo" style="background-image:url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80');">
+          <div class="prop-photo-overlay">
+            <div>
+              <div class="prop-photo-name">Modern House</div>
+              <div class="prop-photo-location">Tampa, FL</div>
+            </div>
+            <div class="prop-channels">
+              <div class="prop-channel-badge airbnb">
+                <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="prop-status-bar status-vacant">
+          <span class="prop-status-dot"></span>
+          Open tonight — $185/night
+          <span class="prop-status-right">Next: BDC Guest Apr 24</span>
+        </div>
+        <div class="prop-metrics">
+          <div class="prop-metric">
+            <div class="prop-metric-val">$2.9k</div>
+            <div class="prop-metric-label">Revenue</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">78%</div>
+            <div class="prop-metric-label">Occupancy</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">4.7</div>
+            <div class="prop-metric-label">Rating</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">$185</div>
+            <div class="prop-metric-label">ADR</div>
+          </div>
+        </div>
+        <div class="prop-actions-row">
+          <div class="prop-quick-btn">Calendar</div>
+          <div class="prop-quick-btn">Pricing</div>
+          <div class="prop-quick-btn">Connect BDC</div>
+        </div>
+      </div>
+
+      <!-- Cozy Loft -->
+      <div class="prop-card">
+        <div class="prop-photo" style="background-image:url('https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&q=80');">
+          <div class="prop-photo-overlay">
+            <div>
+              <div class="prop-photo-name">Cozy Loft</div>
+              <div class="prop-photo-location">Tampa, FL</div>
+            </div>
+            <div class="prop-channels">
+              <div class="prop-channel-badge airbnb">
+                <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="prop-status-bar status-occupied">
+          <span class="prop-status-dot"></span>
+          Guest in house — checkout Apr 15
+          <span class="prop-status-right">95% occupancy</span>
+        </div>
+        <div class="prop-metrics">
+          <div class="prop-metric">
+            <div class="prop-metric-val">$1.6k</div>
+            <div class="prop-metric-label">Revenue</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">95%</div>
+            <div class="prop-metric-label">Occupancy</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">5.0</div>
+            <div class="prop-metric-label">Rating</div>
+          </div>
+          <div class="prop-metric">
+            <div class="prop-metric-val">$155</div>
+            <div class="prop-metric-label">ADR</div>
+          </div>
+        </div>
+        <div class="prop-actions-row">
+          <div class="prop-quick-btn">Calendar</div>
+          <div class="prop-quick-btn">Pricing</div>
+          <div class="prop-quick-btn">Connect BDC</div>
+        </div>
+      </div>
+
+      <!-- Add Property -->
+      <div class="add-prop-card">
+        <div class="add-prop-icon">+</div>
+        <div class="add-prop-title">Add a property</div>
+        <div class="add-prop-sub">Connect via Airbnb, Booking.com, or iCal feed</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Table View (hidden by default) -->
+  <div id="tableView" style="display:none;">
+    <div class="props-toolbar">
+      <div class="section-label">All properties</div>
+    </div>
+    <div class="props-table">
+      <div class="props-table-header">
+        <div></div>
+        <div>Property</div>
+        <div>Channels</div>
+        <div>Revenue</div>
+        <div>Occupancy</div>
+        <div>Rating</div>
+        <div>Status</div>
+        <div></div>
+      </div>
+
+      <div class="props-table-row">
+        <div class="table-thumb" style="background-image:url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=100&q=80');"></div>
+        <div><div class="table-name">Pool House</div><div class="table-sub">Tampa, FL</div></div>
+        <div class="table-channels">
+          <div class="table-channel" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+          <div class="table-channel" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        </div>
+        <div class="table-val">$4,200</div>
+        <div class="table-val">92%</div>
+        <div class="table-val">4.9</div>
+        <div class="table-status status-occupied"><span class="prop-status-dot"></span> Occupied</div>
+        <div class="table-actions">
+          <button class="table-action-btn" title="Calendar">&#128197;</button>
+          <button class="table-action-btn" title="Settings">&#9881;</button>
+        </div>
+      </div>
+
+      <div class="props-table-row">
+        <div class="table-thumb" style="background-image:url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=100&q=80');"></div>
+        <div><div class="table-name">Villa Jamaica</div><div class="table-sub">Tampa, FL</div></div>
+        <div class="table-channels">
+          <div class="table-channel" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+          <div class="table-channel" style="background:#003580;"><svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="12" font-weight="800" font-family="sans-serif">B</text></svg></div>
+        </div>
+        <div class="table-val">$3,800</div>
+        <div class="table-val">87%</div>
+        <div class="table-val">4.8</div>
+        <div class="table-status status-turnover"><span class="prop-status-dot"></span> Turnover</div>
+        <div class="table-actions">
+          <button class="table-action-btn">&#128197;</button>
+          <button class="table-action-btn">&#9881;</button>
+        </div>
+      </div>
+
+      <div class="props-table-row">
+        <div class="table-thumb" style="background-image:url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=100&q=80');"></div>
+        <div><div class="table-name">Modern House</div><div class="table-sub">Tampa, FL</div></div>
+        <div class="table-channels">
+          <div class="table-channel" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        </div>
+        <div class="table-val">$2,900</div>
+        <div class="table-val">78%</div>
+        <div class="table-val">4.7</div>
+        <div class="table-status status-vacant"><span class="prop-status-dot"></span> Open</div>
+        <div class="table-actions">
+          <button class="table-action-btn">&#128197;</button>
+          <button class="table-action-btn">&#9881;</button>
+        </div>
+      </div>
+
+      <div class="props-table-row">
+        <div class="table-thumb" style="background-image:url('https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=100&q=80');"></div>
+        <div><div class="table-name">Cozy Loft</div><div class="table-sub">Tampa, FL</div></div>
+        <div class="table-channels">
+          <div class="table-channel" style="background:#FF385C;"><svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg></div>
+        </div>
+        <div class="table-val">$1,600</div>
+        <div class="table-val">95%</div>
+        <div class="table-val">5.0</div>
+        <div class="table-status status-occupied"><span class="prop-status-dot"></span> Occupied</div>
+        <div class="table-actions">
+          <button class="table-action-btn">&#128197;</button>
+          <button class="table-action-btn">&#9881;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function showGrid() {
+  document.getElementById('gridView').style.display = '';
+  document.getElementById('tableView').style.display = 'none';
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-btn')[0].classList.add('active');
+}
+function showTable() {
+  document.getElementById('gridView').style.display = 'none';
+  document.getElementById('tableView').style.display = '';
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-btn')[1].classList.add('active');
+}
+</script>
+</body>
+</html>

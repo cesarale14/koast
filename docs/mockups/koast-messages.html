@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Messages</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-sea: #132e20;
+  --coastal: #17392a;
+  --mangrove: #1f4d38;
+  --tideline: #3d6b52;
+  --golden: #c49a5a;
+  --driftwood: #d4b47a;
+  --sandbar: #e8d5b0;
+  --shore: #f7f3ec;
+  --dry-sand: #ede7db;
+  --shell: #e2dace;
+  --coral-reef: #c44040;
+  --lagoon: #1a7a5a;
+  --deep-water: #2a5a8a;
+  --amber-tide: #d4960b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--shore);
+  color: var(--deep-sea);
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* SIDEBAR (same as other pages) */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--deep-sea) 0%, #0e2218 100%);
+  padding: 24px 14px; display: flex; flex-direction: column;
+  box-shadow: 4px 0 40px rgba(0,0,0,0.3); position: relative; z-index: 10;
+}
+.sidebar::after { content:''; position:absolute; top:0; right:0; bottom:0; width:1px; background: linear-gradient(180deg, rgba(196,154,90,0.3), rgba(196,154,90,0.05)); }
+.logo { font-size:20px; font-weight:800; letter-spacing:-0.03em; color:var(--golden); margin-bottom:36px; padding:0 10px; display:flex; align-items:center; gap:10px; }
+.logo-mark { width:30px; height:30px; background:linear-gradient(135deg,var(--golden),#a87d3a); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--deep-sea); box-shadow:0 2px 12px rgba(196,154,90,0.4); }
+.nav-item { padding:9px 10px; border-radius:8px; font-size:12.5px; font-weight:500; color:rgba(168,191,174,0.6); cursor:pointer; transition:all 0.2s; position:relative; margin-bottom:1px; display:flex; align-items:center; justify-content:space-between; }
+.nav-item:hover { color:rgba(168,191,174,0.9); background:rgba(255,255,255,0.03); }
+.nav-item.active { color:var(--golden); background:rgba(196,154,90,0.08); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 2px 2px 0; background:var(--golden); box-shadow:0 0 10px rgba(196,154,90,0.5); }
+.nav-label { font-size:9px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--tideline); padding:0 10px; margin:16px 0 6px; }
+.nav-badge { background:var(--coral-reef); color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; }
+
+/* CONVERSATION LIST */
+.conv-list {
+  width: 340px; flex-shrink: 0; background: #fff;
+  border-right: 1px solid var(--dry-sand);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.conv-list-header {
+  padding: 20px 20px 0;
+}
+.conv-list-title {
+  font-size: 20px; font-weight: 700; color: var(--coastal);
+  margin-bottom: 14px;
+}
+.conv-search {
+  width: 100%; padding: 9px 12px 9px 36px;
+  border: 1.5px solid var(--dry-sand); border-radius: 10px;
+  font-family: inherit; font-size: 13px; color: var(--coastal);
+  background: var(--shore); outline: none;
+  transition: all 0.2s;
+}
+.conv-search:focus { border-color: var(--golden); box-shadow: 0 0 0 3px rgba(196,154,90,0.12); background: #fff; }
+.conv-search-wrap { position: relative; margin-bottom: 12px; }
+.conv-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--tideline); font-size: 14px; }
+
+.conv-filters {
+  display: flex; gap: 6px; padding: 0 20px 14px;
+  border-bottom: 1px solid var(--dry-sand);
+}
+.conv-filter {
+  padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; border: 1px solid var(--dry-sand);
+  background: #fff; color: var(--tideline);
+}
+.conv-filter:hover { border-color: var(--shell); background: var(--shore); }
+.conv-filter.active { background: var(--coastal); color: var(--shore); border-color: var(--coastal); }
+
+.conv-scroll { flex: 1; overflow-y: auto; }
+
+.conv-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 20px; cursor: pointer; transition: background 0.12s;
+  border-bottom: 1px solid rgba(237,231,219,0.4);
+  position: relative;
+}
+.conv-item:hover { background: rgba(237,231,219,0.3); }
+.conv-item.active { background: rgba(196,154,90,0.06); }
+.conv-item.active::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--golden);
+}
+.conv-item.unread .conv-name { font-weight: 700; }
+.conv-item.unread .conv-preview { color: var(--coastal); font-weight: 500; }
+.conv-unread-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--golden);
+  position: absolute; right: 20px; top: 18px;
+  box-shadow: 0 0 6px rgba(196,154,90,0.4);
+}
+
+.conv-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--mangrove), var(--tideline));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff;
+  position: relative;
+}
+.conv-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.conv-platform-badge {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 18px; height: 18px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff;
+}
+.conv-platform-badge.airbnb { background: #FF385C; }
+.conv-platform-badge.bdc { background: #003580; }
+.conv-platform-badge svg { width: 9px; height: 9px; }
+
+.conv-content { flex: 1; min-width: 0; }
+.conv-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+.conv-name { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.conv-time { font-size: 11px; color: var(--tideline); flex-shrink: 0; }
+.conv-property { font-size: 11px; color: var(--tideline); margin-bottom: 3px; }
+.conv-preview { font-size: 12px; color: var(--tideline); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* THREAD AREA */
+.thread-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--shore);
+}
+.thread-header {
+  padding: 16px 24px; background: #fff;
+  border-bottom: 1px solid var(--dry-sand);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.thread-header-left { display: flex; align-items: center; gap: 12px; }
+.thread-guest-name { font-size: 15px; font-weight: 700; color: var(--coastal); }
+.thread-property { font-size: 12px; color: var(--tideline); }
+.thread-status {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-checkin { color: var(--lagoon); }
+.status-checkin .status-dot { background: var(--lagoon); box-shadow: 0 0 6px rgba(26,122,90,0.4); }
+.thread-actions { display: flex; gap: 6px; }
+.thread-action-btn {
+  padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--dry-sand); background: #fff; color: var(--tideline);
+  cursor: pointer; transition: all 0.15s;
+}
+.thread-action-btn:hover { background: var(--shore); border-color: var(--shell); }
+
+.thread-scroll {
+  flex: 1; overflow-y: auto; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* Messages */
+.msg { max-width: 75%; display: flex; flex-direction: column; }
+.msg.guest { align-self: flex-start; }
+.msg.host { align-self: flex-end; }
+.msg.ai-draft { align-self: flex-end; }
+
+.msg-bubble {
+  padding: 12px 16px; border-radius: 16px;
+  font-size: 13px; line-height: 1.6;
+}
+.msg.guest .msg-bubble {
+  background: #fff; color: var(--coastal);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(19,46,32,0.06);
+}
+.msg.host .msg-bubble {
+  background: var(--coastal); color: var(--shore);
+  border-bottom-right-radius: 4px;
+}
+.msg.ai-draft .msg-bubble {
+  background: linear-gradient(135deg, rgba(196,154,90,0.08), rgba(196,154,90,0.03));
+  border: 1.5px dashed rgba(196,154,90,0.3);
+  color: var(--coastal);
+  border-bottom-right-radius: 4px;
+  position: relative;
+}
+.msg-meta {
+  font-size: 10px; color: var(--tideline); margin-top: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.msg.host .msg-meta { text-align: right; justify-content: flex-end; }
+
+.ai-draft-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; color: var(--golden);
+  margin-bottom: 6px;
+}
+.ai-draft-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--golden); }
+
+.ai-draft-actions {
+  display: flex; gap: 6px; margin-top: 10px;
+}
+.ai-draft-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; border: none;
+}
+.ai-draft-send { background: var(--golden); color: var(--deep-sea); }
+.ai-draft-send:hover { background: var(--driftwood); }
+.ai-draft-edit { background: var(--shore); color: var(--tideline); border: 1px solid var(--dry-sand); }
+.ai-draft-edit:hover { background: var(--dry-sand); }
+
+/* Timestamp divider */
+.time-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: var(--tideline); font-weight: 500;
+  align-self: center;
+}
+.time-divider::before, .time-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--dry-sand);
+  max-width: 60px;
+}
+
+/* Compose bar */
+.compose-bar {
+  padding: 16px 24px; background: #fff;
+  border-top: 1px solid var(--dry-sand);
+  display: flex; align-items: flex-end; gap: 10px;
+}
+.compose-input-wrap {
+  flex: 1; position: relative;
+}
+.compose-input {
+  width: 100%; padding: 12px 16px; padding-right: 44px;
+  border: 1.5px solid var(--dry-sand); border-radius: 14px;
+  font-family: inherit; font-size: 13px; color: var(--coastal);
+  background: var(--shore); outline: none; resize: none;
+  min-height: 44px; max-height: 120px; line-height: 1.5;
+  transition: all 0.2s;
+}
+.compose-input:focus { border-color: var(--golden); box-shadow: 0 0 0 3px rgba(196,154,90,0.12); background: #fff; }
+.compose-input::placeholder { color: var(--shell); }
+.compose-ai-btn {
+  position: absolute; right: 8px; bottom: 8px;
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, rgba(196,154,90,0.15), rgba(196,154,90,0.05));
+  border: 1px solid rgba(196,154,90,0.2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+  color: var(--golden); font-size: 12px; font-weight: 700;
+}
+.compose-ai-btn:hover { background: rgba(196,154,90,0.25); }
+.compose-send {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--coastal); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; color: var(--shore);
+}
+.compose-send:hover { background: var(--mangrove); transform: translateY(-1px); }
+.compose-send svg { width: 18px; height: 18px; }
+
+/* CONTEXT PANEL (right) */
+.context-panel {
+  width: 300px; flex-shrink: 0; background: #fff;
+  border-left: 1px solid var(--dry-sand);
+  overflow-y: auto; display: flex; flex-direction: column;
+}
+.ctx-section { padding: 18px 20px; border-bottom: 1px solid rgba(237,231,219,0.5); }
+.ctx-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--golden); margin-bottom: 12px; }
+
+/* Guest info */
+.ctx-guest { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ctx-guest-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--mangrove), var(--tideline));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.ctx-guest-name { font-size: 16px; font-weight: 700; color: var(--coastal); }
+.ctx-guest-sub { font-size: 12px; color: var(--tideline); margin-top: 2px; }
+
+.ctx-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ctx-meta-item { padding: 10px 12px; border-radius: 10px; background: var(--shore); }
+.ctx-meta-val { font-size: 14px; font-weight: 700; color: var(--coastal); letter-spacing: -0.02em; }
+.ctx-meta-label { font-size: 10px; font-weight: 600; color: var(--tideline); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+
+/* Property card */
+.ctx-property-card {
+  display: flex; gap: 10px; padding: 10px; border-radius: 10px;
+  background: var(--shore); cursor: pointer; transition: all 0.15s;
+}
+.ctx-property-card:hover { background: var(--dry-sand); }
+.ctx-property-thumb {
+  width: 56px; height: 56px; border-radius: 8px; flex-shrink: 0;
+  background-size: cover; background-position: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.ctx-property-name { font-size: 13px; font-weight: 600; color: var(--coastal); }
+.ctx-property-dates { font-size: 11px; color: var(--tideline); margin-top: 2px; }
+.ctx-property-channel { margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.ctx-property-channel span {
+  font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+}
+
+/* Quick actions */
+.ctx-action {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  transition: all 0.15s; font-size: 13px; font-weight: 500; color: var(--coastal);
+}
+.ctx-action:hover { background: var(--shore); }
+.ctx-action-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+}
+
+/* AI quick replies */
+.ai-suggestion {
+  padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 500;
+  color: var(--coastal); cursor: pointer; transition: all 0.15s;
+  background: linear-gradient(135deg, rgba(196,154,90,0.06), rgba(196,154,90,0.02));
+  border: 1px solid rgba(196,154,90,0.12);
+  margin-bottom: 6px;
+}
+.ai-suggestion:hover {
+  background: rgba(196,154,90,0.12);
+  border-color: rgba(196,154,90,0.25);
+  transform: translateY(-1px);
+}
+.ai-suggestion-label {
+  font-size: 10px; font-weight: 600; color: var(--golden); margin-bottom: 2px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.msg { animation: fadeIn 0.25s ease-out; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">K</div> Koast</div>
+  <div class="nav-item">Dashboard</div>
+  <div class="nav-item">Calendar</div>
+  <div class="nav-item active">Messages <span class="nav-badge">3</span></div>
+  <div class="nav-label">Manage</div>
+  <div class="nav-item">Properties</div>
+  <div class="nav-item">Pricing</div>
+  <div class="nav-item">Cleaning</div>
+  <div class="nav-label">Insights</div>
+  <div class="nav-item">Market Intel</div>
+  <div class="nav-item">Comp Sets</div>
+</aside>
+
+<!-- CONVERSATION LIST -->
+<div class="conv-list">
+  <div class="conv-list-header">
+    <div class="conv-list-title">Messages</div>
+    <div class="conv-search-wrap">
+      <span class="conv-search-icon">&#128269;</span>
+      <input type="text" class="conv-search" placeholder="Search conversations..." />
+    </div>
+  </div>
+  <div class="conv-filters">
+    <div class="conv-filter active">All</div>
+    <div class="conv-filter">Unread</div>
+    <div class="conv-filter">Needs reply</div>
+    <div class="conv-filter">AI drafted</div>
+  </div>
+  <div class="conv-scroll">
+    <!-- Active conversation -->
+    <div class="conv-item active unread">
+      <div class="conv-unread-dot"></div>
+      <div class="conv-avatar">
+        DK
+        <div class="conv-platform-badge airbnb">
+          <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+        </div>
+      </div>
+      <div class="conv-content">
+        <div class="conv-top">
+          <span class="conv-name">David K.</span>
+          <span class="conv-time">34m ago</span>
+        </div>
+        <div class="conv-property">Pool House &middot; Apr 13-17</div>
+        <div class="conv-preview">What are the best beaches nearby? We'd love to spend a day at the beach tomorrow</div>
+      </div>
+    </div>
+
+    <div class="conv-item unread">
+      <div class="conv-unread-dot"></div>
+      <div class="conv-avatar">
+        MS
+        <div class="conv-platform-badge bdc">
+          <svg viewBox="0 0 20 20" fill="#fff"><text x="4" y="14" font-size="11" font-weight="800" font-family="sans-serif">B</text></svg>
+        </div>
+      </div>
+      <div class="conv-content">
+        <div class="conv-top">
+          <span class="conv-name">Myanna S.</span>
+          <span class="conv-time">2h ago</span>
+        </div>
+        <div class="conv-property">Pool House &middot; Apr 22-26</div>
+        <div class="conv-preview">Hey! Can we get extra towels for our stay? We're bringing 4 guests total</div>
+      </div>
+    </div>
+
+    <div class="conv-item unread">
+      <div class="conv-unread-dot"></div>
+      <div class="conv-avatar">
+        JT
+        <div class="conv-platform-badge airbnb">
+          <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+        </div>
+      </div>
+      <div class="conv-content">
+        <div class="conv-top">
+          <span class="conv-name">James T.</span>
+          <span class="conv-time">5h ago</span>
+        </div>
+        <div class="conv-property">Villa Jamaica &middot; Apr 6-10</div>
+        <div class="conv-preview">Thanks for the amazing stay! Already left a 5-star review ⭐</div>
+      </div>
+    </div>
+
+    <div class="conv-item">
+      <div class="conv-avatar">
+        BM
+        <div class="conv-platform-badge airbnb">
+          <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+        </div>
+      </div>
+      <div class="conv-content">
+        <div class="conv-top">
+          <span class="conv-name">Bassem M.</span>
+          <span class="conv-time">Yesterday</span>
+        </div>
+        <div class="conv-property">Pool House &middot; Apr 1-4</div>
+        <div class="conv-preview">Perfect, see you at 3pm! Is there parking available?</div>
+      </div>
+    </div>
+
+    <div class="conv-item">
+      <div class="conv-avatar">
+        HW
+        <div class="conv-platform-badge airbnb">
+          <svg viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5c-.9 0-1.7.3-2.4 1L2.8 10c-.4.6-.3 1.3.2 1.8l4.7 4.7c.5.5 1.3.6 1.8.2l6.9-4.7c.7-.7 1-1.5 1-2.4C17.4 6.2 14 1.5 10 1.5z"/></svg>
+        </div>
+      </div>
+      <div class="conv-content">
+        <div class="conv-top">
+          <span class="conv-name">Hillary W.</span>
+          <span class="conv-time">2 days ago</span>
+        </div>
+        <div class="conv-property">Pool House &middot; Apr 8-11</div>
+        <div class="conv-preview">The check-in was smooth, thank you for the detailed instructions!</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- THREAD -->
+<div class="thread-area">
+  <div class="thread-header">
+    <div class="thread-header-left">
+      <div>
+        <div class="thread-guest-name">David K.</div>
+        <div class="thread-property">Pool House &middot; Checking in today</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="thread-status status-checkin">
+        <span class="status-dot"></span>
+        Currently in house
+      </div>
+      <div class="thread-actions">
+        <button class="thread-action-btn">Archive</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="thread-scroll">
+    <div class="time-divider">Today, 2:26 PM</div>
+
+    <div class="msg guest">
+      <div class="msg-bubble">
+        Hey! We just checked in, the place looks great 🙌 Quick question — what are the best beaches nearby? We'd love to spend a day at the beach tomorrow.
+      </div>
+      <div class="msg-meta">
+        <span>David K.</span> &middot; <span>2:26 PM</span> &middot;
+        <span style="display:inline-flex; align-items:center; gap:3px;">
+          via <span style="color:#FF385C; font-weight:600;">Airbnb</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- AI Draft -->
+    <div class="msg ai-draft">
+      <div class="msg-bubble">
+        <div class="ai-draft-badge">
+          <span class="ai-draft-badge-dot"></span>
+          Koast AI draft
+        </div>
+        Hi David! So glad you're enjoying the place 😊<br><br>
+        Here are the best beaches near the property:<br><br>
+        <strong>Ben T. Davis Beach</strong> — 10 min drive. Great for sunset views and paddleboarding. Free parking along the Courtney Campbell Causeway.<br><br>
+        <strong>Clearwater Beach</strong> — 30 min drive. Consistently rated #1 beach in the US. White sand, crystal clear water. Can get busy on weekends — go early!<br><br>
+        <strong>Honeymoon Island</strong> — 40 min. More natural and less crowded. State park entry is $8/car. Best for a quiet, relaxing day.<br><br>
+        I'd recommend Ben T. Davis for a quick trip or Clearwater if you want the full beach day experience. Let me know if you need directions or restaurant recs nearby! 🏖️
+
+        <div class="ai-draft-actions">
+          <button class="ai-draft-btn ai-draft-send">Send as-is</button>
+          <button class="ai-draft-btn ai-draft-edit">Edit before sending</button>
+        </div>
+      </div>
+      <div class="msg-meta">
+        <span style="color:var(--golden); font-weight:600;">AI drafted</span> &middot; <span>2:26 PM</span> &middot; Response time: instant
+      </div>
+    </div>
+
+    <div class="time-divider">Earlier today, 11:45 AM</div>
+
+    <div class="msg host">
+      <div class="msg-bubble">
+        Welcome David! 🎉 Your check-in code is <strong>4829</strong>. The lockbox is on the front door handle. WiFi password is on the fridge. Let me know if you need anything!
+      </div>
+      <div class="msg-meta">
+        Cesar &middot; 11:45 AM &middot; <span style="color:var(--lagoon);">Delivered</span>
+      </div>
+    </div>
+
+    <div class="msg guest">
+      <div class="msg-bubble">
+        Awesome, thanks! We're on our way, should be there around 3pm.
+      </div>
+      <div class="msg-meta">David K. &middot; 12:15 PM &middot; via <span style="color:#FF385C; font-weight:600;">Airbnb</span></div>
+    </div>
+
+    <div class="time-divider">Yesterday, 9:30 AM</div>
+
+    <div class="msg host">
+      <div class="msg-bubble">
+        Hi David! Looking forward to hosting you. Just a reminder — check-in is at 3 PM tomorrow. I'll send the access code in the morning. Safe travels! 🙏
+      </div>
+      <div class="msg-meta">
+        Cesar &middot; 9:30 AM &middot; <span style="color:var(--lagoon);">Read</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compose -->
+  <div class="compose-bar">
+    <div class="compose-input-wrap">
+      <textarea class="compose-input" placeholder="Type a message..." rows="1"></textarea>
+      <div class="compose-ai-btn" title="Generate AI reply">K</div>
+    </div>
+    <button class="compose-send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- CONTEXT PANEL -->
+<div class="context-panel">
+  <div class="ctx-section">
+    <div class="ctx-label">Guest</div>
+    <div class="ctx-guest">
+      <div class="ctx-guest-avatar">DK</div>
+      <div>
+        <div class="ctx-guest-name">David K.</div>
+        <div class="ctx-guest-sub">2 previous stays &middot; 4.9 avg review</div>
+      </div>
+    </div>
+    <div class="ctx-meta-grid">
+      <div class="ctx-meta-item">
+        <div class="ctx-meta-val">Apr 13</div>
+        <div class="ctx-meta-label">Check-in</div>
+      </div>
+      <div class="ctx-meta-item">
+        <div class="ctx-meta-val">Apr 17</div>
+        <div class="ctx-meta-label">Checkout</div>
+      </div>
+      <div class="ctx-meta-item">
+        <div class="ctx-meta-val">$920</div>
+        <div class="ctx-meta-label">Total</div>
+      </div>
+      <div class="ctx-meta-item">
+        <div class="ctx-meta-val">2 adults</div>
+        <div class="ctx-meta-label">Guests</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx-section">
+    <div class="ctx-label">Property</div>
+    <div class="ctx-property-card">
+      <div class="ctx-property-thumb" style="background-image:url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=100&q=80');"></div>
+      <div>
+        <div class="ctx-property-name">Pool House</div>
+        <div class="ctx-property-dates">Tampa, FL</div>
+        <div class="ctx-property-channel">
+          <span style="background:rgba(255,56,92,0.1); color:#FF385C;">Airbnb</span>
+          <span style="background:rgba(0,53,128,0.1); color:#003580;">BDC</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx-section">
+    <div class="ctx-label">Quick actions</div>
+    <div class="ctx-action">
+      <div class="ctx-action-icon" style="background:linear-gradient(135deg,rgba(212,150,11,0.15),rgba(212,150,11,0.05)); color:var(--amber-tide);">🧹</div>
+      Notify cleaner
+    </div>
+    <div class="ctx-action">
+      <div class="ctx-action-icon" style="background:linear-gradient(135deg,rgba(42,90,138,0.15),rgba(42,90,138,0.05)); color:var(--deep-water);">📋</div>
+      View booking details
+    </div>
+    <div class="ctx-action">
+      <div class="ctx-action-icon" style="background:linear-gradient(135deg,rgba(26,122,90,0.15),rgba(26,122,90,0.05)); color:var(--lagoon);">⭐</div>
+      Request review
+    </div>
+    <div class="ctx-action">
+      <div class="ctx-action-icon" style="background:linear-gradient(135deg,rgba(196,64,64,0.15),rgba(196,64,64,0.05)); color:var(--coral-reef);">🚨</div>
+      Report issue
+    </div>
+  </div>
+
+  <div class="ctx-section">
+    <div class="ctx-label">AI suggestions</div>
+    <div class="ai-suggestion">
+      <div class="ai-suggestion-label"><span style="width:5px;height:5px;border-radius:50%;background:var(--golden);display:inline-block;"></span> Koast AI</div>
+      Send restaurant recommendations for tonight
+    </div>
+    <div class="ai-suggestion">
+      <div class="ai-suggestion-label"><span style="width:5px;height:5px;border-radius:50%;background:var(--golden);display:inline-block;"></span> Koast AI</div>
+      Share checkout instructions (2 days before)
+    </div>
+    <div class="ai-suggestion">
+      <div class="ai-suggestion-label"><span style="width:5px;height:5px;border-radius:50%;background:var(--golden);display:inline-block;"></span> Koast AI</div>
+      Ask about their experience so far
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.conv-item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.conv-item.active').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+const textarea = document.querySelector('.compose-input');
+textarea.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+</script>
+</body>
+</html>
