@@ -69,9 +69,9 @@ export async function POST() {
     // Phase 1: Properties
     const { data: propertiesData } = await supabase
       .from("properties")
-      .select("id, name, cover_photo_url")
+      .select("id, name, cover_photo_url, city, state")
       .eq("user_id", user.id);
-    const props = (propertiesData ?? []) as { id: string; name: string; cover_photo_url: string | null }[];
+    const props = (propertiesData ?? []) as { id: string; name: string; cover_photo_url: string | null; city: string | null; state: string | null }[];
     if (props.length === 0) return NextResponse.json({ empty: true });
     const propIds = props.map((p) => p.id);
     const propNameMap = new Map(props.map((p) => [p.id, p.name]));
@@ -89,6 +89,7 @@ export async function POST() {
       recentCleaningsRes,
       recentReviewsRes,
       allReviewsRes,
+      ratingsRes,
     ] = await Promise.all([
       // All bookings for current year (revenue, status, activity, occupancy)
       supabase
@@ -166,6 +167,14 @@ export async function POST() {
         .from("guest_reviews")
         .select("booking_id")
         .in("property_id", propIds),
+      // Star ratings per property — Airbnb/BDC ingest this into
+      // guest_reviews.rating when the host writes back a public review.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase
+        .from("guest_reviews")
+        .select("property_id, rating")
+        .in("property_id", propIds)
+        .not("rating", "is", null),
     ]);
 
     const bookings = (bookingsRes.data ?? []) as BookingRow[];
@@ -179,6 +188,16 @@ export async function POST() {
     const recentCleanings = (recentCleaningsRes.data ?? []) as { property_id: string; completed_at: string }[];
     const recentReviews = (recentReviewsRes.data ?? []) as { property_id: string; booking_id: string; published_at: string }[];
     const allReviewedIds = new Set(((allReviewsRes.data ?? []) as { booking_id: string }[]).map((r) => r.booking_id));
+    const ratings = (ratingsRes.data ?? []) as { property_id: string; rating: number | string | null }[];
+    const ratingSumByProp = new Map<string, { sum: number; count: number }>();
+    for (const r of ratings) {
+      const val = Number(r.rating);
+      if (!Number.isFinite(val) || val <= 0) continue;
+      const existing = ratingSumByProp.get(r.property_id) ?? { sum: 0, count: 0 };
+      existing.sum += val;
+      existing.count += 1;
+      ratingSumByProp.set(r.property_id, existing);
+    }
 
     // Build lookup maps
     const cleanerMap = new Map(allCleaners.map((c) => [c.id, c.name]));
@@ -209,6 +228,9 @@ export async function POST() {
       }
     }
 
+    // Reused below — used to build monthly aggregates per property.
+    const thisMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
     // ====== SECTION 1: Property Cards ======
     const propertyCards = props.map((prop) => {
       const propBookings = bookings.filter((b) => b.property_id === prop.id);
@@ -229,15 +251,38 @@ export async function POST() {
         ? channelPlatforms
         : (listingPlatform ? [listingPlatform] : []);
 
+      // Per-property metrics for the card footer row.
+      const pMonthBookings = bookings.filter(
+        (b) => b.property_id === prop.id && b.check_in <= thisMonthEnd && b.check_out > thisMonthStart
+      );
+      const pRevenue = calcRevenue(pMonthBookings, thisMonthStart, thisMonthEnd);
+      const pBookedDates = new Set<string>();
+      for (const b of pMonthBookings) {
+        const ci = new Date(Math.max(new Date(b.check_in + "T00:00:00Z").getTime(), new Date(thisMonthStart + "T00:00:00Z").getTime()));
+        const co = new Date(Math.min(new Date(b.check_out + "T00:00:00Z").getTime(), new Date(addDay(thisMonthEnd) + "T00:00:00Z").getTime()));
+        for (let d = new Date(ci); d < co; d.setUTCDate(d.getUTCDate() + 1)) pBookedDates.add(d.toISOString().split("T")[0]);
+      }
+      const pOccupancy = Math.round((pBookedDates.size / thisMonthDays) * 100);
+      const pAdr = pBookedDates.size > 0 ? Math.round(pRevenue / pBookedDates.size) : (tonightRateMap.get(prop.id) || 0);
+      const ratingAgg = ratingSumByProp.get(prop.id);
+      const pRating = ratingAgg && ratingAgg.count > 0 ? Math.round((ratingAgg.sum / ratingAgg.count) * 10) / 10 : 0;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const card: any = {
         id: prop.id,
         name: prop.name,
         coverPhotoUrl: prop.cover_photo_url,
+        location: [prop.city, prop.state].filter(Boolean).join(", ") || null,
         platform: platforms[0] ?? null,
         platforms,
         status,
         tonightRate: tonightRateMap.get(prop.id) || null,
+        metrics: {
+          revenue: pRevenue,
+          occupancy: pOccupancy,
+          adr: pAdr,
+          rating: pRating,
+        },
       };
 
       // Guest info for occupied / checkin
@@ -410,7 +455,6 @@ export async function POST() {
     const ytdRevenue = calcRevenue(ytdBookings, yearStart, today);
 
     // Occupancy (this month, per-property average)
-    const thisMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     let totalOccupancy = 0;
     let propsWithBookings = 0;
     for (const prop of props) {
@@ -430,7 +474,7 @@ export async function POST() {
     }
     const occupancyRate = propsWithBookings > 0 ? Math.round(totalOccupancy / props.length) : 0;
 
-    // Revenue chart (12 months)
+    // Revenue chart (12 months — legacy, kept for anywhere still reading it)
     const revenueData: { month: string; revenue: number }[] = [];
     for (let i = 0; i < 12; i++) {
       const mStart = new Date(now.getFullYear(), i, 1);
@@ -439,6 +483,20 @@ export async function POST() {
       revenueData.push({
         month: mStart.toLocaleDateString("en-US", { month: "short" }),
         revenue: calcRevenue(mBookings, fmt(mStart), fmt(mEnd)),
+      });
+    }
+
+    // Daily revenue series for the last 30 days (powers the Canvas chart).
+    const dailyRevenue: { date: string; label: string; revenue: number }[] = [];
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + i);
+      const ds = fmt(d);
+      const dayBookings = bookings.filter((b) => b.check_in <= ds && b.check_out > ds);
+      dailyRevenue.push({
+        date: ds,
+        label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        revenue: calcRevenue(dayBookings, ds, ds),
       });
     }
 
@@ -567,7 +625,40 @@ export async function POST() {
     feed.sort((a, b) => b.ts - a.ts);
     const activityFeed = feed.slice(0, 5).map(({ type, text, timeAgo }) => ({ type, text, timeAgo }));
 
+    // ====== User + sync status ======
+    const userName = (() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const meta: any = user.user_metadata ?? {};
+      const raw: string = meta.full_name || meta.name || meta.first_name || user.email || "";
+      const first = String(raw).trim().split(/\s+/)[0] || "";
+      if (first && first.includes("@")) return first.split("@")[0];
+      return first || "there";
+    })();
+
+    // Channel health: "synced" if every connected channel is active,
+    // "disconnected" if any are pending/error, "syncing" if there's
+    // in-flight work. channel_rows.status is already filtered to "active"
+    // by the query, so we need the un-filtered set for health.
+    const { data: allChannelsData } = await supabase
+      .from("property_channels")
+      .select("status")
+      .in("property_id", propIds);
+    const allChannels = (allChannelsData ?? []) as { status: string }[];
+    let syncStatus: "synced" | "syncing" | "disconnected" | "none" = "none";
+    if (allChannels.length === 0) syncStatus = "none";
+    else if (allChannels.some((c) => c.status === "error" || c.status === "disconnected")) syncStatus = "disconnected";
+    else if (allChannels.some((c) => c.status === "pending" || c.status === "connecting")) syncStatus = "syncing";
+    else syncStatus = "synced";
+
+    const totalBookingsThisMonth = thisMonthBookings.length;
+
     return NextResponse.json({
+      user: { name: userName },
+      summary: {
+        propertyCount: props.length,
+        bookingsThisMonth: totalBookingsThisMonth,
+        syncStatus,
+      },
       propertyCards,
       actions: actions.slice(0, 5),
       events: eventPills,
@@ -578,6 +669,7 @@ export async function POST() {
         ytdRevenue,
         occupancyRate,
         revenueData,
+        dailyRevenue,
       },
       market: {
         grade,

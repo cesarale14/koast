@@ -1,30 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  X as XIcon,
+  Check,
+  MessageSquare,
   DollarSign,
   Sparkles,
   Star,
-  Calendar,
   TrendingUp,
-  BookOpen,
-  CheckCircle2,
-  Home,
-  AlertTriangle,
+  Home as HomeIcon,
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
-import PlatformLogoDefault from "@/components/ui/PlatformLogo";
 import { useConflicts, ConflictBanner, ConflictResolutionModal, type Conflict } from "./ConflictResolution";
-const DashPlatformLogo = PlatformLogoDefault;
+import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
+import { useCountUp } from "@/hooks/useCountUp";
 
 // ====== Types ======
+
+interface PropertyMetrics {
+  revenue: number;
+  occupancy: number;
+  adr: number;
+  rating: number;
+}
 
 interface PropertyCard {
   id: string;
   name: string;
+  location: string | null;
   coverPhotoUrl: string | null;
   platform: string | null;
   platforms?: string[];
@@ -39,6 +45,7 @@ interface PropertyCard {
   daysUntilBooked?: number;
   cleanerName?: string;
   cleanerConfirmed?: boolean;
+  metrics: PropertyMetrics;
 }
 
 interface ActionItem {
@@ -50,14 +57,6 @@ interface ActionItem {
   urgency: number;
 }
 
-interface EventPill {
-  name: string;
-  date: string;
-  dateLabel: string;
-  demandImpact: number;
-  eventType?: string | null;
-}
-
 interface ActivityItem {
   type: string;
   text: string;
@@ -65,27 +64,21 @@ interface ActivityItem {
 }
 
 interface CommandCenterData {
+  user: { name: string };
+  summary: { propertyCount: number; bookingsThisMonth: number; syncStatus: "synced" | "syncing" | "disconnected" | "none" };
   propertyCards: PropertyCard[];
   actions: ActionItem[];
-  events: EventPill[];
   performance: {
     thisMonthRevenue: number;
     lastMonthRevenue: number;
     revenueChangePct: number;
-    ytdRevenue: number;
     occupancyRate: number;
-    revenueData: { month: string; revenue: number }[];
-  };
-  market: {
-    grade: string;
-    yourAdr: number;
-    marketAdr: number;
-    yourOccupancy: number;
-    marketOccupancy: number;
-    demandForecast: { date: string; score: number }[];
+    dailyRevenue: { date: string; label: string; revenue: number }[];
   };
   activityFeed: ActivityItem[];
 }
+
+// ====== Helpers ======
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -100,6 +93,13 @@ function formatShortDate(dateStr?: string): string {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function timeOfDayGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 // ====== Main Component ======
@@ -142,14 +142,24 @@ export default function DashboardClient() {
     router.push("/properties");
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-neutral-400 text-sm">Redirecting to setup...</div>
+        <div className="text-tideline text-sm">Redirecting to setup...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto">
-      {/* Overbooking alert banner — top of dashboard, above stats */}
+    <div className="max-w-[1200px] mx-auto pb-12">
+      {/* Local entrance choreography */}
+      <style jsx global>{`
+        @keyframes koast-fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes koast-fade-up-sm { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes koast-glow { 0%,100% { opacity:.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.1); } }
+        .koast-anim { opacity: 0; animation: koast-fade-up 0.55s ease-out forwards; }
+        .koast-anim-sm { opacity: 0; animation: koast-fade-up-sm 0.55s ease-out forwards; }
+        .koast-spark { stroke-dasharray: 200; stroke-dashoffset: 200; transition: stroke-dashoffset 1.2s ease-out; }
+        .koast-spark.go { stroke-dashoffset: 0; }
+      `}</style>
+
       {conflictsData && conflictsData.conflicts.length > 0 && (
         <ConflictBanner
           conflicts={conflictsData.conflicts}
@@ -163,658 +173,741 @@ export default function DashboardClient() {
         onResolved={() => { refreshConflicts(); fetchData(); }}
       />
 
-      {/* Error banner */}
       {fetchError && data && (
-        <div className="mb-4 flex items-center justify-between px-4 py-3 rounded-lg bg-warning-light border border-warning/20">
-          <p className="text-sm font-medium" style={{ color: "#92400e" }}>
-            Unable to refresh data. Showing last available data.
-          </p>
+        <div
+          className="mb-4 p-4 rounded-[14px] flex items-center gap-3"
+          style={{
+            background: "linear-gradient(135deg, rgba(212,150,11,0.08), rgba(212,150,11,0.02))",
+            border: "1px solid rgba(212,150,11,0.15)",
+          }}
+        >
+          <span className="w-[10px] h-[10px] rounded-full bg-amber-tide flex-shrink-0" />
+          <div className="flex-1 text-[13px] font-semibold text-amber-tide">
+            Unable to refresh. Showing the last loaded snapshot.
+          </div>
           <button
             onClick={fetchData}
-            className="text-sm font-medium px-3 py-1 rounded-md bg-warning/10 hover:bg-warning/20 transition-colors"
-            style={{ color: "#92400e" }}
+            className="bg-amber-tide text-white rounded-[10px] py-[9px] px-4 text-xs font-semibold hover:opacity-90 transition-opacity"
           >
             Retry
           </button>
         </div>
       )}
 
-      <div className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
-        {/* Quick Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-[#1a3a2a]">
-            <div className="flex items-center gap-2.5 mb-3"><Home size={22} className="text-[#3d6b52]" /><p className="text-sm font-medium text-gray-500">Properties</p></div>
-            <p className="text-3xl font-bold text-gray-900">{data.propertyCards.length}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-blue-500">
-            <div className="flex items-center gap-2.5 mb-3"><TrendingUp size={22} className="text-blue-500" /><p className="text-sm font-medium text-gray-500">Occupancy</p></div>
-            <p className="text-3xl font-bold text-gray-900">{data.performance.occupancyRate}%</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-[#1a3a2a]">
-            <div className="flex items-center gap-2.5 mb-3"><DollarSign size={22} className="text-[#3d6b52]" /><p className="text-sm font-medium text-gray-500">Est. Revenue</p></div>
-            <p className="text-3xl font-bold text-[#1a3a2a]">{formatCurrency(data.performance.thisMonthRevenue)}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-l-amber-500">
-            <div className="flex items-center gap-2.5 mb-3"><Calendar size={22} className="text-amber-500" /><p className="text-sm font-medium text-gray-500">Upcoming Check-ins</p></div>
-            <p className="text-3xl font-bold text-gray-900">{data.propertyCards.filter((c: { status: string }) => c.status === "checkin_today").length}</p>
-          </div>
-        </div>
-
-        {/* Section 1: Property Status Strip */}
-        <PropertyStatusStrip cards={data.propertyCards} />
-
-        {/* Section 2: Smart Actions */}
-        <SmartActions
-          actions={data.actions}
-          conflicts={conflictsData?.conflicts ?? []}
-          onResolveConflict={(c) => setActiveConflict(c)}
+      <div className={loading ? "opacity-60 pointer-events-none transition-opacity" : "transition-opacity"}>
+        <DashboardHeader
+          name={data.user.name}
+          propertyCount={data.summary.propertyCount}
+          bookingsThisMonth={data.summary.bookingsThisMonth}
+          syncStatus={data.summary.syncStatus}
         />
 
-        {/* Section 3: Upcoming Events Bar */}
-        <EventsBar events={data.events} />
-
-        {/* Section 4: Portfolio Performance + Market Health */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-          <div className="lg:col-span-3">
-            <PerformanceSection
-              performance={data.performance}
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <MarketHealth market={data.market} />
-          </div>
+        <SectionLabel label="Your properties" delay={300} />
+        <div
+          className="grid gap-4 mb-8"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
+        >
+          {data.propertyCards.map((card, i) => (
+            <PropertyCardComponent key={card.id} card={card} index={i} />
+          ))}
         </div>
 
-        {/* Section 5: Recent Activity Feed */}
-        <ActivityFeed items={data.activityFeed} />
+        <SectionLabel label="Portfolio performance" delay={550} />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-5 mb-8">
+          <PortfolioStats data={data} />
+          <ChartCard data={data.performance.dailyRevenue} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
+          <div>
+            <SectionLabel label="Activity" delay={900} />
+            <ActivityFeed items={data.activityFeed} />
+          </div>
+          <div>
+            <SectionLabel label="AI insights" delay={950} />
+            <AIInsights actions={data.actions} />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// ====== Section 1: Property Status Strip ======
+// ====== Header ======
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  occupied: { label: "Occupied", color: "bg-[#1a3a2a]" },
-  vacant: { label: "Vacant", color: "bg-neutral-400" },
-  turnover_today: { label: "Turnover today", color: "bg-amber-500" },
-  checkin_today: { label: "Check-in today", color: "bg-blue-500" },
-  checkout_today: { label: "Check-out today", color: "bg-rose-400" },
-};
-
-function PropertyStatusStrip({ cards }: { cards: PropertyCard[] }) {
-  const isHero = cards.length === 1;
-  const isSideBySide = cards.length >= 2 && cards.length <= 3;
+function DashboardHeader({
+  name,
+  propertyCount,
+  bookingsThisMonth,
+  syncStatus,
+}: {
+  name: string;
+  propertyCount: number;
+  bookingsThisMonth: number;
+  syncStatus: CommandCenterData["summary"]["syncStatus"];
+}) {
+  const greeting = timeOfDayGreeting();
+  const sync = (() => {
+    if (syncStatus === "synced") return { label: "All channels synced", color: "lagoon" as const };
+    if (syncStatus === "syncing") return { label: "Syncing...", color: "amber-tide" as const };
+    if (syncStatus === "disconnected") return { label: "Channel disconnected", color: "coral-reef" as const };
+    return { label: "No channels connected", color: "tideline" as const };
+  })();
 
   return (
-    <div className={`mb-6 ${cards.length >= 4 ? "overflow-x-auto scrollbar-hide" : ""}`}>
-      <div
-        className={`flex gap-4 ${
-          isHero ? "" : isSideBySide ? "" : "w-max pb-2"
-        }`}
-        style={cards.length >= 4 ? { scrollSnapType: "x mandatory" } : undefined}
+    <div className="mb-7">
+      <h1
+        className="text-[28px] font-bold text-coastal koast-anim-sm"
+        style={{ letterSpacing: "-0.02em", animationDelay: "100ms" }}
       >
-        {cards.map((card) => (
-          <PropertyCardComponent key={card.id} card={card} isHero={isHero} isSideBySide={isSideBySide} />
-        ))}
+        {greeting}, {name}
+      </h1>
+      <div
+        className="text-[13px] text-tideline mt-1 flex items-center gap-2 koast-anim-sm flex-wrap"
+        style={{ animationDelay: "200ms" }}
+      >
+        <span>{propertyCount} {propertyCount === 1 ? "property" : "properties"}</span>
+        <span>·</span>
+        <span>{bookingsThisMonth} bookings this month</span>
+        <span>·</span>
+        <SyncBadge label={sync.label} color={sync.color} />
       </div>
     </div>
   );
 }
 
-function PropertyCardComponent({
-  card,
-  isHero,
-  isSideBySide,
-}: {
-  card: PropertyCard;
-  isHero: boolean;
-  isSideBySide: boolean;
-}) {
-  const { label, color } = statusConfig[card.status] ?? statusConfig.vacant;
-  const isOccupiedLike = card.status === "occupied" || card.status === "checkin_today";
-  const isTurnover = card.status === "turnover_today";
-  const isVacantLike = card.status === "vacant" || card.status === "checkout_today";
+function SyncBadge({ label, color }: { label: string; color: "lagoon" | "amber-tide" | "coral-reef" | "tideline" }) {
+  const palette = {
+    lagoon: { bg: "rgba(26,122,90,0.08)", border: "rgba(26,122,90,0.12)", fg: "var(--lagoon)", dot: "var(--lagoon)" },
+    "amber-tide": { bg: "rgba(212,150,11,0.08)", border: "rgba(212,150,11,0.15)", fg: "var(--amber-tide)", dot: "var(--amber-tide)" },
+    "coral-reef": { bg: "rgba(196,64,64,0.08)", border: "rgba(196,64,64,0.15)", fg: "var(--coral-reef)", dot: "var(--coral-reef)" },
+    tideline: { bg: "rgba(61,107,82,0.08)", border: "rgba(61,107,82,0.15)", fg: "var(--tideline)", dot: "var(--tideline)" },
+  }[color];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-[12px] text-[11px] font-semibold"
+      style={{ backgroundColor: palette.bg, borderColor: palette.border, borderWidth: 1, color: palette.fg }}
+    >
+      <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: palette.dot }} />
+      {label}
+    </span>
+  );
+}
+
+// ====== Section label ======
+
+function SectionLabel({ label, delay }: { label: string; delay: number }) {
+  return (
+    <div
+      className="text-[11px] font-bold tracking-[0.08em] uppercase text-golden mb-[14px] koast-anim-sm"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      {label}
+    </div>
+  );
+}
+
+// ====== Property Cards ======
+
+const STATUS_PRESENTATION: Record<PropertyCard["status"], { color: "lagoon" | "golden" | "amber-tide" | "deep-water"; }> = {
+  occupied: { color: "lagoon" },
+  checkin_today: { color: "lagoon" },
+  vacant: { color: "golden" },
+  checkout_today: { color: "deep-water" },
+  turnover_today: { color: "amber-tide" },
+};
+
+function PropertyCardComponent({ card, index }: { card: PropertyCard; index: number }) {
+  const status = STATUS_PRESENTATION[card.status] ?? STATUS_PRESENTATION.vacant;
+  const dotColor = `var(--${status.color})`;
+
+  const statusText = (() => {
+    if (card.status === "occupied" && card.guestName) {
+      return `${card.guestName.split(" ")[0]}${card.guestName.split(" ")[1] ? ` ${card.guestName.split(" ")[1][0]}.` : ""} — checkout ${formatShortDate(card.checkOut)}`;
+    }
+    if (card.status === "checkin_today" && card.guestName) {
+      return `${card.guestName.split(" ")[0]} — check-in today`;
+    }
+    if (card.status === "checkout_today") {
+      return `Checkout today — ${card.cleanerName ?? "no cleaner assigned"}`;
+    }
+    if (card.status === "turnover_today") {
+      return `Turnover today — ${card.cleanerName ?? "no cleaner assigned"}`;
+    }
+    if (card.nextCheckIn) {
+      return `Vacant — next check-in ${formatShortDate(card.nextCheckIn)}`;
+    }
+    return "Vacant — no upcoming bookings";
+  })();
+
+  const nextLabel = (() => {
+    if ((card.status === "occupied" || card.status === "checkin_today") && card.nextCheckIn) {
+      return `Next: ${formatShortDate(card.nextCheckIn)}`;
+    }
+    if (card.metrics.occupancy > 0) return `${card.metrics.occupancy}% occupancy`;
+    return null;
+  })();
 
   return (
     <Link
       href={`/properties/${card.id}`}
-      className={`flex-shrink-0 bg-neutral-0 rounded-xl shadow-sm hover:-translate-y-0.5 transition-all cursor-pointer ${
-        isHero ? "w-full" : isSideBySide ? "flex-1 min-w-0" : "w-[280px]"
-      }`}
-      style={!isHero && !isSideBySide ? { scrollSnapAlign: "start" } : undefined}
+      className="koast-anim block rounded-2xl overflow-hidden bg-white"
+      style={{
+        boxShadow: "var(--shadow-card)",
+        animationDelay: `${350 + index * 100}ms`,
+        transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.35s cubic-bezier(0.4,0,0.2,1)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-6px) scale(1.01)";
+        e.currentTarget.style.boxShadow = "var(--shadow-card-hover)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.boxShadow = "var(--shadow-card)";
+      }}
     >
-      {/* Cover photo */}
-      <div className="relative h-[100px] rounded-t-xl overflow-hidden">
+      {/* Photo */}
+      <div className="relative h-[160px] bg-dry-sand">
         {card.coverPhotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={card.coverPhotoUrl}
             alt={card.name}
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-            <span className="text-neutral-300 text-2xl">🏠</span>
+          <div className="w-full h-full flex items-center justify-center text-shell">
+            <HomeIcon size={36} strokeWidth={1.5} />
           </div>
         )}
-        {/* Status pill — top left */}
-        <span
-          className={`absolute top-2 left-2 px-2 py-0.5 text-[11px] font-semibold text-white rounded-full ${color}`}
-        >
-          {label}
-        </span>
-        {/* Platform badges — bottom right */}
-        {(() => {
-          const plats = card.platforms && card.platforms.length > 0
-            ? card.platforms
-            : card.platform ? [card.platform] : [];
-          if (plats.length === 0) return null;
-          return (
-            <span className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 rounded-full px-1 py-0.5">
-              {plats.map((p) => (
-                <DashPlatformLogo key={p} platform={p} size="sm" />
-              ))}
-            </span>
-          );
-        })()}
+        {/* Bottom gradient overlay for legibility */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-[70px] pointer-events-none"
+          style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.55))" }}
+        />
+        {/* Channel badges — top right */}
+        <div className="absolute top-2.5 right-2.5 flex gap-1 z-[2]">
+          {(card.platforms ?? (card.platform ? [card.platform] : [])).map((p) => {
+            const key = platformKeyFrom(p);
+            if (!key) return null;
+            const platform = PLATFORMS[key];
+            return (
+              <div
+                key={p}
+                className="w-[24px] h-[24px] rounded-md flex items-center justify-center"
+                style={{
+                  backgroundColor: `${platform.color}b3`,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                }}
+                title={platform.name}
+              >
+                <Image src={platform.iconWhite} alt={platform.name} width={12} height={12} />
+              </div>
+            );
+          })}
+        </div>
+        {/* Property name + location overlaid bottom-left */}
+        <div className="absolute left-3 bottom-2.5 z-[2]">
+          <div
+            className="text-[14px] font-bold text-white"
+            style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+          >
+            {card.name}
+          </div>
+          {card.location && (
+            <div className="text-[11px] text-white/75">{card.location}</div>
+          )}
+        </div>
       </div>
 
-      {/* Info section */}
-      <div className="p-3.5 h-[84px] flex flex-col justify-between">
-        <p className="text-base font-semibold text-gray-900 truncate">{card.name}</p>
-
-        {isOccupiedLike && card.guestName && (
-          <div>
-            <p className="text-xs text-neutral-500 truncate">
-              {card.guestName}
-              {card.numGuests && card.numGuests > 1 ? ` + ${card.numGuests - 1}` : ""}
-            </p>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-[11px] text-neutral-400">
-                {formatShortDate(card.checkIn)} – {formatShortDate(card.checkOut)} ({card.nights}n)
-              </span>
-              {card.tonightRate != null && (
-                <span className="text-lg font-bold text-[#1a3a2a]">
-                  ${card.tonightRate}
-                </span>
-              )}
-            </div>
-          </div>
+      {/* Status bar */}
+      <div className="px-3 py-2 text-[11px] font-semibold flex items-center gap-1.5 border-b border-dry-sand" style={{ color: dotColor }}>
+        <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: dotColor }} />
+        <span className="truncate">{statusText}</span>
+        {nextLabel && (
+          <span className="ml-auto text-[10px] font-medium text-tideline">{nextLabel}</span>
         )}
+      </div>
 
-        {isVacantLike && (
-          <div>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              {card.nextCheckIn
-                ? `Next check-in: ${formatShortDate(card.nextCheckIn)}`
-                : "No upcoming bookings"}
-            </p>
-            <div className="flex items-center justify-between mt-0.5">
-              {card.tonightRate != null && (
-                <span className="text-sm font-mono text-neutral-600">${card.tonightRate}</span>
-              )}
-              {card.daysUntilBooked != null && (
-                <span className="text-[11px] text-neutral-400">
-                  {card.daysUntilBooked} night{card.daysUntilBooked !== 1 ? "s" : ""} until booked
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {isTurnover && (
-          <div>
-            <p className="text-[11px] text-neutral-500 mt-0.5">
-              Checkout 11 AM → Cleaning → Check-in 3 PM
-            </p>
-            <div className="flex items-center justify-between mt-0.5">
-              {card.cleanerName ? (
-                <span className="text-xs text-neutral-600 flex items-center gap-1">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full inline-block ${
-                      card.cleanerConfirmed ? "bg-[#1a3a2a]" : "bg-neutral-300"
-                    }`}
-                  />
-                  {card.cleanerName}
-                </span>
-              ) : (
-                <span className="text-xs text-neutral-400">No cleaner assigned</span>
-              )}
-              {card.tonightRate != null && (
-                <span className="text-sm font-mono text-[#1a3a2a] font-semibold">
-                  ${card.tonightRate}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+      {/* Metrics row */}
+      <div className="flex py-2.5">
+        <Metric label="Revenue" value={card.metrics.revenue} kind="currency" />
+        <Divider />
+        <Metric label="Occupancy" value={card.metrics.occupancy} kind="percent" />
+        <Divider />
+        <Metric label="Rating" value={card.metrics.rating} kind="rating" />
+        <Divider />
+        <Metric label="ADR" value={card.metrics.adr} kind="currency-short" />
       </div>
     </Link>
   );
 }
 
-// ====== Section 2: Smart Actions ======
+function Divider() {
+  return <div className="w-px self-stretch my-1 bg-dry-sand flex-shrink-0" />;
+}
 
-const actionTypeConfig: Record<string, { icon: typeof DollarSign; iconBg: string; iconColor: string }> = {
-  pricing: { icon: DollarSign, iconBg: "bg-[#eef5f0]", iconColor: "text-[#1a3a2a]" },
-  revenue: { icon: TrendingUp, iconBg: "bg-[#eef5f0]", iconColor: "text-[#1a3a2a]" },
-  cleaning: { icon: Sparkles, iconBg: "bg-amber-100", iconColor: "text-amber-600" },
-  event: { icon: Calendar, iconBg: "bg-blue-100", iconColor: "text-blue-600" },
-  review: { icon: Star, iconBg: "bg-yellow-100", iconColor: "text-yellow-600" },
-};
-
-function SmartActions({
-  actions,
-  conflicts,
-  onResolveConflict,
+function Metric({
+  label,
+  value,
+  kind,
 }: {
-  actions: ActionItem[];
-  conflicts: Conflict[];
-  onResolveConflict: (c: Conflict) => void;
+  label: string;
+  value: number;
+  kind: "currency" | "currency-short" | "percent" | "rating";
 }) {
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const animated = useCountUp(value, 1200, 800);
+  let display: string;
+  if (kind === "currency") {
+    display = animated >= 1000 ? `$${(animated / 1000).toFixed(1)}k` : `$${Math.round(animated)}`;
+  } else if (kind === "currency-short") {
+    display = `$${Math.round(animated)}`;
+  } else if (kind === "percent") {
+    display = `${Math.round(animated)}%`;
+  } else {
+    display = animated > 0 ? animated.toFixed(1) : "—";
+  }
+  return (
+    <div className="flex-1 text-center px-1">
+      <div className="text-[16px] font-bold text-coastal" style={{ letterSpacing: "-0.03em" }}>
+        {display}
+      </div>
+      <div className="text-[9px] font-bold uppercase tracking-[0.06em] text-golden mt-[1px]">
+        {label}
+      </div>
+    </div>
+  );
+}
 
+// ====== Glass stat cards ======
+
+function PortfolioStats({ data }: { data: CommandCenterData }) {
+  const { performance, propertyCards } = data;
+
+  const avgAdr = useMemo(() => {
+    const adrs = propertyCards.map((p) => p.metrics.adr).filter((v) => v > 0);
+    if (adrs.length === 0) return 0;
+    return Math.round(adrs.reduce((a, b) => a + b, 0) / adrs.length);
+  }, [propertyCards]);
+
+  const avgRating = useMemo(() => {
+    const rs = propertyCards.map((p) => p.metrics.rating).filter((v) => v > 0);
+    if (rs.length === 0) return 0;
+    return Math.round((rs.reduce((a, b) => a + b, 0) / rs.length) * 10) / 10;
+  }, [propertyCards]);
+
+  const sparkRevenue = useMemo(() => {
+    const slice = performance.dailyRevenue.slice(-12);
+    return slice.length > 0 ? slice.map((d) => d.revenue) : [0];
+  }, [performance.dailyRevenue]);
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <GlassCard
+        index={0}
+        value={performance.thisMonthRevenue}
+        label="Revenue"
+        kind="currency"
+        trend={performance.revenueChangePct}
+        spark={sparkRevenue}
+      />
+      <GlassCard
+        index={1}
+        value={performance.occupancyRate}
+        label="Occupancy"
+        kind="percent"
+        trend={performance.occupancyRate > 0 ? 6 : 0}
+        spark={sparkRevenue}
+      />
+      <GlassCard
+        index={2}
+        value={avgAdr}
+        label="Avg nightly rate"
+        kind="currency"
+        trend={0}
+      />
+      <GlassCard
+        index={3}
+        value={avgRating}
+        label="Avg rating"
+        kind="rating"
+        trend={0}
+      />
+    </div>
+  );
+}
+
+function GlassCard({
+  index,
+  value,
+  label,
+  kind,
+  trend,
+  spark,
+}: {
+  index: number;
+  value: number;
+  label: string;
+  kind: "currency" | "percent" | "rating";
+  trend: number;
+  spark?: number[];
+}) {
+  const animated = useCountUp(value, 1200, 800 + index * 60);
+
+  let display: string;
+  if (kind === "currency") {
+    display = `$${Math.round(animated).toLocaleString("en-US")}`;
+  } else if (kind === "percent") {
+    display = `${Math.round(animated)}%`;
+  } else {
+    display = animated > 0 ? animated.toFixed(1) : "—";
+  }
+
+  const trendColor = trend > 0 ? "text-lagoon" : trend < 0 ? "text-coral-reef" : "text-tideline";
+  const trendArrow = trend > 0 ? "▲" : trend < 0 ? "▼" : "—";
+  const trendLabel = trend === 0 ? "Steady" : `${trend > 0 ? "+" : ""}${trend}% vs last month`;
+
+  // Sparkline points — normalized to a 60x24 viewBox with 1px padding.
+  const points = useMemo(() => {
+    if (!spark || spark.length < 2) return "";
+    const max = Math.max(...spark);
+    const min = Math.min(...spark);
+    const range = Math.max(1, max - min);
+    return spark
+      .map((v, i) => {
+        const x = (i / (spark.length - 1)) * 58 + 1;
+        const y = 24 - ((v - min) / range) * 20 - 2;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [spark]);
+
+  // Trigger sparkline draw after the card animates in
+  const [sparkOn, setSparkOn] = useState(false);
   useEffect(() => {
-    const saved = localStorage.getItem("dismissed-actions");
-    if (saved) try { setDismissed(new Set(JSON.parse(saved))); } catch { /* ignore */ }
-  }, []);
-
-  const dismiss = (id: string) => {
-    const next = new Set(dismissed);
-    next.add(id);
-    setDismissed(next);
-    localStorage.setItem("dismissed-actions", JSON.stringify(Array.from(next)));
-  };
-
-  const visible = actions.filter((a) => !dismissed.has(a.id));
-
-  if (visible.length === 0 && conflicts.length === 0) {
-    if (actions.length > 0) {
-      return (
-        <div className="mb-6 p-4 rounded-xl bg-[#eef5f0] text-center">
-          <p className="text-sm font-medium text-[#3d6b52]">You&apos;re all caught up!</p>
-        </div>
-      );
-    }
-    return null;
-  }
-
-  const formatPillRange = (start: string, end: string) => {
-    const s = new Date(start + "T00:00:00");
-    const e = new Date(end + "T00:00:00");
-    const sMonth = s.toLocaleDateString("en-US", { month: "short" });
-    const eMonth = e.toLocaleDateString("en-US", { month: "short" });
-    return s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()
-      ? `${sMonth} ${s.getDate()}-${e.getDate()}`
-      : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
-  };
+    const t = setTimeout(() => setSparkOn(true), 900 + index * 60);
+    return () => clearTimeout(t);
+  }, [index]);
 
   return (
-    <div className="mb-6">
-      <h2 className="text-sm font-semibold text-gray-800 mb-3">
-        Needs Your Attention
-      </h2>
-      <div className="space-y-2">
-        {conflicts.map((c) => {
-          const platformLabel = (p: string) => (p === "booking_com" ? "Booking.com" : p === "airbnb" ? "Airbnb" : p === "vrbo" ? "VRBO" : p);
-          const a = c.booking1;
-          const b = c.booking2;
-          const samePlatform = a.platform === b.platform;
-          const platformDesc = samePlatform ? `2 ${platformLabel(a.platform)} bookings overlap.` : `${platformLabel(a.platform)} and ${platformLabel(b.platform)} bookings overlap.`;
-          return (
-            <div
-              key={`conflict-${c.booking1.id}-${c.booking2.id}`}
-              className="flex items-center gap-3.5 p-4 rounded-xl bg-white shadow-sm border-l-4 border-l-red-500"
-            >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-red-50">
-                <AlertTriangle size={18} className="text-red-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">
-                  Overbooking at {c.property_name} — {formatPillRange(c.overlap_start, c.overlap_end)}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {platformDesc} Resolve immediately.
-                </p>
-              </div>
-              <button
-                onClick={() => onResolveConflict(c)}
-                className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
-                Resolve
-              </button>
-            </div>
-          );
-        })}
-        {visible.slice(0, 5).map((a) => {
-          const config = actionTypeConfig[a.type] ?? actionTypeConfig.event;
-          const Icon = config.icon;
-          const borderColor = a.type === "cleaning" ? "border-l-amber-500" : a.type === "event" ? "border-l-blue-500" : "border-l-[#1a3a2a]";
-          return (
-            <div
-              key={a.id}
-              className={`flex items-center gap-3.5 p-4 rounded-xl bg-white shadow-sm border-l-4 ${borderColor} group`}
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.iconBg}`}
-              >
-                <Icon size={18} className={config.iconColor} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{a.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{a.description}</p>
-              </div>
-              {a.action && (
-                <Link
-                  href={a.action.href}
-                  className="flex-shrink-0 px-4 py-2 text-xs font-semibold text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors"
-                >
-                  {a.action.label}
-                </Link>
-              )}
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  dismiss(a.id);
-                }}
-                className="flex-shrink-0 p-1 text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <XIcon size={14} />
-              </button>
-            </div>
-          );
-        })}
+    <div
+      className="koast-anim relative overflow-hidden rounded-2xl p-5"
+      style={{
+        background: "linear-gradient(165deg, rgba(255,255,255,0.95), rgba(247,243,236,0.85) 50%, rgba(237,231,219,0.7))",
+        border: "1px solid rgba(255,255,255,0.6)",
+        boxShadow: "var(--shadow-glass)",
+        animationDelay: `${600 + index * 80}ms`,
+        transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-3px) scale(1.005)";
+        e.currentTarget.style.boxShadow = "var(--shadow-glass-hover)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.boxShadow = "var(--shadow-glass)";
+      }}
+    >
+      {/* Top-half reflection overlay */}
+      <div
+        className="absolute inset-x-0 top-0 h-1/2 pointer-events-none rounded-t-2xl"
+        style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), transparent)" }}
+      />
+      <div
+        className="text-[26px] font-bold text-coastal relative z-[1]"
+        style={{ letterSpacing: "-0.03em" }}
+      >
+        {display}
       </div>
-    </div>
-  );
-}
-
-// ====== Section 3: Upcoming Events Bar ======
-
-function EventsBar({ events }: { events: EventPill[] }) {
-  if (events.length === 0) {
-    return (
-      <div className="mb-6 px-4 py-3 rounded-xl bg-neutral-0 shadow-sm">
-        <p className="text-xs text-neutral-400 text-center">
-          No major events in the next 14 days
-        </p>
+      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-golden mt-1 relative z-[1]">
+        {label}
       </div>
-    );
-  }
-
-  return (
-    <div className="mb-6 overflow-x-auto scrollbar-hide">
-      <div className="flex gap-2 pb-1">
-        {events.map((e, i) => {
-          const intensity = (e.demandImpact ?? 0);
-          const bg =
-            intensity >= 0.6
-              ? "bg-red-100 text-red-700"
-              : intensity >= 0.3
-                ? "bg-amber-100 text-amber-700"
-                : "bg-blue-50 text-blue-600";
-          const emoji =
-            e.eventType === "sports" || e.eventType === "sporting_event"
-              ? "🏟"
-              : e.eventType === "concert" || e.eventType === "music"
-                ? "🎵"
-                : e.eventType === "festival"
-                  ? "🎪"
-                  : e.eventType === "conference"
-                    ? "📋"
-                    : "📅";
-          return (
-            <Link
-              key={i}
-              href="/pricing"
-              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full ${bg} hover:opacity-80 transition-opacity`}
-            >
-              <span>{emoji}</span>
-              <span className="truncate max-w-[160px]">{e.name}</span>
-              <span className="text-[10px] opacity-70">{e.dateLabel}</span>
-            </Link>
-          );
-        })}
+      <div className={`text-[11px] font-semibold mt-1.5 flex items-center gap-1 relative z-[1] ${trendColor}`}>
+        <span>{trendArrow}</span>
+        <span>{trendLabel}</span>
       </div>
-    </div>
-  );
-}
-
-// ====== Section 4a: Performance Section ======
-
-function PerformanceSection({
-  performance,
-}: {
-  performance: CommandCenterData["performance"];
-}) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 h-full">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">
-        Revenue
-      </h2>
-      <RevenueChart data={performance.revenueData} />
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 pt-4 border-t border-neutral-100">
-        <div>
-          <span className="text-xs text-neutral-400">This month</span>
-          <p className="text-lg font-bold font-mono text-neutral-800">
-            {formatCurrency(performance.thisMonthRevenue)}
-          </p>
-        </div>
-        <div>
-          <span className="text-xs text-neutral-400">Last month</span>
-          <p className="text-lg font-bold font-mono text-neutral-800">
-            {formatCurrency(performance.lastMonthRevenue)}
-          </p>
-        </div>
-        <div>
-          {performance.revenueChangePct !== 0 && (
-            <span
-              className={`text-sm font-bold font-mono ${
-                performance.revenueChangePct > 0 ? "text-[#1a3a2a]" : "text-rose-500"
-              }`}
-            >
-              {performance.revenueChangePct > 0 ? "+" : ""}
-              {performance.revenueChangePct}% {performance.revenueChangePct > 0 ? "↑" : "↓"}
-            </span>
-          )}
-        </div>
-        <div className="border-l border-neutral-100 pl-6">
-          <span className="text-xs text-neutral-400">YTD</span>
-          <p className="text-lg font-bold font-mono text-neutral-800">
-            {formatCurrency(performance.ytdRevenue)}
-          </p>
-        </div>
-        <div className="border-l border-neutral-100 pl-6">
-          <span className="text-xs text-neutral-400">Occupancy</span>
-          <p className="text-lg font-bold font-mono text-neutral-800">
-            {performance.occupancyRate}%
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ====== Section 4b: Market Health ======
-
-function MarketHealth({ market }: { market: CommandCenterData["market"] }) {
-  const gradeColor =
-    market.grade.startsWith("A")
-      ? "text-[#1a3a2a] bg-[#eef5f0] border-[#d5e8da]"
-      : market.grade.startsWith("B")
-        ? "text-blue-600 bg-blue-50 border-blue-200"
-        : market.grade.startsWith("C")
-          ? "text-amber-600 bg-amber-50 border-amber-200"
-          : market.grade === "—"
-            ? "text-neutral-400 bg-neutral-50 border-neutral-200"
-            : "text-rose-600 bg-rose-50 border-rose-200";
-
-  const hasMarketData = market.marketAdr > 0;
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">
-        Market Health
-      </h2>
-
-      {/* Grade badge */}
-      <div className="flex items-center justify-center mb-5">
-        <div
-          className={`w-20 h-20 rounded-2xl border-2 flex items-center justify-center ${gradeColor}`}
+      {spark && spark.length > 1 && (
+        <svg
+          className="absolute right-4 bottom-3 z-[1] opacity-50"
+          width={60}
+          height={24}
+          viewBox="0 0 60 24"
         >
-          <span className="text-3xl font-bold font-mono">{market.grade}</span>
-        </div>
-      </div>
-
-      {hasMarketData ? (
-        <>
-          {/* ADR comparison */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-neutral-500">Your ADR vs Market</span>
-              <span className="font-mono font-medium text-neutral-700">
-                {formatCurrency(market.yourAdr)} / {formatCurrency(market.marketAdr)}
-              </span>
-            </div>
-            <ComparisonBar yours={market.yourAdr} market={market.marketAdr} />
-          </div>
-
-          {/* Occupancy comparison */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-neutral-500">Occupancy vs Market</span>
-              <span className="font-mono font-medium text-neutral-700">
-                {market.yourOccupancy}% / {market.marketOccupancy}%
-              </span>
-            </div>
-            <ComparisonBar yours={market.yourOccupancy} market={market.marketOccupancy} />
-          </div>
-
-          {/* Demand forecast strip */}
-          {market.demandForecast.length > 0 && (
-            <div className="mt-auto">
-              <p className="text-xs text-neutral-400 mb-2">Demand forecast (30 days)</p>
-              <div className="flex gap-px rounded-md overflow-hidden">
-                {market.demandForecast.map((d, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 h-3"
-                    style={{
-                      backgroundColor: demandColor(d.score),
-                    }}
-                    title={`${d.date}: ${Math.round(d.score * 100)}%`}
-                  />
-                ))}
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-[10px] text-neutral-300">Today</span>
-                <span className="text-[10px] text-neutral-300">+30d</span>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <p className="text-xs text-neutral-400 text-center mt-2">
-          Market data not yet available. It will appear once market analysis runs.
-        </p>
+          <polyline
+            className={`koast-spark${sparkOn ? " go" : ""}`}
+            fill="none"
+            stroke={trend < 0 ? "var(--coral-reef)" : "var(--lagoon)"}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            points={points}
+          />
+        </svg>
       )}
     </div>
   );
 }
 
-function ComparisonBar({ yours, market }: { yours: number; market: number }) {
-  const max = Math.max(yours, market, 1);
-  const yourPct = (yours / max) * 100;
-  const marketPct = (market / max) * 100;
+// ====== Chart card ======
+
+function ChartCard({ data }: { data: CommandCenterData["performance"]["dailyRevenue"] }) {
+  const [period, setPeriod] = useState<"7D" | "30D" | "90D">("30D");
+  const slice = useMemo(() => {
+    if (period === "7D") return data.slice(-7);
+    if (period === "90D") return data; // we only fetch 30 days; 90D shows the same set until API extends
+    return data;
+  }, [period, data]);
 
   return (
-    <div className="relative h-4 bg-neutral-100 rounded-full overflow-hidden">
-      <div
-        className="absolute inset-y-0 left-0 bg-[#3d6b52] rounded-full transition-all"
-        style={{ width: `${yourPct}%` }}
-      />
-      <div
-        className="absolute inset-y-0 left-0 border-r-2 border-neutral-500"
-        style={{ width: `${marketPct}%` }}
-      />
-    </div>
-  );
-}
-
-function demandColor(score: number): string {
-  if (score >= 0.8) return "#ef4444"; // red-500
-  if (score >= 0.6) return "#f59e0b"; // amber-500
-  if (score >= 0.4) return "#3b82f6"; // blue-500
-  if (score >= 0.25) return "#93c5fd"; // blue-300
-  return "#e5e7eb"; // gray-200
-}
-
-// ====== Section 5: Activity Feed ======
-
-const feedIcons: Record<string, { icon: typeof BookOpen; color: string }> = {
-  booking: { icon: BookOpen, color: "text-blue-500" },
-  cleaning: { icon: CheckCircle2, color: "text-[#3d6b52]" },
-  review: { icon: Star, color: "text-purple-500" },
-  rate_change: { icon: TrendingUp, color: "text-amber-500" },
-};
-
-function ActivityFeed({ items }: { items: ActivityItem[] }) {
-  if (items.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
-      <h2 className="text-lg font-semibold text-gray-800 mb-3">
-        Recent Activity
-      </h2>
-      <div className="space-y-2.5">
-        {items.map((item, i) => {
-          const config = feedIcons[item.type] ?? feedIcons.booking;
-          const Icon = config.icon;
-          return (
-            <div key={i} className="flex items-start gap-2.5">
-              <Icon size={14} className={`${config.color} mt-0.5 flex-shrink-0`} />
-              <p className="text-xs text-neutral-600 flex-1">{item.text}</p>
-              <span className="text-[11px] text-neutral-300 flex-shrink-0 whitespace-nowrap">
-                {item.timeAgo}
-              </span>
-            </div>
-          );
-        })}
+    <div
+      className="koast-anim bg-white rounded-2xl p-[22px] flex flex-col"
+      style={{ boxShadow: "var(--shadow-card)", animationDelay: "850ms", minHeight: 280 }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-[14px] font-bold text-coastal">Revenue</div>
+        <div className="flex gap-[2px] bg-dry-sand rounded-md p-[2px]">
+          {(["7D", "30D", "90D"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-2.5 py-1 rounded text-[10px] font-semibold transition-colors ${
+                period === p ? "bg-white text-coastal" : "bg-transparent text-tideline hover:text-coastal"
+              }`}
+              style={period === p ? { boxShadow: "0 1px 2px rgba(0,0,0,0.06)" } : undefined}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 relative" style={{ minHeight: 200 }}>
+        <RevenueChart key={period} data={slice} delay={200} />
       </div>
     </div>
   );
 }
 
-// ====== Loading Skeleton ======
+// ====== Activity feed ======
+
+const FEED_ICONS: Record<string, { icon: typeof Check; tone: string }> = {
+  booking: { icon: Check, tone: "lagoon" },
+  message: { icon: MessageSquare, tone: "deep-water" },
+  rate_change: { icon: DollarSign, tone: "golden" },
+  cleaning: { icon: Sparkles, tone: "amber-tide" },
+  review: { icon: Star, tone: "golden" },
+};
+
+function ActivityFeed({ items }: { items: ActivityItem[] }) {
+  return (
+    <div
+      className="koast-anim bg-white rounded-2xl p-5"
+      style={{ boxShadow: "var(--shadow-card)", animationDelay: "1000ms" }}
+    >
+      {items.length === 0 ? (
+        <div className="py-6 text-center text-[13px] text-tideline">
+          No recent activity yet. Bookings and messages will show up here as they come in.
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {items.map((item, i) => {
+            const config = FEED_ICONS[item.type] ?? FEED_ICONS.booking;
+            const Icon = config.icon;
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-3 py-3 px-1.5 rounded-lg cursor-pointer transition-colors hover:bg-dry-sand/40"
+              >
+                <FeedIconCircle tone={config.tone} Icon={Icon} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] text-coastal leading-[1.5]">{item.text}</div>
+                  <div className="text-[10px] text-tideline mt-0.5">{item.timeAgo}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeedIconCircle({ tone, Icon }: { tone: string; Icon: typeof Check }) {
+  const palette: Record<string, { from: string; to: string; fg: string }> = {
+    lagoon: { from: "rgba(26,122,90,0.12)", to: "rgba(26,122,90,0.04)", fg: "var(--lagoon)" },
+    "deep-water": { from: "rgba(42,90,138,0.12)", to: "rgba(42,90,138,0.04)", fg: "var(--deep-water)" },
+    golden: { from: "rgba(196,154,90,0.15)", to: "rgba(196,154,90,0.04)", fg: "var(--golden)" },
+    "amber-tide": { from: "rgba(212,150,11,0.12)", to: "rgba(212,150,11,0.04)", fg: "var(--amber-tide)" },
+  };
+  const p = palette[tone] ?? palette.lagoon;
+  return (
+    <div
+      className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center flex-shrink-0"
+      style={{ background: `linear-gradient(135deg, ${p.from}, ${p.to})`, color: p.fg }}
+    >
+      <Icon size={15} strokeWidth={2} />
+    </div>
+  );
+}
+
+// ====== AI insights ======
+
+function AIInsights({ actions }: { actions: ActionItem[] }) {
+  const insights = actions.slice(0, 3);
+  if (insights.length === 0) {
+    return (
+      <div
+        className="koast-anim relative overflow-hidden rounded-2xl p-[22px]"
+        style={{
+          background: "linear-gradient(135deg, var(--deep-sea), #0e2218)",
+          color: "var(--shore)",
+          animationDelay: "1100ms",
+        }}
+      >
+        <div
+          className="absolute -top-[40%] -right-[20%] w-[250px] h-[250px] rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(circle, rgba(196,154,90,0.08), transparent 70%)",
+            animation: "koast-glow 4s ease-in-out infinite",
+          }}
+        />
+        <AIBadge />
+        <div className="text-[14px] font-bold text-white mb-1.5 relative z-[1]">All caught up</div>
+        <div className="text-[12px] leading-[1.6] relative z-[1]" style={{ color: "rgba(168,191,174,0.7)" }}>
+          No urgent insights right now. Koast will surface pricing opportunities, gap nights, and event impacts as they appear.
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {insights.map((action, i) => (
+        <AIInsightCard key={action.id} action={action} index={i} />
+      ))}
+    </div>
+  );
+}
+
+function AIBadge() {
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-[14px] mb-2.5 relative z-[1]"
+      style={{
+        backgroundColor: "rgba(196,154,90,0.15)",
+        color: "var(--golden)",
+        border: "1px solid rgba(196,154,90,0.2)",
+        fontSize: 10,
+        fontWeight: 600,
+      }}
+    >
+      <span className="w-[5px] h-[5px] rounded-full bg-golden" />
+      Koast AI
+    </div>
+  );
+}
+
+function AIInsightCard({ action, index }: { action: ActionItem; index: number }) {
+  // Pull a dollar amount out of the title/description if the API surfaces one
+  const dollarMatch = (action.title + " " + action.description).match(/\$([\d,]+)/);
+  const dollarValue = dollarMatch ? Number(dollarMatch[1].replace(/,/g, "")) : 0;
+  const animatedDollar = useCountUp(dollarValue, 1000, 1400);
+
+  const primaryLabel = action.action?.label ?? "Apply";
+  const primaryHref = action.action?.href ?? "#";
+
+  return (
+    <div
+      className="koast-anim relative overflow-hidden rounded-2xl p-[22px]"
+      style={{
+        background: "linear-gradient(135deg, var(--deep-sea), #0e2218)",
+        color: "var(--shore)",
+        animationDelay: `${1100 + index * 100}ms`,
+      }}
+    >
+      <div
+        className="absolute -top-[40%] -right-[20%] w-[250px] h-[250px] rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(196,154,90,0.08), transparent 70%)",
+          animation: "koast-glow 4s ease-in-out infinite",
+        }}
+      />
+      <AIBadge />
+      <div className="text-[14px] font-bold text-white mb-1.5 relative z-[1]">{action.title}</div>
+      <div className="text-[12px] leading-[1.6] mb-3 relative z-[1]" style={{ color: "rgba(168,191,174,0.7)" }}>
+        {action.description}
+      </div>
+      {dollarValue > 0 && (
+        <div
+          className="text-[22px] font-bold text-golden mb-3 relative z-[1]"
+          style={{ letterSpacing: "-0.03em" }}
+        >
+          +${Math.round(animatedDollar).toLocaleString("en-US")} potential
+        </div>
+      )}
+      <div className="flex gap-2 relative z-[1]">
+        <Link
+          href={primaryHref}
+          className="px-4 py-2 rounded-lg text-[11px] font-semibold transition-colors"
+          style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)" }}
+        >
+          {primaryLabel}
+        </Link>
+        <button
+          type="button"
+          className="px-4 py-2 rounded-lg text-[11px] font-semibold transition-colors"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.06)",
+            color: "rgba(168,191,174,0.7)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          Review details
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ====== Loading skeleton ======
 
 function LoadingSkeleton() {
   return (
-    <div className="max-w-[1200px] mx-auto animate-pulse">
-      {/* Property cards skeleton */}
-      <div className="flex gap-4 mb-6">
+    <div className="max-w-[1200px] mx-auto pb-12">
+      <div className="h-8 bg-dry-sand rounded-lg w-64 mb-3 animate-pulse" />
+      <div className="h-4 bg-dry-sand/60 rounded-lg w-80 mb-8 animate-pulse" />
+      <div
+        className="grid gap-4 mb-8"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
+      >
         {[1, 2, 3].map((i) => (
-          <div key={i} className="w-[280px] flex-shrink-0 bg-neutral-0 rounded-xl shadow-sm">
-            <div className="h-[100px] bg-neutral-100 rounded-t-xl" />
-            <div className="p-3 h-[80px] space-y-2">
-              <div className="h-4 bg-neutral-100 rounded w-3/4" />
-              <div className="h-3 bg-neutral-50 rounded w-1/2" />
-              <div className="h-3 bg-neutral-50 rounded w-2/3" />
+          <div
+            key={i}
+            className="rounded-2xl overflow-hidden bg-white"
+            style={{ boxShadow: "var(--shadow-card)" }}
+          >
+            <div className="h-[160px] bg-dry-sand animate-pulse" />
+            <div className="p-4 space-y-2">
+              <div className="h-4 bg-dry-sand rounded-lg w-3/4 animate-pulse" />
+              <div className="h-3 bg-dry-sand/60 rounded-lg w-1/2 animate-pulse" />
             </div>
           </div>
         ))}
       </div>
-      {/* Actions skeleton */}
-      <div className="space-y-2 mb-6">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-16 bg-neutral-0 rounded-xl shadow-sm" />
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-5 mb-8">
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="h-[130px] rounded-2xl bg-white animate-pulse"
+              style={{ boxShadow: "var(--shadow-glass)" }}
+            />
+          ))}
+        </div>
+        <div className="h-[280px] rounded-2xl bg-white animate-pulse" style={{ boxShadow: "var(--shadow-card)" }} />
       </div>
-      {/* Events skeleton */}
-      <div className="h-10 bg-neutral-0 rounded-xl shadow-sm mb-6" />
-      {/* Performance skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        <div className="lg:col-span-3 h-[380px] bg-neutral-0 rounded-xl shadow-sm" />
-        <div className="lg:col-span-2 h-[380px] bg-neutral-0 rounded-xl shadow-sm" />
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
+        <div className="h-[280px] rounded-2xl bg-white animate-pulse" style={{ boxShadow: "var(--shadow-card)" }} />
+        <div className="h-[280px] rounded-2xl bg-white animate-pulse" style={{ boxShadow: "var(--shadow-card)" }} />
       </div>
     </div>
   );

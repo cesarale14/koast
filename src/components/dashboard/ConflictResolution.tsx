@@ -97,22 +97,26 @@ export function ConflictBanner({
   const extra = conflicts.length - 1;
 
   return (
-    <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4 flex items-start gap-3">
-      <div className="flex-shrink-0 w-9 h-9 rounded-full bg-red-500 flex items-center justify-center">
-        <AlertTriangle size={18} className="text-white" strokeWidth={2.5} />
-      </div>
+    <div
+      className="mb-6 p-4 rounded-[14px] flex items-center gap-3"
+      style={{
+        background: "linear-gradient(135deg, rgba(196,64,64,0.08), rgba(196,64,64,0.02))",
+        border: "1px solid rgba(196,64,64,0.15)",
+      }}
+    >
+      <span className="w-[10px] h-[10px] rounded-full bg-coral-reef flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-red-900">
+        <div className="text-[13px] font-semibold text-coral-reef">
           Overbooking detected — {primary.property_name}
-        </p>
-        <p className="text-sm text-red-800 mt-0.5">
+        </div>
+        <div className="text-xs text-tideline mt-[2px]">
           {conflicts.length} bookings overlap on {formatRange(primary.overlap_start, primary.overlap_end)}
           {extra > 0 ? ` (+${extra} more conflict${extra === 1 ? "" : "s"})` : ""}. Immediate action required.
-        </p>
+        </div>
       </div>
       <button
         onClick={() => onResolve(primary)}
-        className="flex-shrink-0 px-4 h-9 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+        className="bg-coral-reef text-white rounded-[10px] py-[9px] px-4 text-xs font-semibold flex-shrink-0 hover:opacity-90 transition-opacity"
       >
         Resolve now
       </button>
