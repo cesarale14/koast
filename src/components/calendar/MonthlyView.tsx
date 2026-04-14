@@ -67,6 +67,35 @@ function getNights(ci: string, co: string): number {
   );
 }
 
+// Bar label: prefer "First L." when we have a real name, fall back to
+// the platform-specific placeholder Channex sends us ("Airbnb Guest",
+// "BDC Guest") for anonymous bookings. Never "Booked".
+function formatBookingLabel(
+  guestName: string | null,
+  platformKey: ReturnType<typeof platformKeyFrom>
+): string {
+  const raw = (guestName ?? "").trim();
+  const platformFallback =
+    platformKey === "airbnb"
+      ? "Airbnb Guest"
+      : platformKey === "booking_com"
+      ? "BDC Guest"
+      : platformKey === "vrbo"
+      ? "VRBO Guest"
+      : "Guest";
+
+  if (!raw) return platformFallback;
+  // Channel-generated anonymous names like "Airbnb Guest" or
+  // "BookingDotCom Guest" should pass through without being parsed as
+  // first + last initial.
+  if (/guest$/i.test(raw) || /^reserved$/i.test(raw)) return platformFallback;
+
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const first = parts[0] ?? "";
+  const lastInitial = parts[1]?.[0];
+  return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
+}
+
 // Build the 6×7 grid including leading/trailing dates from adjacent
 // months so the first and last rows stay visually complete.
 function buildMonthGrid(year: number, month: number, todayStr: string): DayInfo[] {
@@ -479,11 +508,7 @@ export default function MonthlyView({
             const platformKey = platformKeyFrom(seg.booking.platform);
             const platform = platformKey ? PLATFORMS[platformKey] : null;
 
-            const rawName = seg.booking.guest_name?.trim() ?? "";
-            const firstName = rawName.split(" ")[0];
-            const hasRealName =
-              firstName.length > 0 && firstName !== "Airbnb" && firstName !== "Guest" && firstName !== "Reserved";
-            const label = hasRealName ? firstName : "Booked";
+            const label = formatBookingLabel(seg.booking.guest_name, platformKey);
             const guests = seg.booking.num_guests ?? null;
             const showText = cellSpan >= 1.2;
 

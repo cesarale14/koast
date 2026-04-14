@@ -510,6 +510,25 @@ function RightPanel({
     });
   };
 
+  const showBookingView = !!(selectedBooking && selectedBookingDetails);
+
+  // Date range for the channel rate editor. When showing a booking we
+  // use every night of its stay; otherwise we fall back to the single
+  // selected date.
+  const channelRateDates = useMemo(() => {
+    if (showBookingView && selectedBooking) {
+      const out: string[] = [];
+      const d = new Date(selectedBooking.check_in + "T00:00:00Z");
+      const co = new Date(selectedBooking.check_out + "T00:00:00Z");
+      while (d < co) {
+        out.push(d.toISOString().split("T")[0]);
+        d.setUTCDate(d.getUTCDate() + 1);
+      }
+      return out.length > 0 ? out : [selectedDate ?? ""].filter(Boolean);
+    }
+    return selectedDate ? [selectedDate] : [];
+  }, [showBookingView, selectedBooking, selectedDate]);
+
   return (
     <aside
       className="hidden lg:flex flex-col flex-shrink-0 bg-white overflow-y-auto"
@@ -517,7 +536,16 @@ function RightPanel({
     >
       {/* Header */}
       <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
-        {selectedDate ? (
+        {showBookingView ? (
+          <>
+            <div className="text-[18px] font-bold" style={{ color: "var(--coastal)" }}>
+              Booking details
+            </div>
+            <div className="text-xs mt-0.5" style={{ color: "var(--tideline)" }}>
+              {propertyName}
+            </div>
+          </>
+        ) : selectedDate ? (
           <>
             <div className="text-[18px] font-bold" style={{ color: "var(--coastal)" }}>
               {dateLabel}
@@ -533,7 +561,7 @@ function RightPanel({
         )}
       </div>
 
-      {/* Booking info (when a booking is selected) */}
+      {/* Booking-specific view: booking card + channel rates only */}
       {selectedBooking && selectedBookingDetails && (
         <BookingInfoSection
           booking={selectedBooking}
@@ -542,8 +570,8 @@ function RightPanel({
         />
       )}
 
-      {/* Base Rate */}
-      {selectedDate && (
+      {/* Base Rate — hidden while a booking is being inspected */}
+      {!showBookingView && selectedDate && (
         <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
           <SectionLabel label="Base rate" />
           <div className="flex items-center justify-between">
@@ -571,18 +599,18 @@ function RightPanel({
       )}
 
       {/* Channel rates */}
-      {selectedDate && (
+      {(selectedDate || showBookingView) && (
         <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
           <PerChannelRateEditor
             propertyId={propertyId}
-            dates={[selectedDate]}
+            dates={channelRateDates}
             baseRate={baseRate}
           />
         </div>
       )}
 
-      {/* Settings */}
-      {selectedDate && (
+      {/* Settings — hidden while a booking is being inspected */}
+      {!showBookingView && selectedDate && (
         <div className="px-5 py-4">
           <SectionLabel label="Settings" />
           <div className="flex items-center justify-between py-3">

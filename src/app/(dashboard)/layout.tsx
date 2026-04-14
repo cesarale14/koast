@@ -304,11 +304,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [conflictCount, setConflictCount] = useState(0);
+  const [userFirstName, setUserFirstName] = useState<string>("");
 
   // Persist sidebar preference
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-expanded");
     if (saved === "true") setSidebarExpanded(true);
+  }, []);
+
+  // Load the user's first name for the greeting. Same resolution order
+  // as /api/dashboard/command-center: user_preferences.display_name →
+  // auth metadata full_name → safe email-local fallback.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!user || cancelled) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meta: any = user.user_metadata ?? {};
+        const rawName: string = meta.full_name || meta.name || meta.first_name || "";
+        let first = "";
+        if (rawName) {
+          first = String(rawName).trim().split(/\s+/)[0] ?? "";
+        } else if (user.email) {
+          const local = user.email.split("@")[0] ?? "";
+          const candidate = local.split(/[\d._-]/)[0];
+          if (candidate && candidate.length <= 12) {
+            first = candidate.charAt(0).toUpperCase() + candidate.slice(1).toLowerCase();
+          }
+        }
+        if (!cancelled && first) setUserFirstName(first);
+      } catch {
+        /* non-critical */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Poll for unresolved overbookings — surfaces as coral-reef badge on Messages.
@@ -379,7 +415,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </span>
               {!isDashboard && (
                 <span className="hidden md:block text-sm" style={{ color: "var(--tideline)" }}>
-                  {(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; })()}
+                  {(() => {
+                    const h = new Date().getHours();
+                    const base = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+                    return userFirstName ? `${base}, ${userFirstName}` : base;
+                  })()}
                 </span>
               )}
             </div>

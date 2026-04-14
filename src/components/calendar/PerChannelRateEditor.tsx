@@ -355,17 +355,27 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
         </p>
       )}
 
-      {dirty && channel.editable && (
+      {channel.editable && (
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
-          className="relative z-[1] mt-2 w-full text-[12px] font-semibold transition-colors disabled:opacity-60"
+          disabled={saving || !dirty}
+          className="relative z-[1] mt-2 w-full text-[12px] font-semibold transition-all duration-150 disabled:cursor-not-allowed"
           style={{
-            padding: 9,
+            padding: "9px",
             borderRadius: 10,
             backgroundColor: "var(--coastal)",
             color: "var(--shore)",
+            opacity: saving || !dirty ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!dirty || saving) return;
+            e.currentTarget.style.backgroundColor = "var(--mangrove)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--coastal)";
+            e.currentTarget.style.transform = "";
           }}
         >
           {saving ? "Saving…" : `Save & push${dates.length > 1 ? ` (${dates.length} days)` : ""}`}
@@ -386,19 +396,16 @@ function GlossyWrapper({ children, dim = false }: { children: React.ReactNode; d
         padding: "14px 16px",
         background: "linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(247,243,236,0.8) 100%)",
         border: "1px solid rgba(237,231,219,0.8)",
-        boxShadow:
-          "0 1px 3px rgba(19,46,32,0.04), 0 4px 16px rgba(19,46,32,0.03), inset 0 1px 0 rgba(255,255,255,1)",
+        boxShadow: "var(--shadow-glass)",
         opacity: dim ? 0.75 : 1,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow =
-          "0 2px 6px rgba(19,46,32,0.06), 0 8px 28px rgba(19,46,32,0.07), inset 0 1px 0 rgba(255,255,255,1)";
+        e.currentTarget.style.boxShadow = "var(--shadow-glass-hover)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "";
-        e.currentTarget.style.boxShadow =
-          "0 1px 3px rgba(19,46,32,0.04), 0 4px 16px rgba(19,46,32,0.03), inset 0 1px 0 rgba(255,255,255,1)";
+        e.currentTarget.style.boxShadow = "var(--shadow-glass)";
       }}
     >
       {/* Reflection overlay on the top half */}
