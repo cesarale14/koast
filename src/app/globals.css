@@ -3,46 +3,80 @@
 @tailwind utilities;
 
 :root {
-  /* ============ CANOPY DESIGN SYSTEM ============ */
+  /* ============ KOAST DESIGN SYSTEM (April 2026) ============ */
+  /* See DESIGN_SYSTEM.md Section 1 for the canonical spec.     */
 
-  /* Forest green — primary */
+  /* Primary — coastal greens */
+  --deep-sea: #132e20;       /* marketing bg, hero, login */
+  --coastal: #17392a;        /* sidebar bg, headings, stat values */
+  --mangrove: #1f4d38;       /* sidebar hover, secondary dark */
+  --tideline: #3d6b52;       /* icons, muted text, secondary text */
+
+  /* Accent — golden hour warmth */
+  --golden: #c49a5a;         /* primary accent, CTAs, section labels */
+  --driftwood: #d4b47a;      /* light accent, gold hover */
+  --sandbar: #e8d5b0;        /* accent backgrounds */
+
+  /* Neutral — sandy shore */
+  --shore: #f7f3ec;          /* product page background */
+  --dry-sand: #ede7db;       /* borders, dividers */
+  --shell: #e2dace;          /* input borders, disabled */
+  --white: #ffffff;          /* card backgrounds */
+
+  /* Semantic */
+  --coral-reef: #c44040;     /* errors, destructive */
+  --amber-tide: #d4960b;     /* warnings, urgency */
+  --lagoon: #1a7a5a;         /* success, synced */
+  --deep-water: #2a5a8a;     /* info, links */
+  --bar-dark: #222222;       /* booking bar bg */
+
+  /* Koast shadows — all use rgba(19,46,32) coastal tint */
+  --shadow-card: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);
+  --shadow-glass: 0 1px 1px rgba(19,46,32,0.02), 0 4px 8px rgba(19,46,32,0.04), 0 12px 36px rgba(19,46,32,0.06), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(19,46,32,0.04);
+  --shadow-glass-hover: 0 2px 4px rgba(19,46,32,0.03), 0 8px 16px rgba(19,46,32,0.06), 0 24px 56px rgba(19,46,32,0.1), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(19,46,32,0.04);
+  --shadow-sidebar: 4px 0 40px rgba(0,0,0,0.3);
+  --shadow-logo-glow: 0 2px 12px rgba(196,154,90,0.4);
+
+  /* ============ LEGACY ALIASES (for transition) ============ */
+  /* Old Canopy tokens point at the new Koast values so existing
+   * components keep rendering while we migrate. Remove these once
+   * every component has been ported to the new names.           */
+
+  /* Forest/brass/linen → coastal/golden/shore */
+  --forest: var(--coastal);
+  --forest-light: var(--mangrove);
+  --forest-muted: var(--tideline);
+  --brass: var(--golden);
+  --brass-light: var(--driftwood);
+  --brass-dark: #b08f52;
+  --linen: var(--shore);
+  --linen-dark: var(--dry-sand);
+
+  /* Brand scale (used by old components) */
   --brand-50: #eef5f0;
   --brand-100: #d5e8da;
   --brand-200: #a8d1b4;
   --brand-300: #6aad7e;
   --brand-400: #3d8a5a;
-  --brand-500: #264d38;
-  --brand-600: #1a3a2a;
-  --brand-700: #1a3a2a;
+  --brand-500: var(--coastal);
+  --brand-600: var(--deep-sea);
+  --brand-700: var(--deep-sea);
   --brand-800: #142e21;
   --brand-900: #0d1f16;
   --brand-950: #07120c;
 
-  /* Forest scale */
-  --forest: #1a3a2a;
-  --forest-light: #264d38;
-  --forest-muted: #3d6b52;
-
-  /* Brass — accent */
-  --brass: #c9a96e;
-  --brass-light: #d4bc8a;
-  --brass-dark: #b08f52;
-
-  /* Linen — backgrounds */
-  --linen: #f8f6f1;
-  --linen-dark: #efe9dd;
-
   /* Ink — text */
-  --ink: #1a3a2a;
+  --ink: var(--coastal);
   --ink-secondary: #4a6355;
   --ink-muted: #8a9e92;
 
-  /* Neutrals — linen-toned warm grays */
-  --neutral-0: #ffffff;
+  /* Neutrals — point at shore/dry-sand/shell tones */
+  --neutral-0: var(--white);
   --neutral-25: #faf9f6;
-  --neutral-50: #f8f6f1;
-  --neutral-100: #efe9dd;
-  --neutral-200: #e2dac8;
+  --neutral-50: var(--shore);
+  --neutral-100: var(--dry-sand);
+  --neutral-200: var(--shell);
   --neutral-300: #c4b99e;
   --neutral-400: #9e9480;
   --neutral-500: #7a7264;
@@ -51,41 +85,41 @@
   --neutral-800: #2a2520;
   --neutral-900: #1a1614;
 
-  /* Sidebar — forest green */
-  --sidebar-bg: #1a3a2a;
-  --sidebar-text: #a8c4b4;
-  --sidebar-text-active: #c9a96e;
-  --sidebar-hover: #264d38;
-  --sidebar-active-bg: rgba(201, 169, 110, 0.1);
-  --sidebar-active-text: #c9a96e;
-  --sidebar-border: #264d38;
+  /* Sidebar — deep-sea gradient stops live in the layout.tsx style */
+  --sidebar-bg: var(--coastal);
+  --sidebar-text: rgba(168,191,174,0.6);
+  --sidebar-text-active: var(--golden);
+  --sidebar-hover: var(--mangrove);
+  --sidebar-active-bg: rgba(196,154,90,0.1);
+  --sidebar-active-text: var(--golden);
+  --sidebar-border: rgba(196,154,90,0.1);
 
-  /* Semantic */
-  --success: #3d6b52;
+  /* Legacy semantic aliases */
+  --success: var(--lagoon);
   --success-light: #eef5f0;
-  --warning: #b8860b;
+  --warning: var(--amber-tide);
   --warning-light: #fdf6e3;
-  --danger: #c44040;
+  --danger: var(--coral-reef);
   --danger-light: #fdf0f0;
-  --info: #2a5a8a;
+  --info: var(--deep-water);
   --info-light: #edf4fb;
 
-  /* Platform colors */
-  --airbnb: #FF5A5F;
-  --vrbo: #3B5998;
+  /* Platform colors (legacy — components should read from PLATFORMS config) */
+  --airbnb: #FF385C;
+  --vrbo: #3145F5;
   --booking-com: #003580;
-  --direct: var(--forest-muted);
+  --direct: var(--golden);
 
-  /* Shadows — warmer tones */
-  --shadow-sm: 0 1px 2px rgba(26, 58, 42, 0.04);
-  --shadow-md: 0 2px 8px rgba(26, 58, 42, 0.06), 0 1px 2px rgba(26, 58, 42, 0.04);
-  --shadow-lg: 0 4px 16px rgba(26, 58, 42, 0.08), 0 2px 4px rgba(26, 58, 42, 0.04);
-  --shadow-xl: 0 8px 32px rgba(26, 58, 42, 0.10), 0 4px 8px rgba(26, 58, 42, 0.04);
+  /* Legacy shadow aliases — point at the card shadow by default */
+  --shadow-sm: 0 1px 2px rgba(19,46,32,0.04);
+  --shadow-md: 0 2px 8px rgba(19,46,32,0.06), 0 1px 2px rgba(19,46,32,0.04);
+  --shadow-lg: var(--shadow-card);
+  --shadow-xl: var(--shadow-card-hover);
 
-  /* Borders — linen-toned */
-  --border: #efe9dd;
-  --border-hover: #e2dac8;
-  --border-focus: var(--brass);
+  /* Borders */
+  --border: var(--dry-sand);
+  --border-hover: var(--shell);
+  --border-focus: var(--golden);
 
   /* Radius */
   --radius-sm: 6px;

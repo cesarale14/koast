@@ -311,14 +311,14 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                         In the meantime, use the <strong>Booking.com iCal feed</strong> to
                         import reservations and prevent overbookings. From
                         admin.booking.com: <strong>Rates & Availability → Sync calendars →
-                        Export calendar</strong>, copy the URL, and paste it in Moora&apos;s
-                        property settings → Calendar Connections. Moora will pull BDC
+                        Export calendar</strong>, copy the URL, and paste it in Koast&apos;s
+                        property settings → Calendar Connections. Koast will pull BDC
                         bookings every 15 minutes and automatically block those dates on
                         Airbnb and Vrbo.
                       </li>
                     </ol>
                     <p className="text-[11px] text-[#999]">
-                      Note: iCal is one-way (Moora reads BDC bookings) and doesn&apos;t
+                      Note: iCal is one-way (Koast reads BDC bookings) and doesn&apos;t
                       push rates to Booking.com — you&apos;ll still need to manage pricing
                       from the Booking.com extranet until the Channex connection is
                       authorized.
@@ -440,7 +440,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   <p className="text-sm text-[#999] mt-1">Hotel ID: {hotelId}</p>
                 </div>
                 <p className="text-[13px] text-[#666] leading-relaxed">
-                  New bookings will sync automatically via Channex. Calendar availability is managed by Moora.
+                  New bookings will sync automatically via Channex. Calendar availability is managed by Koast.
                 </p>
 
                 {/* Parent rate discovery progress — runs in the background

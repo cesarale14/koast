@@ -15,6 +15,27 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // ============ KOAST DESIGN SYSTEM (April 2026) ============
+        // Primary — coastal greens
+        "deep-sea": "var(--deep-sea)",
+        coastal: "var(--coastal)",
+        mangrove: "var(--mangrove)",
+        tideline: "var(--tideline)",
+        // Accent — golden hour
+        golden: "var(--golden)",
+        driftwood: "var(--driftwood)",
+        sandbar: "var(--sandbar)",
+        // Neutral — sandy shore
+        shore: "var(--shore)",
+        "dry-sand": "var(--dry-sand)",
+        shell: "var(--shell)",
+        // Semantic
+        "coral-reef": "var(--coral-reef)",
+        "amber-tide": "var(--amber-tide)",
+        lagoon: "var(--lagoon)",
+        "deep-water": "var(--deep-water)",
+        "bar-dark": "var(--bar-dark)",
+        // ============ LEGACY ALIASES (transition) ============
         forest: {
           DEFAULT: "var(--forest)",
           light: "var(--forest-light)",
@@ -84,6 +105,12 @@ const config: Config = {
         md: "var(--shadow-md)",
         lg: "var(--shadow-lg)",
         xl: "var(--shadow-xl)",
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
+        glass: "var(--shadow-glass)",
+        "glass-hover": "var(--shadow-glass-hover)",
+        sidebar: "var(--shadow-sidebar)",
+        "logo-glow": "var(--shadow-logo-glow)",
       },
       borderRadius: {
         sm: "var(--radius-sm)",

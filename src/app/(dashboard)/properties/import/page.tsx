@@ -351,7 +351,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
             <>
               <p className="text-xs text-[#3d6b52] mt-0.5">
                 {r.reason === "multiple_candidates"
-                  ? "Multiple Moora properties match this name. Pick the right one or import as a new property."
+                  ? "Multiple Koast properties match this name. Pick the right one or import as a new property."
                   : "This property couldn't be auto-matched."}
               </p>
               {r.candidates && r.candidates.length > 0 && (

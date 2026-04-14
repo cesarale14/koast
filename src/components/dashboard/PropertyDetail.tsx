@@ -953,7 +953,7 @@ export default function PropertyDetail({
           </h3>
           <p className="text-sm text-[#555] mb-3">
             Deleting this property will disconnect all channels, remove all bookings,
-            rates, and cleaning tasks from Moora, and remove the Channex channel on
+            rates, and cleaning tasks from Koast, and remove the Channex channel on
             your behalf. This cannot be undone.
           </p>
           <button

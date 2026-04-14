@@ -27,7 +27,7 @@ export default async function CompSetsPage() {
           icon={GitCompare}
           title="No competitive set"
           description="Run a market analysis to build your competitive set of similar properties."
-          action={{ label: "Market Intel", href: "/market-explorer" }}
+          action={{ label: "Market Intel", href: "/market-intel" }}
         />
       </div>
     );

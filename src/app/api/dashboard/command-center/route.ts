@@ -330,7 +330,7 @@ export async function POST() {
         id: `clean-${t.id}`, type: "cleaning", urgency: t.scheduled_date === today ? 90 : 70,
         title: `Cleaning ${when} at ${propName}`,
         description: `Status: ${statusLabel}`,
-        action: { label: "View Task", href: "/turnover" },
+        action: { label: "View Task", href: "/turnovers" },
       });
     }
 

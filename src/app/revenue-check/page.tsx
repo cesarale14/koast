@@ -316,7 +316,7 @@ export default function RevenueCheckPage() {
           <div className="text-center">
             <h3 className="text-2xl font-bold text-neutral-900 mb-3">Ready to stop leaving money on the table?</h3>
             <p className="text-neutral-500 max-w-xl mx-auto mb-6">
-              StayCommand automatically optimizes your pricing using AI, market data, and local events — so you earn more on every booking.
+              Koast automatically optimizes your pricing using AI, market data, and local events — so you earn more on every booking.
             </p>
             <Link href="/signup"
               className="revenue-check-cta inline-flex px-8 py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 text-lg">

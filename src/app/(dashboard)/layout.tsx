@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
-  Home, DollarSign, Star, SprayCan,
-  Map, MapPin, GitCompare,
+  Home, DollarSign, Star, Sparkles,
+  TrendingUp, GitCompare,
   Bell, Settings, RefreshCcw, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; dot?: boolean; dotColor?: "emerald" | "red"; }
+interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; badge?: number | null; }
 interface NavGroup { label?: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
@@ -20,46 +20,64 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
-      { name: "Messages", href: "/messages", icon: MessageCircle, dot: true },
+      { name: "Messages", href: "/messages", icon: MessageCircle },
     ],
   },
   {
+    label: "MANAGE",
     items: [
       { name: "Properties", href: "/properties", icon: Home },
       { name: "Pricing", href: "/pricing", icon: DollarSign },
       { name: "Reviews", href: "/reviews", icon: Star },
-      { name: "Cleaning", href: "/turnover", icon: SprayCan },
+      { name: "Turnovers", href: "/turnovers", icon: Sparkles },
     ],
   },
   {
+    label: "INSIGHTS",
     items: [
-      { name: "Market Intel", href: "/market-explorer", icon: Map },
-      { name: "Nearby Listings", href: "/nearby-listings", icon: MapPin },
+      { name: "Market Intel", href: "/market-intel", icon: TrendingUp },
       { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
     ],
   },
 ];
 
-/* ---- Collapsed nav link with tooltip — forest/brass ---- */
+const SIDEBAR_BG = "linear-gradient(180deg, #132e20 0%, #0e2218 100%)";
+const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(196,154,90,0.15)";
+const INACTIVE_TEXT = "rgba(168,191,174,0.6)";
+
+/* ---- Collapsed nav link with tooltip ---- */
 function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon;
   const [showTip, setShowTip] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dotBg = item.dotColor === "red" ? "bg-red-400" : "bg-[#c9a96e]";
   return (
-    <Link href={item.href}
+    <Link
+      href={item.href}
       onMouseEnter={() => { timerRef.current = setTimeout(() => setShowTip(true), 300); }}
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
-      className={`relative flex items-center justify-center w-11 h-11 rounded-lg transition-all duration-150 ${
-        isActive ? "text-[#c9a96e]" : "text-[#a8c4b4] hover:text-white hover:bg-[#264d38]"
-      }`}
-      style={isActive ? { backgroundColor: "rgba(201,169,110,0.1)" } : {}}>
-      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-[#c9a96e]" />}
+      className="relative flex items-center justify-center w-11 h-11 rounded-lg transition-colors duration-150"
+      style={{
+        color: isActive ? "#c49a5a" : INACTIVE_TEXT,
+        backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
+      }}
+    >
+      {isActive && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "#c49a5a" }} />
+      )}
       <Icon size={20} strokeWidth={1.5} />
-      {item.dot && <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full ${dotBg} ring-2 ring-[#1a3a2a]`} />}
+      {item.badge != null && item.badge > 0 && (
+        <span
+          className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2"
+          style={{ backgroundColor: "#c44040", boxShadow: "0 0 0 2px #132e20" }}
+        >
+          {item.badge > 9 ? "9+" : item.badge}
+        </span>
+      )}
       {showTip && (
-        <span className="fixed ml-[72px] px-3 py-2 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
-          style={{ backgroundColor: "#1a3a2a", boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}>
+        <span
+          className="fixed ml-[72px] px-3 py-2 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
+          style={{ backgroundColor: "#17392a", boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}
+        >
           {item.name}
         </span>
       )}
@@ -67,107 +85,163 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
   );
 }
 
-/* ---- Expanded nav link — forest/brass ---- */
+/* ---- Expanded nav link ---- */
 function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive: boolean; onClick?: () => void }) {
   const Icon = item.icon;
   const linkProps = item.external ? { target: "_blank" as const, rel: "noopener noreferrer" } : {};
   return (
-    <Link href={item.href} onClick={onClick} {...linkProps}
-      className={`relative flex items-center gap-3 px-3 h-11 text-sm font-medium rounded-lg transition-all duration-150 ${
-        isActive ? "text-[#c9a96e]" : "text-[#a8c4b4] hover:text-white hover:bg-[#264d38]"
-      }`}
-      style={isActive ? { backgroundColor: "rgba(201,169,110,0.1)" } : {}}>
-      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-[#c9a96e]" />}
-      <Icon size={20} strokeWidth={1.5} className={`flex-shrink-0 ${isActive ? "text-[#c9a96e]" : "text-[#a8c4b4]"}`} />
+    <Link
+      href={item.href}
+      onClick={onClick}
+      {...linkProps}
+      className="relative flex items-center gap-3 px-3 h-11 text-sm font-medium rounded-lg transition-colors duration-150"
+      style={{
+        color: isActive ? "#c49a5a" : INACTIVE_TEXT,
+        backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
+      }}
+    >
+      {isActive && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "#c49a5a" }} />
+      )}
+      <Icon size={20} strokeWidth={1.5} className="flex-shrink-0" style={{ color: isActive ? "#c49a5a" : INACTIVE_TEXT }} />
       <span className="truncate">{item.name}</span>
-      {item.dot && <span className={`w-2 h-2 rounded-full ml-auto flex-shrink-0 ${item.dotColor === "red" ? "bg-red-400" : "bg-[#c9a96e]"}`} />}
-      {item.external && <span className="text-[#a8c4b4]/50 text-[10px] ml-auto">↗</span>}
+      {item.badge != null && item.badge > 0 && (
+        <span
+          className="ml-auto min-w-[18px] h-[18px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+          style={{ backgroundColor: "#c44040" }}
+        >
+          {item.badge > 9 ? "9+" : item.badge}
+        </span>
+      )}
     </Link>
   );
 }
 
-/* ---- Desktop sidebar — toggleable collapsed/expanded ---- */
+/* ---- Group label (MANAGE / INSIGHTS) ---- */
+function GroupLabel({ label }: { label: string }) {
+  return (
+    <div
+      className="px-3 mb-1 mt-3 text-[10px] font-bold tracking-[0.08em]"
+      style={{ color: "#3d6b52" }}
+    >
+      {label}
+    </div>
+  );
+}
+
+/* ---- Logo mark "K" with gold glow ---- */
+function LogoMark() {
+  return (
+    <div
+      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+      style={{
+        backgroundColor: "#c49a5a",
+        boxShadow: "0 2px 12px rgba(196,154,90,0.4)",
+      }}
+    >
+      <span className="text-white text-base font-bold tracking-tight">K</span>
+    </div>
+  );
+}
+
+/* ---- Desktop sidebar ---- */
 function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: string; expanded: boolean; onToggle: () => void; groups: NavGroup[] }) {
   return (
     <>
-    <aside
-      className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out"
-      style={{ width: expanded ? 240 : 60, backgroundColor: "#1a3a2a" }}
-    >
-      {expanded ? (
-        /* ---- EXPANDED ---- */
-        <>
-          <div className="px-5 h-16 flex items-center">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#c9a96e" }}>
-                <span className="text-white text-sm font-bold">M</span>
+      <aside
+        className="hidden md:flex flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-out"
+        style={{ width: expanded ? 240 : 60, background: SIDEBAR_BG, boxShadow: SIDEBAR_RIGHT_EDGE }}
+      >
+        {expanded ? (
+          /* ---- EXPANDED ---- */
+          <>
+            <div className="px-5 h-16 flex items-center">
+              <div className="flex items-center gap-2.5">
+                <LogoMark />
+                <span className="text-white font-bold text-lg tracking-tight">Koast</span>
               </div>
-              <span className="text-white font-bold text-lg tracking-tight">Moora</span>
             </div>
-          </div>
-          <nav className="flex-1 px-3 overflow-y-auto">
-            {groups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-[#264d38]" : ""}>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                    return <NavLinkExpanded key={item.name} item={item} isActive={isActive} />;
-                  })}
+            <nav className="flex-1 px-3 overflow-y-auto">
+              {groups.map((group, gi) => (
+                <div key={gi}>
+                  {group.label && <GroupLabel label={group.label} />}
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => {
+                      const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                      return <NavLinkExpanded key={item.name} item={item} isActive={isActive} />;
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </nav>
-          <div className="px-4 py-4 border-t border-[#264d38]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold" style={{ backgroundColor: "rgba(201,169,110,0.2)", color: "#c9a96e" }}>C</div>
-              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-[#a8c4b4] truncate">Cesar</p></div>
-              <Link href="/settings" className="text-[#a8c4b4] hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* ---- COLLAPSED ---- */
-        <div className="flex flex-col items-center pt-4 h-full">
-          <Link href="/" className="mb-5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#c9a96e" }}>
-              <span className="text-white text-sm font-bold">M</span>
-            </div>
-          </Link>
-          <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto">
-            {groups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-[#264d38] w-8" : ""}>
-                <div className="flex flex-col items-center gap-0.5">
-                  {group.items.map((item) => {
-                    const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                    return <NavLinkCollapsed key={item.name} item={item} isActive={isActive} />;
-                  })}
+              ))}
+            </nav>
+            <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                  style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+                >
+                  C
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">Cesar</p>
+                  <p className="text-[11px] truncate" style={{ color: INACTIVE_TEXT }}>Free plan</p>
+                </div>
+                <Link href="/settings" className="transition-colors" style={{ color: INACTIVE_TEXT }}>
+                  <Settings size={16} strokeWidth={1.5} />
+                </Link>
               </div>
-            ))}
-          </nav>
-          <div className="mt-3 pt-3 border-t border-[#264d38] w-8 flex flex-col items-center pb-3">
-            <Link href="/settings" className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold transition-colors" style={{ backgroundColor: "rgba(201,169,110,0.2)", color: "#c9a96e" }}>C</Link>
+            </div>
+          </>
+        ) : (
+          /* ---- COLLAPSED ---- */
+          <div className="flex flex-col items-center pt-4 h-full">
+            <Link href="/" className="mb-5">
+              <LogoMark />
+            </Link>
+            <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto w-full px-2">
+              {groups.map((group, gi) => (
+                <div key={gi} className={`w-full flex flex-col items-center ${gi > 0 ? "mt-2 pt-2" : ""}`} style={gi > 0 ? { borderTop: "1px solid rgba(196,154,90,0.1)" } : {}}>
+                  <div className="flex flex-col items-center gap-0.5">
+                    {group.items.map((item) => {
+                      const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                      return <NavLinkCollapsed key={item.name} item={item} isActive={isActive} />;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+            <div
+              className="mt-3 pt-3 w-10 flex flex-col items-center pb-3"
+              style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}
+            >
+              <Link
+                href="/settings"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold transition-colors"
+                style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+              >
+                C
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
-    </aside>
-    {/* Toggle pill */}
-    <button
-      onClick={onToggle}
-      className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full border transition-all duration-200 ease-out"
-      style={{
-        left: (expanded ? 240 : 60) - 12,
-        top: 20,
-        backgroundColor: "#264d38",
-        borderColor: "#3d6b52",
-        color: "#a8c4b4",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)",
-        transitionProperty: "left, background-color, border-color, color",
-      }}
-      title={expanded ? "Collapse sidebar" : "Expand sidebar"}
-    >
-      <ChevronLeft size={13} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
-    </button>
+        )}
+      </aside>
+      {/* Toggle pill */}
+      <button
+        onClick={onToggle}
+        className="hidden md:flex fixed z-40 items-center justify-center w-7 h-7 rounded-full border transition-all duration-200 ease-out"
+        style={{
+          left: (expanded ? 240 : 60) - 12,
+          top: 20,
+          backgroundColor: "#1f4d38",
+          borderColor: "#3d6b52",
+          color: INACTIVE_TEXT,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+          transitionProperty: "left, background-color, border-color, color",
+        }}
+        title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+      >
+        <ChevronLeft size={13} strokeWidth={2} className={`transition-transform duration-200 ${expanded ? "" : "rotate-180"}`} />
+      </button>
     </>
   );
 }
@@ -177,19 +251,23 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={onClose} />
-      <aside className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left" style={{ backgroundColor: "#1a3a2a" }}>
+      <aside
+        className="fixed inset-y-0 left-0 w-60 flex flex-col z-50 md:hidden animate-slide-in-left"
+        style={{ background: SIDEBAR_BG, boxShadow: SIDEBAR_RIGHT_EDGE }}
+      >
         <div className="px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#c9a96e" }}>
-              <span className="text-white text-sm font-bold">M</span>
-            </div>
-            <span className="text-white font-bold text-lg tracking-tight">Moora</span>
+            <LogoMark />
+            <span className="text-white font-bold text-lg tracking-tight">Koast</span>
           </div>
-          <button onClick={onClose} className="text-[#a8c4b4] hover:text-white transition-colors p-1"><X size={18} strokeWidth={1.5} /></button>
+          <button onClick={onClose} className="transition-colors p-1" style={{ color: INACTIVE_TEXT }}>
+            <X size={18} strokeWidth={1.5} />
+          </button>
         </div>
         <nav className="flex-1 px-3 overflow-y-auto">
           {groups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-[#264d38]" : ""}>
+            <div key={gi}>
+              {group.label && <GroupLabel label={group.label} />}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -199,11 +277,21 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
             </div>
           ))}
         </nav>
-        <div className="px-4 py-4 border-t border-[#264d38]">
+        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold" style={{ backgroundColor: "rgba(201,169,110,0.2)", color: "#c9a96e" }}>C</div>
-            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-[#a8c4b4] truncate">Cesar</p></div>
-            <Link href="/settings" onClick={onClose} className="text-[#a8c4b4] hover:text-white transition-colors"><Settings size={16} strokeWidth={1.5} /></Link>
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+              style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+            >
+              C
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">Cesar</p>
+              <p className="text-[11px] truncate" style={{ color: INACTIVE_TEXT }}>Free plan</p>
+            </div>
+            <Link href="/settings" onClick={onClose} className="transition-colors" style={{ color: INACTIVE_TEXT }}>
+              <Settings size={16} strokeWidth={1.5} />
+            </Link>
           </div>
         </div>
       </aside>
@@ -223,7 +311,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (saved === "true") setSidebarExpanded(true);
   }, []);
 
-  // Poll for unresolved overbookings — flips the Messages dot red.
+  // Poll for unresolved overbookings — surfaces as coral-reef badge on Messages.
   useEffect(() => {
     let cancelled = false;
     const fetchCount = async () => {
@@ -239,12 +327,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  // Rebuild navGroups with the current dot color for Messages
+  // Inject the live badge count onto the Messages item.
   const dynamicNavGroups = navGroups.map((group) => ({
     ...group,
     items: group.items.map((item) =>
       item.name === "Messages"
-        ? { ...item, dotColor: conflictCount > 0 ? ("red" as const) : ("emerald" as const) }
+        ? { ...item, badge: conflictCount }
         : item
     ),
   }));
@@ -260,7 +348,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarWidth = sidebarExpanded ? 240 : 60;
 
   return (
-    <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "#f8f6f1" }}>
+    <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
       <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} groups={dynamicNavGroups} />
 
       {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} groups={dynamicNavGroups} />}
@@ -273,25 +361,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <style>{`@media(min-width:768px){.main-offset{margin-left:${sidebarWidth}px}}`}</style>
         <div className="main-offset flex-1 flex flex-col min-h-screen">
           {/* Topbar */}
-          <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-white" style={{ borderColor: "#efe9dd" }}>
+          <header
+            className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-white"
+            style={{ borderColor: "var(--dry-sand)" }}
+          >
             <div className="flex items-center gap-3">
               <button
                 className="md:hidden transition-colors"
-                style={{ color: "#1a3a2a" }}
+                style={{ color: "var(--coastal)" }}
                 onClick={() => setMobileOpen(true)}
               >
                 <Menu size={20} strokeWidth={1.5} />
               </button>
-              <span className="md:hidden text-sm font-medium" style={{ color: "#1a3a2a" }}>
+              <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
                 {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
-              <span className="hidden md:block text-sm" style={{ color: "#4a6355" }}>
+              <span className="hidden md:block text-sm" style={{ color: "var(--tideline)" }}>
                 {(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; })()}, Cesar
               </span>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "#4a6355" }}><Bell size={20} strokeWidth={1.5} /></button>
-              <button className="hidden sm:flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-lg transition-all" style={{ color: "#1a3a2a", border: "1px solid #efe9dd" }}>
+              <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
+                <Bell size={20} strokeWidth={1.5} />
+              </button>
+              <button
+                className="hidden sm:flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-lg transition-all"
+                style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
+              >
                 <RefreshCcw size={14} strokeWidth={1.5} />Sync Now
               </button>
             </div>

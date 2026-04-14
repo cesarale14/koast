@@ -3,13 +3,10 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
+import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
 
 const TOTAL_MONTHS = 24;
 const GAP = 5;
-
-const platformLogos: Record<string, string> = {
-  airbnb: "/logos/airbnb.svg", vrbo: "/logos/vrbo.svg", booking_com: "/logos/booking.svg", booking: "/logos/booking.svg", direct: "/logos/direct.svg",
-};
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_LABELS_SHORT = ["M", "T", "W", "T", "F", "S", "S"];
@@ -524,9 +521,10 @@ export default function MonthlyView({
                   // Color: dark neutral by default; Booking.com uses the
                   // brand dark blue so the two platforms are distinguishable
                   // at a glance.
-                  const isBooking = seg.booking.platform === "booking_com" || seg.booking.platform === "booking";
-                  const color = isBooking ? "#003580" : "#222222";
-                  const logo = platformLogos[seg.booking.platform] ?? null;
+                  const platformKey = platformKeyFrom(seg.booking.platform);
+                  const isBooking = platformKey === "booking_com";
+                  const color = isBooking ? PLATFORMS.booking_com.color : "#222222";
+                  const logo = platformKey ? PLATFORMS[platformKey].tile : null;
 
                   const rawName = seg.booking.guest_name?.trim() ?? "";
                   const firstName = rawName.split(" ")[0];

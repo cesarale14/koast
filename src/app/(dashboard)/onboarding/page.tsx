@@ -362,12 +362,12 @@ export default function OnboardingPage() {
       <div className="flex items-center justify-center gap-2 mb-6">
         <div className="w-3 h-3 rounded-full bg-brand-500" />
         <span className="text-xl font-bold text-neutral-800 tracking-tight">
-          StayCommand
+          Koast
         </span>
       </div>
 
       <h1 className="text-2xl font-bold text-neutral-800 mb-2">
-        Welcome to StayCommand
+        Welcome to Koast
       </h1>
       <p className="text-neutral-500 mb-10 max-w-md mx-auto">
         Let&apos;s get your first property set up in 5 minutes. How would you

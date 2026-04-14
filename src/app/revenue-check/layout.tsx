@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Free STR Revenue Check | StayCommand",
+  title: "Free STR Revenue Check | Koast",
   description: "Find out how much more your short-term rental could earn with AI-powered pricing",
   openGraph: {
-    title: "Free STR Revenue Check | StayCommand",
+    title: "Free STR Revenue Check | Koast",
     description: "Find out how much more your short-term rental could earn with AI-powered pricing",
     type: "website",
   },

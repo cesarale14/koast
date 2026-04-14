@@ -4,14 +4,10 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Moora",
+  title: "Koast",
   description: "Property management for short-term rentals",
   icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "32x32" },
-    ],
-    apple: "/apple-icon.png",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
 };
 

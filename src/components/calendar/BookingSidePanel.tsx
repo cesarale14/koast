@@ -167,7 +167,7 @@ export default function BookingSidePanel({ booking, onClose, propertyMap }: Book
               Message Guest
             </Link>
             <Link
-              href="/turnover"
+              href="/turnovers"
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-0 text-neutral-700 text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-neutral-50 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

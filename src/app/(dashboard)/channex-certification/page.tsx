@@ -35,7 +35,7 @@ const TESTS = [
   { num: 8, name: "Half-Year Update", desc: "Twin BAR Dec-May: $432 min_stay=2, Double BAR Dec-May: $342 min_stay=3. 1 API call." },
   { num: 9, name: "Single Date Availability", desc: "Twin Nov 21: avail=7, Double Nov 25: avail=0 (simulated booking). 1 API call." },
   { num: 10, name: "Multiple Date Availability", desc: "Twin Nov 10-16: avail=3, Double Nov 17-24: avail=4. 1 API call." },
-  { num: 11, name: "Booking Receiving", desc: "MANUAL: Create/modify/cancel booking in Channex CRS. Take screenshots in StayCommand." },
+  { num: 11, name: "Booking Receiving", desc: "MANUAL: Create/modify/cancel booking in Channex CRS. Take screenshots in Koast." },
   { num: 12, name: "Rate Limits", desc: "CONFIRM: Sequential requests, no parallel flooding, rate limit headers respected." },
   { num: 13, name: "Update Logic", desc: "CONFIRM: Push changes only, no scheduled full syncs." },
   { num: 14, name: "Extra Notes", desc: "min_stay_arrival (not through), stop_sell, CTA, CTD supported. No CC needed. Not PCI certified." },

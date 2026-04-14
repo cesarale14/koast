@@ -720,7 +720,7 @@ export default function SettingsPage() {
       </SectionCard>
 
       {/* APPEARANCE */}
-      <SectionCard icon={Palette} title="Appearance" description="Customize how StayCommand looks.">
+      <SectionCard icon={Palette} title="Appearance" description="Customize how Koast looks.">
         <div className="grid grid-cols-3 gap-3">
           {(["light", "dark", "system"] as const).map((t) => (
             <button
