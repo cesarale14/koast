@@ -379,14 +379,17 @@ export default function CalendarGrid({
         </div>
       )}
 
-      {/* Three-column layout */}
+      {/* Three-column layout (strip hides when there's only one property,
+          i.e. when embedded inside the property detail page). */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <PropertyThumbStrip
-          properties={thumbnailProps}
-          activeId={activePropertyId}
-          onSelect={(id) => setActivePropertyId(id)}
-          stats={stats}
-        />
+        {properties.length > 1 && (
+          <PropertyThumbStrip
+            properties={thumbnailProps}
+            activeId={activePropertyId}
+            onSelect={(id) => setActivePropertyId(id)}
+            stats={stats}
+          />
+        )}
 
         <div className="flex-1 min-w-0 flex flex-col">
           <CalendarToolbar
