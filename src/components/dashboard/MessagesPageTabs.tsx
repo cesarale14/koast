@@ -16,23 +16,41 @@ export default function MessagesPageTabs({ inboxContent, templatesContent }: Mes
   const [tab, setTab] = useState<"inbox" | "templates">("inbox");
 
   return (
-    <div>
-      <div className="flex gap-1 mb-6 border-b border-neutral-200">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.key
-                ? "border-brand-500 text-brand-600"
-                : "border-transparent text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+    <div className="flex flex-col h-full">
+      <div
+        className="flex-shrink-0 px-6 pt-3 flex gap-6 bg-white"
+        style={{ borderBottom: "1px solid var(--dry-sand)" }}
+      >
+        {TABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className="pb-3 text-[13px] font-semibold transition-colors"
+              style={{
+                color: active ? "var(--coastal)" : "var(--tideline)",
+                borderBottom: active ? "2px solid var(--golden)" : "2px solid transparent",
+                marginBottom: -1,
+              }}
+              onMouseEnter={(e) => {
+                if (!active) e.currentTarget.style.color = "var(--coastal)";
+              }}
+              onMouseLeave={(e) => {
+                if (!active) e.currentTarget.style.color = "var(--tideline)";
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
-      {tab === "inbox" ? inboxContent : templatesContent}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {tab === "inbox" ? inboxContent : (
+          <div className="max-w-[1200px] mx-auto p-8 overflow-y-auto h-full">{templatesContent}</div>
+        )}
+      </div>
     </div>
   );
 }

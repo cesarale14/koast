@@ -440,7 +440,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <main className="flex-1 overflow-auto">
             <ToastProvider>
-              {pathname === "/calendar" ? (
+              {pathname === "/calendar" || pathname === "/messages" ? (
                 <div className="h-full page-enter">{children}</div>
               ) : /^\/properties\/[^/]+$/.test(pathname) ? (
                 // Property detail page handles its own layout (full-bleed
