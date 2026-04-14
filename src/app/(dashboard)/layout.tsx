@@ -346,6 +346,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
   const sidebarWidth = sidebarExpanded ? 240 : 60;
+  const isDashboard = pathname === "/";
 
   return (
     <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
@@ -376,20 +377,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
                 {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
-              <span className="hidden md:block text-sm" style={{ color: "var(--tideline)" }}>
-                {(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; })()}, Cesar
-              </span>
+              {!isDashboard && (
+                <span className="hidden md:block text-sm" style={{ color: "var(--tideline)" }}>
+                  {(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; })()}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
                 <Bell size={20} strokeWidth={1.5} />
               </button>
-              <button
-                className="hidden sm:flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-lg transition-all"
-                style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
-              >
-                <RefreshCcw size={14} strokeWidth={1.5} />Sync Now
-              </button>
+              {!isDashboard && (
+                <button
+                  className="hidden sm:flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-lg transition-all"
+                  style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
+                >
+                  <RefreshCcw size={14} strokeWidth={1.5} />Sync Now
+                </button>
+              )}
             </div>
           </header>
 

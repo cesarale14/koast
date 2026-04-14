@@ -313,30 +313,29 @@ function PropertyCardComponent({ card, index }: { card: PropertyCard; index: num
 
   const statusText = (() => {
     if (card.status === "occupied" && card.guestName) {
-      return `${card.guestName.split(" ")[0]}${card.guestName.split(" ")[1] ? ` ${card.guestName.split(" ")[1][0]}.` : ""} — checkout ${formatShortDate(card.checkOut)}`;
+      const first = card.guestName.split(" ")[0];
+      return `${first} — out ${formatShortDate(card.checkOut)}`;
     }
     if (card.status === "checkin_today" && card.guestName) {
-      return `${card.guestName.split(" ")[0]} — check-in today`;
+      const first = card.guestName.split(" ")[0];
+      return `${first} — arriving today`;
     }
     if (card.status === "checkout_today") {
-      return `Checkout today — ${card.cleanerName ?? "no cleaner assigned"}`;
+      return `Checkout today${card.cleanerName ? ` — ${card.cleanerName}` : ""}`;
     }
     if (card.status === "turnover_today") {
-      return `Turnover today — ${card.cleanerName ?? "no cleaner assigned"}`;
+      return `Turnover${card.cleanerName ? ` — ${card.cleanerName}` : " today"}`;
     }
     if (card.nextCheckIn) {
-      return `Vacant — next check-in ${formatShortDate(card.nextCheckIn)}`;
+      return `Vacant — next: ${formatShortDate(card.nextCheckIn)}`;
     }
-    return "Vacant — no upcoming bookings";
+    return "Vacant";
   })();
 
-  const nextLabel = (() => {
-    if ((card.status === "occupied" || card.status === "checkin_today") && card.nextCheckIn) {
-      return `Next: ${formatShortDate(card.nextCheckIn)}`;
-    }
-    if (card.metrics.occupancy > 0) return `${card.metrics.occupancy}% occupancy`;
-    return null;
-  })();
+  const nextLabel =
+    (card.status === "occupied" || card.status === "checkin_today") && card.nextCheckIn
+      ? `Next ${formatShortDate(card.nextCheckIn)}`
+      : null;
 
   return (
     <Link

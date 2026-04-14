@@ -90,6 +90,7 @@ export async function POST() {
       recentReviewsRes,
       allReviewsRes,
       ratingsRes,
+      messagesRes,
     ] = await Promise.all([
       // All bookings for current year (revenue, status, activity, occupancy)
       supabase
@@ -175,6 +176,15 @@ export async function POST() {
         .select("property_id, rating")
         .in("property_id", propIds)
         .not("rating", "is", null),
+      // Recent inbound guest messages (activity feed). Joined via
+      // bookings to resolve the property name and guest label.
+      supabase
+        .from("messages")
+        .select("property_id, body, direction, created_at")
+        .in("property_id", propIds)
+        .eq("direction", "inbound")
+        .order("created_at", { ascending: false })
+        .limit(5),
     ]);
 
     const bookings = (bookingsRes.data ?? []) as BookingRow[];
@@ -188,6 +198,7 @@ export async function POST() {
     const recentCleanings = (recentCleaningsRes.data ?? []) as { property_id: string; completed_at: string }[];
     const recentReviews = (recentReviewsRes.data ?? []) as { property_id: string; booking_id: string; published_at: string }[];
     const allReviewedIds = new Set(((allReviewsRes.data ?? []) as { booking_id: string }[]).map((r) => r.booking_id));
+    const recentMessages = (messagesRes.data ?? []) as { property_id: string; body: string | null; direction: string; created_at: string }[];
     const ratings = (ratingsRes.data ?? []) as { property_id: string; rating: number | string | null }[];
     const ratingSumByProp = new Map<string, { sum: number; count: number }>();
     for (const r of ratings) {
@@ -486,9 +497,14 @@ export async function POST() {
       });
     }
 
-    // Daily revenue series for the last 30 days (powers the Canvas chart).
+    // Daily revenue series for the chart. Window is 7 days back + 23 days
+    // forward so the chart shows both recent payouts and upcoming
+    // confirmed revenue — much more useful for a host whose bookings are
+    // mostly future-dated. Each day sums the per-night share of every
+    // booking that covers that night (calcRevenue handles the ratable
+    // split + the $150 fallback for iCal bookings with no total_price).
     const dailyRevenue: { date: string; label: string; revenue: number }[] = [];
-    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
     for (let i = 0; i < 30; i++) {
       const d = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + i);
       const ds = fmt(d);
@@ -599,6 +615,18 @@ export async function POST() {
       });
     }
 
+    // Recent guest messages
+    for (const m of recentMessages) {
+      const propName = propNameMap.get(m.property_id) ?? "Property";
+      const snippet = (m.body ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+      feed.push({
+        type: "message",
+        text: `Guest message at ${propName}${snippet ? ` — "${snippet}${(m.body ?? "").length > 80 ? "…" : ""}"` : ""}`,
+        timeAgo: timeAgo(m.created_at),
+        ts: new Date(m.created_at).getTime(),
+      });
+    }
+
     // Recent cleanings
     for (const c of recentCleanings) {
       const propName = propNameMap.get(c.property_id) ?? "Property";
@@ -623,17 +651,43 @@ export async function POST() {
 
     // Sort by timestamp, take top 5
     feed.sort((a, b) => b.ts - a.ts);
-    const activityFeed = feed.slice(0, 5).map(({ type, text, timeAgo }) => ({ type, text, timeAgo }));
+    const activityFeed = feed.slice(0, 6).map(({ type, text, timeAgo }) => ({ type, text, timeAgo }));
 
     // ====== User + sync status ======
-    const userName = (() => {
+    // Priority: user_preferences.preferences.full_name (profile) →
+    // auth.users.user_metadata.full_name / name / first_name →
+    // first name derived from the email local part. If the email local
+    // part is a long concatenated string like
+    // "cesaralejandrosantana18@gmail.com" we fall back to "there" rather
+    // than rendering a machine-looking username.
+    let userName = "there";
+    try {
+      const { data: prefRow } = await supabase
+        .from("user_preferences")
+        .select("preferences")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prefs: any = prefRow?.preferences ?? {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const meta: any = user.user_metadata ?? {};
-      const raw: string = meta.full_name || meta.name || meta.first_name || user.email || "";
-      const first = String(raw).trim().split(/\s+/)[0] || "";
-      if (first && first.includes("@")) return first.split("@")[0];
-      return first || "there";
-    })();
+      const rawName: string =
+        prefs.display_name || prefs.full_name || meta.full_name || meta.name || meta.first_name || "";
+      if (rawName) {
+        const first = String(rawName).trim().split(/\s+/)[0];
+        if (first) userName = first;
+      } else if (user.email) {
+        // Email local part, take everything up to the first digit or
+        // separator and require <= 12 chars to avoid walls of text.
+        const local = user.email.split("@")[0] ?? "";
+        const candidate = local.split(/[\d._-]/)[0];
+        if (candidate && candidate.length <= 12) {
+          userName = candidate.charAt(0).toUpperCase() + candidate.slice(1).toLowerCase();
+        }
+      }
+    } catch {
+      // Non-critical: leave userName as "there"
+    }
 
     // Channel health: "synced" if every connected channel is active,
     // "disconnected" if any are pending/error, "syncing" if there's
