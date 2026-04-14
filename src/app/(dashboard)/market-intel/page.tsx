@@ -24,7 +24,7 @@ export default async function MarketExplorerPage({ searchParams }: { searchParam
   if (properties.length === 0) {
     return (
       <div>
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Explorer</h1>
+        <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Intel</h1>
         <p className="text-sm text-neutral-500 mb-8">Market analysis and performance metrics</p>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">

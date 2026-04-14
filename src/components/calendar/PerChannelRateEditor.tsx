@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChannelLogo } from "./ChannelLogo";
+import Image from "next/image";
 import { useChannelRates, type ChannelBlock } from "@/lib/hooks/useChannelRates";
+import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
 
 type Props = {
   propertyId: string;
@@ -28,16 +29,17 @@ export function PerChannelRateEditor({ propertyId, dates, baseRate }: Props) {
   if (!dateFrom || !dateTo) return null;
 
   return (
-    <div className="mt-6">
+    <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#c9a96e]">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--golden)" }}>
           Channel rates
         </h3>
         <button
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="flex items-center gap-1 text-[11px] text-[#3d6b52] hover:text-[#1a3a2a] disabled:opacity-50"
+          className="flex items-center gap-1 text-[11px] transition-colors disabled:opacity-50"
+          style={{ color: "var(--tideline)" }}
           title="Re-fetch live rates from Channex"
         >
           <svg
@@ -53,21 +55,17 @@ export function PerChannelRateEditor({ propertyId, dates, baseRate }: Props) {
         </button>
       </div>
 
-      {baseRate != null && (
-        <div className="mb-3 rounded-lg bg-[#efe9dd]/50 border border-[#efe9dd] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#3d6b52]">
-            Base rate (engine)
-          </div>
-          <div className="text-lg font-bold text-[#1a3a2a] tabular-nums" style={{ letterSpacing: "-0.03em" }}>
-            ${baseRate}
-          </div>
-        </div>
-      )}
-
       {loading && !data && <LoadingSkeleton />}
 
       {error && !data && (
-        <div className="rounded-lg border border-[#c44040]/30 bg-[#c44040]/5 px-3 py-2 text-xs text-[#c44040]">
+        <div
+          className="rounded-[10px] px-3 py-2 text-xs"
+          style={{
+            border: "1px solid rgba(196,64,64,0.2)",
+            backgroundColor: "rgba(196,64,64,0.04)",
+            color: "var(--coral-reef)",
+          }}
+        >
           Failed to load: {error}
           <button
             onClick={refresh}
@@ -79,14 +77,28 @@ export function PerChannelRateEditor({ propertyId, dates, baseRate }: Props) {
       )}
 
       {data && data.channels.length === 0 && (
-        <div className="rounded-lg border border-[#efe9dd] bg-[#f8f6f1] px-3 py-4 text-xs text-[#3d6b52]">
-          No channels connected yet. Connect Booking.com, Vrbo, or Airbnb from
-          the property&apos;s channel settings.
+        <div
+          className="rounded-[10px] px-3 py-3 text-xs"
+          style={{
+            border: "1px solid var(--dry-sand)",
+            backgroundColor: "var(--shore)",
+            color: "var(--tideline)",
+          }}
+        >
+          No channels connected yet. Connect Booking.com, Vrbo, or Airbnb from the property&apos;s
+          channel settings.
         </div>
       )}
 
       {data && data.channex_error && (
-        <div className="mb-3 rounded-lg border border-[#b8860b]/30 bg-[#b8860b]/5 px-3 py-2 text-[11px] text-[#b8860b]">
+        <div
+          className="mb-3 rounded-[10px] px-3 py-2 text-[11px]"
+          style={{
+            border: "1px solid rgba(212,150,11,0.25)",
+            backgroundColor: "rgba(212,150,11,0.05)",
+            color: "var(--amber-tide)",
+          }}
+        >
           Live rates unavailable — showing stored values. ({data.channex_error})
         </div>
       )}
@@ -122,7 +134,8 @@ function LoadingSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="h-[86px] rounded-lg bg-[#efe9dd]/40 animate-pulse"
+          className="h-[116px] rounded-[14px] animate-pulse"
+          style={{ backgroundColor: "var(--dry-sand)" }}
         />
       ))}
     </div>
@@ -180,16 +193,6 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
 
   const dirty = rate !== initialRate && rate > 0;
 
-  const applyMarkup = useCallback(
-    (pct: number) => {
-      setMarkup(pct);
-      if (baseRate != null && baseRate > 0) {
-        setRate(Math.round(baseRate * (1 + pct / 100)));
-      }
-    },
-    [baseRate]
-  );
-
   const applyRate = useCallback(
     (r: number) => {
       setRate(r);
@@ -233,89 +236,123 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
     }
   }, [channel.channel_code, channel.editable, dates, dirty, onSaved, propertyId, rate]);
 
-  // ---- status pill ----
-  let statusPillClass = "bg-[#eef5f0] text-[#1a3a2a]";
-  let statusLabel = channel.status;
-  if (channel.status === "pending_authorization") {
-    statusPillClass = "bg-[#fff4d6] text-[#b8860b]";
-    statusLabel = "Pending auth";
-  } else if (channel.status === "active") {
-    statusLabel = "Active";
-  } else if (channel.status !== "active") {
-    statusPillClass = "bg-[#efe9dd] text-[#3d6b52]";
-  }
+  const platformKey = platformKeyFrom(channel.channel_code);
+  const platform = platformKey ? PLATFORMS[platformKey] : null;
 
-  // ---- setup needed state (e.g. VRBO without a rate plan linked) ----
+  // ---- setup needed state ----
   if (channel.needs_setup) {
     return (
-      <div className="rounded-lg border border-[#efe9dd] bg-[#f8f6f1] px-3 py-3 opacity-80">
-        <div className="flex items-center gap-2 mb-2">
-          <ChannelLogo code={channel.channel_code} />
-          <span className="text-sm font-semibold text-[#1a3a2a]">{channel.channel_name}</span>
-          <span className={`ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusPillClass}`}>
-            {statusLabel}
+      <GlossyWrapper dim>
+        <div className="flex items-center gap-2 mb-2 relative z-[1]">
+          {platform && (
+            <div
+              className="flex items-center justify-center rounded-md"
+              style={{ width: 22, height: 22, backgroundColor: platform.color }}
+            >
+              <Image src={platform.iconWhite} alt={platform.name} width={14} height={14} />
+            </div>
+          )}
+          <span className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
+            {channel.channel_name}
           </span>
         </div>
-        <p className="text-[11px] text-[#3d6b52] mb-2">
+        <p className="text-[11px] mb-2 relative z-[1]" style={{ color: "var(--tideline)" }}>
           {channel.setup_hint ?? "Finish channel setup to push rates."}
         </p>
         <a
           href="/settings"
-          className="inline-flex items-center justify-center text-[11px] font-semibold text-[#1a3a2a] bg-[#c9a96e] hover:bg-[#d4bc8a] rounded px-3 py-1.5"
+          className="inline-flex items-center justify-center text-[11px] font-semibold rounded-[8px] px-3 py-1.5 relative z-[1] transition-colors"
+          style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)" }}
         >
           Connect rate plan
         </a>
-      </div>
+      </GlossyWrapper>
     );
   }
 
+  const markupLabel =
+    baseRate == null || baseRate === 0
+      ? null
+      : markup === 0
+      ? "Base"
+      : `${markup > 0 ? "+" : ""}${markup}%`;
+
   return (
-    <div className="rounded-lg border border-[#efe9dd] bg-white px-3 py-3">
-      <div className="flex items-center gap-2 mb-2">
-        <ChannelLogo code={channel.channel_code} />
-        <span className="text-sm font-semibold text-[#1a3a2a]">{channel.channel_name}</span>
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusPillClass}`}>
-          {statusLabel}
-        </span>
+    <GlossyWrapper>
+      <div className="flex items-center justify-between mb-[10px] relative z-[1]">
+        <div className="flex items-center gap-2">
+          {platform && (
+            <div
+              className="flex items-center justify-center rounded-md"
+              style={{ width: 22, height: 22, backgroundColor: platform.color }}
+            >
+              <Image src={platform.iconWhite} alt={platform.name} width={14} height={14} />
+            </div>
+          )}
+          <div className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
+            {channel.channel_name}
+          </div>
+        </div>
         <SyncIndicator mismatch={anyMismatch} editable={channel.editable} savedAt={savedAt} />
       </div>
 
       {!channel.editable && channel.read_only_reason && (
-        <p className="text-[10px] text-[#3d6b52] mb-2">{channel.read_only_reason}</p>
+        <p className="text-[10px] mb-2 relative z-[1]" style={{ color: "var(--tideline)" }}>
+          {channel.read_only_reason}
+        </p>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-[10px] relative z-[1]">
         <div className="flex-1 relative">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#3d6b52]">$</span>
+          <span
+            className="absolute left-[10px] top-1/2 -translate-y-1/2 text-[14px] font-semibold"
+            style={{ color: "var(--tideline)" }}
+          >
+            $
+          </span>
           <input
             type="number"
             value={rate || ""}
             disabled={!channel.editable}
             onChange={(e) => applyRate(Number(e.target.value) || 0)}
-            className="w-full pl-5 pr-2 py-1.5 text-sm border border-[#efe9dd] rounded focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 disabled:bg-[#f8f6f1] disabled:text-[#3d6b52]"
+            className="w-full outline-none transition-all tabular-nums"
+            style={{
+              padding: "9px 10px 9px 24px",
+              border: "1.5px solid var(--dry-sand)",
+              borderRadius: 10,
+              fontSize: 17,
+              fontWeight: 700,
+              color: "var(--coastal)",
+              backgroundColor: "rgba(255,255,255,0.7)",
+              letterSpacing: "-0.02em",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "var(--golden)";
+              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "var(--dry-sand)";
+              e.currentTarget.style.boxShadow = "";
+            }}
             placeholder="—"
             min={0}
             step={1}
           />
         </div>
-        {baseRate != null && baseRate > 0 && (
-          <div className="flex-1 relative">
-            <input
-              type="number"
-              value={Number.isFinite(markup) ? markup : 0}
-              disabled={!channel.editable}
-              onChange={(e) => applyMarkup(Number(e.target.value) || 0)}
-              className="w-full pl-2 pr-6 py-1.5 text-sm border border-[#efe9dd] rounded focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 disabled:bg-[#f8f6f1] disabled:text-[#3d6b52] tabular-nums"
-              placeholder="markup"
-              step={1}
-            />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#3d6b52]">%</span>
+        {markupLabel && (
+          <div
+            className="text-[11px] font-semibold px-2 py-[5px] rounded-[8px] whitespace-nowrap"
+            style={{ backgroundColor: "var(--shore)", color: "var(--tideline)" }}
+          >
+            {markupLabel}
           </div>
         )}
       </div>
 
       {saveError && (
-        <p className="text-[11px] text-[#c44040] mt-2">{saveError}</p>
+        <p className="text-[11px] mt-2 relative z-[1]" style={{ color: "var(--coral-reef)" }}>
+          {saveError}
+        </p>
       )}
 
       {dirty && channel.editable && (
@@ -323,11 +360,58 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="mt-2 w-full bg-[#1a3a2a] hover:bg-[#264d38] disabled:opacity-60 text-white text-[11px] font-semibold uppercase tracking-wide py-1.5 rounded"
+          className="relative z-[1] mt-2 w-full text-[12px] font-semibold transition-colors disabled:opacity-60"
+          style={{
+            padding: 9,
+            borderRadius: 10,
+            backgroundColor: "var(--coastal)",
+            color: "var(--shore)",
+          }}
         >
           {saving ? "Saving…" : `Save & push${dates.length > 1 ? ` (${dates.length} days)` : ""}`}
         </button>
       )}
+    </GlossyWrapper>
+  );
+}
+
+// Glossy card shell matching DESIGN_SYSTEM.md Section 7.5 — gradient bg,
+// reflection overlay on top half, warm dry-sand border.
+function GlossyWrapper({ children, dim = false }: { children: React.ReactNode; dim?: boolean }) {
+  return (
+    <div
+      className="relative overflow-hidden mb-2 transition-all"
+      style={{
+        borderRadius: 14,
+        padding: "14px 16px",
+        background: "linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(247,243,236,0.8) 100%)",
+        border: "1px solid rgba(237,231,219,0.8)",
+        boxShadow:
+          "0 1px 3px rgba(19,46,32,0.04), 0 4px 16px rgba(19,46,32,0.03), inset 0 1px 0 rgba(255,255,255,1)",
+        opacity: dim ? 0.75 : 1,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow =
+          "0 2px 6px rgba(19,46,32,0.06), 0 8px 28px rgba(19,46,32,0.07), inset 0 1px 0 rgba(255,255,255,1)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.boxShadow =
+          "0 1px 3px rgba(19,46,32,0.04), 0 4px 16px rgba(19,46,32,0.03), inset 0 1px 0 rgba(255,255,255,1)";
+      }}
+    >
+      {/* Reflection overlay on the top half */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 pointer-events-none"
+        style={{
+          height: "50%",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 100%)",
+          borderRadius: "14px 14px 0 0",
+        }}
+      />
+      {children}
     </div>
   );
 }
@@ -343,40 +427,42 @@ function SyncIndicator({
   editable: boolean;
   savedAt: number | null;
 }) {
-  // Recent save → briefly show "Saved"
   if (savedAt && Date.now() - savedAt < 3000) {
     return (
-      <span className="ml-auto text-[10px] font-semibold text-[#1a3a2a] flex items-center gap-1">
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
+      <span
+        className="flex items-center gap-1 text-[10px] font-semibold"
+        style={{ color: "var(--lagoon)" }}
+      >
+        <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "var(--lagoon)" }} />
         Saved
       </span>
     );
   }
   if (!editable) {
     return (
-      <span className="ml-auto text-[10px] text-[#3d6b52]">Read-only</span>
+      <span className="text-[10px] font-semibold" style={{ color: "var(--tideline)" }}>
+        Read-only
+      </span>
     );
   }
   if (mismatch) {
     return (
       <span
-        className="ml-auto text-[10px] font-semibold text-[#b8860b] flex items-center gap-1"
+        className="flex items-center gap-1 text-[10px] font-semibold"
+        style={{ color: "var(--amber-tide)" }}
         title="Rate differs from Koast's stored value"
       >
-        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.515 2.625H3.72c-1.345 0-2.188-1.458-1.515-2.625L8.485 2.495zM10 6a1 1 0 011 1v3a1 1 0 11-2 0V7a1 1 0 011-1zm0 8a1 1 0 100-2 1 1 0 000 2z" />
-        </svg>
+        <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "var(--amber-tide)" }} />
         Out of sync
       </span>
     );
   }
   return (
-    <span className="ml-auto text-[10px] text-[#3d6b52] flex items-center gap-1">
-      <svg className="w-3 h-3 text-[#1a3a2a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-      </svg>
+    <span
+      className="flex items-center gap-1 text-[10px] font-semibold"
+      style={{ color: "var(--lagoon)" }}
+    >
+      <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "var(--lagoon)" }} />
       In sync
     </span>
   );

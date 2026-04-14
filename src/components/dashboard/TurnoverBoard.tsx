@@ -471,8 +471,8 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Cleaning</h1>
-        <p className="text-sm text-gray-500">Cleaning schedules and task management</p>
+        <h1 className="text-2xl font-bold text-coastal mb-1">Turnovers</h1>
+        <p className="text-sm text-tideline">Cleaning schedules and task management</p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {/* Stats pills */}

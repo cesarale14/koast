@@ -1,16 +1,23 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { Minus, Plus, X } from "lucide-react";
 import CalendarToolbar from "./CalendarToolbar";
-import MonthlyView from "./MonthlyView";
+import MonthlyView, { MONTH_NAMES } from "./MonthlyView";
+import PropertyThumbStrip from "./PropertyThumbStrip";
 import BookingSidePanel from "./BookingSidePanel";
 import { PerChannelRateEditor } from "./PerChannelRateEditor";
-import { ConflictResolutionModal, type Conflict, type ConflictBooking } from "@/components/dashboard/ConflictResolution";
-import PropertyAvatar from "@/components/ui/PropertyAvatar";
+import {
+  ConflictResolutionModal,
+  type Conflict,
+  type ConflictBooking,
+} from "@/components/dashboard/ConflictResolution";
 import type { BookingBarData } from "./BookingBar";
 import type { RateData } from "./DateCell";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
+import Image from "next/image";
 
 interface CalendarProperty {
   id: string;
@@ -44,11 +51,6 @@ interface CalendarRate {
   rate_source: string;
 }
 
-interface CalendarEvent {
-  name: string;
-  impact: number;
-}
-
 interface CalendarGridProps {
   properties: CalendarProperty[];
   bookings: CalendarBooking[];
@@ -57,11 +59,15 @@ interface CalendarGridProps {
 }
 
 function getToday(): string {
-  // Use the user's LOCAL calendar day, not UTC. toISOString() converts to
-  // UTC which gives a wrong "today" for users west of UTC during the
-  // evening (e.g. 8pm PST = 4am UTC next day).
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatRangeDate(s: string): string {
+  return new Date(s + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function CalendarGrid({
@@ -72,20 +78,20 @@ export default function CalendarGrid({
   const { toast } = useToast();
   const todayStr = getToday();
 
-  // ---------- State ----------
-  const [monthlyPropertyId, setMonthlyPropertyId] = useState(properties[0]?.id ?? "");
-  const [monthlyTodayTrigger, setMonthlyTodayTrigger] = useState(0);
+  const [activePropertyId, setActivePropertyId] = useState(properties[0]?.id ?? "");
   const [selectedBooking, setSelectedBooking] = useState<BookingBarData | null>(null);
   const [activeConflict, setActiveConflict] = useState<Conflict | null>(null);
 
-  // Right-side rate editing panel
-  const [ratePanel, setRatePanel] = useState<{
-    propertyId: string;
-    dates: string[];
-    rate: RateData | null;
-  } | null>(null);
+  // View month state (single-month pagination)
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
 
-  // ---------- Rates ----------
+  // Selected date (controls the right panel). Default to today so the
+  // panel always has something to show when the page loads.
+  const [selectedDate, setSelectedDate] = useState<string | null>(todayStr);
+
   const [ratesState, setRatesState] = useState(initialRates);
 
   const rateLookup = useMemo(() => {
@@ -104,7 +110,6 @@ export default function CalendarGrid({
     return map;
   }, [ratesState]);
 
-  // ---------- Bookings ----------
   const bookingLookup = useMemo(() => {
     const map = new Map<string, BookingBarData[]>();
     for (const b of bookings) {
@@ -114,152 +119,135 @@ export default function CalendarGrid({
     return map;
   }, [bookings]);
 
-  // ---------- Events (per property) ----------
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [eventLookup, setEventLookup] = useState<Map<string, Map<string, CalendarEvent>>>(new Map());
+  // Property → connected platform slugs map for thumbnail channel badges.
+  const [propertyPlatforms, setPropertyPlatforms] = useState<Map<string, string[]>>(new Map());
   useEffect(() => {
-    const map = new Map<string, Map<string, CalendarEvent>>();
-    const fetches = properties.map((p) =>
-      fetch(`/api/analytics/forecast/${p.id}`)
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => {
-          if (!d?.forecast) return;
-          const dateMap = new Map<string, CalendarEvent>();
-          for (const f of d.forecast as { date: string; demand_score: number; factors: string[] }[]) {
-            const eventFactor = f.factors.find((fac: string) =>
-              !fac.includes("season") && !fac.includes("DOW") && !fac.includes("Market") &&
-              !fac.includes("Supply") && !fac.includes("learned") && !fac.includes("default") &&
-              !fac.includes("Clear") && !fac.includes("Rain")
-            );
-            if (eventFactor) dateMap.set(f.date, { name: eventFactor, impact: f.demand_score / 100 });
-          }
-          map.set(p.id, dateMap);
-        })
-        .catch(() => {})
-    );
-    Promise.all(fetches).then(() => setEventLookup(new Map(map)));
-  }, [properties]);
+    // Derive from bookings directly — every connected channel that has
+    // pushed or received a booking shows up in the booking set.
+    const map = new Map<string, Set<string>>();
+    for (const b of bookings) {
+      const key = platformKeyFrom(b.platform);
+      if (!key) continue;
+      if (!map.has(b.property_id)) map.set(b.property_id, new Set());
+      map.get(b.property_id)!.add(key);
+    }
+    const out = new Map<string, string[]>();
+    for (const [k, v] of Array.from(map.entries())) out.set(k, Array.from(v));
+    setPropertyPlatforms(out);
+  }, [bookings]);
 
-  // ---------- Handlers ----------
-  const handleDateClick = useCallback(
-    (propertyId: string, date: string, rate: RateData | null) => {
-      setRatePanel({ propertyId, dates: [date], rate });
-    },
-    [],
-  );
-
-  const handleSaveRate = useCallback(
-    async (updates: {
-      dates: string[];
-      applied_rate: number | null;
-      is_available: boolean;
-      min_stay: number;
-    }) => {
-      if (!ratePanel) return;
-      const supabase = createClient();
-
-      for (const date of updates.dates) {
-        await supabase.from("calendar_rates").upsert(
-          {
-            property_id: ratePanel.propertyId,
-            date,
-            applied_rate: updates.applied_rate,
-            is_available: updates.is_available,
-            min_stay: updates.min_stay,
-            rate_source: "manual",
-            channel_code: null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-          { onConflict: "property_id,date,channel_code" },
-        );
-      }
-
-      setRatesState((prev) => {
-        const next = [...prev];
-        for (const date of updates.dates) {
-          const idx = next.findIndex(
-            (r) => r.property_id === ratePanel.propertyId && r.date === date,
-          );
-          const entry: CalendarRate = {
-            property_id: ratePanel.propertyId,
-            date,
-            base_rate: null,
-            suggested_rate: null,
-            applied_rate: updates.applied_rate,
-            min_stay: updates.min_stay,
-            is_available: updates.is_available,
-            rate_source: "manual",
-          };
-          if (idx >= 0) {
-            next[idx] = { ...next[idx], ...entry };
-          } else {
-            next.push(entry);
-          }
-        }
-        return next;
-      });
-
-      toast(`Rate saved for ${updates.dates.length} date${updates.dates.length > 1 ? "s" : ""}. Use "Push to OTAs" on the Pricing page to sync to Channex.`);
-      setRatePanel(null);
-    },
-    [ratePanel, toast],
-  );
-
-  // ---------- Property switch sync ----------
-  // When the user switches property via the sidebar, re-anchor any open
-  // rate panel to the new property so it doesn't show stale data from
-  // the previous selection.
-  useEffect(() => {
-    setRatePanel((prev) => {
-      if (!prev) return prev;
-      if (prev.propertyId === monthlyPropertyId) return prev;
-      const propLookup = rateLookup.get(monthlyPropertyId);
-      const rate = prev.dates.length === 1
-        ? propLookup?.get(prev.dates[0]) ?? null
-        : null;
-      return { propertyId: monthlyPropertyId, dates: prev.dates, rate };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthlyPropertyId]);
-
-  // ---------- Monthly property stats ----------
-  const monthlyStats = useMemo(() => {
-    if (!monthlyPropertyId) return { nextCheckIn: "—", occupancy: 0, avgRate: 0 };
-    const propBookings = bookingLookup.get(monthlyPropertyId) ?? [];
-    const propRates = rateLookup.get(monthlyPropertyId) ?? new Map<string, RateData>();
+  // Quick stats for the thumbnail strip (computed for the active property).
+  const stats = useMemo(() => {
+    if (!activePropertyId) return { nextCheckIn: "—", occupancy: 0, avgRate: 0 };
+    const propBookings = bookingLookup.get(activePropertyId) ?? [];
+    const propRates = rateLookup.get(activePropertyId) ?? new Map<string, RateData>();
 
     const upcoming = propBookings
       .filter((b) => b.check_in >= todayStr)
       .sort((a, b) => a.check_in.localeCompare(b.check_in));
     const nextCheckIn = upcoming[0]
-      ? new Date(upcoming[0].check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      ? new Date(upcoming[0].check_in + "T00:00:00").toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
       : "—";
 
     let bookedNights = 0;
     const days = 30;
     for (let i = 0; i < days; i++) {
-      const d = new Date(); d.setDate(d.getDate() + i);
+      const d = new Date();
+      d.setDate(d.getDate() + i);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       if (propBookings.some((b) => ds >= b.check_in && ds < b.check_out)) bookedNights++;
     }
     const occupancy = Math.round((bookedNights / days) * 100);
 
-    let rateSum = 0, rateCount = 0;
+    let rateSum = 0;
+    let rateCount = 0;
     propRates.forEach((r) => {
       const rate = r.applied_rate ?? r.suggested_rate ?? r.base_rate;
-      if (rate) { rateSum += rate; rateCount++; }
+      if (rate) {
+        rateSum += rate;
+        rateCount++;
+      }
     });
     const avgRate = rateCount > 0 ? Math.round(rateSum / rateCount) : 0;
 
     return { nextCheckIn, occupancy, avgRate };
-  }, [monthlyPropertyId, bookingLookup, rateLookup, todayStr]);
+  }, [activePropertyId, bookingLookup, rateLookup, todayStr]);
 
-  // ---------- Conflict pairs (banner) ----------
+  // ---------- Month nav ----------
+  const goPrevMonth = useCallback(() => {
+    setViewMonth((m) => {
+      const month = m.month === 0 ? 11 : m.month - 1;
+      const year = m.month === 0 ? m.year - 1 : m.year;
+      return { year, month };
+    });
+  }, []);
+  const goNextMonth = useCallback(() => {
+    setViewMonth((m) => {
+      const month = m.month === 11 ? 0 : m.month + 1;
+      const year = m.month === 11 ? m.year + 1 : m.year;
+      return { year, month };
+    });
+  }, []);
+  const goToday = useCallback(() => {
+    const d = new Date();
+    setViewMonth({ year: d.getFullYear(), month: d.getMonth() });
+    setSelectedDate(todayStr);
+  }, [todayStr]);
+
+  // ---------- Rate save ----------
+  const handleSaveRate = useCallback(
+    async (updates: { date: string; applied_rate: number | null; is_available: boolean; min_stay: number }) => {
+      const supabase = createClient();
+      await supabase.from("calendar_rates").upsert(
+        {
+          property_id: activePropertyId,
+          date: updates.date,
+          applied_rate: updates.applied_rate,
+          is_available: updates.is_available,
+          min_stay: updates.min_stay,
+          rate_source: "manual",
+          channel_code: null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        { onConflict: "property_id,date,channel_code" }
+      );
+
+      setRatesState((prev) => {
+        const next = [...prev];
+        const idx = next.findIndex(
+          (r) => r.property_id === activePropertyId && r.date === updates.date
+        );
+        const entry: CalendarRate = {
+          property_id: activePropertyId,
+          date: updates.date,
+          base_rate: null,
+          suggested_rate: null,
+          applied_rate: updates.applied_rate,
+          min_stay: updates.min_stay,
+          is_available: updates.is_available,
+          rate_source: "manual",
+        };
+        if (idx >= 0) next[idx] = { ...next[idx], ...entry };
+        else next.push(entry);
+        return next;
+      });
+
+      toast("Saved. Use the per-channel editor below to push to OTAs.");
+    },
+    [activePropertyId, toast]
+  );
+
+  // ---------- Conflict helpers ----------
   const monthlyConflictPairs = useMemo(() => {
-    const propBookings = bookingLookup.get(monthlyPropertyId) ?? [];
+    const propBookings = bookingLookup.get(activePropertyId) ?? [];
     const confirmed = propBookings.filter((b) => !b.status || b.status === "confirmed");
     const sorted = [...confirmed].sort((x, y) =>
-      x.check_in === y.check_in ? x.check_out.localeCompare(y.check_out) : x.check_in.localeCompare(y.check_in),
+      x.check_in === y.check_in
+        ? x.check_out.localeCompare(y.check_out)
+        : x.check_in.localeCompare(y.check_in)
     );
     const pairs: { a: BookingBarData; b: BookingBarData; start: string; end: string; nights: number }[] = [];
     for (let i = 0; i < sorted.length; i++) {
@@ -271,59 +259,96 @@ export default function CalendarGrid({
         const nights = Math.round(
           (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
             Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
-            86400000,
+            86400000
         );
         if (nights === 0) continue;
         pairs.push({ a: sorted[i], b: sorted[j], start, end, nights });
       }
     }
     return pairs;
-  }, [monthlyPropertyId, bookingLookup]);
+  }, [activePropertyId, bookingLookup]);
 
   const handleConflictResolve = useCallback(
     (a: BookingBarData, b: BookingBarData) => {
       const toConflictBooking = (x: BookingBarData): ConflictBooking => ({
-        id: x.id, property_id: x.property_id, guest_name: x.guest_name,
-        check_in: x.check_in, check_out: x.check_out, platform: x.platform,
-        total_price: x.total_price, channex_booking_id: null,
-        platform_booking_id: null, status: x.status,
+        id: x.id,
+        property_id: x.property_id,
+        guest_name: x.guest_name,
+        check_in: x.check_in,
+        check_out: x.check_out,
+        platform: x.platform,
+        total_price: x.total_price,
+        channex_booking_id: null,
+        platform_booking_id: null,
+        status: x.status,
       });
       const start = a.check_in > b.check_in ? a.check_in : b.check_in;
       const end = a.check_out < b.check_out ? a.check_out : b.check_out;
       const nights = Math.round(
         (Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10)) -
           Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) /
-          86400000,
+          86400000
       );
       setActiveConflict({
-        property_id: monthlyPropertyId,
-        property_name: properties.find((p) => p.id === monthlyPropertyId)?.name ?? "Property",
-        booking1: toConflictBooking(a), booking2: toConflictBooking(b),
-        overlap_start: start, overlap_end: end, overlap_nights: nights,
+        property_id: activePropertyId,
+        property_name: properties.find((p) => p.id === activePropertyId)?.name ?? "Property",
+        booking1: toConflictBooking(a),
+        booking2: toConflictBooking(b),
+        overlap_start: start,
+        overlap_end: end,
+        overlap_nights: nights,
       });
     },
-    [monthlyPropertyId, properties],
+    [activePropertyId, properties]
   );
 
-  return (
-    <div className="flex flex-col h-full relative bg-white">
-      <CalendarToolbar
-        onToday={() => setMonthlyTodayTrigger((t) => t + 1)}
-        properties={properties}
-        selectedPropertyId={monthlyPropertyId}
-        onPropertyChange={(id) => setMonthlyPropertyId(id ?? properties[0]?.id ?? "")}
-      />
+  // ---------- Selected booking tracking ----------
+  const selectedBookingDetails = useMemo(() => {
+    if (!selectedBooking) return null;
+    const propName = properties.find((p) => p.id === selectedBooking.property_id)?.name ?? "";
+    const nights = Math.round(
+      (Date.UTC(+selectedBooking.check_out.slice(0, 4), +selectedBooking.check_out.slice(5, 7) - 1, +selectedBooking.check_out.slice(8, 10)) -
+        Date.UTC(+selectedBooking.check_in.slice(0, 4), +selectedBooking.check_in.slice(5, 7) - 1, +selectedBooking.check_in.slice(8, 10))) /
+        86400000
+    );
+    return { propName, nights };
+  }, [selectedBooking, properties]);
 
-      {/* Conflict banner — full width between toolbar and calendar */}
+  // Rate for the currently selected date on the active property
+  const activeRate = useMemo(() => {
+    if (!selectedDate) return null;
+    return rateLookup.get(activePropertyId)?.get(selectedDate) ?? null;
+  }, [rateLookup, activePropertyId, selectedDate]);
+
+  const thumbnailProps = useMemo(
+    () =>
+      properties.map((p) => ({
+        id: p.id,
+        name: p.name,
+        cover_photo_url: p.cover_photo_url,
+        platforms: propertyPlatforms.get(p.id) ?? [],
+      })),
+    [properties, propertyPlatforms]
+  );
+
+  const monthLabel = MONTH_NAMES[viewMonth.month];
+  const yearLabel = String(viewMonth.year);
+
+  return (
+    <div className="flex flex-col h-full bg-white relative">
+      {/* Conflict pill row — persists from the old implementation */}
       {monthlyConflictPairs.length > 0 && (
-        <div className="flex-shrink-0 px-4 py-2 border-b border-red-100 bg-red-50">
+        <div
+          className="flex-shrink-0 px-4 py-2 bg-coral-reef/[0.04]"
+          style={{ borderBottom: "1px solid rgba(196,64,64,0.15)" }}
+        >
           <div className="flex flex-wrap items-center gap-2">
             {monthlyConflictPairs.map((p, i) => {
               const s = new Date(p.start + "T00:00:00");
               const e = new Date(p.end + "T00:00:00");
-              const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
               const sMonth = s.toLocaleDateString("en-US", { month: "short" });
               const eMonth = e.toLocaleDateString("en-US", { month: "short" });
+              const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
               const range = sameMonth
                 ? `${sMonth} ${s.getDate()}–${e.getDate()}`
                 : `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
@@ -332,12 +357,21 @@ export default function CalendarGrid({
                 <button
                   key={`${p.a.id}-${p.b.id}`}
                   onClick={() => handleConflictResolve(p.a, p.b)}
-                  className="inline-flex items-center gap-2 px-3 h-7 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200 hover:bg-red-200 transition-colors"
-                  title={`${p.a.guest_name ?? "Guest"} × ${p.b.guest_name ?? "Guest"}`}
+                  className="inline-flex items-center gap-2 px-3 h-7 rounded-full text-xs font-semibold transition-colors"
+                  style={{
+                    backgroundColor: "rgba(196,64,64,0.08)",
+                    border: "1px solid rgba(196,64,64,0.2)",
+                    color: "var(--coral-reef)",
+                  }}
                 >
-                  <span className="w-4 h-4 rounded-full bg-red-500 text-white inline-flex items-center justify-center text-[10px] font-bold">!</span>
+                  <span
+                    className="w-4 h-4 rounded-full text-white inline-flex items-center justify-center text-[10px] font-bold"
+                    style={{ backgroundColor: "var(--coral-reef)" }}
+                  >
+                    !
+                  </span>
                   <span>{label}</span>
-                  <span className="text-red-600/80 font-normal">· Click to resolve</span>
+                  <span style={{ opacity: 0.7, fontWeight: 400 }}>· Click to resolve</span>
                 </button>
               );
             })}
@@ -345,101 +379,56 @@ export default function CalendarGrid({
         </div>
       )}
 
-      {/* Main content fills remaining viewport height */}
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white overflow-hidden">
-        {/* Left property panel — desktop only */}
-        <aside className="hidden md:flex flex-col w-[240px] flex-shrink-0 border-r border-gray-100 overflow-y-auto">
-          <div className="p-3">
-            <div className="space-y-0.5">
-              {properties.map((p) => {
-                const isActive = monthlyPropertyId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setMonthlyPropertyId(p.id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                      isActive ? "bg-gray-100" : "hover:bg-gray-50"
-                    }`}
-                    style={isActive ? { borderLeft: "3px solid var(--brand-500)" } : { borderLeft: "3px solid transparent" }}
-                  >
-                    <PropertyAvatar name={p.name} photoUrl={p.cover_photo_url} size={26} />
-                    <span className={`text-sm truncate ${isActive ? "font-bold text-[#222]" : "text-[#555]"}`}>
-                      {p.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {/* Three-column layout */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <PropertyThumbStrip
+          properties={thumbnailProps}
+          activeId={activePropertyId}
+          onSelect={(id) => setActivePropertyId(id)}
+          stats={stats}
+        />
 
-          {/* Quick stats */}
-          <div className="border-t border-gray-100 p-3 mt-auto">
-            <h3 className="text-[10px] font-medium uppercase tracking-widest text-[#999] mb-2">
-              Quick Stats
-            </h3>
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[#999]">Next check-in</span>
-                <span className="font-medium text-[#333]">{monthlyStats.nextCheckIn}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#999]">Occupancy</span>
-                <span className="font-medium text-[#333]">{monthlyStats.occupancy}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#999]">Avg rate</span>
-                <span className="font-mono font-medium text-[#333]">
-                  {monthlyStats.avgRate > 0 ? `$${monthlyStats.avgRate}` : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Calendar grid fills remaining space */}
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        <div className="flex-1 min-w-0 flex flex-col">
+          <CalendarToolbar
+            monthLabel={monthLabel}
+            yearLabel={yearLabel}
+            onPrev={goPrevMonth}
+            onNext={goNextMonth}
+            onToday={goToday}
+          />
           <MonthlyView
-            propertyId={monthlyPropertyId}
-            bookings={bookingLookup.get(monthlyPropertyId) ?? []}
-            rates={rateLookup.get(monthlyPropertyId) ?? new Map()}
+            propertyId={activePropertyId}
+            bookings={bookingLookup.get(activePropertyId) ?? []}
+            rates={rateLookup.get(activePropertyId) ?? new Map()}
             todayStr={todayStr}
-            todayTrigger={monthlyTodayTrigger}
+            selectedDate={selectedDate}
+            viewMonth={viewMonth}
             onBookingClick={setSelectedBooking}
-            onDateClick={handleDateClick}
+            onDateClick={(date) => {
+              setSelectedDate(date);
+              setSelectedBooking(null);
+            }}
           />
         </div>
 
-        {/* Right-side settings panel — always visible on desktop, expandable on mobile */}
-        <RightSettingsPanel
-          monthlyStats={monthlyStats}
-          ratePanel={ratePanel}
-          rateLookup={rateLookup}
-          onSave={handleSaveRate}
-          onCloseDate={() => setRatePanel(null)}
-          onOpenDefault={() => {
-            // "Price settings" / "Availability settings" header click —
-            // open the date editor with today's date on the CURRENTLY
-            // selected property (the one the user is viewing in the
-            // sidebar), not just properties[0]. Falls back to the first
-            // property only if there is no active selection.
-            const activeId = monthlyPropertyId || properties[0]?.id;
-            if (!activeId) return;
-            const today = getToday();
-            const propLookup = rateLookup.get(activeId);
-            const rate = propLookup?.get(today) ?? null;
-            setRatePanel({ propertyId: activeId, dates: [today], rate });
-          }}
+        <RightPanel
+          propertyId={activePropertyId}
+          propertyName={properties.find((p) => p.id === activePropertyId)?.name ?? ""}
+          selectedDate={selectedDate}
+          activeRate={activeRate}
+          selectedBooking={selectedBooking}
+          selectedBookingDetails={selectedBookingDetails}
+          onClearBooking={() => setSelectedBooking(null)}
+          onSaveRate={handleSaveRate}
         />
       </div>
 
-      {/* Booking side panel */}
       <BookingSidePanel
-        booking={selectedBooking}
-        onClose={() => setSelectedBooking(null)}
+        booking={null}
+        onClose={() => {}}
         propertyMap={new Map(properties.map((p) => [p.id, { name: p.name, cover_photo_url: p.cover_photo_url }]))}
       />
 
-      {/* Conflict resolution modal */}
       <ConflictResolutionModal
         conflict={activeConflict}
         onClose={() => setActiveConflict(null)}
@@ -449,205 +438,358 @@ export default function CalendarGrid({
   );
 }
 
-// ---------- Right-side settings panel (always visible) ----------
+// ============ Right Panel ============
 
-function RightSettingsPanel({
-  monthlyStats,
-  ratePanel,
-  rateLookup,
-  onSave,
-  onCloseDate,
-  onOpenDefault,
+function RightPanel({
+  propertyId,
+  propertyName,
+  selectedDate,
+  activeRate,
+  selectedBooking,
+  selectedBookingDetails,
+  onClearBooking,
+  onSaveRate,
 }: {
-  monthlyStats: { nextCheckIn: string; occupancy: number; avgRate: number };
-  ratePanel: { propertyId: string; dates: string[]; rate: RateData | null } | null;
-  rateLookup: Map<string, Map<string, RateData>>;
-  onSave: (updates: { dates: string[]; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
-  onCloseDate: () => void;
-  onOpenDefault: () => void;
+  propertyId: string;
+  propertyName: string;
+  selectedDate: string | null;
+  activeRate: RateData | null;
+  selectedBooking: BookingBarData | null;
+  selectedBookingDetails: { propName: string; nights: number } | null;
+  onClearBooking: () => void;
+  onSaveRate: (updates: { date: string; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Date-specific editing state
-  const [rateValue, setRateValue] = useState("");
   const [available, setAvailable] = useState(true);
   const [minStay, setMinStay] = useState(1);
-  const [saving, setSaving] = useState(false);
 
-  const panelKey = ratePanel?.dates.join(",") ?? "";
+  // Re-sync controls when the selection changes
   useEffect(() => {
-    if (!ratePanel) return;
-    const fresh = ratePanel.rate;
-    setRateValue(fresh?.applied_rate?.toString() ?? fresh?.base_rate?.toString() ?? "");
-    setAvailable(fresh?.is_available !== false);
-    setMinStay(fresh?.min_stay ?? 1);
-    setSaving(false);
-  }, [panelKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!activeRate) {
+      setAvailable(true);
+      setMinStay(1);
+      return;
+    }
+    setAvailable(activeRate.is_available !== false);
+    setMinStay(activeRate.min_stay ?? 1);
+  }, [selectedDate, activeRate]);
 
-  const handleSave = () => {
-    if (!ratePanel) return;
-    setSaving(true);
-    onSave({
-      dates: ratePanel.dates,
-      applied_rate: rateValue ? parseFloat(rateValue) : null,
-      is_available: available,
+  const dateLabel = selectedDate
+    ? new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+  const dowLabel = selectedDate
+    ? new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })
+    : null;
+
+  const baseRate = activeRate?.suggested_rate ?? activeRate?.base_rate ?? activeRate?.applied_rate ?? null;
+
+  const handleAvailableToggle = () => {
+    if (!selectedDate) return;
+    const next = !available;
+    setAvailable(next);
+    onSaveRate({
+      date: selectedDate,
+      applied_rate: activeRate?.applied_rate ?? null,
+      is_available: next,
       min_stay: minStay,
     });
   };
 
-  const dateLabel = ratePanel
-    ? ratePanel.dates.length === 1
-      ? new Date(ratePanel.dates[0] + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-      : `${ratePanel.dates.length} dates`
-    : null;
-
-  const propRates = ratePanel ? rateLookup.get(ratePanel.propertyId) : null;
-  const dateRate = ratePanel && ratePanel.dates.length === 1 ? propRates?.get(ratePanel.dates[0]) : null;
-
-  const panelContent = (
-    <div className="flex flex-col h-full">
-      {/* Price settings — click opens the editor for today on the first property */}
-      <button
-        type="button"
-        onClick={onOpenDefault}
-        className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-[#f8f6f1] transition-colors focus:outline-none focus-visible:bg-[#f8f6f1]"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-[#222]">Price settings</h3>
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-        <div className="text-[13px] text-[#555] space-y-0.5">
-          <div>${monthlyStats.avgRate > 0 ? monthlyStats.avgRate : "—"} per night</div>
-          <div>{monthlyStats.occupancy}% occupancy (30d)</div>
-        </div>
-      </button>
-
-      {/* Availability settings — click opens the same editor */}
-      <button
-        type="button"
-        onClick={onOpenDefault}
-        className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-[#f8f6f1] transition-colors focus:outline-none focus-visible:bg-[#f8f6f1]"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-[#222]">Availability settings</h3>
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-        <div className="text-[13px] text-[#555] space-y-0.5">
-          <div>Next check-in: {monthlyStats.nextCheckIn}</div>
-        </div>
-      </button>
-
-      {/* Date-specific editing — shown when a date is clicked */}
-      {ratePanel && (
-        <div className="flex-1 flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[#222]">{dateLabel}</h3>
-            <button onClick={onCloseDate} className="p-0.5 text-gray-400 hover:text-gray-600 rounded transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="px-4 py-3 space-y-3 flex-1">
-            {/* Current rate cards */}
-            {dateRate && (
-              <div className="grid grid-cols-2 gap-1.5 text-xs">
-                {dateRate.base_rate != null && (
-                  <div className="bg-gray-50 rounded px-2 py-1.5">
-                    <div className="text-[9px] text-[#999]">Base</div>
-                    <div className="font-mono font-semibold text-[#333]">${dateRate.base_rate}</div>
-                  </div>
-                )}
-                {dateRate.suggested_rate != null && (
-                  <div className="bg-[#eef5f0] rounded px-2 py-1.5">
-                    <div className="text-[9px] text-[#3d6b52]">Suggested</div>
-                    <div className="font-mono font-semibold text-[#1a3a2a]">${dateRate.suggested_rate}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-[11px] font-medium text-[#666] mb-1">Nightly Rate ($)</label>
-              <input
-                type="number"
-                value={rateValue}
-                onChange={(e) => setRateValue(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 focus:border-[#3d6b52]"
-                placeholder="0" min="0" step="1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-medium text-[#666] mb-1">Min Stay</label>
-              <input
-                type="number"
-                value={minStay}
-                onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3d6b52]/30 focus:border-[#3d6b52]"
-                min="1"
-              />
-            </div>
-
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-sm text-[#333]">Available</span>
-              <button type="button" role="switch" aria-checked={available} onClick={() => setAvailable(!available)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${available ? "bg-[#eef5f0]0" : "bg-gray-300"}`}>
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${available ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
-              </button>
-            </label>
-
-            <PerChannelRateEditor
-              propertyId={ratePanel.propertyId}
-              dates={ratePanel.dates}
-              baseRate={dateRate?.suggested_rate ?? dateRate?.base_rate ?? null}
-            />
-          </div>
-
-          <div className="px-4 py-3 border-t border-gray-100">
-            <button onClick={handleSave} disabled={saving}
-              className="w-full px-3 py-1.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] disabled:opacity-50 transition-colors">
-              {saving ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const handleMinStayChange = (delta: number) => {
+    if (!selectedDate) return;
+    const next = Math.max(1, minStay + delta);
+    setMinStay(next);
+    onSaveRate({
+      date: selectedDate,
+      applied_rate: activeRate?.applied_rate ?? null,
+      is_available: available,
+      min_stay: next,
+    });
+  };
 
   return (
-    <>
-      {/* Desktop: always-visible sidebar */}
-      <aside className="hidden md:flex flex-col w-[280px] flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
-        {panelContent}
-      </aside>
-
-      {/* Mobile: expandable bottom sheet */}
-      <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="md:hidden fixed bottom-4 right-4 z-30 w-12 h-12 rounded-full bg-[#222] text-white shadow-lg flex items-center justify-center"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
-      {mobileOpen && (
-        <>
-          <div className="md:hidden fixed inset-0 bg-black/30 z-40" onClick={() => setMobileOpen(false)} />
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
-            <div className="flex justify-center py-2">
-              <div className="w-10 h-1 rounded-full bg-gray-300" />
+    <aside
+      className="hidden lg:flex flex-col flex-shrink-0 bg-white overflow-y-auto"
+      style={{ width: 310, borderLeft: "1px solid var(--dry-sand)" }}
+    >
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
+        {selectedDate ? (
+          <>
+            <div className="text-[18px] font-bold" style={{ color: "var(--coastal)" }}>
+              {dateLabel}
             </div>
-            {panelContent}
+            <div className="text-xs mt-0.5" style={{ color: "var(--tideline)" }}>
+              {dowLabel} · {propertyName}
+            </div>
+          </>
+        ) : (
+          <div className="text-[13px]" style={{ color: "var(--tideline)" }}>
+            Select a date to edit pricing
           </div>
-        </>
+        )}
+      </div>
+
+      {/* Booking info (when a booking is selected) */}
+      {selectedBooking && selectedBookingDetails && (
+        <BookingInfoSection
+          booking={selectedBooking}
+          nights={selectedBookingDetails.nights}
+          onClear={onClearBooking}
+        />
       )}
-    </>
+
+      {/* Base Rate */}
+      {selectedDate && (
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
+          <SectionLabel label="Base rate" />
+          <div className="flex items-center justify-between">
+            <div
+              className="text-[28px] font-bold tabular-nums"
+              style={{ color: "var(--coastal)", letterSpacing: "-0.03em" }}
+            >
+              ${baseRate ?? "—"}
+            </div>
+            <div
+              className="px-[10px] py-1 rounded-full text-[10px] font-bold"
+              style={{
+                background: "linear-gradient(135deg, rgba(26,122,90,0.12), rgba(26,122,90,0.04))",
+                color: "var(--lagoon)",
+                border: "1px solid rgba(26,122,90,0.15)",
+              }}
+            >
+              9-signal
+            </div>
+          </div>
+          <div className="text-[11px] mt-1.5" style={{ color: "var(--tideline)" }}>
+            {activeRate?.rate_source === "manual" ? "Manual override" : "Engine output"}
+          </div>
+        </div>
+      )}
+
+      {/* Channel rates */}
+      {selectedDate && (
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
+          <PerChannelRateEditor
+            propertyId={propertyId}
+            dates={[selectedDate]}
+            baseRate={baseRate}
+          />
+        </div>
+      )}
+
+      {/* Settings */}
+      {selectedDate && (
+        <div className="px-5 py-4">
+          <SectionLabel label="Settings" />
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <div className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
+                Available
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--tideline)" }}>
+                Open on all channels
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={available}
+              onClick={handleAvailableToggle}
+              className="relative transition-colors"
+              style={{
+                width: 42,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: available ? "var(--lagoon)" : "var(--shell)",
+              }}
+            >
+              <div
+                className="absolute top-[2px] rounded-full bg-white"
+                style={{
+                  width: 18,
+                  height: 18,
+                  left: available ? 22 : 2,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                  transition: "left 0.2s ease",
+                }}
+              />
+            </button>
+          </div>
+          <div
+            className="flex items-center justify-between py-3"
+            style={{ borderTop: "1px solid var(--dry-sand)" }}
+          >
+            <div>
+              <div className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
+                Min stay
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--tideline)" }}>
+                All channels
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleMinStayChange(-1)}
+                className="flex items-center justify-center transition-colors"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  border: "1px solid var(--dry-sand)",
+                  backgroundColor: "#fff",
+                  color: "var(--coastal)",
+                }}
+              >
+                <Minus size={14} />
+              </button>
+              <div
+                className="text-[18px] font-bold text-center"
+                style={{ color: "var(--coastal)", minWidth: 28 }}
+              >
+                {minStay}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleMinStayChange(1)}
+                className="flex items-center justify-center transition-colors"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  border: "1px solid var(--dry-sand)",
+                  backgroundColor: "#fff",
+                  color: "var(--coastal)",
+                }}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div
+      className="mb-3 text-[10px] font-bold tracking-[0.08em] uppercase"
+      style={{ color: "var(--golden)" }}
+    >
+      {label}
+    </div>
+  );
+}
+
+function BookingInfoSection({
+  booking,
+  nights,
+  onClear,
+}: {
+  booking: BookingBarData;
+  nights: number;
+  onClear: () => void;
+}) {
+  const platformKey = platformKeyFrom(booking.platform);
+  const platform = platformKey ? PLATFORMS[platformKey] : null;
+  const guestName = booking.guest_name?.trim() || "Guest";
+  const initials = guestName
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+  const total = booking.total_price ?? 0;
+  const perNight = total && nights > 0 ? Math.round(total / nights) : 0;
+
+  return (
+    <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] font-bold tracking-[0.08em] uppercase" style={{ color: "var(--golden)" }}>
+          Current booking
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="p-0.5 transition-colors rounded"
+          style={{ color: "var(--tideline)" }}
+          aria-label="Clear booking selection"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="flex items-center justify-center flex-shrink-0 text-white font-bold"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, var(--mangrove), var(--tideline))",
+            fontSize: 16,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+          }}
+        >
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15px] font-bold truncate" style={{ color: "var(--coastal)" }}>
+              {guestName}
+            </span>
+            {platform && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 rounded text-[10px] font-semibold"
+                style={{
+                  height: 18,
+                  backgroundColor: platform.colorLight,
+                  color: platform.color,
+                }}
+              >
+                <Image src={platform.icon} alt={platform.name} width={10} height={10} />
+                {platform.name}
+              </span>
+            )}
+          </div>
+          <div className="text-xs mt-0.5" style={{ color: "var(--tideline)" }}>
+            {formatRangeDate(booking.check_in)} — {formatRangeDate(booking.check_out)} ·{" "}
+            {nights} night{nights !== 1 ? "s" : ""} · {booking.num_guests ?? 1} guest
+            {(booking.num_guests ?? 1) !== 1 ? "s" : ""}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-[10px] px-3 py-2.5" style={{ backgroundColor: "var(--shore)" }}>
+          <div className="text-[16px] font-bold" style={{ color: "var(--coastal)", letterSpacing: "-0.02em" }}>
+            ${total || "—"}
+          </div>
+          <div
+            className="text-[10px] font-semibold uppercase tracking-[0.04em] mt-0.5"
+            style={{ color: "var(--tideline)" }}
+          >
+            Total payout
+          </div>
+        </div>
+        <div className="rounded-[10px] px-3 py-2.5" style={{ backgroundColor: "var(--shore)" }}>
+          <div className="text-[16px] font-bold" style={{ color: "var(--coastal)", letterSpacing: "-0.02em" }}>
+            ${perNight || "—"}
+          </div>
+          <div
+            className="text-[10px] font-semibold uppercase tracking-[0.04em] mt-0.5"
+            style={{ color: "var(--tideline)" }}
+          >
+            Per night
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

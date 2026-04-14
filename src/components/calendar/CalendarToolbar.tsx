@@ -1,46 +1,59 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 interface CalendarToolbarProps {
+  monthLabel: string;
+  yearLabel: string;
+  onPrev: () => void;
+  onNext: () => void;
   onToday: () => void;
-  properties: { id: string; name: string }[];
-  selectedPropertyId: string | null;
-  onPropertyChange: (id: string | null) => void;
 }
 
 export default function CalendarToolbar({
+  monthLabel,
+  yearLabel,
+  onPrev,
+  onNext,
   onToday,
-  properties,
-  selectedPropertyId,
-  onPropertyChange,
 }: CalendarToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
-      {/* Left: title */}
-      <h1 className="text-sm font-bold text-neutral-800">Calendar</h1>
-
-      {/* Center: today button */}
+    <div
+      className="flex-shrink-0 px-6 py-[18px] flex items-center justify-between bg-white"
+      style={{ borderBottom: "1px solid var(--dry-sand)" }}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onPrev}
+          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-shore"
+          style={{ border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
+          aria-label="Previous month"
+        >
+          <ChevronLeft size={16} strokeWidth={2} />
+        </button>
+        <div
+          className="text-[22px] font-bold"
+          style={{ color: "var(--coastal)", minWidth: 180 }}
+        >
+          {monthLabel}{" "}
+          <span style={{ color: "var(--tideline)", fontWeight: 500 }}>{yearLabel}</span>
+        </div>
+        <button
+          onClick={onNext}
+          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-shore"
+          style={{ border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
+          aria-label="Next month"
+        >
+          <ChevronRight size={16} strokeWidth={2} />
+        </button>
+      </div>
       <button
         onClick={onToday}
-        className="px-2.5 py-1 text-xs font-medium text-neutral-600 bg-white border border-gray-200 rounded-lg hover:bg-neutral-50 transition-colors"
+        className="px-[14px] py-[6px] rounded-full text-xs font-semibold transition-colors hover:bg-shore"
+        style={{ border: "1px solid var(--dry-sand)", backgroundColor: "#fff", color: "var(--coastal)" }}
       >
         Today
       </button>
-
-      {/* Right: property selector (mobile only — desktop sidebar handles it) */}
-      <select
-        value={selectedPropertyId ?? ""}
-        onChange={(e) => onPropertyChange(e.target.value || null)}
-        className="md:hidden h-8 px-2.5 text-xs border border-gray-200 rounded-lg bg-white text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-      >
-        {properties.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-
-      {/* Desktop: invisible spacer for centering */}
-      <div className="hidden md:block w-[1px]" />
     </div>
   );
 }

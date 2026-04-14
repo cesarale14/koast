@@ -258,7 +258,7 @@ export default function AnalyticsDashboard({
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Explorer</h1>
+            <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Intel</h1>
             <p className="text-neutral-500">Market analysis and performance metrics</p>
           </div>
           {properties.length > 1 && (
@@ -322,7 +322,7 @@ export default function AnalyticsDashboard({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Explorer</h1>
+          <h1 className="text-xl font-bold text-neutral-800 mb-1">Market Intel</h1>
           <p className="text-neutral-500">
             Market analysis and performance metrics
             {lastUpdated && <span className="text-xs text-neutral-400 ml-2">Last updated: {timeAgo(lastUpdated)}</span>}

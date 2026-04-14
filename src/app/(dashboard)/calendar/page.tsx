@@ -30,9 +30,6 @@ export default async function CalendarPage() {
   if (properties.length === 0) {
     return (
       <div>
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Calendar</h1>
-        <p className="text-sm text-neutral-500 mb-8">Multi-property availability calendar</p>
-
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
