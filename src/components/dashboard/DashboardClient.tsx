@@ -10,7 +10,6 @@ import {
   DollarSign,
   Sparkles,
   Star,
-  TrendingUp,
   Home as HomeIcon,
 } from "lucide-react";
 import RevenueChart from "./RevenueChart";
@@ -79,15 +78,6 @@ interface CommandCenterData {
 }
 
 // ====== Helpers ======
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 function formatShortDate(dateStr?: string): string {
   if (!dateStr) return "";
