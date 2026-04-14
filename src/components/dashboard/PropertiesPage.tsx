@@ -1,9 +1,11 @@
 "use client";
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { Home, Plus, X, Loader2, ChevronRight, Check, ChevronDown } from "lucide-react";
+import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
 
 /* ---------- Types (keep compatible with server page.tsx) ---------- */
 interface PropertyData {
@@ -17,17 +19,24 @@ export interface PropertiesPageProps {
   properties: PropertyData[]; channels: ChannelRecord[];
   bookingCounts: Record<string, number>; occupancy: Record<string, number>;
   nextCheckins: Record<string, { date: string; guest: string | null }>;
+  monthlyRevenue?: Record<string, number>;
+  rating?: Record<string, number>;
+  adr?: Record<string, number>;
+  currentBooking?: Record<string, { guest: string | null; check_out: string } | null>;
+  nextBookingGuest?: Record<string, string | null>;
+  cleaningToday?: Record<string, { status: string; cleaner: string | null } | null>;
+  tonightRate?: Record<string, number>;
 }
 
 /* ---------- Constants ---------- */
-const PLATFORMS = [
+const IMPORT_PLATFORMS = [
   { code: "ABB", name: "Airbnb", color: "bg-red-500", letter: "A", desc: "Import your Airbnb listing" },
   { code: "BDC", name: "Booking.com", color: "bg-blue-600", letter: "B", desc: "Import from Booking.com" },
   { code: "VRBO", name: "VRBO", color: "bg-purple-600", letter: "V", desc: "Import from VRBO" },
 ];
-type Platform = (typeof PLATFORMS)[0];
+type ImportPlatform = (typeof IMPORT_PLATFORMS)[0];
 
-const BADGE: Record<string, { label: string; bg: string; text: string }> = {
+const BADGE: Record<string, { label: string; bg: string; text: string } | undefined> = {
   ABB: { label: "Airbnb", bg: "bg-red-50", text: "text-red-700" },
   BDC: { label: "Booking.com", bg: "bg-blue-50", text: "text-blue-700" },
   VRBO: { label: "VRBO", bg: "bg-purple-50", text: "text-purple-700" },
@@ -59,11 +68,8 @@ function StepDots({ current }: { current: number }) {
   );
 }
 
-/* ---------- Platform Badge ---------- */
-import PlatformLogoIcon, { PlatformBadge as PlatformBadgeUI } from "@/components/ui/PlatformLogo";
-function PlatformBadge({ code }: { code: string }) {
-  return <PlatformBadgeUI platform={code} />;
-}
+/* ---------- Platform Badge (used inside the import modal only) ---------- */
+import PlatformLogoIcon from "@/components/ui/PlatformLogo";
 
 /* ---------- Preview Card ---------- */
 function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: {
@@ -94,36 +100,270 @@ function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: 
   );
 }
 
-/* ---------- Property Card (list view) ---------- */
-function PropertyCard({ property: p, connectedChannels, bookingCount, occupancy, nextCheckin }: {
-  property: PropertyData; connectedChannels: ChannelRecord[];
-  bookingCount: number; occupancy: number; nextCheckin: { date: string; guest: string | null } | null;
-}) {
+/* ---------- Property Card (Koast grid card) ---------- */
+interface PropertyCardData {
+  property: PropertyData;
+  connectedChannels: ChannelRecord[];
+  monthlyRevenue: number;
+  occupancy: number;
+  rating: number;
+  adr: number;
+  tonightRate: number;
+  currentBooking: { guest: string | null; check_out: string } | null;
+  nextCheckin: { date: string; guest: string | null } | null;
+  cleaningToday: { status: string; cleaner: string | null } | null;
+  index: number;
+}
+
+function firstNameLastInitial(name: string | null | undefined): string {
+  const raw = (name ?? "").trim();
+  if (!raw || /guest$/i.test(raw)) return raw || "Guest";
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const first = parts[0] ?? "";
+  const lastInitial = parts[1]?.[0];
+  return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
+}
+
+function shortDate(date: string): string {
+  return new Date(date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function PropertyCard({
+  property: p,
+  connectedChannels,
+  monthlyRevenue,
+  occupancy,
+  rating,
+  adr,
+  tonightRate,
+  currentBooking,
+  nextCheckin,
+  cleaningToday,
+  index,
+}: PropertyCardData) {
+  // Derive status from the live data we have. Turnover = cleaning task
+  // scheduled for today. Occupied = current active booking. Vacant =
+  // neither.
+  const isTurnover = !!cleaningToday && cleaningToday.status !== "completed";
+  const isOccupied = !!currentBooking && !isTurnover;
+
+  let statusTone: "lagoon" | "golden" | "amber-tide" = "golden";
+  let statusText = "Vacant";
+  let statusRight: string | null = null;
+
+  if (isTurnover && cleaningToday) {
+    statusTone = "amber-tide";
+    const label =
+      cleaningToday.status === "completed"
+        ? "cleaned"
+        : cleaningToday.status === "in_progress"
+        ? "in progress"
+        : cleaningToday.status === "assigned"
+        ? "confirmed"
+        : "pending";
+    statusText = `Turnover today — ${cleaningToday.cleaner ?? "no cleaner"}${cleaningToday.cleaner ? ` ${label}` : ""}`;
+  } else if (isOccupied && currentBooking) {
+    statusTone = "lagoon";
+    const first = firstNameLastInitial(currentBooking.guest);
+    statusText = `${first} — checkout ${shortDate(currentBooking.check_out)}`;
+    if (nextCheckin) {
+      statusRight = `Next: ${firstNameLastInitial(nextCheckin.guest)}`;
+    }
+  } else if (nextCheckin) {
+    statusTone = "golden";
+    statusText = `Vacant — next: ${shortDate(nextCheckin.date)}`;
+    if (tonightRate > 0) {
+      statusRight = `$${tonightRate}/night`;
+    }
+  } else if (tonightRate > 0) {
+    statusTone = "golden";
+    statusText = `Open tonight — $${tonightRate}/night`;
+  } else {
+    statusText = "Vacant";
+  }
+
+  const statusColor = `var(--${statusTone})`;
+  const revDisplay = monthlyRevenue >= 1000 ? `$${(monthlyRevenue / 1000).toFixed(1)}k` : `$${Math.round(monthlyRevenue)}`;
+  const locationLabel = [p.city, p.state].filter(Boolean).join(", ");
+
   return (
-    <Link href={`/properties/${p.id}`} className="bg-neutral-0 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 group">
-      {p.cover_photo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <div className="h-40 rounded-t-xl overflow-hidden"><img src={p.cover_photo_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /></div>
-      ) : (
-        <div className="h-40 bg-gradient-to-br from-[#eef5f0] to-[#d5e8da] rounded-t-xl flex items-center justify-center"><Home size={32} className="text-[#a8d1b4]" strokeWidth={1.5} /></div>
-      )}
-      <div className="p-5">
-        <h3 className="text-lg font-semibold text-neutral-800">{p.name}</h3>
-        {(p.city || p.state) && <p className="text-sm text-neutral-500 mt-0.5">{[p.city, p.state].filter(Boolean).join(", ")}</p>}
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {connectedChannels.length > 0 ? connectedChannels.map((ch) => (
-            <PlatformBadge key={ch.channel_code} code={ch.channel_code} />
-          )) : <span className="text-xs text-neutral-400">No channels</span>}
-        </div>
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-100">
-          <div><p className="text-xs text-neutral-400">Bookings</p><p className="text-sm font-semibold font-mono text-neutral-800">{bookingCount}</p></div>
-          <div><p className="text-xs text-neutral-400">Occupancy</p><p className="text-sm font-semibold font-mono text-neutral-800">{occupancy}%</p></div>
-          <div className="text-right"><p className="text-xs text-neutral-400">Next check-in</p>
-            <p className="text-sm font-medium text-neutral-700">{nextCheckin ? new Date(nextCheckin.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "\u2014"}</p>
+    <Link
+      href={`/properties/${p.id}`}
+      className="block rounded-2xl overflow-hidden bg-white koast-prop-card"
+      style={{
+        boxShadow: "var(--shadow-card)",
+        animation: `koast-card-reveal 0.55s ease-out ${200 + index * 100}ms both`,
+        transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.35s cubic-bezier(0.4,0,0.2,1)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-6px) scale(1.01)";
+        e.currentTarget.style.boxShadow = "var(--shadow-card-hover)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.boxShadow = "var(--shadow-card)";
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px) scale(0.995)";
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.style.transform = "translateY(-6px) scale(1.01)";
+      }}
+    >
+      {/* Photo */}
+      <div className="relative" style={{ height: 180, backgroundColor: "var(--dry-sand)" }}>
+        {p.cover_photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.cover_photo_url} alt={p.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-shell">
+            <Home size={36} strokeWidth={1.5} />
           </div>
+        )}
+        {/* Bottom gradient overlay */}
+        <div
+          className="absolute inset-x-0 bottom-0 pointer-events-none"
+          style={{ height: 80, background: "linear-gradient(transparent, rgba(0,0,0,0.5))" }}
+        />
+        {/* Channel badges — top right */}
+        <div className="absolute top-3 right-3 flex gap-1 z-[2]">
+          {connectedChannels.map((ch) => {
+            const key: PlatformKey | null = platformKeyFrom(ch.channel_code);
+            if (!key) return null;
+            const platform = PLATFORMS[key];
+            return (
+              <div
+                key={ch.channel_code}
+                className="flex items-center justify-center"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  backgroundColor: `${platform.color}bf`,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}
+                title={platform.name}
+              >
+                <Image src={platform.iconWhite} alt={platform.name} width={12} height={12} />
+              </div>
+            );
+          })}
+        </div>
+        {/* Name + location overlaid bottom-left */}
+        <div className="absolute left-3 bottom-3 right-3 z-[2]">
+          <div
+            className="font-bold text-white truncate"
+            style={{ fontSize: 17, textShadow: "0 1px 4px rgba(0,0,0,0.35)" }}
+          >
+            {p.name}
+          </div>
+          {locationLabel && (
+            <div className="text-[12px] text-white/80 truncate" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
+              {locationLabel}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Status bar */}
+      <div
+        className="flex items-center gap-2 px-[14px] py-2 text-[12px] font-semibold"
+        style={{ borderBottom: "1px solid var(--dry-sand)", color: statusColor }}
+      >
+        <span
+          className="flex-shrink-0 rounded-full"
+          style={{ width: 6, height: 6, backgroundColor: statusColor }}
+        />
+        <span className="truncate">{statusText}</span>
+        {statusRight && (
+          <span
+            className="ml-auto text-[11px] font-medium flex-shrink-0"
+            style={{ color: "var(--tideline)" }}
+          >
+            {statusRight}
+          </span>
+        )}
+      </div>
+
+      {/* Metrics row */}
+      <div className="flex py-3 px-[14px]">
+        <Metric label="Revenue" value={revDisplay} />
+        <MetricDivider />
+        <Metric label="Occupancy" value={`${occupancy}%`} />
+        <MetricDivider />
+        <Metric label="Rating" value={rating > 0 ? rating.toFixed(1) : "—"} />
+        <MetricDivider />
+        <Metric label="ADR" value={adr > 0 ? `$${adr}` : "—"} />
+      </div>
     </Link>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex-1 text-center px-1">
+      <div className="text-[17px] font-bold" style={{ color: "var(--coastal)", letterSpacing: "-0.03em" }}>
+        {value}
+      </div>
+      <div
+        className="text-[9px] font-bold uppercase mt-0.5"
+        style={{ color: "var(--golden)", letterSpacing: "0.06em" }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MetricDivider() {
+  return <div className="w-px self-stretch my-1" style={{ backgroundColor: "var(--dry-sand)" }} />;
+}
+
+function AddPropertyTile({ onClick, index }: { onClick: () => void; index: number }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl flex flex-col items-center justify-center text-center transition-all"
+      style={{
+        border: "2px dashed var(--dry-sand)",
+        minHeight: 340,
+        backgroundColor: "rgba(255,255,255,0.5)",
+        padding: 24,
+        animation: `koast-card-reveal 0.55s ease-out ${200 + index * 100}ms both`,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "var(--golden)";
+        e.currentTarget.style.backgroundColor = "rgba(196,154,90,0.04)";
+        e.currentTarget.style.transform = "translateY(-3px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "var(--dry-sand)";
+        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.5)";
+        e.currentTarget.style.transform = "";
+      }}
+    >
+      <div
+        className="flex items-center justify-center mb-[14px]"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          background: "linear-gradient(135deg, rgba(196,154,90,0.12), rgba(196,154,90,0.04))",
+          color: "var(--golden)",
+          border: "1px solid rgba(196,154,90,0.15)",
+        }}
+      >
+        <Plus size={24} strokeWidth={2} />
+      </div>
+      <div className="text-[15px] font-bold mb-1" style={{ color: "var(--coastal)" }}>
+        Add property
+      </div>
+      <div className="text-[12px] max-w-[220px] leading-[1.5]" style={{ color: "var(--tideline)" }}>
+        Connect Airbnb, Booking.com, or import via iCal
+      </div>
+    </button>
   );
 }
 
@@ -167,7 +407,7 @@ function IcalHelp({ platform }: { platform: string }) {
 /* ---------- Full-Screen Add Property Modal (4 steps) ---------- */
 function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [platform, setPlatform] = useState<Platform | null>(null);
+  const [platform, setPlatform] = useState<ImportPlatform | null>(null);
   const [listingUrl, setListingUrl] = useState("");
   const [listingId, setListingId] = useState<string | null>(null);
   const [listingName, setListingName] = useState("");
@@ -190,7 +430,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
   }, [onClose]);
 
   /* Step 1: Choose platform */
-  const selectPlatform = (p: Platform) => {
+  const selectPlatform = (p: ImportPlatform) => {
     setPlatform(p); setStep(2); setUrlError(null);
   };
 
@@ -284,7 +524,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
               <h2 className="text-xl font-bold text-neutral-800 mb-2">Choose a platform</h2>
               <p className="text-sm text-neutral-500 mb-6">Select where your property is listed</p>
               <div className="space-y-3">
-                {PLATFORMS.map((p) => (
+                {IMPORT_PLATFORMS.map((p) => (
                   <button key={p.code} onClick={() => selectPlatform(p)}
                     className="w-full flex items-center gap-4 p-5 rounded-xl border border-[var(--border)] bg-white hover:bg-neutral-50 hover:border-neutral-300 transition-all group text-left">
                     <PlatformLogoIcon platform={p.code} size="xl" />
@@ -404,15 +644,28 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 }
 
 /* ---------- Main Component ---------- */
-export default function PropertiesPage({ properties, channels, bookingCounts, occupancy, nextCheckins }: PropertiesPageProps) {
+export default function PropertiesPage({
+  properties,
+  channels,
+  nextCheckins,
+  occupancy,
+  monthlyRevenue,
+  rating,
+  adr,
+  currentBooking,
+  cleaningToday,
+  tonightRate,
+}: PropertiesPageProps) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
 
   const chMap = new Map<string, ChannelRecord[]>();
+  const activeChannelTotal = new Set<string>();
   for (const ch of channels) {
     if (ch.status !== "active") continue;
     if (!chMap.has(ch.property_id)) chMap.set(ch.property_id, []);
     chMap.get(ch.property_id)!.push(ch);
+    activeChannelTotal.add(`${ch.property_id}:${ch.channel_code}`);
   }
 
   const closeModal = useCallback((didImport: boolean) => {
@@ -423,16 +676,30 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
   if (properties.length === 0) {
     return (
       <div>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center max-w-lg">
-            <div className="w-16 h-16 bg-[#eef5f0] rounded-2xl flex items-center justify-center mx-auto mb-6"><Home size={32} className="text-[#3d6b52]" strokeWidth={1.5} /></div>
-            <h1 className="text-2xl font-bold text-neutral-800 mb-2">Add your first property</h1>
-            <p className="text-neutral-500 mb-8">Import from Airbnb, Booking.com, or VRBO to get started</p>
-            <button onClick={() => setShowModal(true)}
-              className="px-6 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors flex items-center gap-2 mx-auto">
-              <Plus size={16} />Add Property
-            </button>
+        <GlobalAnim />
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-[20px] font-bold" style={{ color: "var(--coastal)" }}>
+              Properties
+            </h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--tideline)" }}>
+              0 properties · 0 active channels
+            </p>
           </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-[10px] text-[13px] font-semibold transition-colors"
+            style={{ borderRadius: 10, backgroundColor: "var(--coastal)", color: "var(--shore)" }}
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            Add property
+          </button>
+        </div>
+        <div
+          className="grid gap-5"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}
+        >
+          <AddPropertyTile onClick={() => setShowModal(true)} index={0} />
         </div>
         {showModal && <AddPropertyModal onClose={closeModal} />}
       </div>
@@ -441,18 +708,76 @@ export default function PropertiesPage({ properties, channels, bookingCounts, oc
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-bold text-neutral-800">Properties</h1>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors"><Plus size={16} />Add Property</button>
+      <GlobalAnim />
+      <div
+        className="flex items-center justify-between mb-8"
+        style={{ animation: "koast-fade-up 0.5s ease-out 200ms both" }}
+      >
+        <div>
+          <h1 className="text-[20px] font-bold" style={{ color: "var(--coastal)" }}>
+            Properties
+          </h1>
+          <p className="text-[13px] mt-1" style={{ color: "var(--tideline)" }}>
+            {properties.length} {properties.length === 1 ? "property" : "properties"} ·{" "}
+            {activeChannelTotal.size} active{" "}
+            {activeChannelTotal.size === 1 ? "channel" : "channels"}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-[10px] text-[13px] font-semibold transition-all"
+          style={{ borderRadius: 10, backgroundColor: "var(--coastal)", color: "var(--shore)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--mangrove)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--coastal)";
+            e.currentTarget.style.transform = "";
+          }}
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          Add property
+        </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {properties.map((prop) => (
-          <PropertyCard key={prop.id} property={prop} connectedChannels={chMap.get(prop.id) ?? []}
-            bookingCount={bookingCounts[prop.id] ?? 0} occupancy={occupancy[prop.id] ?? 0}
-            nextCheckin={nextCheckins[prop.id] ?? null} />
+      <div
+        className="grid gap-5"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}
+      >
+        {properties.map((prop, i) => (
+          <PropertyCard
+            key={prop.id}
+            property={prop}
+            connectedChannels={chMap.get(prop.id) ?? []}
+            monthlyRevenue={monthlyRevenue?.[prop.id] ?? 0}
+            occupancy={occupancy[prop.id] ?? 0}
+            rating={rating?.[prop.id] ?? 0}
+            adr={adr?.[prop.id] ?? 0}
+            tonightRate={tonightRate?.[prop.id] ?? 0}
+            currentBooking={currentBooking?.[prop.id] ?? null}
+            nextCheckin={nextCheckins[prop.id] ?? null}
+            cleaningToday={cleaningToday?.[prop.id] ?? null}
+            index={i}
+          />
         ))}
+        <AddPropertyTile onClick={() => setShowModal(true)} index={properties.length} />
       </div>
       {showModal && <AddPropertyModal onClose={closeModal} />}
     </div>
+  );
+}
+
+function GlobalAnim() {
+  return (
+    <style jsx global>{`
+      @keyframes koast-fade-up {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes koast-card-reveal {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `}</style>
   );
 }
