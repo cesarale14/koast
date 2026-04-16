@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
+import { useCountUp } from "@/hooks/useCountUp";
 
 interface Comp {
   comp_listing_id: string;
@@ -22,7 +23,7 @@ interface Props {
   propertyAvgRate: number;
 }
 
-const BG_COLORS = ["bg-blue-500", "bg-[#1a3a2a]", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
+const BG_COLORS = ["bg-[var(--coastal)]", "bg-[var(--tideline)]", "bg-[var(--golden)]", "bg-[var(--deep-water)]", "bg-[var(--lagoon)]", "bg-[var(--amber-tide)]"];
 function letterBg(name: string | null): string {
   const s = name ?? "L";
   let hash = 0;
@@ -35,6 +36,27 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function CompGlassCard({ label, value, prefix, suffix, delay }: { label: string; value: number; prefix?: string; suffix?: string; delay: number }) {
+  const animated = useCountUp(value, 1200, 800);
+  return (
+    <div
+      className="koast-anim relative rounded-2xl p-5 overflow-hidden text-center"
+      style={{
+        background: "linear-gradient(165deg, rgba(255,255,255,0.95), rgba(247,243,236,0.85) 50%, rgba(237,231,219,0.7))",
+        border: "1px solid rgba(255,255,255,0.6)",
+        boxShadow: "var(--shadow-glass)",
+        animationDelay: `${delay * 80}ms`,
+      }}
+    >
+      <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-2xl pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), transparent)" }} />
+      <p className="relative font-bold font-mono" style={{ fontSize: 26, color: "var(--coastal)", letterSpacing: "-0.03em" }}>
+        {prefix ?? ""}{Math.round(animated)}{suffix ?? ""}
+      </p>
+      <p className="relative mt-1" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)" }}>{label}</p>
+    </div>
+  );
 }
 
 export default function CompSetsClient({ properties, initialPropertyId, initialComps, propertyAvgRate }: Props) {
@@ -85,16 +107,29 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
 
   return (
     <div>
+      {/* Entrance animation keyframes */}
+      <style>{`
+        @keyframes koast-fade-up {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .koast-anim {
+          opacity: 0;
+          animation: koast-fade-up 0.55s ease-out forwards;
+        }
+      `}</style>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Comp Sets</h1>
-          <p className="text-sm text-neutral-500">Your competitive set analysis</p>
+          <h1 className="font-bold" style={{ fontSize: 20, color: "var(--coastal)" }}>Comp Sets</h1>
+          <p style={{ fontSize: 13, color: "var(--tideline)" }}>Your competitive set analysis</p>
         </div>
         {properties.length > 1 && (
           <select
             value={propertyId}
             onChange={(e) => switchProperty(e.target.value)}
-            className="px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-neutral-0"
+            className="px-3 py-2 text-sm rounded-[10px] focus:outline-none focus:ring-2"
+            style={{ background: "var(--shore)", border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
           >
             {properties.map((p: { id: string; name: string }) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -103,44 +138,38 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
         )}
       </div>
 
+      {/* Section Label */}
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Summary</div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-neutral-800">{summary.count}</p>
-          <p className="text-xs text-neutral-500 mt-1">Comps</p>
-        </div>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-neutral-800">${summary.avgAdr}</p>
-          <p className="text-xs text-neutral-500 mt-1">Median ADR</p>
-        </div>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-neutral-800">{summary.avgOcc}%</p>
-          <p className="text-xs text-neutral-500 mt-1">Median Occupancy</p>
-        </div>
-        <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-neutral-800">${summary.avgRevpar}</p>
-          <p className="text-xs text-neutral-500 mt-1">Median RevPAR</p>
-        </div>
+        <CompGlassCard label="Comps" value={summary.count} delay={0} />
+        <CompGlassCard label="Median ADR" value={summary.avgAdr} prefix="$" delay={1} />
+        <CompGlassCard label="Median Occupancy" value={summary.avgOcc} suffix="%" delay={2} />
+        <CompGlassCard label="Median RevPAR" value={summary.avgRevpar} prefix="$" delay={3} />
       </div>
 
+      {/* Section Label */}
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Competitive Set</div>
+
       {/* Comp table */}
-      <div className={`bg-neutral-0 rounded-lg border border-[var(--border)] overflow-hidden ${loading ? "opacity-50" : ""}`}>
+      <div className={`koast-anim rounded-2xl overflow-hidden ${loading ? "opacity-50" : ""}`} style={{ background: "white", boxShadow: "var(--shadow-card)", animationDelay: "400ms" }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50">
-                <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 uppercase tracking-wider">Listing</th>
-                <th className="text-left py-3 px-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">BR</th>
-                <th className="text-right py-3 px-3 text-xs font-medium text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-neutral-600" onClick={() => handleSort("comp_adr")}>
+              <tr>
+                <th className="text-left py-3 px-4" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }}>Listing</th>
+                <th className="text-left py-3 px-3" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }}>BR</th>
+                <th className="text-right py-3 px-3 cursor-pointer" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }} onClick={() => handleSort("comp_adr")}>
                   ADR{sortArrow("comp_adr")}
                 </th>
-                <th className="text-right py-3 px-3 text-xs font-medium text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-neutral-600" onClick={() => handleSort("comp_occupancy")}>
+                <th className="text-right py-3 px-3 cursor-pointer" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }} onClick={() => handleSort("comp_occupancy")}>
                   Occ{sortArrow("comp_occupancy")}
                 </th>
-                <th className="text-right py-3 px-3 text-xs font-medium text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-neutral-600" onClick={() => handleSort("comp_revpar")}>
+                <th className="text-right py-3 px-3 cursor-pointer" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }} onClick={() => handleSort("comp_revpar")}>
                   RevPAR{sortArrow("comp_revpar")}
                 </th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-neutral-600" onClick={() => handleSort("distance_km")}>
+                <th className="text-right py-3 px-4 cursor-pointer" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--tideline)" }} onClick={() => handleSort("distance_km")}>
                   Distance{sortArrow("distance_km")}
                 </th>
               </tr>
@@ -148,55 +177,61 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
             <tbody>
               {/* Your property row */}
               {currentProp && (
-                <tr className="border-b border-brand-100 bg-brand-50/50">
+                <tr style={{ background: "rgba(196,154,90,0.05)", borderLeft: "3px solid var(--golden)" }}>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2.5">
                       <PropertyAvatar name={currentProp.name} photoUrl={currentProp.cover_photo_url} size={32} />
                       <div>
-                        <p className="font-semibold text-brand-700">{currentProp.name}</p>
-                        <p className="text-[10px] text-brand-500">Your Property</p>
+                        <p className="font-semibold" style={{ fontSize: 13, color: "var(--coastal)" }}>{currentProp.name}</p>
+                        <p style={{ fontSize: 10, color: "var(--golden)" }}>Your Property</p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-3 text-brand-700">{currentProp.bedrooms ?? "—"}</td>
-                  <td className="py-3 px-3 text-right font-bold font-mono text-brand-700">${propertyAvgRate}</td>
-                  <td className="py-3 px-3 text-right font-mono text-brand-700">—</td>
-                  <td className="py-3 px-3 text-right font-mono text-brand-700">—</td>
-                  <td className="py-3 px-4 text-right text-brand-400">—</td>
+                  <td className="py-3 px-3" style={{ color: "var(--coastal)" }}>{currentProp.bedrooms ?? "\u2014"}</td>
+                  <td className="py-3 px-3 text-right font-bold font-mono" style={{ color: "var(--coastal)" }}>${propertyAvgRate}</td>
+                  <td className="py-3 px-3 text-right font-mono" style={{ color: "var(--coastal)" }}>{"\u2014"}</td>
+                  <td className="py-3 px-3 text-right font-mono" style={{ color: "var(--coastal)" }}>{"\u2014"}</td>
+                  <td className="py-3 px-4 text-right" style={{ color: "var(--tideline)" }}>{"\u2014"}</td>
                 </tr>
               )}
 
               {/* Comp rows */}
-              {sorted.map((comp) => {
+              {sorted.map((comp, idx) => {
                 const adrDiff = propertyAvgRate > 0 ? (comp.comp_adr ?? 0) - propertyAvgRate : 0;
-                const adrColor = adrDiff > 0 ? "text-red-500" : adrDiff < -5 ? "text-[#1a3a2a]" : "text-neutral-800";
+                const adrColorStyle = adrDiff > 0 ? "var(--coral-reef)" : adrDiff < -5 ? "var(--lagoon)" : "var(--coastal)";
                 return (
-                  <tr key={comp.comp_listing_id} className="border-b border-neutral-50 hover:bg-neutral-50 transition-colors">
+                  <tr
+                    key={comp.comp_listing_id}
+                    className="koast-anim transition-colors"
+                    style={{ background: idx % 2 === 0 ? "white" : "var(--shore)", animationDelay: `${500 + idx * 30}ms` }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(237,231,219,0.4)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? "white" : "var(--shore)"; }}
+                  >
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         {comp.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={comp.photo_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                          <img src={comp.photo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                         ) : (
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${letterBg(comp.comp_name)}`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${letterBg(comp.comp_name)}`}>
                             <span className="text-sm font-bold text-white">{(comp.comp_name ?? "L").charAt(0).toUpperCase()}</span>
                           </div>
                         )}
-                        <p className="font-medium text-neutral-800 truncate max-w-[200px]">{comp.comp_name ?? "Listing"}</p>
+                        <p className="truncate max-w-[200px]" style={{ fontSize: 13, fontWeight: 600, color: "var(--coastal)" }}>{comp.comp_name ?? "Listing"}</p>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-neutral-500">{comp.comp_bedrooms ?? "—"}</td>
-                    <td className={`py-3 px-3 text-right font-bold font-mono ${adrColor}`}>
+                    <td className="py-3 px-3" style={{ color: "var(--tideline)" }}>{comp.comp_bedrooms ?? "\u2014"}</td>
+                    <td className="py-3 px-3 text-right font-bold font-mono" style={{ color: adrColorStyle }}>
                       ${Math.round(comp.comp_adr ?? 0)}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-neutral-800">
+                    <td className="py-3 px-3 text-right font-mono" style={{ color: "var(--coastal)" }}>
                       {Math.round(comp.comp_occupancy ?? 0)}%
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-neutral-800">
+                    <td className="py-3 px-3 text-right font-mono" style={{ color: "var(--coastal)" }}>
                       ${Math.round(comp.comp_revpar ?? 0)}
                     </td>
-                    <td className="py-3 px-4 text-right text-neutral-400">
-                      {comp.distance_km != null ? `${comp.distance_km} km` : "—"}
+                    <td className="py-3 px-4 text-right" style={{ color: "var(--tideline)" }}>
+                      {comp.distance_km != null ? `${comp.distance_km} km` : "\u2014"}
                     </td>
                   </tr>
                 );
@@ -207,7 +242,7 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
 
         {sorted.length === 0 && (
           <div className="p-16 text-center">
-            <p className="text-neutral-400 text-sm">No comp data. Refresh market data on the Pricing page.</p>
+            <p className="text-sm" style={{ color: "var(--tideline)" }}>No comp data. Refresh market data on the Pricing page.</p>
           </div>
         )}
       </div>

@@ -21,8 +21,8 @@ export default async function CompSetsPage() {
   if (properties.length === 0) {
     return (
       <div>
-        <h1 className="text-xl font-bold text-neutral-800 mb-1">Comp Sets</h1>
-        <p className="text-sm text-neutral-500 mb-8">Your competitive set analysis</p>
+        <h1 className="font-bold mb-1" style={{ fontSize: 20, color: "var(--coastal)" }}>Comp Sets</h1>
+        <p className="mb-8" style={{ fontSize: 13, color: "var(--tideline)" }}>Your competitive set analysis</p>
         <EmptyState
           icon={GitCompare}
           title="No competitive set"
