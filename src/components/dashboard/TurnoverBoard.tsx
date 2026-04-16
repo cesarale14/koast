@@ -285,17 +285,18 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         <Header stats={stats} cleanerCount={cleaners.length} onShowCleaners={() => setShowCleaners(!showCleaners)} onBackfill={backfill} backfilling={backfilling} />
         <div className="flex items-center justify-center py-20">
           <div className="text-center max-w-sm">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <Sparkles className="w-8 h-8 text-gray-400" />
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: "rgba(196,154,90,0.12)" }}>
+              <Sparkles className="w-8 h-8" style={{ color: "var(--golden)" }} />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">No upcoming turnovers</h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--coastal)" }}>No upcoming turnovers</h2>
+            <p className="text-sm mb-6" style={{ color: "var(--tideline)" }}>
               Cleaning tasks are automatically created when new bookings sync from your calendar.
             </p>
             <button
               onClick={backfill}
               disabled={backfilling}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
+              style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
             >
               <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
               {backfilling ? "Creating..." : "Auto-Create Tasks"}
@@ -312,17 +313,17 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
       {/* Cleaners management panel */}
       {showCleaners && (
-        <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Manage Cleaners</h3>
+        <div className="mb-6 bg-white p-5" style={{ borderRadius: 14, boxShadow: "var(--shadow-card)", border: "1px solid var(--dry-sand)" }}>
+          <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>MANAGE CLEANERS</div>
           <div className="space-y-2 mb-4">
             {cleaners.map((c) => {
               const sms = smsState[c.id];
               return (
-                <div key={c.id} className="py-2.5 border-b border-gray-50 last:border-0">
+                <div key={c.id} className="py-2.5 last:border-0" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                      <p className="text-xs text-gray-400">{c.phone}</p>
+                      <p className="text-sm font-medium" style={{ color: "var(--coastal)" }}>{c.name}</p>
+                      <p className="text-xs" style={{ color: "var(--tideline)" }}>{c.phone}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
@@ -344,13 +345,14 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 </div>
               );
             })}
-            {cleaners.length === 0 && <p className="text-sm text-gray-400">No cleaners added yet.</p>}
+            {cleaners.length === 0 && <p className="text-sm" style={{ color: "var(--tideline)" }}>No cleaners added yet.</p>}
           </div>
           <div className="flex gap-2">
-            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none" />
-            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none" />
+            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-golden/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
+            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-golden/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
             <button onClick={addCleaner} disabled={addingCleaner || !newCleanerName || !newCleanerPhone}
-              className="px-4 py-2 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors">
+              className="px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
+              style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}>
               {addingCleaner ? "..." : "Add"}
             </button>
           </div>
@@ -358,25 +360,28 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       )}
 
       {/* Tab navigation — scrollable on mobile */}
-      <div className="flex items-center gap-1 mb-6 border-b border-gray-200 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-1 mb-6 overflow-x-auto scrollbar-hide" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap ${
+            className="flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap border-b-2 -mb-px"
+            style={
               activeTab === tab.key
-                ? "text-[#1a3a2a]"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+                ? { color: "var(--coastal)", borderColor: "var(--golden)" }
+                : { color: "var(--tideline)", borderColor: "transparent" }
+            }
           >
             {tab.label}
             {tab.count > 0 && (
-              <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                activeTab === tab.key ? "bg-[#eef5f0] text-[#1a3a2a]" : "bg-gray-100 text-gray-500"
-              }`}>{tab.count}</span>
-            )}
-            {activeTab === tab.key && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1a3a2a] rounded-t" />
+              <span
+                className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                style={
+                  activeTab === tab.key
+                    ? { backgroundColor: "rgba(196,154,90,0.12)", color: "var(--golden)" }
+                    : { backgroundColor: "var(--shore)", color: "var(--tideline)" }
+                }
+              >{tab.count}</span>
             )}
           </button>
         ))}
@@ -385,10 +390,10 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       {/* Content */}
       {filteredTasks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-            <CheckCircle2 size={20} className="text-gray-300" />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: "rgba(196,154,90,0.12)" }}>
+            <CheckCircle2 size={20} style={{ color: "var(--golden)" }} />
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm" style={{ color: "var(--tideline)" }}>
             {activeTab === "today" ? "No turnovers today" : activeTab === "completed" ? "No completed tasks yet" : "No tasks found"}
           </p>
         </div>
@@ -401,9 +406,9 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 onClick={() => toggleDateCollapse(group.date)}
                 className="flex items-center gap-2 mb-2 w-full text-left"
               >
-                {collapsedDates.has(group.date) ? <ChevronRight size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-                <span className="text-sm font-semibold text-gray-700">{group.label}</span>
-                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{group.tasks.length}</span>
+                {collapsedDates.has(group.date) ? <ChevronRight size={16} style={{ color: "var(--tideline)" }} /> : <ChevronDown size={16} style={{ color: "var(--tideline)" }} />}
+                <span className="text-sm font-semibold" style={{ color: "var(--coastal)" }}>{group.label}</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--shore)", color: "var(--tideline)" }}>{group.tasks.length}</span>
               </button>
               {!collapsedDates.has(group.date) && (
                 <div className="space-y-2 ml-6">
@@ -430,7 +435,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
           {filteredTasks.length >= 10 && (
             <button
               onClick={() => setUpcomingLimit((v) => v + 14)}
-              className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              className="w-full py-3 text-sm font-medium transition-colors"
+              style={{ backgroundColor: "var(--shore)", color: "var(--tideline)", borderRadius: 10 }}
             >
               Load more
             </button>
@@ -471,32 +477,34 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-2xl font-bold text-coastal mb-1">Turnovers</h1>
-        <p className="text-sm text-tideline">Cleaning schedules and task management</p>
+        <h1 className="text-[20px] font-bold mb-1" style={{ color: "var(--coastal)" }}>Turnovers</h1>
+        <p className="text-[13px]" style={{ color: "var(--tideline)" }}>Cleaning schedules and task management</p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {/* Stats pills */}
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full" style={{ backgroundColor: "rgba(212,150,11,0.1)", color: "var(--amber-tide)", border: "1px solid rgba(212,150,11,0.2)" }}>
           <Clock size={12} /> Today: {stats.today}
         </span>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-50 text-gray-600 border border-gray-200">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full" style={{ backgroundColor: "var(--shore)", color: "var(--tideline)", border: "1px solid var(--dry-sand)" }}>
           This Week: {stats.week}
         </span>
         {stats.unassigned > 0 && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)", border: "1px solid rgba(196,64,64,0.2)" }}>
             <AlertTriangle size={12} /> Unassigned: {stats.unassigned}
           </span>
         )}
         <button
           onClick={onShowCleaners}
-          className="px-3.5 py-1.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+          className="px-3.5 py-1.5 text-sm font-medium transition-colors hover:opacity-90"
+          style={{ backgroundColor: "var(--shore)", color: "var(--tideline)", borderRadius: 10, border: "1px solid var(--dry-sand)" }}
         >
           Cleaners ({cleanerCount})
         </button>
         <button
           onClick={onBackfill}
           disabled={backfilling}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#264d38] text-white text-sm font-medium rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
+          style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${backfilling ? "animate-spin" : ""}`} />
           {backfilling ? "Creating..." : "Auto-Create"}
@@ -529,10 +537,10 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
   const totalCount = (task.checklist ?? []).length;
   const photoSize = compact ? 48 : 64;
 
-  const statusBorder = task.status === "issue" ? "border-l-4 border-l-red-400"
-    : task.status === "in_progress" ? "border-l-4 border-l-blue-400"
-    : task.status === "completed" ? "border-l-4 border-l-[#3d6b52]"
-    : "";
+  const statusBorderStyle: React.CSSProperties = task.status === "issue" ? { borderLeft: "4px solid var(--coral-reef)" }
+    : task.status === "in_progress" ? { borderLeft: "4px solid var(--deep-water)" }
+    : task.status === "completed" ? { borderLeft: "4px solid var(--lagoon)" }
+    : {};
 
   const handleStatus = (e: React.MouseEvent, newStatus: string) => {
     e.preventDefault();
@@ -550,7 +558,10 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 ${statusBorder}`}
+      className="bg-white transition-all duration-200"
+      style={{ borderRadius: 14, boxShadow: "var(--shadow-card)", border: "1px solid var(--dry-sand)", ...statusBorderStyle }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-card-hover)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "var(--shadow-card)"; e.currentTarget.style.transform = "translateY(0)"; }}
     >
       <div className="p-4">
         {/* Top row: photo + info (clickable to expand) + desktop actions */}
@@ -563,16 +574,16 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           >
             <PropertyAvatar name={propName} photoUrl={prop?.cover_photo_url} size={photoSize} />
             <div className="flex-1 min-w-0">
-              <p className={`font-semibold text-gray-900 truncate ${compact ? "text-sm" : "text-base"}`}>{propName}</p>
-              <p className="text-sm text-gray-500">
+              <p className={`font-semibold truncate ${compact ? "text-sm" : "text-base"}`} style={{ color: "var(--coastal)" }}>{propName}</p>
+              <p className="text-sm" style={{ color: "var(--tideline)" }}>
                 {formatShortDate(task.scheduled_date)}
                 {task.scheduled_time && ` · ${formatTime(task.scheduled_time)} checkout`}
                 {nextBooking && " → 3:00 PM check-in"}
               </p>
               {!compact && (checkoutBooking || nextBooking) && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs mt-1" style={{ color: "var(--tideline)" }}>
                   {checkoutBooking && <span>Checkout: {checkoutBooking.guest_name ?? "Guest"}</span>}
-                  {checkoutBooking && nextBooking && <span className="mx-1.5 text-gray-300">→</span>}
+                  {checkoutBooking && nextBooking && <span className="mx-1.5" style={{ color: "var(--shell)" }}>→</span>}
                   {nextBooking && <span>Check-in: {nextBooking.guest_name ?? "Guest"}</span>}
                 </p>
               )}
@@ -583,26 +594,26 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
             {/* Status badge */}
             {task.status === "completed" ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>
                 <CheckCircle2 size={12} /> Completed
               </span>
             ) : task.status === "in_progress" ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(42,90,138,0.1)", color: "var(--deep-water)" }}>
                 <Clock size={12} /> In Progress
               </span>
             ) : task.status === "issue" ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>
                 <AlertTriangle size={12} /> Issue
               </span>
             ) : null}
 
             {/* Cleaner pill */}
             {assignedCleaner ? (
-              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
+              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>
                 {assignedCleaner.name}
               </span>
             ) : (
-              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+              <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>
                 Unassigned
               </span>
             )}
@@ -612,7 +623,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               <button
                 type="button"
                 onClick={handleNotify}
-                className="p-1.5 text-gray-400 hover:text-[#1a3a2a] hover:bg-[#eef5f0] rounded-lg transition-colors"
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: "var(--tideline)" }}
                 title={`Notify ${assignedCleaner.name}`}
               >
                 <MessageSquare size={14} />
@@ -625,7 +637,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 type="button"
                 onClick={(e) => handleStatus(e, "in_progress")}
                 disabled={updating}
-                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "rgba(42,90,138,0.1)", color: "var(--deep-water)", borderRadius: 10 }}
               >
                 {updating ? "..." : "In Progress"}
               </button>
@@ -635,7 +648,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 type="button"
                 onClick={(e) => handleStatus(e, "completed")}
                 disabled={updating}
-                className="px-3 py-1.5 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)", borderRadius: 10 }}
               >
                 {updating ? "..." : "Complete"}
               </button>
@@ -646,23 +660,23 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
         {/* Mobile bottom row: status + cleaner + actions (NOT inside the expand button) */}
         <div className="flex items-center gap-2 flex-wrap mt-3 sm:hidden">
           {task.status === "completed" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#1a3a2a]">
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>
               <CheckCircle2 size={11} /> Done
             </span>
           ) : task.status === "in_progress" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(42,90,138,0.1)", color: "var(--deep-water)" }}>
               <Clock size={11} /> In Progress
             </span>
           ) : task.status === "issue" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>
               <AlertTriangle size={11} /> Issue
             </span>
           ) : null}
 
           {assignedCleaner ? (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#1a3a2a]">{assignedCleaner.name}</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>{assignedCleaner.name}</span>
           ) : (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Unassigned</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>Unassigned</span>
           )}
 
           {task.status !== "completed" && task.status !== "in_progress" && (
@@ -670,7 +684,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               type="button"
               onClick={(e) => handleStatus(e, "in_progress")}
               disabled={updating}
-              className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg disabled:opacity-50"
+              className="px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+              style={{ backgroundColor: "rgba(42,90,138,0.1)", color: "var(--deep-water)", borderRadius: 10 }}
             >
               {updating ? "..." : "In Progress"}
             </button>
@@ -680,7 +695,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               type="button"
               onClick={(e) => handleStatus(e, "completed")}
               disabled={updating}
-              className="px-2.5 py-1 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg disabled:opacity-50"
+              className="px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+              style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)", borderRadius: 10 }}
             >
               {updating ? "..." : "Complete"}
             </button>
@@ -690,17 +706,18 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
 
       {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4" style={{ borderTop: "1px solid var(--dry-sand)" }}>
           {/* Assign cleaner */}
           {cleaners.length > 0 && (
             <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Assign Cleaner</label>
+              <label className="text-xs font-medium mb-1 block" style={{ color: "var(--tideline)" }}>Assign Cleaner</label>
               <div className="flex items-center gap-2">
                 <select
                   value={task.cleaner_id ?? ""}
                   onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] outline-none"
+                  className="w-full sm:w-64 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-golden/30"
+                  style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }}
                 >
                   <option value="">Select cleaner...</option>
                   {cleaners.filter((c) => c.is_active).map((c) => (
@@ -710,7 +727,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 {assignedCleaner && task.status !== "completed" && (
                   <button
                     onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors flex-shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors flex-shrink-0"
+                    style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)", borderRadius: 10 }}
                   >
                     <MessageSquare size={12} /> Notify
                   </button>
@@ -722,18 +740,18 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           {/* Checklist */}
           {totalCount > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-2">Checklist ({doneCount}/{totalCount})</p>
+              <p className="text-xs font-medium mb-2" style={{ color: "var(--tideline)" }}>Checklist ({doneCount}/{totalCount})</p>
               <div className="space-y-1.5">
                 {task.checklist.map((item) => (
                   <div key={item.id} className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-[#1a3a2a] border-[#1a3a2a]" : "border-gray-300"}`}>
+                    <div className="w-4 h-4 rounded border flex items-center justify-center" style={item.done ? { backgroundColor: "var(--coastal)", borderColor: "var(--coastal)" } : { borderColor: "var(--shell)" }}>
                       {item.done && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                     </div>
-                    <span className={`text-sm ${item.done ? "text-gray-400 line-through" : "text-gray-700"}`}>{item.label}</span>
+                    <span className={`text-sm ${item.done ? "line-through" : ""}`} style={{ color: item.done ? "var(--shell)" : "var(--coastal)" }}>{item.label}</span>
                   </div>
                 ))}
               </div>
@@ -743,22 +761,22 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           {/* Notes */}
           {task.notes && (
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
-              <p className="text-sm text-gray-600">{task.notes}</p>
+              <p className="text-xs font-medium mb-1" style={{ color: "var(--tideline)" }}>Notes</p>
+              <p className="text-sm" style={{ color: "var(--coastal)" }}>{task.notes}</p>
             </div>
           )}
 
           {/* Guest details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-gray-400">Checkout Guest</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs" style={{ color: "var(--tideline)" }}>Checkout Guest</p>
+              <p className="text-sm font-medium" style={{ color: "var(--coastal)" }}>
                 {checkoutBooking?.guest_name ?? "—"}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-400">Next Guest</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs" style={{ color: "var(--tideline)" }}>Next Guest</p>
+              <p className="text-sm font-medium" style={{ color: "var(--coastal)" }}>
                 {nextBooking?.guest_name ?? "None"}
               </p>
             </div>
@@ -771,7 +789,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 <button
                   onClick={() => onUpdateStatus(task.id, "in_progress")}
                   disabled={updating}
-                  className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors"
+                  style={{ backgroundColor: "rgba(42,90,138,0.1)", color: "var(--deep-water)", borderRadius: 10 }}
                 >
                   Mark In Progress
                 </button>
@@ -779,7 +798,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               <button
                 onClick={() => onUpdateStatus(task.id, "completed")}
                 disabled={updating}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#264d38] rounded-lg hover:bg-[#1a3a2a] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
+                style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
               >
                 Mark Complete
               </button>
@@ -787,7 +807,8 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 <button
                   onClick={() => onUpdateStatus(task.id, "issue")}
                   disabled={updating}
-                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors"
+                  style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)", borderRadius: 10 }}
                 >
                   Report Issue
                 </button>
@@ -796,7 +817,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
           )}
 
           {task.completed_at && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs" style={{ color: "var(--tideline)" }}>
               Completed {new Date(task.completed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </p>
           )}

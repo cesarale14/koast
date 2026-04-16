@@ -186,7 +186,8 @@ export default function ReviewsPage() {
           type="button"
           onClick={() => onChange?.(star)}
           disabled={!onChange}
-          className={`${size} font-mono transition-colors ${star <= rating ? "text-warning" : "text-neutral-300"} ${onChange ? "cursor-pointer hover:text-warning" : "cursor-default"}`}
+          className={`${size} font-mono transition-colors ${star <= rating ? "" : "text-neutral-300"} ${onChange ? "cursor-pointer" : "cursor-default"}`}
+          style={star <= rating ? { color: "var(--golden)" } : undefined}
         >
           ★
         </button>
@@ -195,16 +196,19 @@ export default function ReviewsPage() {
   );
 
   const statusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: "bg-neutral-100 text-neutral-600",
-      draft_generated: "bg-brand-50 text-brand-600",
-      approved: "bg-success-light text-success",
-      scheduled: "bg-brand-50 text-brand-600",
-      published: "bg-success-light text-success",
-      bad_review_held: "bg-warning-light text-warning",
+    const colorStyles: Record<string, React.CSSProperties> = {
+      pending: { backgroundColor: "var(--shore)", color: "var(--tideline)" },
+      draft_generated: { backgroundColor: "rgba(196,154,90,0.1)", color: "var(--golden)" },
+      approved: { backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" },
+      scheduled: { backgroundColor: "rgba(196,154,90,0.1)", color: "var(--golden)" },
+      published: { backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" },
+      bad_review_held: { backgroundColor: "rgba(212,150,11,0.1)", color: "var(--amber-tide)" },
     };
     return (
-      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${colors[status] ?? "bg-neutral-100 text-neutral-500"}`}>
+      <span
+        className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+        style={colorStyles[status] ?? { backgroundColor: "var(--shore)", color: "var(--tideline)" }}
+      >
         {status.replace(/_/g, " ")}
       </span>
     );
@@ -214,25 +218,29 @@ export default function ReviewsPage() {
 
   return (
     <div>
+      <style>{`
+        @keyframes koast-fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .koast-anim { opacity: 0; animation: koast-fade-up 0.55s ease-out forwards; }
+      `}</style>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-800 mb-1">Reviews</h1>
-          <p className="text-sm text-neutral-500">AI-powered review automation</p>
+          <h1 className="text-[20px] font-bold mb-1" style={{ color: "var(--coastal)" }}>Reviews</h1>
+          <p className="text-[13px]" style={{ color: "var(--tideline)" }}>AI-powered review automation</p>
         </div>
         {data && (
           <div className="flex gap-3">
             {data.needs_review > 0 && (
-              <span className="px-3 py-1.5 bg-warning-light text-warning text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 text-xs font-medium rounded-full" style={{ backgroundColor: "rgba(212,150,11,0.1)", color: "var(--amber-tide)" }}>
                 {data.needs_review} needs review
               </span>
             )}
             {data.needs_approval > 0 && (
-              <span className="px-3 py-1.5 bg-brand-50 text-brand-600 text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 text-xs font-medium rounded-full" style={{ backgroundColor: "rgba(196,154,90,0.1)", color: "var(--golden)" }}>
                 {data.needs_approval} drafts ready
               </span>
             )}
             {data.needs_response > 0 && (
-              <span className="px-3 py-1.5 bg-danger-light text-danger text-xs font-medium rounded-full">
+              <span className="px-3 py-1.5 text-xs font-medium rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>
                 {data.needs_response} needs response
               </span>
             )}
@@ -241,18 +249,21 @@ export default function ReviewsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border)] mb-6">
+      <div className="flex gap-1 mb-6" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
         {([["outgoing", "Outgoing Reviews"], ["incoming", "Incoming Reviews"], ["settings", "Settings"]] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === key ? "border-brand-500 text-brand-600" : "border-transparent text-neutral-500 hover:text-neutral-700"
-            }`}
+            className="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+            style={
+              tab === key
+                ? { borderColor: "var(--golden)", color: "var(--coastal)" }
+                : { borderColor: "transparent", color: "var(--tideline)" }
+            }
           >
             {label}
             {key === "outgoing" && pendingCount > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-warning text-white rounded-full">{pendingCount}</span>
+              <span className="ml-2 px-1.5 py-0.5 text-[10px] text-white rounded-full" style={{ backgroundColor: "var(--amber-tide)" }}>{pendingCount}</span>
             )}
           </button>
         ))}
@@ -260,7 +271,7 @@ export default function ReviewsPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: "var(--dry-sand)", borderTopColor: "var(--golden)" }} />
         </div>
       ) : (
         <>
@@ -270,15 +281,15 @@ export default function ReviewsPage() {
 
               {/* Pending approval banner */}
               {data.needs_approval > 0 && (
-                <div className="bg-warning-light border border-warning/20 rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-warning/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-warning text-sm font-bold">{data.needs_approval}</span>
+                <div className="p-4 flex items-center gap-3" style={{ backgroundColor: "rgba(196,154,90,0.1)", border: "1px solid rgba(196,154,90,0.25)", borderRadius: 14 }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(196,154,90,0.15)" }}>
+                    <span className="text-sm font-bold" style={{ color: "var(--golden)" }}>{data.needs_approval}</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-neutral-900">
+                    <p className="text-sm font-medium" style={{ color: "var(--coastal)" }}>
                       {data.needs_approval} review{data.needs_approval !== 1 ? "s" : ""} pending your approval
                     </p>
-                    <p className="text-xs text-warning">Review the drafts below and approve or edit before publishing</p>
+                    <p className="text-xs" style={{ color: "var(--golden)" }}>Review the drafts below and approve or edit before publishing</p>
                   </div>
                 </div>
               )}
@@ -286,7 +297,7 @@ export default function ReviewsPage() {
               {/* Draft reviews (shown at TOP with warning highlight) */}
               {data.draft_reviews.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Drafts ({data.draft_reviews.length})</h2>
+                  <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>DRAFTS ({data.draft_reviews.length})</div>
                   <div className="space-y-3">
                     {data.draft_reviews.map((r: AnyData) => {
                       const isEditing = editingDraftId === r.id;
@@ -294,7 +305,7 @@ export default function ReviewsPage() {
                       const checkInFmt = r.check_in ? new Date(r.check_in + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
                       const checkOutFmt = r.check_out ? new Date(r.check_out + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
                       return (
-                        <div key={r.id} className="bg-neutral-0 rounded-xl shadow-sm p-5">
+                        <div key={r.id} className="bg-neutral-0 p-5 koast-anim" style={{ boxShadow: "var(--shadow-card)", borderRadius: 16 }}>
                           {/* Context row */}
                           <div className="flex items-center gap-3 mb-4">
                             {r.property_photo ? (
@@ -320,21 +331,27 @@ export default function ReviewsPage() {
                               value={editDraftText}
                               onChange={(e) => setEditDraftText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg mb-4 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                              className="w-full px-3 py-2 text-sm rounded-lg mb-4 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-golden/30"
+                              style={{ border: "1px solid var(--dry-sand)" }}
                             />
                           ) : hasText ? (
                             <p className="text-sm text-neutral-700 mb-4 bg-neutral-50 rounded-lg p-3">
                               &quot;{r.draft_text}&quot;
                             </p>
                           ) : (
-                            <div className="mb-4">
-                              <button
-                                onClick={() => generateReview(r.booking_id)}
-                                disabled={generating === r.booking_id}
-                                className="w-full py-3 text-sm font-semibold text-[#1a3a2a] bg-[#eef5f0] rounded-lg hover:bg-[#eef5f0] transition-colors disabled:opacity-50"
-                              >
-                                {generating === r.booking_id ? "Writing your review..." : "✨ Generate AI Review"}
-                              </button>
+                            <div className="mb-4" style={{ background: "linear-gradient(135deg, var(--deep-sea), #0e2218)", color: "var(--shore)", borderRadius: 14, padding: 18 }}>
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full mb-2" style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}>Koast AI</span>
+                              <p className="text-sm mb-3" style={{ color: "var(--shell)" }}>Generate a personalized review for this guest</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => generateReview(r.booking_id)}
+                                  disabled={generating === r.booking_id}
+                                  className="text-sm disabled:opacity-50 transition-colors"
+                                  style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)", borderRadius: 10, padding: "9px 16px", fontWeight: 600 }}
+                                >
+                                  {generating === r.booking_id ? "Writing your review..." : "Generate AI Review"}
+                                </button>
+                              </div>
                             </div>
                           )}
 
@@ -344,7 +361,7 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => { approveReview(r.id, false, editDraftText, editDraftRating); setEditingDraftId(null); }}
                                   disabled={approvingId === r.id}
-                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
+                                  className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
                                   {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
@@ -360,7 +377,7 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => approveReview(r.id)}
                                   disabled={approvingId === r.id}
-                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
+                                  className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
                                   {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
@@ -372,7 +389,8 @@ export default function ReviewsPage() {
                                 </button>
                                 <button
                                   onClick={() => approveReview(r.id, true)}
-                                  className="px-4 py-2 bg-neutral-0 text-danger text-xs font-medium rounded-lg border border-danger/20 hover:bg-danger-light"
+                                  className="px-4 py-2 text-xs font-medium border-0"
+                                  style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)", borderRadius: 10 }}
                                 >
                                   Mark as Bad Review
                                 </button>
@@ -389,7 +407,7 @@ export default function ReviewsPage() {
               {/* Pending bookings needing reviews */}
               {data.pending_bookings.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Needs Review ({data.pending_bookings.length})</h2>
+                  <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>NEEDS REVIEW ({data.pending_bookings.length})</div>
                   <div className="space-y-2">
                     {data.pending_bookings.map((b: AnyData) => {
                       const draft = inlineDrafts.get(b.id);
@@ -405,7 +423,8 @@ export default function ReviewsPage() {
                             <button
                               onClick={() => generateReview(b.id)}
                               disabled={generating === b.id}
-                              className="px-4 py-2 bg-brand-500 text-white text-xs font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
+                              className="px-4 py-2 text-xs font-semibold disabled:opacity-50 transition-colors"
+                              style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                             >
                               {generating === b.id ? (
                                 <span className="flex items-center gap-2">
@@ -420,10 +439,11 @@ export default function ReviewsPage() {
                           {draft && (
                             <div
                               ref={(el) => { draftRefs.current.set(b.id, el); }}
-                              className="ml-4 mt-2 bg-brand-50 rounded-lg border border-brand-200 p-5 animate-in"
+                              className="ml-4 mt-2 p-5 animate-in"
+                              style={{ backgroundColor: "rgba(196,154,90,0.08)", borderRadius: 14, border: "1px solid rgba(196,154,90,0.2)" }}
                             >
                               <div className="flex items-center justify-between mb-3">
-                                <p className="text-xs font-medium text-brand-500 uppercase tracking-wider">AI-Generated Draft</p>
+                                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--golden)" }}>AI-Generated Draft</p>
                                 <StarRating
                                   rating={draft.rating}
                                   onChange={(r) => {
@@ -442,7 +462,8 @@ export default function ReviewsPage() {
                                   setInlineDrafts(newDrafts);
                                 }}
                                 rows={4}
-                                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg mb-3 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                                className="w-full px-3 py-2 text-sm rounded-lg mb-3 bg-neutral-0 focus:outline-none focus:ring-2 focus:ring-golden/30"
+                                style={{ border: "1px solid var(--dry-sand)" }}
                               />
 
                               <div className="flex items-center gap-4 mb-4">
@@ -465,7 +486,7 @@ export default function ReviewsPage() {
                                 <button
                                   onClick={() => approveInlineDraft(b.id)}
                                   disabled={approvingId !== null}
-                                  className="px-4 py-2 bg-success text-white text-xs font-medium rounded-lg hover:bg-success/90 disabled:opacity-50"
+                                  className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
                                   {approvingId ? "Scheduling..." : "Approve & Schedule"}
                                 </button>
@@ -488,7 +509,7 @@ export default function ReviewsPage() {
               {/* Scheduled */}
               {data.scheduled_reviews.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-neutral-800 mb-3">Scheduled ({data.scheduled_reviews.length})</h2>
+                  <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>SCHEDULED ({data.scheduled_reviews.length})</div>
                   <div className="space-y-2">
                     {data.scheduled_reviews.map((r: AnyData) => (
                       <div key={r.id} className="bg-neutral-0 rounded-lg border border-[var(--border)] p-4 flex items-center justify-between">
@@ -534,7 +555,7 @@ export default function ReviewsPage() {
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-bold font-mono ${(r.incoming_rating ?? 5) < 4 ? "text-danger" : "text-warning"}`}>
+                        <span className="text-sm font-bold font-mono" style={{ color: (r.incoming_rating ?? 5) < 4 ? "var(--coral-reef)" : "var(--golden)" }}>
                           {"★".repeat(Math.round(r.incoming_rating ?? 5))}
                         </span>
                         <span className="text-xs text-neutral-400 font-mono">
@@ -542,22 +563,23 @@ export default function ReviewsPage() {
                         </span>
                       </div>
                       {r.response_sent ? (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-light text-success">responded</span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>responded</span>
                       ) : (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-danger-light text-danger">needs response</span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>needs response</span>
                       )}
                     </div>
                     <p className="text-sm text-neutral-700 mb-3">{r.incoming_text}</p>
                     {r.response_draft && (
-                      <div className="bg-brand-50 rounded-lg p-3 mb-3">
-                        <p className="text-[10px] text-brand-500 font-medium mb-1">AI RESPONSE DRAFT</p>
+                      <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: "rgba(196,154,90,0.08)" }}>
+                        <p className="text-[10px] font-medium mb-1" style={{ color: "var(--golden)" }}>AI RESPONSE DRAFT</p>
                         <p className="text-sm text-neutral-800">{r.response_draft}</p>
                       </div>
                     )}
                     {!r.response_sent && (
                       <button
                         onClick={() => respondToReview(r.id, !!r.response_draft)}
-                        className="px-4 py-2 bg-brand-500 text-white text-xs font-semibold rounded-lg hover:bg-brand-600"
+                        className="px-4 py-2 text-xs font-semibold transition-colors hover:opacity-90"
+                        style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                       >
                         {r.response_draft ? "Approve Response" : "Generate Draft Response"}
                       </button>
@@ -571,7 +593,7 @@ export default function ReviewsPage() {
           {/* Settings */}
           {tab === "settings" && (
             <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-6 max-w-xl">
-              <h2 className="text-lg font-semibold text-neutral-800 mb-4">Review Rules</h2>
+              <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>REVIEW RULES</div>
               <div className="space-y-4">
                 <label className="flex items-center gap-3">
                   <input type="checkbox" checked={ruleForm.auto_publish}
@@ -628,7 +650,8 @@ export default function ReviewsPage() {
 
                 <button
                   onClick={() => saveRules(data?.pending_bookings?.[0]?.property_id ?? "")}
-                  className="px-5 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
+                  className="px-5 py-2.5 text-sm font-semibold transition-colors hover:opacity-90"
+                  style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                 >
                   Save Rules
                 </button>
