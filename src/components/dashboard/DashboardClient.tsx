@@ -15,6 +15,7 @@ import {
 import RevenueChart from "./RevenueChart";
 import { useConflicts, ConflictBanner, ConflictResolutionModal, type Conflict } from "./ConflictResolution";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
+import ChannelPopover from "@/components/channels/ChannelPopover";
 import { useCountUp } from "@/hooks/useCountUp";
 
 // ====== Types ======
@@ -374,25 +375,26 @@ function PropertyCardComponent({ card, index }: { card: PropertyCard; index: num
           className="absolute inset-x-0 bottom-0 h-[70px] pointer-events-none"
           style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.55))" }}
         />
-        {/* Channel badges — top right */}
-        <div className="absolute top-2.5 right-2.5 flex gap-1 z-[2]">
+        {/* Channel badges — top right (wrapped in ChannelPopover) */}
+        <div className="absolute top-2.5 right-2.5 flex gap-1 z-[2]" onClick={(e) => e.preventDefault()}>
           {(card.platforms ?? (card.platform ? [card.platform] : [])).map((p) => {
             const key = platformKeyFrom(p);
             if (!key) return null;
-            const platform = PLATFORMS[key];
+            const plat = PLATFORMS[key];
             return (
-              <div
-                key={p}
-                className="w-[24px] h-[24px] rounded-md flex items-center justify-center"
-                style={{
-                  backgroundColor: `${platform.color}b3`,
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                }}
-                title={platform.name}
-              >
-                <Image src={platform.iconWhite} alt={platform.name} width={12} height={12} />
-              </div>
+              <ChannelPopover key={p} platform={key} propertyId={card.id}>
+                <div
+                  className="w-[24px] h-[24px] rounded-md flex items-center justify-center cursor-pointer"
+                  style={{
+                    backgroundColor: `${plat.color}b3`,
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                  }}
+                  title={plat.name}
+                >
+                  <Image src={plat.iconWhite} alt={plat.name} width={12} height={12} />
+                </div>
+              </ChannelPopover>
             );
           })}
         </div>
