@@ -13,16 +13,32 @@ interface EmptyStateProps {
 
 export default function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="bg-neutral-0 rounded-xl p-16 text-center">
-      <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-        <Icon size={32} className="text-brand-500" strokeWidth={1.5} />
+    <div className="flex flex-col items-center justify-center py-16">
+      <div
+        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+        style={{ backgroundColor: "rgba(196,154,90,0.1)" }}
+      >
+        <Icon size={24} style={{ color: "var(--golden)" }} />
       </div>
-      <h2 className="text-xl font-bold text-neutral-800 mb-2">{title}</h2>
-      <p className="text-sm text-neutral-500 mb-6 max-w-md mx-auto">{description}</p>
+      <h3 className="text-base font-bold mb-1" style={{ color: "var(--coastal)" }}>
+        {title}
+      </h3>
+      <p
+        className="text-[13px] text-center max-w-[320px] mb-5"
+        style={{ color: "var(--tideline)" }}
+      >
+        {description}
+      </p>
       {action && (
         <Link
           href={action.href}
-          className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+          className="text-xs font-semibold transition-all duration-150"
+          style={{
+            backgroundColor: "var(--coastal)",
+            color: "var(--shore)",
+            borderRadius: 10,
+            padding: "9px 20px",
+          }}
         >
           {action.label}
         </Link>

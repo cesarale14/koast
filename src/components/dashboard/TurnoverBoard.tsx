@@ -503,8 +503,10 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
         <button
           onClick={onBackfill}
           disabled={backfilling}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
-          style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
+          className="inline-flex items-center gap-2 text-xs font-semibold disabled:opacity-50 transition-all duration-150"
+          style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10, padding: "9px 16px" }}
+          onMouseEnter={(e) => { if (!backfilling) { e.currentTarget.style.backgroundColor = "var(--mangrove)"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--coastal)"; e.currentTarget.style.transform = ""; }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${backfilling ? "animate-spin" : ""}`} />
           {backfilling ? "Creating..." : "Auto-Create"}
