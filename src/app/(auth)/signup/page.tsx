@@ -3,13 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import Logo from "@/components/ui/Logo";
+import { Check } from "lucide-react";
+import {
+  AuthShell,
+  AuthHeader,
+  AuthInput,
+  AuthDivider,
+  AuthError,
+  GoldenButton,
+  GoogleButton,
+} from "@/components/auth/AuthShell";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -18,10 +28,7 @@ export default function SignupPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       setError(error.message);
@@ -32,76 +39,118 @@ export default function SignupPage() {
     }
   };
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+  };
+
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-25 px-4">
-        <div className="w-full max-w-md p-8 bg-neutral-0 rounded-lg shadow-lg border border-[var(--border)] text-center">
-          <h1 className="text-2xl font-bold text-neutral-800 mb-2">Check your email</h1>
-          <p className="text-neutral-500">
-            We sent a confirmation link to <strong>{email}</strong>
+      <AuthShell>
+        <div className="flex flex-col items-center text-center">
+          <div
+            className="flex items-center justify-center mb-5"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              backgroundColor: "rgba(26,122,90,0.15)",
+              color: "var(--lagoon)",
+            }}
+          >
+            <Check size={26} strokeWidth={2.5} />
+          </div>
+          <h1
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: "#fff",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Check your email
+          </h1>
+          <p
+            className="mt-2"
+            style={{ fontSize: 13, color: "rgba(168,191,174,0.7)" }}
+          >
+            We sent a confirmation link to{" "}
+            <span style={{ color: "var(--golden)", fontWeight: 600 }}>{email}</span>
           </p>
+          <Link
+            href="/login"
+            className="mt-6 font-semibold transition-colors text-[13px]"
+            style={{ color: "var(--golden)" }}
+          >
+            Back to sign in
+          </Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-25 px-4">
-      <div className="w-full max-w-md p-8 bg-neutral-0 rounded-lg shadow-lg border border-[var(--border)]">
-        <div className="mb-2">
-          <Logo variant="full" size={40} />
-        </div>
-        <p className="text-sm text-neutral-500 mb-8">Create your account</p>
+    <AuthShell>
+      <AuthHeader
+        title="Create your account"
+        subtitle="Start managing your properties in minutes"
+      />
+      <form onSubmit={handleSignup} className="space-y-4">
+        <AuthInput
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          placeholder="you@example.com"
+          autoComplete="email"
+          required
+        />
+        <AuthInput
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          placeholder="Min 8 characters"
+          autoComplete="new-password"
+          minLength={8}
+          required
+        />
 
-        <form onSubmit={handleSignup} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-              placeholder="Min 8 characters"
-            />
-          </div>
+        {error && <AuthError message={error} />}
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+        <GoldenButton type="submit" disabled={loading}>
+          {loading ? "Creating account..." : "Create account"}
+        </GoldenButton>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-10 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Creating account..." : "Create account"}
-          </button>
-        </form>
+      <AuthDivider />
 
-        <p className="mt-6 text-center text-sm text-neutral-500">
-          Already have an account?{" "}
-          <Link href="/login" className="text-brand-500 hover:text-brand-600">
-            Sign in
-          </Link>
-        </p>
+      <GoogleButton onClick={handleGoogle} disabled={googleLoading}>
+        {googleLoading ? "Redirecting..." : "Google"}
+      </GoogleButton>
+
+      <div
+        className="mt-6 text-center text-[13px]"
+        style={{ color: "rgba(168,191,174,0.6)" }}
+      >
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-semibold transition-colors"
+          style={{ color: "var(--golden)" }}
+        >
+          Sign in
+        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }

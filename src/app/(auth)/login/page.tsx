@@ -3,13 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import Logo from "@/components/ui/Logo";
+import {
+  AuthShell,
+  AuthHeader,
+  AuthInput,
+  AuthDivider,
+  AuthError,
+  GoldenButton,
+  GoogleButton,
+} from "@/components/auth/AuthShell";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,10 +26,7 @@ export default function LoginPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError(error.message);
@@ -30,62 +36,72 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-25 px-4">
-      <div className="w-full max-w-md p-8 bg-neutral-0 rounded-lg shadow-lg border border-[var(--border)]">
-        <div className="mb-2">
-          <Logo variant="full" size={40} />
-        </div>
-        <p className="text-sm text-neutral-500 mb-8">Sign in to your account</p>
+    <AuthShell>
+      <AuthHeader
+        title="Welcome back"
+        subtitle="Sign in to manage your properties"
+      />
+      <form onSubmit={handleLogin} className="space-y-4">
+        <AuthInput
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          placeholder="you@example.com"
+          autoComplete="email"
+          required
+        />
+        <AuthInput
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          required
+        />
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
-              placeholder="••••••••"
-            />
-          </div>
+        {error && <AuthError message={error} />}
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+        <GoldenButton type="submit" disabled={loading}>
+          {loading ? "Signing in..." : "Sign in"}
+        </GoldenButton>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-10 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+      <AuthDivider />
 
-        <p className="mt-6 text-center text-sm text-neutral-500">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-brand-500 hover:text-brand-600">
-            Sign up
-          </Link>
-        </p>
+      <GoogleButton onClick={handleGoogle} disabled={googleLoading}>
+        {googleLoading ? "Redirecting..." : "Google"}
+      </GoogleButton>
+
+      <div
+        className="mt-6 text-center text-[13px]"
+        style={{ color: "rgba(168,191,174,0.6)" }}
+      >
+        New to Koast?{" "}
+        <Link
+          href="/signup"
+          className="font-semibold transition-colors"
+          style={{ color: "var(--golden)" }}
+        >
+          Create an account
+        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }
