@@ -4,7 +4,20 @@ import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Home, Settings, X, Minus, Plus, AlertTriangle, Check, Sparkles } from "lucide-react";
+import {
+  Home,
+  Settings,
+  X,
+  Minus,
+  Plus,
+  AlertTriangle,
+  Check,
+  Sparkles,
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
@@ -24,6 +37,15 @@ interface Booking {
   total_price: number | null;
   num_guests: number | null;
   status: string;
+}
+
+interface PricingRecommendation {
+  date: string;
+  current_rate: number | null;
+  suggested_rate: number | null;
+  delta_abs: number | null;
+  delta_pct: number | null;
+  reason_signals: Record<string, unknown> | null;
 }
 
 interface PropertyDetailProps {
@@ -60,6 +82,7 @@ interface PropertyDetailProps {
   };
   channelRevenue: Record<string, number>;
   cleaningToday: { status: string; cleaner: string | null } | null;
+  pricingRecommendations?: PricingRecommendation[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   calendarBookings: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,6 +127,7 @@ export default function PropertyDetail({
   stats,
   channelRevenue,
   cleaningToday,
+  pricingRecommendations = [],
   calendarBookings,
   calendarRates,
   channels = [],
@@ -196,7 +220,9 @@ export default function PropertyDetail({
           </div>
         )}
 
-        {tab === "Pricing" && <PricingTab propertyId={property.id} />}
+        {tab === "Pricing" && (
+          <PricingTab propertyId={property.id} recommendations={pricingRecommendations} />
+        )}
       </div>
 
       {settingsOpen && (
@@ -242,14 +268,20 @@ function HeroSection({
   return (
     <div
       className="relative w-full pd-hero"
-      style={{ height: 240, backgroundColor: "var(--dry-sand)", marginBottom: 0 }}
+      style={{ height: 280, backgroundColor: "var(--deep-sea)", marginBottom: 0 }}
     >
       {property.cover_photo_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={property.cover_photo_url} alt={property.name} className="w-full h-full object-cover" />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-shell">
-          <Home size={60} strokeWidth={1.5} />
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{
+            background: "linear-gradient(135deg, var(--deep-sea), #0a1c14 50%, #0e2218)",
+            color: "rgba(196,154,90,0.25)",
+          }}
+        >
+          <Home size={72} strokeWidth={1.2} />
         </div>
       )}
       {/* Dark gradient overlay */}
@@ -258,14 +290,23 @@ function HeroSection({
         style={{ background: "linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.7) 100%)" }}
       />
 
-      {/* Back link + gear */}
+      {/* Back arrow + gear — both use the same frosted-glass pill style */}
       <div className="absolute top-6 left-8 right-8 flex items-center justify-between z-[2]">
         <Link
           href="/properties"
-          className="text-[12px] font-medium text-white/70 hover:text-white transition-colors"
-          style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
+          className="flex items-center justify-center rounded-full transition-colors"
+          style={{
+            width: 36,
+            height: 36,
+            backgroundColor: "rgba(255,255,255,0.1)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "rgba(255,255,255,0.85)",
+          }}
+          title="Back to properties"
+          aria-label="Back to properties"
         >
-          ← Properties
+          <ArrowLeft size={18} strokeWidth={2} />
         </Link>
         <button
           type="button"
@@ -275,34 +316,36 @@ function HeroSection({
             width: 36,
             height: 36,
             backgroundColor: "rgba(255,255,255,0.1)",
+            backdropFilter: "blur(8px)",
             border: "1px solid rgba(255,255,255,0.18)",
-            color: "rgba(255,255,255,0.7)",
+            color: "rgba(255,255,255,0.85)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+            e.currentTarget.style.color = "rgba(255,255,255,1)";
             e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.18)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.85)";
             e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)";
           }}
           title="Property settings"
+          aria-label="Property settings"
         >
           <Settings size={18} strokeWidth={1.8} />
         </button>
       </div>
 
       {/* Bottom-left: name + location */}
-      <div className="absolute left-8 bottom-6 z-[2] max-w-[60%]">
+      <div className="absolute left-8 bottom-7 z-[2] max-w-[60%]">
         <div
-          className="text-[24px] font-bold text-white truncate"
-          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}
+          className="text-[28px] font-bold text-white truncate"
+          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)", letterSpacing: "-0.02em" }}
         >
           {property.name}
         </div>
         {locationLabel && (
           <div
-            className="text-[13px] text-white/75 truncate"
+            className="text-[14px] text-white/75 mt-0.5 truncate"
             style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
           >
             {locationLabel}
@@ -311,7 +354,7 @@ function HeroSection({
       </div>
 
       {/* Bottom-right: channel badges + Connect listing */}
-      <div className="absolute right-8 bottom-6 flex items-center gap-2 z-[2]">
+      <div className="absolute right-8 bottom-7 flex items-center gap-2 z-[2]">
         {connectedPlatforms.map((key) => {
           const platform = PLATFORMS[key];
           return (
@@ -336,18 +379,19 @@ function HeroSection({
           <button
             type="button"
             onClick={onConnectBdc}
-            className="px-[14px] py-[9px] text-[12px] font-semibold transition-colors"
+            className="text-[11px] font-semibold transition-colors"
             style={{
-              borderRadius: 10,
-              backgroundColor: "rgba(255,255,255,0.1)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              color: "rgba(255,255,255,0.85)",
+              padding: "7px 12px",
+              borderRadius: 8,
+              backgroundColor: "var(--coastal)",
+              color: "var(--shore)",
+              border: "1px solid rgba(255,255,255,0.1)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+              e.currentTarget.style.backgroundColor = "var(--mangrove)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
+              e.currentTarget.style.backgroundColor = "var(--coastal)";
             }}
           >
             Connect listing
@@ -370,11 +414,13 @@ function TabBar({
   const tabs: ("Overview" | "Calendar" | "Pricing")[] = ["Overview", "Calendar", "Pricing"];
   return (
     <div
-      className="flex gap-6 pd-anim"
+      className="flex gap-6 pd-anim sticky z-[3]"
       style={{
         borderBottom: "1px solid var(--dry-sand)",
+        top: 0,
+        backgroundColor: "#fff",
         marginTop: 16,
-        animationDelay: "300ms",
+        animationDelay: "200ms",
       }}
     >
       {tabs.map((t) => {
@@ -846,35 +892,505 @@ function SectionLabel({ label }: { label: string }) {
   );
 }
 
-// ============ Pricing tab (placeholder, links to full page) ============
+// ============ Pricing tab ============
 
-function PricingTab({ propertyId }: { propertyId: string }) {
+function PricingTab({
+  propertyId,
+  recommendations,
+}: {
+  propertyId: string;
+  recommendations: PricingRecommendation[];
+}) {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const sevenFromNow = new Date();
+  sevenFromNow.setDate(sevenFromNow.getDate() + 7);
+  const sevenStr = sevenFromNow.toISOString().split("T")[0];
+
+  const scorecard = useMemo(() => {
+    const rows = recommendations.filter(
+      (r) => r.current_rate != null && r.suggested_rate != null
+    );
+    if (rows.length === 0) {
+      return { avgCurrent: 0, avgSuggested: 0, upside: 0, captured: 0 };
+    }
+    const avgCurrent = Math.round(
+      rows.reduce((s, r) => s + (r.current_rate ?? 0), 0) / rows.length
+    );
+    const avgSuggested = Math.round(
+      rows.reduce((s, r) => s + (r.suggested_rate ?? 0), 0) / rows.length
+    );
+    const upside = Math.round(
+      rows.reduce(
+        (s, r) =>
+          s + Math.max(0, (r.suggested_rate ?? 0) - (r.current_rate ?? 0)),
+        0
+      )
+    );
+    const currentTotal = rows.reduce((s, r) => s + (r.current_rate ?? 0), 0);
+    const suggestedTotal = rows.reduce((s, r) => s + (r.suggested_rate ?? 0), 0);
+    const captured = suggestedTotal > 0 ? Math.round((currentTotal / suggestedTotal) * 100) : 100;
+    return { avgCurrent, avgSuggested, upside, captured };
+  }, [recommendations]);
+
+  const actionable = useMemo(
+    () =>
+      recommendations
+        .filter(
+          (r) =>
+            r.current_rate != null &&
+            r.suggested_rate != null &&
+            r.delta_abs != null &&
+            Math.abs(r.delta_abs) >= 1
+        )
+        .slice(0, 20),
+    [recommendations]
+  );
+
+  const actNow = actionable.filter((r) => r.date >= todayStr && r.date <= sevenStr);
+  const comingUp = actionable.filter((r) => r.date > sevenStr).slice(0, 8);
+
+  const empty = recommendations.length === 0;
+
   return (
-    <div className="pd-anim mt-6" style={{ animationDelay: "100ms" }}>
+    <div className="mt-6 space-y-6">
+      {empty ? (
+        <div
+          className="pd-anim p-10 text-center rounded-2xl bg-white"
+          style={{ boxShadow: "var(--shadow-card)", animationDelay: "100ms" }}
+        >
+          <div
+            className="inline-flex items-center justify-center mb-4"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              backgroundColor: "rgba(196,154,90,0.1)",
+              color: "var(--golden)",
+            }}
+          >
+            <Zap size={24} strokeWidth={1.8} />
+          </div>
+          <h3 className="text-[18px] font-bold mb-2" style={{ color: "var(--coastal)" }}>
+            Pricing engine is collecting data
+          </h3>
+          <p className="text-[13px] max-w-[440px] mx-auto" style={{ color: "var(--tideline)" }}>
+            First recommendations will appear after 14 days of daily analysis. Meanwhile
+            the engine is building your baseline from AirROI, bookings, events, and weather.
+          </p>
+        </div>
+      ) : (
+        <>
+          <ScorecardBlock scorecard={scorecard} />
+          <RecommendationsBlock
+            actNow={actNow}
+            comingUp={comingUp}
+            propertyId={propertyId}
+          />
+          <PricingRulesBlock baseRate={scorecard.avgSuggested} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ScorecardBlock({
+  scorecard,
+}: {
+  scorecard: { avgCurrent: number; avgSuggested: number; upside: number; captured: number };
+}) {
+  return (
+    <div>
+      <SectionLabel label="How you're performing" />
       <div
-        className="rounded-2xl p-10 bg-white text-center"
-        style={{ boxShadow: "var(--shadow-card)" }}
+        className="rounded-2xl p-6 bg-white pd-anim"
+        style={{ boxShadow: "var(--shadow-card)", animationDelay: "100ms" }}
       >
-        <SectionLabel label="Pricing" />
-        <h3 className="text-[18px] font-bold mb-2" style={{ color: "var(--coastal)" }}>
-          Full pricing workspace
-        </h3>
-        <p className="text-[13px] mb-5 max-w-[480px] mx-auto" style={{ color: "var(--tideline)" }}>
-          The pricing page has the 9-signal heatmap, rate calendar, comp set, and push-to-OTA controls.
-          It&apos;ll be re-designed to live inline here once the engine has two weeks of validation data.
-        </p>
-        <Link
-          href={`/pricing?property=${propertyId}`}
-          className="inline-flex px-5 py-[10px] text-[13px] font-semibold transition-colors"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--golden)" }}>
+              Your avg rate
+            </div>
+            <div
+              className="text-[26px] font-bold mt-1 tabular-nums"
+              style={{ color: "var(--coastal)", letterSpacing: "-0.03em" }}
+            >
+              ${scorecard.avgCurrent}
+            </div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--tideline)" }}>
+              Next 30 days
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--golden)" }}>
+              Koast suggestion
+            </div>
+            <div
+              className="text-[26px] font-bold mt-1 tabular-nums"
+              style={{ color: "var(--coastal)", letterSpacing: "-0.03em" }}
+            >
+              ${scorecard.avgSuggested}
+            </div>
+            <div
+              className="text-[11px] mt-0.5 font-semibold"
+              style={{
+                color:
+                  scorecard.avgSuggested > scorecard.avgCurrent
+                    ? "var(--lagoon)"
+                    : scorecard.avgSuggested < scorecard.avgCurrent
+                    ? "var(--coral-reef)"
+                    : "var(--tideline)",
+              }}
+            >
+              {scorecard.avgSuggested > scorecard.avgCurrent ? (
+                <>
+                  <TrendingUp size={11} strokeWidth={2.5} className="inline mr-1" />+
+                  ${scorecard.avgSuggested - scorecard.avgCurrent}/night avg
+                </>
+              ) : scorecard.avgSuggested < scorecard.avgCurrent ? (
+                <>
+                  <TrendingDown size={11} strokeWidth={2.5} className="inline mr-1" />-
+                  ${scorecard.avgCurrent - scorecard.avgSuggested}/night avg
+                </>
+              ) : (
+                "At market"
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--golden)" }}>
+              Upside this month
+            </div>
+            <div
+              className="text-[26px] font-bold mt-1 tabular-nums"
+              style={{
+                color: scorecard.upside > 0 ? "var(--lagoon)" : "var(--tideline)",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              ${scorecard.upside.toLocaleString("en-US")}
+            </div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--tideline)" }}>
+              Leaving on the table
+            </div>
+          </div>
+        </div>
+        {/* Revenue captured bar */}
+        <div className="pt-4" style={{ borderTop: "1px solid var(--dry-sand)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold" style={{ color: "var(--tideline)" }}>
+              Revenue captured vs Koast potential
+            </span>
+            <span
+              className="text-[13px] font-bold tabular-nums"
+              style={{ color: "var(--coastal)" }}
+            >
+              {scorecard.captured}%
+            </span>
+          </div>
+          <div
+            className="rounded-full overflow-hidden"
+            style={{ height: 8, backgroundColor: "var(--dry-sand)" }}
+          >
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${Math.min(100, scorecard.captured)}%`,
+                background: "linear-gradient(90deg, var(--lagoon), var(--golden))",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecommendationsBlock({
+  actNow,
+  comingUp,
+  propertyId,
+}: {
+  actNow: PricingRecommendation[];
+  comingUp: PricingRecommendation[];
+  propertyId: string;
+}) {
+  return (
+    <div>
+      <SectionLabel label="What Koast recommends" />
+      <div
+        className="rounded-2xl bg-white pd-anim overflow-hidden"
+        style={{ boxShadow: "var(--shadow-card)", animationDelay: "200ms" }}
+      >
+        <RecGroup label="Act now" sublabel="Next 7 days" rows={actNow} propertyId={propertyId} />
+        {comingUp.length > 0 && (
+          <RecGroup
+            label="Coming up"
+            sublabel="8 – 30 days"
+            rows={comingUp}
+            propertyId={propertyId}
+            border
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecGroup({
+  label,
+  sublabel,
+  rows,
+  propertyId,
+  border = false,
+}: {
+  label: string;
+  sublabel: string;
+  rows: PricingRecommendation[];
+  propertyId: string;
+  border?: boolean;
+}) {
+  if (rows.length === 0 && label === "Act now") {
+    return (
+      <div
+        className="px-5 py-5 flex items-center justify-between"
+        style={border ? { borderTop: "1px solid var(--dry-sand)" } : {}}
+      >
+        <div>
+          <div className="text-[12px] font-bold" style={{ color: "var(--coastal)" }}>
+            {label}
+          </div>
+          <div className="text-[11px]" style={{ color: "var(--tideline)" }}>
+            {sublabel}
+          </div>
+        </div>
+        <div className="text-[12px]" style={{ color: "var(--tideline)" }}>
+          Nothing urgent — you&apos;re matched to Koast&apos;s suggestions this week.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={border ? { borderTop: "1px solid var(--dry-sand)" } : {}}>
+      <div
+        className="px-5 pt-4 pb-2 flex items-center justify-between"
+        style={{ backgroundColor: label === "Act now" ? "rgba(26,122,90,0.04)" : "transparent" }}
+      >
+        <div>
+          <div className="text-[12px] font-bold" style={{ color: "var(--coastal)" }}>
+            {label}
+          </div>
+          <div className="text-[11px]" style={{ color: "var(--tideline)" }}>
+            {sublabel}
+          </div>
+        </div>
+        <div className="text-[11px]" style={{ color: "var(--tideline)" }}>
+          {rows.length} recommendation{rows.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+      <div>
+        {rows.map((rec) => (
+          <RecRow key={`${propertyId}-${rec.date}`} rec={rec} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecRow({ rec }: { rec: PricingRecommendation }) {
+  const delta = rec.delta_abs ?? 0;
+  const positive = delta > 0;
+  const dateLabel = new Date(rec.date + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  // Pull the first signal that looks like a driver reason for display
+  const reasonText = extractReason(rec.reason_signals);
+
+  return (
+    <div
+      className="grid items-center px-5 py-3"
+      style={{
+        gridTemplateColumns: "100px 1fr 120px 110px",
+        borderTop: "1px solid rgba(237,231,219,0.5)",
+        gap: 12,
+      }}
+    >
+      <div>
+        <div className="text-[12px] font-semibold" style={{ color: "var(--coastal)" }}>
+          {dateLabel}
+        </div>
+      </div>
+      <div className="min-w-0">
+        <div
+          className="text-[12px] truncate"
+          style={{ color: "var(--tideline)" }}
+          title={reasonText}
+        >
+          {reasonText}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 tabular-nums">
+        <span className="text-[12px]" style={{ color: "var(--tideline)" }}>
+          ${Math.round(rec.current_rate ?? 0)}
+        </span>
+        <span style={{ color: "var(--shell)" }}>→</span>
+        <span
+          className="text-[13px] font-bold"
+          style={{ color: positive ? "var(--lagoon)" : "var(--coral-reef)" }}
+        >
+          ${Math.round(rec.suggested_rate ?? 0)}
+        </span>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <span
+          className="text-[11px] font-semibold tabular-nums"
+          style={{ color: positive ? "var(--lagoon)" : "var(--coral-reef)" }}
+        >
+          {positive ? "+" : ""}
+          {Math.round(delta)}
+        </span>
+        <button
+          type="button"
+          className="text-[11px] font-semibold transition-colors"
           style={{
-            borderRadius: 10,
+            padding: "5px 10px",
+            borderRadius: 8,
             backgroundColor: "var(--coastal)",
             color: "var(--shore)",
           }}
+          title="Push this rate to all connected channels"
         >
-          Open pricing →
-        </Link>
+          Apply
+        </button>
       </div>
+    </div>
+  );
+}
+
+function extractReason(signals: Record<string, unknown> | null): string {
+  if (!signals || typeof signals !== "object") return "Engine-driven adjustment";
+  // Find the factor with the largest absolute dollar impact
+  let best: { name: string; reason: string | null; delta: number } | null = null;
+  for (const [name, raw] of Object.entries(signals)) {
+    if (!raw || typeof raw !== "object") continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const val: any = raw;
+    const deltaNum = Number(val.delta ?? val.impact ?? 0);
+    if (!Number.isFinite(deltaNum) || Math.abs(deltaNum) < 1) continue;
+    if (!best || Math.abs(deltaNum) > Math.abs(best.delta)) {
+      best = { name, reason: typeof val.reason === "string" ? val.reason : null, delta: deltaNum };
+    }
+  }
+  if (!best) return "Engine-driven adjustment";
+  const label =
+    best.name === "demand"
+      ? "High demand"
+      : best.name === "events"
+      ? "Local event nearby"
+      : best.name === "seasonality"
+      ? "Seasonal peak"
+      : best.name === "competitor"
+      ? "Comp set shift"
+      : best.name === "gap_night"
+      ? "Gap night — lower to fill"
+      : best.name === "booking_pace"
+      ? "Booking pace shift"
+      : best.name === "weather"
+      ? "Weather forecast"
+      : best.name.replace(/_/g, " ");
+  const prefix = label.charAt(0).toUpperCase() + label.slice(1);
+  return best.reason ? `${prefix} · ${best.reason}` : prefix;
+}
+
+function PricingRulesBlock({ baseRate }: { baseRate: number }) {
+  return (
+    <div>
+      <SectionLabel label="Pricing rules" />
+      <div
+        className="rounded-2xl p-6 bg-white pd-anim"
+        style={{ boxShadow: "var(--shadow-card)", animationDelay: "280ms" }}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+          <RuleField label="Base rate" value={baseRate > 0 ? `$${baseRate}` : "—"} />
+          <RuleField label="Min rate" value="—" placeholder="Not set" />
+          <RuleField label="Max rate" value="—" placeholder="Not set" />
+        </div>
+        <div
+          className="pt-5 flex items-center justify-between"
+          style={{ borderTop: "1px solid var(--dry-sand)" }}
+        >
+          <div>
+            <div className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
+              Auto-apply suggestions
+            </div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--tideline)" }}>
+              Let Koast push recommended rates automatically within your guardrails.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.06em]"
+              style={{ color: "var(--golden)" }}
+            >
+              Coming soon
+            </span>
+            <div
+              className="relative"
+              style={{
+                width: 42,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: "var(--shell)",
+                opacity: 0.6,
+                cursor: "not-allowed",
+              }}
+            >
+              <div
+                className="absolute top-[2px] left-[2px] bg-white rounded-full"
+                style={{ width: 18, height: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RuleField({
+  label,
+  value,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+}) {
+  return (
+    <div
+      className="rounded-xl px-4 py-3"
+      style={{ backgroundColor: "var(--shore)", border: "1px solid var(--dry-sand)" }}
+    >
+      <div
+        className="text-[10px] font-bold uppercase tracking-[0.06em]"
+        style={{ color: "var(--golden)" }}
+      >
+        {label}
+      </div>
+      <div
+        className="text-[18px] font-bold tabular-nums mt-0.5"
+        style={{ color: value === "—" ? "var(--tideline)" : "var(--coastal)" }}
+      >
+        {value}
+      </div>
+      {placeholder && value === "—" && (
+        <div className="text-[10px]" style={{ color: "var(--tideline)" }}>
+          {placeholder}
+        </div>
+      )}
     </div>
   );
 }

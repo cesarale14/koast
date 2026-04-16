@@ -165,6 +165,26 @@ export default async function PropertyDetailPage({
     channelRevenue[key] = (channelRevenue[key] ?? 0) + (b.total_price ?? 0);
   }
 
+  // Pricing recommendations (latest snapshot per date) — next 30 days
+  const priceRecsRes = await svc
+    .from("pricing_recommendations_latest")
+    .select("date, current_rate, suggested_rate, reason_signals, delta_abs, delta_pct")
+    .eq("property_id", params.id)
+    .gte("date", today)
+    .lte("date", end60)
+    .order("date", { ascending: true })
+    .limit(60);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const priceRecsRaw = (priceRecsRes.data ?? []) as any[];
+  const pricingRecommendations = priceRecsRaw.map((r) => ({
+    date: r.date as string,
+    current_rate: r.current_rate != null ? Number(r.current_rate) : null,
+    suggested_rate: r.suggested_rate != null ? Number(r.suggested_rate) : null,
+    delta_abs: r.delta_abs != null ? Number(r.delta_abs) : null,
+    delta_pct: r.delta_pct != null ? Number(r.delta_pct) : null,
+    reason_signals: (r.reason_signals ?? null) as Record<string, unknown> | null,
+  }));
+
   // Calendar data (next 60 days)
   const calBookingsRes = await supabase
     .from("bookings")
@@ -197,6 +217,7 @@ export default async function PropertyDetailPage({
       stats={{ occupancy, revenue, adr, totalBookings: totalBookingsCount, rating, avgLOS }}
       channelRevenue={channelRevenue}
       cleaningToday={cleaningToday}
+      pricingRecommendations={pricingRecommendations}
       calendarBookings={(calBookingsRes.data ?? []) as never[]}
       calendarRates={(calRatesRes.data ?? []) as never[]}
       channels={channels}
