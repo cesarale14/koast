@@ -24,6 +24,7 @@ import CalendarGrid from "@/components/calendar/CalendarGrid";
 import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 import BookingComConnect from "./BookingComConnect";
 import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
+import ChannelPopover from "@/components/channels/ChannelPopover";
 import { useCountUp } from "@/hooks/useCountUp";
 
 // ============ Types ============
@@ -356,23 +357,24 @@ function HeroSection({
       {/* Bottom-right: channel badges + Connect listing */}
       <div className="absolute right-8 bottom-7 flex items-center gap-2 z-[2]">
         {connectedPlatforms.map((key) => {
-          const platform = PLATFORMS[key];
+          const plat = PLATFORMS[key];
           return (
-            <div
-              key={key}
-              className="flex items-center justify-center"
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: `${platform.color}bf`,
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,0.2)",
-              }}
-              title={platform.name}
-            >
-              <Image src={platform.iconWhite} alt={platform.name} width={14} height={14} />
-            </div>
+            <ChannelPopover key={key} platform={key} propertyId={property.id}>
+              <div
+                className="flex items-center justify-center cursor-pointer"
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 7,
+                  backgroundColor: `${plat.color}bf`,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}
+                title={plat.name}
+              >
+                <Image src={plat.iconWhite} alt={plat.name} width={14} height={14} />
+              </div>
+            </ChannelPopover>
           );
         })}
         {!bdcConnected && (

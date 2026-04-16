@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useChannelRates, type ChannelBlock } from "@/lib/hooks/useChannelRates";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
+import ChannelPopover from "@/components/channels/ChannelPopover";
 
 type Props = {
   propertyId: string;
@@ -281,13 +282,15 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
     <GlossyWrapper>
       <div className="flex items-center justify-between mb-[10px] relative z-[1]">
         <div className="flex items-center gap-2">
-          {platform && (
-            <div
-              className="flex items-center justify-center rounded-md"
-              style={{ width: 22, height: 22, backgroundColor: platform.color }}
-            >
-              <Image src={platform.iconWhite} alt={platform.name} width={14} height={14} />
-            </div>
+          {platform && platformKey && (
+            <ChannelPopover platform={platformKey} propertyId={propertyId}>
+              <div
+                className="flex items-center justify-center rounded-md cursor-pointer"
+                style={{ width: 22, height: 22, backgroundColor: platform.color }}
+              >
+                <Image src={platform.iconWhite} alt={platform.name} width={14} height={14} />
+              </div>
+            </ChannelPopover>
           )}
           <div className="text-[13px] font-semibold" style={{ color: "var(--coastal)" }}>
             {channel.channel_name}

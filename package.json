@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@floating-ui/react": "^0.27.19",
     "@fontsource-variable/nunito": "^5.2.7",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@supabase/ssr": "^0.9.0",

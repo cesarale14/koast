@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { Home, Plus, X, Loader2, ChevronRight, Check, ChevronDown } from "lucide-react";
 import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
+import ChannelPopover from "@/components/channels/ChannelPopover";
 
 /* ---------- Types (keep compatible with server page.tsx) ---------- */
 interface PropertyData {
@@ -225,28 +226,29 @@ function PropertyCard({
           className="absolute inset-x-0 bottom-0 pointer-events-none"
           style={{ height: 80, background: "linear-gradient(transparent, rgba(0,0,0,0.5))" }}
         />
-        {/* Channel badges — top right */}
-        <div className="absolute top-3 right-3 flex gap-1 z-[2]">
+        {/* Channel badges — top right (wrapped in ChannelPopover) */}
+        <div className="absolute top-3 right-3 flex gap-1 z-[2]" onClick={(e) => e.preventDefault()}>
           {connectedChannels.map((ch) => {
             const key: PlatformKey | null = platformKeyFrom(ch.channel_code);
             if (!key) return null;
-            const platform = PLATFORMS[key];
+            const plat = PLATFORMS[key];
             return (
-              <div
-                key={ch.channel_code}
-                className="flex items-center justify-center"
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 6,
-                  backgroundColor: `${platform.color}bf`,
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                }}
-                title={platform.name}
-              >
-                <Image src={platform.iconWhite} alt={platform.name} width={12} height={12} />
-              </div>
+              <ChannelPopover key={ch.channel_code} platform={key} propertyId={p.id}>
+                <div
+                  className="flex items-center justify-center cursor-pointer"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    backgroundColor: `${plat.color}bf`,
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                  title={plat.name}
+                >
+                  <Image src={plat.iconWhite} alt={plat.name} width={12} height={12} />
+                </div>
+              </ChannelPopover>
             );
           })}
         </div>
