@@ -19,14 +19,10 @@ export const PLATFORMS = {
     iconWhite: "/icons/platforms/booking-com-white.svg",
     tile: "/icons/platforms/booking-com-tile.svg",
   },
-  vrbo: {
-    name: "VRBO",
-    color: "#3145F5",
-    colorLight: "rgba(49,69,245,0.1)",
-    icon: "/icons/platforms/vrbo.svg",
-    iconWhite: "/icons/platforms/vrbo-white.svg",
-    tile: "/icons/platforms/vrbo-tile.svg",
-  },
+  // VRBO intentionally omitted — no properties use it today, and the
+  // brand SVG assets are not in public/icons/platforms/. Re-add when
+  // the real logo set lands. platformKeyFrom still accepts "HMA"/"vrbo"
+  // aliases and returns null so DB rows with those codes don't crash.
   direct: {
     name: "Direct",
     color: "#c49a5a",
@@ -46,7 +42,7 @@ export function platformKeyFrom(code: string | null | undefined): PlatformKey | 
   const c = code.toLowerCase().trim();
   if (c === "airbnb" || c === "abb") return "airbnb";
   if (c === "booking_com" || c === "booking-com" || c === "booking.com" || c === "booking" || c === "bdc") return "booking_com";
-  if (c === "vrbo" || c === "hma") return "vrbo";
+  if (c === "vrbo" || c === "hma") return null; // VRBO dropped from PLATFORMS; alias still accepted, returns null
   if (c === "direct" || c === "koast") return "direct";
   return null;
 }

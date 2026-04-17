@@ -29,7 +29,7 @@ export async function notifyCleanerAssigned(
 ) {
   const link = `${BASE_URL}/clean/${task.id}/${task.cleaner_token}`;
   const date = new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const body = `StayCommand: New cleaning task for ${propertyName} on ${date}.${
+  const body = `Koast: New cleaning task for ${propertyName} on ${date}.${
     opts?.checkoutTime ? ` Checkout: ${opts.checkoutTime}.` : ""
   }${opts?.checkinTime ? ` Next check-in: ${opts.checkinTime}.` : ""
   }\nView checklist: ${link}`;
@@ -56,7 +56,7 @@ export async function notifyCleanerReminder(
   opts?: { checkoutTime?: string; userId?: string }
 ) {
   const link = `${BASE_URL}/clean/${task.id}/${task.cleaner_token}`;
-  const body = `StayCommand Reminder: Cleaning tomorrow at ${propertyName}.${
+  const body = `Koast reminder: Cleaning tomorrow at ${propertyName}.${
     propertyAddress ? `\n${propertyAddress}.` : ""
   }${opts?.checkoutTime ? ` Checkout at ${opts.checkoutTime}.` : ""
   }\nChecklist: ${link}`;

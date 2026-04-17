@@ -80,8 +80,6 @@ function formatBookingLabel(
       ? "Airbnb Guest"
       : platformKey === "booking_com"
       ? "BDC Guest"
-      : platformKey === "vrbo"
-      ? "VRBO Guest"
       : "Guest";
 
   if (!raw) return platformFallback;

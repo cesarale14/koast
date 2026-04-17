@@ -135,7 +135,7 @@ export async function PUT(request: NextRequest) {
     const normalizedPhone = normalizePhone(body.phone);
     const sid = await sendSMSOrThrow(
       normalizedPhone,
-      "🏠 StayCommand: Test message! Your cleaning notifications are working."
+      "Koast: Test message — your number is connected."
     );
     console.log("[cleaners] test SMS sent successfully:", sid);
     return NextResponse.json({ success: true, sid });
