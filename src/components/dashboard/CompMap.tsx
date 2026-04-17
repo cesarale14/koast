@@ -89,8 +89,8 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
         <Marker position={[center.lat, center.lng]} icon={propertyIcon}>
           <Popup>
             <div className="text-sm">
-              <p className="font-semibold text-brand-500">{propertyName}</p>
-              <p className="text-neutral-500">Your Property</p>
+              <p className="font-semibold text-coastal">{propertyName}</p>
+              <p className="text-tideline">Your Property</p>
             </div>
           </Popup>
         </Marker>
@@ -118,8 +118,8 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
             <Marker key={i} position={pos} icon={icon}>
               <Popup>
                 <div className="text-sm min-w-[180px]">
-                  <p className="font-semibold text-neutral-800">{compName}</p>
-                  <div className="mt-1 space-y-0.5 text-neutral-600">
+                  <p className="font-semibold text-coastal">{compName}</p>
+                  <div className="mt-1 space-y-0.5 text-tideline">
                     <p>ADR: <span className="font-medium font-mono">${Math.round(comp.comp_adr ?? 0)}</span></p>
                     <p>Occupancy: <span className="font-medium font-mono">{Math.round(occ)}%</span></p>
                     <p>RevPAR: <span className="font-medium font-mono">${Math.round(comp.comp_revpar ?? 0)}</span></p>
@@ -131,7 +131,7 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
                     href={searchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-2 text-xs text-brand-500 hover:underline"
+                    className="inline-block mt-2 text-xs text-coastal hover:underline"
                   >
                     Find on Airbnb →
                   </a>

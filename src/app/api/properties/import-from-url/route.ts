@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { parseListingUrl } from "@/lib/listing-url-parser";
 import { fetchListingDetails } from "@/lib/listing-details";
+import { autoBootstrapCompSet } from "@/lib/airroi/compsets";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = ReturnType<typeof createServiceClient>;
@@ -130,6 +131,30 @@ export async function POST(request: NextRequest) {
     console.log(
       `[import-from-url] Created property ${propertyId} name="${propertyName}"`
     );
+
+    // 5b. Auto-bootstrap comp set from AirROI. Non-blocking — any error
+    //     here logs a warning and continues so a flaky AirROI run doesn't
+    //     fail the import. Skip conditions (no lat/lng, <3 matches, env
+    //     disable) are normal and logged.
+    try {
+      const bootstrap = await autoBootstrapCompSet(supabase, propertyId);
+      if (bootstrap.inserted > 0) {
+        console.log(
+          `[import-from-url] Bootstrapped ${bootstrap.inserted} comps for ${propertyId}`
+        );
+      } else {
+        console.log(
+          `[import-from-url] Comp bootstrap skipped for ${propertyId}: ${bootstrap.reason}${
+            bootstrap.count != null ? ` (count=${bootstrap.count})` : ""
+          }`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        "[import-from-url] Comp bootstrap error:",
+        err instanceof Error ? err.message : err
+      );
+    }
 
     // 6. Create listings record
     const { error: listingErr } = await supabase.from("listings").insert({

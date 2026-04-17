@@ -117,6 +117,127 @@ export async function buildCompSet(property: CompSetProperty): Promise<CompSetRe
   };
 }
 
+/**
+ * Auto-bootstrap a comp set for a newly-imported property. Called from
+ * the property import flow so the Competitor signal (20% weight in the
+ * pricing engine) has real data from day 1 instead of starting cold.
+ *
+ * Policy:
+ *   - Skip if env var KOAST_DISABLE_COMP_BOOTSTRAP === "true"
+ *   - Skip if property has no lat/lng
+ *   - Query AirROI /listings/search/radius within ~2km (1.3 miles)
+ *     filtered by bedrooms when known
+ *   - If the property has existing calendar_rates, filter results to
+ *     those within ±20% of the property's median rate
+ *   - Sort by occupancy desc (proxy for actively-booked = real comps)
+ *   - Take top 8
+ *   - If <3 matches found, do NOT insert (caller surfaces the "add
+ *     comps" prompt via absence of market_comps rows). "Don't silently
+ *     succeed with bad data."
+ *
+ * Non-blocking: callers should wrap in try/catch; bootstrap failure
+ * must not fail the import.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function autoBootstrapCompSet(supabase: any, propertyId: string): Promise<{
+  inserted: number;
+  reason?: "disabled" | "no_location" | "insufficient_matches" | "error";
+  count?: number;
+}> {
+  if (process.env.KOAST_DISABLE_COMP_BOOTSTRAP === "true") {
+    return { inserted: 0, reason: "disabled" };
+  }
+
+  const { data: prop } = await supabase
+    .from("properties")
+    .select("id, latitude, longitude, bedrooms")
+    .eq("id", propertyId)
+    .maybeSingle();
+
+  if (!prop || prop.latitude == null || prop.longitude == null) {
+    return { inserted: 0, reason: "no_location" };
+  }
+
+  const lat = Number(prop.latitude);
+  const lng = Number(prop.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { inserted: 0, reason: "no_location" };
+  }
+
+  // Price anchor for the ±20% filter. Not all properties have rate data
+  // yet — if none, skip the price filter entirely and use radius +
+  // bedrooms alone.
+  let priceAnchor: number | null = null;
+  try {
+    const { data: rates } = await supabase
+      .from("calendar_rates")
+      .select("applied_rate, suggested_rate, base_rate")
+      .eq("property_id", propertyId)
+      .limit(60);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nums = (rates ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => Number(r.applied_rate ?? r.suggested_rate ?? r.base_rate))
+      .filter((n: number) => Number.isFinite(n) && n > 0);
+    if (nums.length > 0) {
+      nums.sort((a: number, b: number) => a - b);
+      priceAnchor = nums[Math.floor(nums.length / 2)];
+    }
+  } catch {
+    // Non-critical; fall through to unfiltered search.
+  }
+
+  const airroi = createAirROIClient();
+  const filter: Record<string, unknown> = {};
+  if (prop.bedrooms != null) filter.bedrooms = prop.bedrooms;
+
+  const result = await airroi.searchByRadius(lat, lng, 1.3, filter, 25);
+
+  // AirROISearchResult.results is AirROIListing[] — see src/types/airroi.ts
+  const mapped = (result.results ?? []).map((l) => mapListing(l, lat, lng));
+
+  let filtered = mapped;
+  if (priceAnchor != null) {
+    const lo = priceAnchor * 0.8;
+    const hi = priceAnchor * 1.2;
+    filtered = mapped.filter((c: ReturnType<typeof mapListing>) => c.adr >= lo && c.adr <= hi);
+  }
+
+  filtered.sort(
+    (a: ReturnType<typeof mapListing>, b: ReturnType<typeof mapListing>) => b.occupancy - a.occupancy
+  );
+  const top = filtered.slice(0, 8);
+
+  if (top.length < 3) {
+    return { inserted: 0, reason: "insufficient_matches", count: top.length };
+  }
+
+  const nowIso = new Date().toISOString();
+  // Replace any existing comps for this property to keep the set fresh.
+  await supabase.from("market_comps").delete().eq("property_id", propertyId);
+  const rows = top.map((c: ReturnType<typeof mapListing>) => ({
+    property_id: propertyId,
+    comp_listing_id: c.listing_id,
+    comp_name: c.name,
+    comp_bedrooms: c.bedrooms,
+    comp_adr: c.adr,
+    comp_occupancy: c.occupancy,
+    comp_revpar: c.revpar,
+    distance_km: c.distance_km,
+    photo_url: c.photo_url,
+    latitude: c.latitude,
+    longitude: c.longitude,
+    last_synced: nowIso,
+  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertErr } = await (supabase.from("market_comps") as any).insert(rows);
+  if (insertErr) {
+    return { inserted: 0, reason: "error" };
+  }
+
+  return { inserted: top.length };
+}
+
 export async function storeCompSet(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,

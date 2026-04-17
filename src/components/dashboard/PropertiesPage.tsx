@@ -63,7 +63,7 @@ function StepDots({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-2">
       {[1, 2, 3, 4].map((s) => (
-        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${current >= s ? "bg-[#1a3a2a]" : "bg-neutral-200"}`} />
+        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${current >= s ? "bg-coastal" : "bg-shell"}`} />
       ))}
     </div>
   );
@@ -89,12 +89,12 @@ function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: 
         {b && <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>}
         {onNameChange ? (
           <input type="text" value={name} onChange={(e) => onNameChange(e.target.value)}
-            className="w-full px-3 py-2 text-sm text-neutral-800 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a]" />
+            className="w-full px-3 py-2 text-sm text-coastal border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal" />
         ) : (
-          <p className="text-sm font-semibold text-neutral-800">{name}</p>
+          <p className="text-sm font-semibold text-coastal">{name}</p>
         )}
         {bookingCount != null && bookingCount > 0 && (
-          <p className="text-xs text-neutral-500">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>
+          <p className="text-xs text-tideline">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>
         )}
       </div>
     </div>
@@ -393,12 +393,12 @@ function IcalHelp({ platform }: { platform: string }) {
   const steps = instructions[platform] ?? instructions.ABB;
   return (
     <div className="mt-3">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 transition-colors">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-tideline hover:text-coastal transition-colors">
         <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         How to find your calendar URL
       </button>
       {open && (
-        <ol className="mt-2 ml-5 text-xs text-neutral-600 space-y-1 list-decimal">
+        <ol className="mt-2 ml-5 text-xs text-tideline space-y-1 list-decimal">
           {steps.map((s, i) => <li key={i}>{s}</li>)}
         </ol>
       )}
@@ -511,8 +511,8 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <button onClick={() => onClose(didImport.current)} className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors"><X size={20} /></button>
-          <h1 className="text-lg font-bold text-neutral-800">Add a Property</h1>
+          <button onClick={() => onClose(didImport.current)} className="p-1 rounded-lg text-shell hover:text-tideline hover:bg-shore transition-colors"><X size={20} /></button>
+          <h1 className="text-lg font-bold text-coastal">Add a Property</h1>
         </div>
         <StepDots current={step} />
       </div>
@@ -523,23 +523,23 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 
           {step === 1 && (
             <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Choose a platform</h2>
-              <p className="text-sm text-neutral-500 mb-6">Select where your property is listed</p>
+              <h2 className="text-xl font-bold text-coastal mb-2">Choose a platform</h2>
+              <p className="text-sm text-tideline mb-6">Select where your property is listed</p>
               <div className="space-y-3">
                 {IMPORT_PLATFORMS.map((p) => (
                   <button key={p.code} onClick={() => selectPlatform(p)}
-                    className="w-full flex items-center gap-4 p-5 rounded-xl border border-[var(--border)] bg-white hover:bg-neutral-50 hover:border-neutral-300 transition-all group text-left">
+                    className="w-full flex items-center gap-4 p-5 rounded-xl border border-[var(--border)] bg-white hover:bg-shore hover:border-shell transition-all group text-left">
                     <PlatformLogoIcon platform={p.code} size="xl" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-neutral-800">{p.name}</p>
-                      <p className="text-xs text-neutral-500">{p.desc}</p>
+                      <p className="font-semibold text-coastal">{p.name}</p>
+                      <p className="text-xs text-tideline">{p.desc}</p>
                     </div>
-                    <ChevronRight size={18} className="text-neutral-400 group-hover:text-neutral-600 shrink-0" />
+                    <ChevronRight size={18} className="text-shell group-hover:text-tideline shrink-0" />
                   </button>
                 ))}
-                <button disabled className="w-full flex items-center gap-4 p-5 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-left opacity-50 cursor-not-allowed">
-                  <div className="w-12 h-12 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-400 font-bold text-lg shrink-0">+</div>
-                  <div className="flex-1 min-w-0"><p className="font-semibold text-neutral-400">Add manually</p><p className="text-xs text-neutral-400">Coming soon</p></div>
+                <button disabled className="w-full flex items-center gap-4 p-5 rounded-xl border border-dashed border-shell bg-shore text-left opacity-50 cursor-not-allowed">
+                  <div className="w-12 h-12 rounded-full bg-shell flex items-center justify-center text-shell font-bold text-lg shrink-0">+</div>
+                  <div className="flex-1 min-w-0"><p className="font-semibold text-shell">Add manually</p><p className="text-xs text-shell">Coming soon</p></div>
                 </button>
               </div>
             </div>
@@ -547,21 +547,21 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 
           {step === 2 && platform && (
             <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Paste your {platform.name} listing URL</h2>
-              <p className="text-sm text-neutral-500 mb-6">We&apos;ll pull in your listing details automatically</p>
+              <h2 className="text-xl font-bold text-coastal mb-2">Paste your {platform.name} listing URL</h2>
+              <p className="text-sm text-tideline mb-6">We&apos;ll pull in your listing details automatically</p>
               <input
                 type="url" autoFocus value={listingUrl}
                 onChange={(e) => { setListingUrl(e.target.value); setUrlError(null); setListingId(null); }}
                 onBlur={validateUrl} onKeyDown={handleUrlKeyDown}
                 placeholder="e.g., airbnb.com/rooms/1234567890"
-                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] placeholder:text-neutral-300"
+                className="w-full px-4 py-3 text-sm text-coastal border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal placeholder:text-shell"
               />
               {urlError && <p className="mt-2 text-sm text-red-500">{urlError}</p>}
 
               {loading && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-8">
                   <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
-                  <p className="text-sm text-neutral-500">{loadMsg}</p>
+                  <p className="text-sm text-tideline">{loadMsg}</p>
                 </div>
               )}
 
@@ -572,9 +572,9 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
               )}
 
               <div className="mt-8 flex justify-between items-center">
-                <button onClick={() => setStep(1)} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">&larr; Back</button>
+                <button onClick={() => setStep(1)} className="text-sm text-tideline hover:text-coastal transition-colors">&larr; Back</button>
                 <button onClick={() => setStep(3)} disabled={!canAdvanceToStep3}
-                  className="px-6 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="px-6 py-3 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-mangrove transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   Next
                 </button>
               </div>
@@ -583,32 +583,32 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 
           {step === 3 && platform && (
             <div>
-              <h2 className="text-xl font-bold text-neutral-800 mb-2">Import existing bookings</h2>
-              <p className="text-sm text-neutral-500 mb-6">Paste your calendar export URL to import past and upcoming bookings</p>
+              <h2 className="text-xl font-bold text-coastal mb-2">Import existing bookings</h2>
+              <p className="text-sm text-tideline mb-6">Paste your calendar export URL to import past and upcoming bookings</p>
               <input
                 type="url" value={icalUrl}
                 onChange={(e) => setIcalUrl(e.target.value)}
                 placeholder={`e.g., airbnb.com/calendar/ical/${listingId ?? "1234567890"}.ics`}
-                className="w-full px-4 py-3 text-sm text-neutral-800 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] focus:border-[#1a3a2a] placeholder:text-neutral-300"
+                className="w-full px-4 py-3 text-sm text-coastal border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal placeholder:text-shell"
               />
               <IcalHelp platform={platform.code} />
 
               {importing && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-4">
                   <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
-                  <p className="text-sm text-neutral-500">Importing property and syncing bookings...</p>
+                  <p className="text-sm text-tideline">Importing property and syncing bookings...</p>
                 </div>
               )}
 
               <div className="mt-8 flex justify-between items-center">
-                <button onClick={() => setStep(2)} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">&larr; Back</button>
+                <button onClick={() => setStep(2)} className="text-sm text-tideline hover:text-coastal transition-colors">&larr; Back</button>
                 <div className="flex items-center gap-3">
                   <button onClick={() => handleImport(true)} disabled={importing}
-                    className="px-5 py-3 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors disabled:opacity-50">
+                    className="px-5 py-3 text-sm font-medium text-tideline bg-shore rounded-lg hover:bg-shell transition-colors disabled:opacity-50">
                     Skip for now
                   </button>
                   <button onClick={() => handleImport(false)} disabled={importing || !icalUrl.trim()}
-                    className="px-5 py-3 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                    className="px-5 py-3 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-mangrove transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
                     {importing && <Loader2 size={16} className="animate-spin" />}
                     Import &amp; Continue
                   </button>
@@ -621,8 +621,8 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
             <div className="flex items-center justify-center py-12">
               <div className="text-center max-w-sm">
                 <div className="w-16 h-16 bg-[#eef5f0] rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-[#3d6b52]" strokeWidth={2.5} /></div>
-                <h2 className="text-xl font-bold text-neutral-800 mb-2">Property added!</h2>
-                {bookingCount > 0 && <p className="text-sm text-neutral-500 mb-4">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>}
+                <h2 className="text-xl font-bold text-coastal mb-2">Property added!</h2>
+                {bookingCount > 0 && <p className="text-sm text-tideline mb-4">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>}
                 <div className="mt-4 mb-8">
                   <PreviewCard
                     photo={importedProperty?.photo_url ?? listingPhoto}
@@ -632,8 +632,8 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <button onClick={handleAddAnother} className="px-5 py-2.5 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors">Add Another Property</button>
-                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-[#1a3a2a] text-white text-sm font-semibold rounded-lg hover:bg-[#264d38] transition-colors">Go to Dashboard</button>
+                  <button onClick={handleAddAnother} className="px-5 py-2.5 text-sm font-medium text-tideline bg-shore rounded-lg hover:bg-shell transition-colors">Add Another Property</button>
+                  <button onClick={() => onClose(true)} className="px-5 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-mangrove transition-colors">Go to Dashboard</button>
                 </div>
               </div>
             </div>
