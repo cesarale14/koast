@@ -56,7 +56,13 @@ export async function POST(
 
     return NextResponse.json({
       snapshot,
+      property_id: propertyId,
+      total_comps: compResult.summary.total_comps,
+      comp_set_quality: compResult.comp_set_quality,
+      source: compResult.source,
+      skipped_reason: compResult.reason ?? null,
       compSet: {
+        // Kept for backward-compat with market_sync.py's log output.
         total_comps: compResult.summary.total_comps,
         summary: compResult.summary,
         skipped_reason: compResult.reason ?? null,

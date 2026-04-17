@@ -54,6 +54,9 @@ type CompRow = ReturnType<typeof mapListing>;
 
 // ---- Public result shape ------------------------------------------------
 
+export type CompSource = "filtered_radius" | "similarity_fallback";
+export type CompSetQuality = "precise" | "fallback" | "insufficient";
+
 export interface CompSetBuildResult {
   /** Rows inserted into market_comps. 0 if skipped for any reason. */
   inserted: number;
@@ -61,6 +64,10 @@ export interface CompSetBuildResult {
   reason?: "disabled" | "no_location" | "insufficient_matches" | "error";
   /** Count of filtered matches found BEFORE the 3-match threshold check. */
   count?: number;
+  /** Which path produced the inserted rows. null when nothing was inserted. */
+  source: CompSource | null;
+  /** Overall quality marker persisted to properties.comp_set_quality. */
+  comp_set_quality: CompSetQuality;
   /** Per-comp rows that were inserted. Empty when skipped. */
   comps: CompRow[];
   /** Summary stats over the inserted rows. */
@@ -108,6 +115,8 @@ export interface CompSetBuildResult {
 export async function buildFilteredCompSet(supabase: any, propertyId: string): Promise<CompSetBuildResult> {
   const empty: CompSetBuildResult = {
     inserted: 0,
+    source: null,
+    comp_set_quality: "insufficient",
     comps: [],
     summary: { median_adr: 0, median_occupancy: 0, median_revpar: 0, total_comps: 0 },
   };
@@ -118,7 +127,7 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
 
   const { data: prop } = await supabase
     .from("properties")
-    .select("id, latitude, longitude, bedrooms")
+    .select("id, latitude, longitude, bedrooms, bathrooms, max_guests")
     .eq("id", propertyId)
     .maybeSingle();
 
@@ -157,15 +166,17 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
 
   const airroi = createAirROIClient();
 
+  // PRIMARY PATH — /listings/search/radius + client-side bed/price filters.
+  //
   // AirROI's /listings/search/radius rejects every filter shape we've tried
   // (bedrooms scalar, array, min/max, bedroom_count). Filter is effectively
   // a black-box field — empty object works, anything else returns "Invalid
   // request JSON". Until AirROI documents the filter schema, we fetch the
   // raw radius results and do bedroom / price filtering client-side.
   //
-  // pageSize capped at 10 server-side ("pagination.pageSize must be less
-  // than or equal to 10"). Page three times to get ~30 candidates before
-  // bedroom / ±20% price / top-8-by-occupancy reduce the set.
+  // pageSize capped at 10 server-side. Page three times to get ~30
+  // candidates before bedroom / ±20% price / top-8-by-occupancy reduce
+  // the set.
   const [page1, page2, page3] = await Promise.all([
     airroi.searchByRadius(lat, lng, 1.3, {}, 10, 0),
     airroi.searchByRadius(lat, lng, 1.3, {}, 10, 10),
@@ -176,35 +187,67 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
     ...(page2.results ?? []),
     ...(page3.results ?? []),
   ];
-
   const mapped = combined.map((l) => mapListing(l, lat, lng));
 
-  // Exclude self-listings (property's own AirBnB listing id shouldn't be a
-  // comp of itself). Not critical since top-8 by occupancy usually crowds
-  // out the own-listing, but defensive.
   let filtered = mapped;
-
-  // Bedroom filter (client-side — AirROI server-side filter is broken).
   if (prop.bedrooms != null) {
     filtered = filtered.filter((c: CompRow) => c.bedrooms === prop.bedrooms);
   }
-
-  // Price anchor filter (±20% of property's median rate, if we have one).
   if (priceAnchor != null) {
     const lo = priceAnchor * 0.8;
     const hi = priceAnchor * 1.2;
     filtered = filtered.filter((c: CompRow) => c.adr >= lo && c.adr <= hi);
   }
-
   filtered.sort((a: CompRow, b: CompRow) => b.occupancy - a.occupancy);
-  const top = filtered.slice(0, 8);
+  const primaryTop = filtered.slice(0, 8);
 
-  if (top.length < 3) {
-    return { ...empty, reason: "insufficient_matches", count: top.length };
+  if (primaryTop.length >= 3) {
+    return await persistCompSet(supabase, propertyId, primaryTop, "filtered_radius");
   }
 
+  // FALLBACK PATH — AirROI /comparables similarity search.
+  //
+  // Primary yielded <3 viable comps — typical for sparsely-tracked
+  // neighborhoods where the strict bed/price/radius filter over-filters.
+  // /comparables is AirROI's "find listings like this one" endpoint; it
+  // returns richer performance data and broader similarity matches
+  // (beds, baths, guests weight the similarity ranking internally). We
+  // tag every row source='similarity_fallback' and mark the property's
+  // comp_set_quality='fallback' so downstream consumers (Competitor
+  // pricing signal, UI) can down-weight or annotate the data.
+  console.log(
+    `[compsets] primary filtered_radius yielded ${primaryTop.length} matches for ${propertyId}; falling back to similarity search`
+  );
+  const bedrooms = prop.bedrooms ?? 2;
+  const baths = prop.bathrooms ?? 1;
+  const guests = prop.max_guests ?? (bedrooms * 2 + 2);
+  const similarity = await airroi.getComparables(lat, lng, bedrooms, baths, guests);
+  const fallbackTop = (similarity.listings ?? [])
+    .slice(0, 10)
+    .map((l) => mapListing(l, lat, lng));
+
+  if (fallbackTop.length >= 3) {
+    return await persistCompSet(supabase, propertyId, fallbackTop, "similarity_fallback");
+  }
+
+  // BOTH paths yielded <3 — preserve existing rows, mark insufficient.
+  await markPropertyQuality(supabase, propertyId, "insufficient");
+  return {
+    ...empty,
+    reason: "insufficient_matches",
+    count: Math.max(primaryTop.length, fallbackTop.length),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function persistCompSet(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  propertyId: string,
+  top: CompRow[],
+  source: CompSource
+): Promise<CompSetBuildResult> {
   const nowIso = new Date().toISOString();
-  // Replace any existing comps for this property (refresh semantics).
   await supabase.from("market_comps").delete().eq("property_id", propertyId);
   const rows = top.map((c: CompRow) => ({
     property_id: propertyId,
@@ -219,12 +262,24 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
     latitude: c.latitude,
     longitude: c.longitude,
     last_synced: nowIso,
+    source,
   }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertErr } = await (supabase.from("market_comps") as any).insert(rows);
   if (insertErr) {
-    return { ...empty, reason: "error" };
+    await markPropertyQuality(supabase, propertyId, "insufficient");
+    return {
+      inserted: 0,
+      source: null,
+      comp_set_quality: "insufficient",
+      reason: "error",
+      comps: [],
+      summary: { median_adr: 0, median_occupancy: 0, median_revpar: 0, total_comps: 0 },
+    };
   }
+
+  const quality: CompSetQuality = source === "filtered_radius" ? "precise" : "fallback";
+  await markPropertyQuality(supabase, propertyId, quality);
 
   const adrs = top.map((c: CompRow) => c.adr).filter((v: number) => v > 0);
   const occs = top.map((c: CompRow) => c.occupancy).filter((v: number) => v > 0);
@@ -233,6 +288,8 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
   return {
     inserted: top.length,
     count: top.length,
+    source,
+    comp_set_quality: quality,
     comps: top,
     summary: {
       median_adr: Math.round(median(adrs) * 100) / 100,
@@ -241,4 +298,20 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
       total_comps: top.length,
     },
   };
+}
+
+async function markPropertyQuality(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  propertyId: string,
+  quality: CompSetQuality
+): Promise<void> {
+  try {
+    await supabase
+      .from("properties")
+      .update({ comp_set_quality: quality, updated_at: new Date().toISOString() })
+      .eq("id", propertyId);
+  } catch (err) {
+    console.warn("[compsets] Failed to mark comp_set_quality:", err instanceof Error ? err.message : err);
+  }
 }
