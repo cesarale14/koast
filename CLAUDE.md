@@ -296,43 +296,92 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 ---
 
 ## UPCOMING FEATURES (Designed, Not Built)
-Items here have a clear design / spec but no shipped code (or only partial wiring).
+Items here have a detailed design spec but no shipped code (or only partial wiring). Specs here are the canonical contract — when implementing, don't deviate without updating this section.
 
-1. **Pricing Apply wiring.** Apply buttons exist in Property Detail pricing tab but don't push to Channex yet. Wire them to `/api/channels/rates/[propertyId]` mirroring the calendar rate editor's request shape + optimistic UI.
-2. **AI messaging pipeline.**
-   - Auto-draft on incoming messages (reply staged, human-approve).
-   - Auto-send for check-in/checkout reminders.
-   - Operational routing: guest says "towels" → AI drafts reply + SMS task to cleaner. Uses Claude API + Twilio + existing `cleaning_tasks`.
-3. **Channel health monitoring.** Automated 5-minute checks per connected channel. New `channel_health` table. Non-dismissible alert banners on disconnect. Worker mirrors `booking_sync.py` cadence.
-4. **Revenue chart data.** Daily revenue aggregation query from `bookings` → feeds the canvas chart on dashboard. Replace current empty state.
-5. **`pricing_rules` / `pricing_performance` tables.** Documented shape exists in prior drafts but no migration. Write migrations before UI expects them: `pricing_rules (id, property_id, base_rate, min_rate, max_rate, channel_markups JSONB, auto_apply BOOLEAN DEFAULT false)` and `pricing_performance (id, property_id, date, suggested_rate, actual_rate, booked BOOLEAN, revenue_delta)`.
-6. **Auto-apply pricing.** Gated on ≥14 days of validation. Reads `pricing_rules.auto_apply` + `pricing_performance` outcomes to decide whether to push.
-7. **Direct booking website builder (Frontdesk).** `/frontdesk` is a placeholder today.
-8. **Owner portal / multi-user.** Shared property access, role-based permissions.
+### ChannelPopover — STATUS: SHIPPED 2026-04-16 (spec preserved as the design contract)
+Component at `src/components/channels/ChannelPopover.tsx`; wired into `DashboardClient`, `PropertiesPage`, `PropertyDetail`, `PerChannelRateEditor`. This spec documents the intended design so future edits don't regress it.
 
-### ChannelPopover (STATUS: SHIPPED 2026-04-16)
-Prior drafts listed this as "designed, not built." It is **live**. Component at `src/components/channels/ChannelPopover.tsx`, wired into `DashboardClient`, `PropertiesPage`, `PropertyDetail`, `PerChannelRateEditor`. Hover popover on desktop, triggers on property cards, rate-panel headers, and property-detail hero badges. Uses `@floating-ui/react` for positioning. Mobile bottom sheet **behavior** is handled without `vaul` today — if vaul is later desired, it would be a new dep. Future work may add richer management actions inside the popover.
+- **Desktop**: floating popover, 340px wide, `@floating-ui/react` positioning, 200ms hover delay, 100ms grace period before close.
+- **Mobile**: bottom sheet, tap trigger, 70vh max, draggable handle. *Intended library: `vaul` — not yet installed; today's mobile behavior is handled without it. Add vaul when the sheet gets polish work.*
+- **Content**:
+  - Platform header with status dot (healthy / degraded / disconnected).
+  - Stats row: bookings, revenue, rating for this channel this month.
+  - Connection details: listing ID (copyable), last synced, sync method, expandable Advanced section.
+  - Actions: Edit rates · Push rates now · View listing on platform · Reconnect (if disconnected). **No Disconnect button** — that stays in Settings.
+- **Triggers ONLY on**: property card channel badges, rate panel platform headers, property detail hero badges.
+- **Does NOT trigger on**: booking bars, conversation avatar badges, inline platform pills.
+- **Keyboard**: focusable; Enter/Space opens; Escape closes; Tab cycles actions.
+
+### Pricing Apply wiring
+Apply buttons exist in the Property Detail pricing tab but don't push to Channex yet. Wire to `/api/channels/rates/[propertyId]` using the same flow the calendar rate editor uses. Per-channel markups from `pricing_rules` should be applied before pushing. **Dependency:** requires the `pricing_rules` migration below to land first.
+
+### `pricing_rules` / `pricing_performance` tables
+Documented shape exists but no migrations. Write before UI features depend on them:
+- `pricing_rules (id uuid, property_id uuid, base_rate numeric, min_rate numeric, max_rate numeric, channel_markups jsonb, auto_apply boolean default false)`
+- `pricing_performance (id uuid, property_id uuid, date date, suggested_rate numeric, actual_rate numeric, booked boolean, revenue_delta numeric)`
+
+### AI messaging pipeline
+- **Auto-draft** on incoming messages via Claude API — Haiku for simple (hours, wifi, code), Sonnet for complex (extensions, early check-in, conflict).
+- **Property knowledge base** per property: local recs, house rules, FAQ. Stored per-property; fed to Claude as system prompt.
+- **Auto-send** (no human approval): check-in instructions (day before), checkout reminders (day before checkout), welcome messages (at check-in time).
+- **Operational routing**:
+  - Guest says "towels" / "broken" / "dirty" → AI drafts reply to guest AND creates `cleaning_tasks` row + SMS to cleaner.
+  - Guest asks about extending → AI checks availability, drafts response with dates + rate.
+  - Guest asks early check-in → AI checks if property is free the night before, drafts conditional approval.
+
+### Channel health monitoring
+5-minute health check worker on the Virginia VPS. New table:
+- `channel_health (property_id uuid, channel_type text, status text, last_check timestamptz, last_success timestamptz, error_message text)`
+- **Status**: `healthy` (<15 min since success) / `degraded` (15-60 min) / `disconnected` (>60 min or failed).
+- **UI**: red non-dismissible banner on dashboard + property card status bar turns red + email notification.
+- **Recovery**: "Reconnect" button triggers OAuth flow, then a full availability + rate resync.
+
+### Revenue chart data
+Daily revenue aggregation query from `bookings` (sum payouts grouped by checkout date per day) → feeds the canvas chart on Dashboard. Replaces today's empty-state placeholder.
+
+### Auto-apply pricing
+Gated on ≥14 days of validation data. Reads `pricing_rules.auto_apply` + `pricing_performance` outcomes to decide whether to push the engine's suggestion automatically.
+
+### Direct booking website builder (Frontdesk)
+`/frontdesk` is a placeholder today.
+
+### Owner portal / multi-user
+Shared property access, role-based permissions.
 
 ---
 
 ## DESIGN PHILOSOPHY
-1. Every interaction should feel premium enough that a host would record their screen and share it.
-2. Platform logos are data surfaces, not decoration — they reveal connection health and channel stats on hover.
-3. AI moments use dark deep-sea cards with ambient golden glow — they stand out from the light product chrome.
-4. The pricing page shows recommendations hosts can act on, not signal dashboards they have to interpret.
-5. No emojis, no pulsing dots, no chart libraries — Canvas-drawn charts, solid status indicators, professional tone.
-6. Entrance choreography on every page — staggered reveals, count-up numbers, chart-draw animations.
+These principles guide every UI decision in Koast.
+
+1. **Video-worthy on first load.** Every page has choreographed entrance animations — staggered card reveals, count-up numbers, chart draws. When a host records their screen for a Facebook group, the app should make people stop scrolling and ask "what PMS is that?"
+2. **Platform logos are data surfaces, not decoration.** They reveal connection health, channel stats, and management actions on hover (ChannelPopover). No other PMS treats channel logos as interactive.
+3. **AI moments use dark cards.** Deep-sea gradient with ambient golden glow — they break visually from the light product chrome and feel like the system is thinking. Never generic white cards for AI content.
+4. **The pricing page shows actions, not dashboards.** Hosts don't want to interpret 9 signal cards with progress bars. They want "you're leaving $430 on the table" and a one-tap Apply button. Signal breakdowns are expandable "why" details behind each recommendation.
+5. **Show me the money.** Every AI insight leads with a dollar amount. "+$765 potential" is more motivating than "29 dates below market." The dollar amount counts up on entrance.
+6. **No emojis. No pulsing dots. No chart libraries.** Professional tone throughout. Status via solid colored dots only. Revenue chart is Canvas-drawn with `requestAnimationFrame`. These constraints are what make the design feel intentional rather than assembled.
+7. **Glass cards for key metrics only.** The glossy gradient + reflection effect is reserved for portfolio stats and market overview. Using it everywhere dilutes the premium feel.
+8. **Golden section labels are the #1 brand signature.** 11px bold uppercase golden text before every content group — "YOUR PROPERTIES", "PORTFOLIO PERFORMANCE", "AI INSIGHTS", "CHANNEL RATES". This is what makes Koast look like Koast.
+9. **Photography as architecture.** Property photos are large (160-280px), atmospheric, with gradient overlays and channel badges. Not thumbnails in a table.
 
 ---
 
 ## COMPETITIVE EDGES
-1. 9-signal pricing engine (no competitor runs all nine).
-2. Per-channel rate control with real-time Channex verification (sync-status green check / amber warning per channel per date).
-3. AI review generation with approve/schedule flow.
-4. Market intelligence with comp-set tracking (AirROI data pipeline).
-5. Interactive platform logos (ChannelPopover — no competing PMS ships this).
-6. Dark AI insight cards on dashboard — the "show me the money" moment.
-7. Canvas-drawn revenue chart with animated draw — video-worthy on first load.
+What Koast has that competitors don't.
+
+| Edge | Koast | Hospitable | Hostaway | Guesty |
+|---|---|---|---|---|
+| 9-signal pricing engine | Yes (demand, comps, seasonality, events, gap night, pace, lead time, weather, supply) | No | Basic | PriceLabs integration only |
+| Per-channel rate control with live Channex verification | Yes | No | Basic | Basic |
+| AI review generation with approve/schedule | Yes (Claude API) | Templates only | Templates only | Templates only |
+| Market intelligence with comp-set tracking | Yes (AirROI, 3,911 listings) | No | Basic | No |
+| Event-based pricing (Ticketmaster) | Yes | No | No | No |
+| Interactive platform logos (ChannelPopover) | Yes (shipped 2026-04-16) | No | No | No |
+| Canvas-drawn animated revenue chart | Yes | No | No | No |
+| AI insight cards with dollar amounts on dashboard | Yes | No | No | No |
+| Dark AI card design language | Yes | No | No | No |
+| Entrance choreography on every page | Yes | No | No | No |
+| Design quality (premium vs enterprise-gray) | Yes — coastal green, golden accents, glass effects | Basic | Basic | Enterprise gray |
+| Starting price | Free (1 property) | $40/mo | $29/mo | Custom |
 
 ---
 
