@@ -156,28 +156,44 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
   }
 
   const airroi = createAirROIClient();
-  const filter: Record<string, unknown> = {};
-  if (prop.bedrooms != null) filter.bedrooms = prop.bedrooms;
 
-  // AirROI caps /listings/search/radius at pageSize=10. Page twice to get
-  // ~20 candidates before the ±20% price filter + top-8 cut. Enough density
-  // for realistic comp sets without blowing the 100 req/min rate limit.
-  const [page1, page2] = await Promise.all([
-    airroi.searchByRadius(lat, lng, 1.3, filter, 10, 0),
-    airroi.searchByRadius(lat, lng, 1.3, filter, 10, 10),
+  // AirROI's /listings/search/radius rejects every filter shape we've tried
+  // (bedrooms scalar, array, min/max, bedroom_count). Filter is effectively
+  // a black-box field — empty object works, anything else returns "Invalid
+  // request JSON". Until AirROI documents the filter schema, we fetch the
+  // raw radius results and do bedroom / price filtering client-side.
+  //
+  // pageSize capped at 10 server-side ("pagination.pageSize must be less
+  // than or equal to 10"). Page three times to get ~30 candidates before
+  // bedroom / ±20% price / top-8-by-occupancy reduce the set.
+  const [page1, page2, page3] = await Promise.all([
+    airroi.searchByRadius(lat, lng, 1.3, {}, 10, 0),
+    airroi.searchByRadius(lat, lng, 1.3, {}, 10, 10),
+    airroi.searchByRadius(lat, lng, 1.3, {}, 10, 20),
   ]);
   const combined = [
     ...(page1.results ?? []),
     ...(page2.results ?? []),
+    ...(page3.results ?? []),
   ];
 
   const mapped = combined.map((l) => mapListing(l, lat, lng));
 
+  // Exclude self-listings (property's own AirBnB listing id shouldn't be a
+  // comp of itself). Not critical since top-8 by occupancy usually crowds
+  // out the own-listing, but defensive.
   let filtered = mapped;
+
+  // Bedroom filter (client-side — AirROI server-side filter is broken).
+  if (prop.bedrooms != null) {
+    filtered = filtered.filter((c: CompRow) => c.bedrooms === prop.bedrooms);
+  }
+
+  // Price anchor filter (±20% of property's median rate, if we have one).
   if (priceAnchor != null) {
     const lo = priceAnchor * 0.8;
     const hi = priceAnchor * 1.2;
-    filtered = mapped.filter((c: CompRow) => c.adr >= lo && c.adr <= hi);
+    filtered = filtered.filter((c: CompRow) => c.adr >= lo && c.adr <= hi);
   }
 
   filtered.sort((a: CompRow, b: CompRow) => b.occupancy - a.occupancy);
