@@ -78,10 +78,11 @@ All platform references must go through `src/lib/platforms.ts`. Never hardcode `
 PLATFORMS.airbnb.tile / .icon / .iconWhite        // coral #FF385C
 PLATFORMS.booking_com.tile / .icon / .iconWhite   // navy  #003580
 PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden #c49a5a
-PLATFORMS.vrbo                                    // WARNING: SVG assets missing (see Known Gaps)
+// VRBO intentionally omitted from PLATFORMS — no properties use it today and
+// the brand SVG assets are not in the repo. Re-add when assets land.
 ```
 
-`platformKeyFrom(code)` normalizes `"ABB" / "airbnb"`, `"BDC" / "booking" / "booking.com" / "booking_com" / "booking-com"`, `"HMA" / "vrbo"`, `"direct" / "koast"`.
+`platformKeyFrom(code)` normalizes `"ABB" / "airbnb"`, `"BDC" / "booking" / "booking.com" / "booking_com" / "booking-com"`, `"direct" / "koast"`. Returns `null` for `"HMA" / "vrbo"` (alias accepted but maps to nothing, since VRBO isn't in PLATFORMS).
 
 ### Legacy Token Cleanup (in progress)
 `bg-brand-500` resolves to `var(--coastal)`, `bg-brand-600` to `var(--deep-sea)`. Current count: **43 `bg-brand-500` occurrences across 17 files; 16 files with `bg-brand-600`; 65 `text-brand-*` occurrences; 132 total `brand-*` references across 24 files.** Migrate each file to Koast tokens when you touch it; deletion of the aliases is a phase-1 milestone.
@@ -238,10 +239,10 @@ Source: `src/app/(dashboard)/layout.tsx`. Nine items total.
 
 ---
 
-## Database (29 tables, verified 2026-04-17)
-`bookings, calendar_rates, channex_rate_plans, channex_room_types, channex_sync_state, channex_webhook_log, cleaners, cleaning_tasks, concurrency_locks, guest_reviews, ical_feeds, leads, listings, local_events, market_comps, market_snapshots, message_templates, messages, pricing_outcomes, pricing_recommendations, properties, property_channels, property_details, revenue_checks, review_rules, sms_log, user_preferences, user_subscriptions, weather_cache`.
+## Database (30 tables, verified 2026-04-17)
+`bookings, calendar_rates, channex_rate_plans, channex_room_types, channex_sync_state, channex_webhook_log, cleaners, cleaning_tasks, concurrency_locks, guest_reviews, ical_feeds, leads, listings, local_events, market_comps, market_snapshots, message_templates, messages, notifications, pricing_outcomes, pricing_recommendations, properties, property_channels, property_details, revenue_checks, review_rules, sms_log, user_preferences, user_subscriptions, weather_cache`.
 
-**Known gap:** `src/lib/db/schema.ts` exports `notifications = pgTable("notifications", ...)` but **there is no `notifications` table in the DB**. Migration missing. Any runtime use will fail. See Known Gaps below.
+The `notifications` table is an audit log for every outbound SMS/email/push. Written by `storeNotification()` in `src/lib/notifications/index.ts` after each `notify*` call (migration `20260417010000_notifications.sql`).
 
 ---
 
@@ -291,9 +292,6 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - **Auto-apply pricing** — toggle dimmed ("Coming soon"). Unlock after ≥14 days of validation data.
 - **Airbnb OAuth** — disconnected from Channex; reconnect when ready.
 - **Google OAuth** — button on login, needs Supabase Google-provider config.
-- **VRBO platform icons** — `PLATFORMS.vrbo.icon / iconWhite / tile` point at nonexistent SVGs. No property uses VRBO today, but any future VRBO render will break. Add the SVGs or drop VRBO from the PLATFORMS map.
-- **`notifications` table** — referenced in `schema.ts`, missing from DB. Add migration or remove from schema.
-- **User-visible "StayCommand" + 🏠 emoji in SMS bodies** — `src/lib/notifications/index.ts:32,59` and `src/app/api/cleaners/route.ts:138`. Violates rebrand + "no emojis" rule.
 
 ---
 
@@ -341,9 +339,7 @@ Prior drafts listed this as "designed, not built." It is **live**. Component at 
 ## Pending Items (priority order)
 
 ### This week
-1. Fix VRBO SVGs (add three files or drop VRBO from PLATFORMS).
-2. Replace "StayCommand" + 🏠 in SMS bodies with Koast copy.
-3. Add `notifications` migration or remove from `schema.ts`.
+*(All three rebrand-debt items shipped 2026-04-17: VRBO dropped from PLATFORMS, SMS copy rebranded + de-emoji'd, `notifications` migration added.)*
 
 ### Phase 1 — Ship to first 5 hosts (2 weeks)
 - Wire pricing Apply buttons to Channex rate push.

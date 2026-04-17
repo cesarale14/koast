@@ -109,7 +109,7 @@ export async function notifyHostIssue(
   hostPhone?: string | null
 ) {
   const link = task.cleaner_token ? `${BASE_URL}/clean/${task.id}/${task.cleaner_token}` : "";
-  const body = `⚠️ Issue reported at ${propertyName}: ${issue}${link ? `\nView details: ${link}` : ""}`;
+  const body = `Issue reported at ${propertyName}: ${issue}${link ? `\nView details: ${link}` : ""}`;
 
   if (hostPhone) {
     const sid = await sendSMS(hostPhone, body);
