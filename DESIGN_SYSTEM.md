@@ -413,7 +413,7 @@ Hero photo + channel badges + "Connect listing". THREE tabs: Overview | Calendar
 ### 17.6 Pricing
 NOT signal cards with progress bars. Structure: scorecard ("leaving $X on table") → recommendations (chronological, expandable) → rules (base, min/max, markups, auto-apply) → performance tracking.
 
-### 17.7 Turnovers: Kanban 4-col. Amber border on in-progress. 0.7 opacity completed.
+### 17.7 Turnovers: Turnovers is a tabbed list today (Today / Upcoming / Completed / All) with per-card cascade entrance. Kanban structure is a candidate for Track D Host Psychology Pass — requires workflow analysis to confirm whether kanban (movement-across-stages) or tabbed list (flow-to-completion) better matches how hosts actually coordinate cleaners. Do NOT rebuild as kanban without that analysis. Shipped structure is canonical until Track D says otherwise.
 ### 17.8 Reviews: Feed + AI drafts left, stats + generator right. No emojis.
 ### 17.9 Market Intel: Glass stats + Leaflet map (60%) + comp sidebar (40%).
 ### 17.10 Login: Dark deep-sea, radial glows, glass form, golden CTA, Google OAuth. "Your hosting runs itself"
