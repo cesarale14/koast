@@ -435,13 +435,12 @@ export async function POST(
   { params }: { params: { propertyId: string } }
 ) {
   try {
-    const { user } = await getAuthenticatedUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
-    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-    const body = await request.json();
+    // Parse body FIRST so the Track B Stage 0 gate can inspect channel_code
+    // before we spend a round-trip on auth. Symmetric with /activate and
+    // /pricing/push which gate at the top of the handler — the only
+    // difference is that this gate is conditional on the body's target
+    // channel. See src/lib/channex/calendar-push-gate.ts + the postmortem.
+    const body = await request.json().catch(() => ({}));
     const { date_from, date_to, channel_code, rate, min_stay_arrival } = body as {
       date_from?: string;
       date_to?: string;
@@ -450,20 +449,23 @@ export async function POST(
       min_stay_arrival?: number;
     };
 
+    if (isBdcChannelCode(channel_code) && !isCalendarPushEnabled()) {
+      return NextResponse.json({
+        error: `${CALENDAR_PUSH_DISABLED_MESSAGE} Airbnb-only rate saves still work.`,
+      }, { status: 503 });
+    }
+
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     if (!date_from || !date_to || !channel_code || rate == null) {
       return NextResponse.json(
         { error: "date_from, date_to, channel_code, rate are required" },
         { status: 400 }
       );
-    }
-
-    // Track B Stage 0 gate — conditional. Only block writes that target
-    // Booking.com; Airbnb and Direct saves stay functional. See
-    // src/lib/channex/calendar-push-gate.ts + the postmortem.
-    if (isBdcChannelCode(channel_code) && !isCalendarPushEnabled()) {
-      return NextResponse.json({
-        error: `${CALENDAR_PUSH_DISABLED_MESSAGE} Airbnb-only rate saves still work.`,
-      }, { status: 503 });
     }
 
     const propertyId = params.propertyId;
