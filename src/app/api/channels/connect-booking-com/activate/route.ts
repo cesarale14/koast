@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
 
 /**
  * POST /api/channels/connect-booking-com/activate
@@ -11,13 +12,10 @@ import { createChannexClient } from "@/lib/channex/client";
  * Body: { propertyId: string, channelId: string }
  */
 export async function POST(request: NextRequest) {
-  // Track B Stage 0 gate. BDC calendar pushes are disabled by default
-  // until the safe-restrictions helper (F1-F6) ships in Stage 1. See
-  // docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md for why.
-  if (process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH !== "true") {
-    return NextResponse.json({
-      error: "BDC calendar push is disabled pending safe-restrictions helper (Track B Stage 1). See INCIDENT_POSTMORTEM_BDC_CLOBBER.md.",
-    }, { status: 503 });
+  // Track B Stage 0 gate. Shared with /pricing/push and the BDC-targeting
+  // path of /channels/rates. See src/lib/channex/calendar-push-gate.ts.
+  if (!isCalendarPushEnabled()) {
+    return NextResponse.json({ error: CALENDAR_PUSH_DISABLED_MESSAGE }, { status: 503 });
   }
 
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled, isBdcChannelCode } from "@/lib/channex/calendar-push-gate";
 
 /**
  * Per-channel rate editing API for the calendar right-side panel.
@@ -454,6 +455,15 @@ export async function POST(
         { error: "date_from, date_to, channel_code, rate are required" },
         { status: 400 }
       );
+    }
+
+    // Track B Stage 0 gate — conditional. Only block writes that target
+    // Booking.com; Airbnb and Direct saves stay functional. See
+    // src/lib/channex/calendar-push-gate.ts + the postmortem.
+    if (isBdcChannelCode(channel_code) && !isCalendarPushEnabled()) {
+      return NextResponse.json({
+        error: `${CALENDAR_PUSH_DISABLED_MESSAGE} Airbnb-only rate saves still work.`,
+      }, { status: 503 });
     }
 
     const propertyId = params.propertyId;
