@@ -251,7 +251,7 @@ function DashboardHeader({
         className="text-[28px] font-bold text-coastal koast-anim-sm"
         style={{ letterSpacing: "-0.02em", animationDelay: "100ms" }}
       >
-        {greeting}, {name}
+        {greeting}{name ? `, ${name}` : ""}
       </h1>
       <div
         className="text-[13px] text-tideline mt-1 flex items-center gap-2 koast-anim-sm flex-wrap"

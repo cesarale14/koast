@@ -37,7 +37,7 @@ export default function PropertyThumbStrip({
               key={p.id}
               type="button"
               onClick={() => onSelect(p.id)}
-              className="relative rounded-xl overflow-visible cursor-pointer transition-all"
+              className="relative rounded-xl overflow-visible cursor-pointer transition-all animate-cardReveal"
               style={{
                 width: 56,
                 height: 56,
@@ -45,7 +45,7 @@ export default function PropertyThumbStrip({
                 boxShadow: isActive
                   ? "0 0 0 3px rgba(196,154,90,0.2), 0 2px 8px rgba(0,0,0,0.1)"
                   : "0 1px 4px rgba(0,0,0,0.08)",
-                animation: `koast-thumb-in 0.45s ease-out ${80 * i}ms both`,
+                animationDelay: `${80 * i}ms`,
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {

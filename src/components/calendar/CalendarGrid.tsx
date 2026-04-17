@@ -94,6 +94,14 @@ export default function CalendarGrid({
 
   const [ratesState, setRatesState] = useState(initialRates);
 
+  // Mount-only entrance trigger. Avoids animations replaying on internal
+  // state changes (month nav, date selection, rate saves) — only fires
+  // once per page load.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const rateLookup = useMemo(() => {
     const map = new Map<string, Map<string, RateData>>();
     for (const r of ratesState) {
@@ -391,7 +399,10 @@ export default function CalendarGrid({
           />
         )}
 
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div
+          className={`flex-1 min-w-0 flex flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+          style={{ animationDelay: "250ms" }}
+        >
           <CalendarToolbar
             monthLabel={monthLabel}
             yearLabel={yearLabel}
@@ -423,6 +434,7 @@ export default function CalendarGrid({
           selectedBookingDetails={selectedBookingDetails}
           onClearBooking={() => setSelectedBooking(null)}
           onSaveRate={handleSaveRate}
+          mounted={mounted}
         />
       </div>
 
@@ -452,6 +464,7 @@ function RightPanel({
   selectedBookingDetails,
   onClearBooking,
   onSaveRate,
+  mounted,
 }: {
   propertyId: string;
   propertyName: string;
@@ -461,6 +474,7 @@ function RightPanel({
   selectedBookingDetails: { propName: string; nights: number } | null;
   onClearBooking: () => void;
   onSaveRate: (updates: { date: string; applied_rate: number | null; is_available: boolean; min_stay: number }) => void;
+  mounted: boolean;
 }) {
   const [available, setAvailable] = useState(true);
   const [minStay, setMinStay] = useState(1);
@@ -534,8 +548,8 @@ function RightPanel({
 
   return (
     <aside
-      className="hidden lg:flex flex-col flex-shrink-0 bg-white overflow-y-auto"
-      style={{ width: 310, borderLeft: "1px solid var(--dry-sand)" }}
+      className={`hidden lg:flex flex-col flex-shrink-0 bg-white overflow-y-auto ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ width: 310, borderLeft: "1px solid var(--dry-sand)", animationDelay: "400ms" }}
     >
       {/* Header */}
       <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--dry-sand)" }}>

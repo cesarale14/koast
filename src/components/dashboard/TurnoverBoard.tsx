@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
@@ -72,6 +72,14 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
   const [addingCleaner, setAddingCleaner] = useState(false);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
   const [upcomingLimit, setUpcomingLimit] = useState(14);
+
+  // Mount-only entrance trigger. Per-card cardReveal stagger fires once
+  // per page load; task list updates (status changes, assignments) don't
+  // replay animations because DOM nodes are keyed by task.id.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p])), [properties]);
   const cleanerMap = useMemo(() => new Map(cleaners.map((c) => [c.id, c])), [cleaners]);
@@ -412,21 +420,26 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
               </button>
               {!collapsedDates.has(group.date) && (
                 <div className="space-y-2 ml-6">
-                  {group.tasks.map((task) => (
-                    <TaskCard
+                  {group.tasks.map((task, cardIdx) => (
+                    <div
                       key={task.id}
-                      task={task}
-                      propMap={propMap}
-                      bookingMap={bookingMap}
-                      cleanerMap={cleanerMap}
-                      cleaners={cleaners}
-                      expanded={expandedTasks.has(task.id)}
-                      onToggle={() => toggleExpand(task.id)}
-                      onUpdateStatus={updateStatus}
-                      onAssign={assignCleaner}
-                      updating={updatingTask === task.id}
-                      compact
-                    />
+                      className={mounted ? "animate-cardReveal" : "opacity-0"}
+                      style={{ animationDelay: `${cardIdx * 50}ms` }}
+                    >
+                      <TaskCard
+                        task={task}
+                        propMap={propMap}
+                        bookingMap={bookingMap}
+                        cleanerMap={cleanerMap}
+                        cleaners={cleaners}
+                        expanded={expandedTasks.has(task.id)}
+                        onToggle={() => toggleExpand(task.id)}
+                        onUpdateStatus={updateStatus}
+                        onAssign={assignCleaner}
+                        updating={updatingTask === task.id}
+                        compact
+                      />
+                    </div>
                   ))}
                 </div>
               )}
@@ -445,20 +458,25 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       ) : (
         /* Today / Completed / All — flat list */
         <div className="space-y-3">
-          {filteredTasks.map((task) => (
-            <TaskCard
+          {filteredTasks.map((task, cardIdx) => (
+            <div
               key={task.id}
-              task={task}
-              propMap={propMap}
-              bookingMap={bookingMap}
-              cleanerMap={cleanerMap}
-              cleaners={cleaners}
-              expanded={expandedTasks.has(task.id)}
-              onToggle={() => toggleExpand(task.id)}
-              onUpdateStatus={updateStatus}
-              onAssign={assignCleaner}
-              updating={updatingTask === task.id}
-            />
+              className={mounted ? "animate-cardReveal" : "opacity-0"}
+              style={{ animationDelay: `${cardIdx * 50}ms` }}
+            >
+              <TaskCard
+                task={task}
+                propMap={propMap}
+                bookingMap={bookingMap}
+                cleanerMap={cleanerMap}
+                cleaners={cleaners}
+                expanded={expandedTasks.has(task.id)}
+                onToggle={() => toggleExpand(task.id)}
+                onUpdateStatus={updateStatus}
+                onAssign={assignCleaner}
+                updating={updatingTask === task.id}
+              />
+            </div>
           ))}
         </div>
       )}

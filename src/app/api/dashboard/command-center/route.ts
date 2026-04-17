@@ -658,9 +658,10 @@ export async function POST() {
     // auth.users.user_metadata.full_name / name / first_name →
     // first name derived from the email local part. If the email local
     // part is a long concatenated string like
-    // "cesaralejandrosantana18@gmail.com" we fall back to "there" rather
-    // than rendering a machine-looking username.
-    let userName = "there";
+    // "cesaralejandrosantana18@gmail.com" we fall back to an empty string,
+    // which the client renders as just "Good morning" (no trailing name).
+    // Better to drop the name than show something awkward.
+    let userName = "";
     try {
       const { data: prefRow } = await supabase
         .from("user_preferences")

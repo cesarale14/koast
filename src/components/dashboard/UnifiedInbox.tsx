@@ -145,6 +145,13 @@ export default function UnifiedInbox({
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Mount-only entrance trigger — fires once, doesn't replay when the
+  // user switches conversations or composes messages.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p])), [properties]);
   const bookingMap = useMemo(() => new Map(bookings.map((b) => [b.id, b])), [bookings]);
 
@@ -309,10 +316,7 @@ export default function UnifiedInbox({
     <div className="flex h-full bg-white" style={{ borderTop: "1px solid var(--dry-sand)" }}>
       <style jsx global>{`
         @keyframes koast-convo-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes koast-thread-in { from { opacity: 0; } to { opacity: 1; } }
         .koast-convo-item { opacity: 0; animation: koast-convo-in 0.4s ease-out forwards; }
-        .koast-thread { opacity: 0; animation: koast-thread-in 0.4s ease-out 300ms forwards; }
-        .koast-context { opacity: 0; animation: koast-thread-in 0.4s ease-out 400ms forwards; }
       `}</style>
 
       <ConversationList
@@ -323,6 +327,7 @@ export default function UnifiedInbox({
         conversations={filtered}
         activeConvo={activeConvo}
         onSelect={setActiveConvo}
+        mounted={mounted}
       />
 
       <ThreadColumn
@@ -335,12 +340,14 @@ export default function UnifiedInbox({
         setSelectedTemplate={setSelectedTemplate}
         applyTemplate={applyTemplate}
         threadScrollRef={threadScrollRef}
+        mounted={mounted}
       />
 
       <GuestContextPanel
         conversation={activeConversation}
         booking={booking}
         property={activeProperty ?? null}
+        mounted={mounted}
       />
     </div>
   );
@@ -356,6 +363,7 @@ function ConversationList({
   conversations,
   activeConvo,
   onSelect,
+  mounted,
 }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
@@ -364,6 +372,7 @@ function ConversationList({
   conversations: ConversationGroup[];
   activeConvo: string | null;
   onSelect: (key: string) => void;
+  mounted: boolean;
 }) {
   const filters: { key: Filter; label: string; disabled?: boolean }[] = [
     { key: "all", label: "All" },
@@ -374,8 +383,8 @@ function ConversationList({
 
   return (
     <aside
-      className="flex-shrink-0 flex flex-col"
-      style={{ width: 340, borderRight: "1px solid var(--dry-sand)" }}
+      className={`flex-shrink-0 flex flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ width: 340, borderRight: "1px solid var(--dry-sand)", animationDelay: "0ms" }}
     >
       {/* Search */}
       <div className="p-4 pb-3">
@@ -584,6 +593,7 @@ function ThreadColumn({
   setSelectedTemplate,
   applyTemplate,
   threadScrollRef,
+  mounted,
 }: {
   conversation: ConversationGroup | null;
   messages: Message[];
@@ -594,6 +604,7 @@ function ThreadColumn({
   setSelectedTemplate: (v: string) => void;
   applyTemplate: (id: string) => void;
   threadScrollRef: React.RefObject<HTMLDivElement>;
+  mounted: boolean;
 }) {
   // Build date-grouped message list — must run unconditionally before
   // any early return so hook order stays stable.
@@ -617,7 +628,10 @@ function ThreadColumn({
   const platform = platformKey ? PLATFORMS[platformKey] : null;
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col koast-thread">
+    <div
+      className={`flex-1 min-w-0 flex flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ animationDelay: "150ms" }}
+    >
       {/* Header */}
       <div
         className="flex-shrink-0 px-6 py-4 flex items-center justify-between bg-white"
@@ -869,10 +883,12 @@ function GuestContextPanel({
   conversation,
   booking,
   property,
+  mounted,
 }: {
   conversation: ConversationGroup | null;
   booking: BookingInfo | null | undefined;
   property: PropertyInfo | null;
+  mounted: boolean;
 }) {
   if (!conversation) return null;
 
@@ -897,8 +913,8 @@ function GuestContextPanel({
 
   return (
     <aside
-      className="flex-shrink-0 flex flex-col bg-white koast-context overflow-y-auto"
-      style={{ width: 300, borderLeft: "1px solid var(--dry-sand)" }}
+      className={`flex-shrink-0 flex flex-col bg-white overflow-y-auto ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ width: 300, borderLeft: "1px solid var(--dry-sand)", animationDelay: "300ms" }}
     >
       {/* Guest info */}
       <div className="p-5" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
