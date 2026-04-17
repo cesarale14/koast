@@ -455,6 +455,8 @@ Scope preview (to be expanded in a dedicated /ultraplan session):
 
 8. **Negative-space anxiety handling.** When the engine suggests a rate *drop*, host instinct is to override. The `reason_text` field exists (Track B), but whether "Market softened 8% this week based on 14 comps" vs "Demand signal: 0.32" gets written is a copy decision that determines whether the host overrides or trusts. Audit every downward-suggestion path.
 
+9. **Multi-unit property structure.** If 10%+ of hosts have multi-unit setups (e.g. main house + casitas at same address, like Villa Jamaica + Cozy Loft today), design parent-child property modeling, shared-field inheritance (address, lat/lng, photos, channel mappings where appropriate), and UX for switching between units without losing context. Until that threshold, accept the current flat model and the co-location caveats in CLAUDE.md Known Data Quality Issues.
+
 ### Out of scope for Track D (noted here to prevent scope creep)
 - Social proof claims ("X hosts accepted similar recs") — requires cross-account data aggregation and careful privacy handling; defer until Koast has >50 active hosts.
 - Gamification (streaks, badges, leaderboards) — not aligned with the premium tone in DESIGN_SYSTEM.md.

@@ -97,7 +97,17 @@ PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden
 
 **Previously listed but removed from DB:** Pool House - Tampa, Modern House - Tampa, Stadium Loft - Tampa. Do not reintroduce in docs without checking DB first.
 
+**Co-located parcel:** both properties share `4105 N Jamaica St, Tampa, FL 33614`. Cozy Loft is a 1BR back unit of the Villa Jamaica main house — same physical parcel, different rentable units. Multi-unit modeling (`parent_property_id`, shared amenities/photos/location) is deferred — see Known Data Quality Issues.
+
 **Airbnb OAuth:** currently disconnected from Channex. Reconnect when PMS is ready for production.
+
+---
+
+## Known Data Quality Issues
+- **Multi-unit properties not modeled.** Villa Jamaica + Cozy Loft share a physical address (same parcel, different rentable units). No `parent_property_id` on `properties` table, no shared-field inheritance. Works for now because the fleet is 2 properties with human operators; will need modeling once a real host has multi-unit listings. Deferred to post-MVP — see `KOAST_OVERHAUL_PLAN.md` Track D item 9.
+- **`autoBootstrapCompSet` vs `buildCompSet` clobber.** Both helpers write to `market_comps` via DELETE-then-INSERT. `autoBootstrapCompSet` runs on property import (top 8 by occupancy, ±20% price, 2km radius). `buildCompSet` runs daily via `market_sync.py` → `/api/market/refresh/{id}` (top 15 from AirROI's `/comparables` endpoint, no strict filters). Last writer wins; `autoBootstrapCompSet`'s day-0 set gets replaced within 24h by `buildCompSet`'s larger set. Fix scheduled as first task of Track B Stage 1 via shared safe-restrictions helper (same pattern covers the BDC-restrictions clobber risk — see `INCIDENT_POSTMORTEM_BDC_CLOBBER.md`).
+- **Import-from-url heuristic coordinates.** `src/app/api/properties/import-from-url/route.ts:103-117` applies Tampa-downtown lat/lng (`27.9506, -82.4572`) to any property whose name contains "tampa". Produces wrong coords for any non-Tampa property that happens to include the word. Should be replaced with Google Places Autocomplete-based geocoding during the Channex connection polish — see `KOAST_PROJECT_PLAN.md`.
+- **Property coords are Nominatim street-level, not parcel-level.** Both Villa Jamaica and Cozy Loft (same parcel, `4105 N Jamaica St`) are set to `27.9873607, -82.4944434` — a street-level point from Nominatim, not the specific building. Adequate for 2km AirROI comp radius + Ticketmaster event radius use cases. If parcel-level precision ever matters (walkability scoring, parking instructions, etc.), pull from Google Maps or a paid geocoder.
 
 ---
 
