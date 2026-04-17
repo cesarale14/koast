@@ -60,9 +60,8 @@ export async function POST(request: NextRequest) {
     if (!propertyName && platform === "airbnb" && listing_id) {
       // Fetch real name + photo from Airbnb listing details
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+          ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
         const detailsUrl = `${baseUrl}/api/airbnb/listing-details?listingId=${listing_id}`;
 
         // Use internal fetch with auth cookie forwarding
@@ -311,9 +310,8 @@ export async function POST(request: NextRequest) {
 
         // Trigger immediate sync
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : "http://localhost:3000";
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+            ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
           const syncRes = await fetch(`${baseUrl}/api/properties/${propertyId}/sync-bookings`, {
             method: "POST",
             headers: {

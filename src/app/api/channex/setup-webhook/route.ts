@@ -10,7 +10,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const propertyId = body.property_id ?? "c83ba211-2e79-4de0-b388-c88d9f695581";
-    const callbackUrl = body.callback_url ?? "https://staycommand.vercel.app/api/webhooks/channex";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!body.callback_url && !appUrl) {
+      throw new Error("NEXT_PUBLIC_APP_URL is not set — can't build default callback URL");
+    }
+    const callbackUrl = body.callback_url ?? `${appUrl}/api/webhooks/channex`;
     const eventMask = body.event_mask ?? "booking";
 
     const channex = createChannexClient();

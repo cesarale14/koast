@@ -17,7 +17,14 @@ async function storeNotification(supabase: any, payload: NotificationPayload, ch
   });
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.STAYCOMMAND_API_URL ?? "https://staycommand.vercel.app";
+// Resolves lazily so module import doesn't crash in environments where
+// NEXT_PUBLIC_APP_URL isn't set. Every code path that sends SMS reaches
+// through one of the notify* helpers, which call this first.
+function getAppUrl(): string {
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_APP_URL is not set");
+  return url;
+}
 
 export async function notifyCleanerAssigned(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,7 +34,7 @@ export async function notifyCleanerAssigned(
   cleaner: { id: string; phone: string; name: string },
   opts?: { checkoutTime?: string; checkinTime?: string; userId?: string }
 ) {
-  const link = `${BASE_URL}/clean/${task.id}/${task.cleaner_token}`;
+  const link = `${getAppUrl()}/clean/${task.id}/${task.cleaner_token}`;
   const date = new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const body = `Koast: New cleaning task for ${propertyName} on ${date}.${
     opts?.checkoutTime ? ` Checkout: ${opts.checkoutTime}.` : ""
@@ -55,7 +62,7 @@ export async function notifyCleanerReminder(
   cleaner: { id: string; phone: string; name: string },
   opts?: { checkoutTime?: string; userId?: string }
 ) {
-  const link = `${BASE_URL}/clean/${task.id}/${task.cleaner_token}`;
+  const link = `${getAppUrl()}/clean/${task.id}/${task.cleaner_token}`;
   const body = `Koast reminder: Cleaning tomorrow at ${propertyName}.${
     propertyAddress ? `\n${propertyAddress}.` : ""
   }${opts?.checkoutTime ? ` Checkout at ${opts.checkoutTime}.` : ""
@@ -108,7 +115,7 @@ export async function notifyHostIssue(
   issue: string,
   hostPhone?: string | null
 ) {
-  const link = task.cleaner_token ? `${BASE_URL}/clean/${task.id}/${task.cleaner_token}` : "";
+  const link = task.cleaner_token ? `${getAppUrl()}/clean/${task.id}/${task.cleaner_token}` : "";
   const body = `Issue reported at ${propertyName}: ${issue}${link ? `\nView details: ${link}` : ""}`;
 
   if (hostPhone) {

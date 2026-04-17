@@ -32,8 +32,8 @@ Every prompt to Claude Code should start with:
 ## Product Overview
 Koast is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. Competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have. Tagline: "Your hosting runs itself."
 
-- **Live URL:** https://staycommand.vercel.app (will move to app.koasthq.com)
-- **Domain:** koasthq.com (registered, not yet configured)
+- **Live URL:** https://app.koasthq.com
+- **Domain:** koasthq.com (apex 308s to app.koasthq.com)
 - **GitHub:** cesarale14/staycommand
 
 ## Tech Stack
@@ -395,7 +395,6 @@ What Koast has that competitors don't.
 - Fix revenue chart data query (daily aggregation from `bookings`).
 - Continue pricing validation (currently at 4 days, need 14).
 - Commission Koast logo.
-- Domain setup (koasthq.com → app.koasthq.com on Vercel).
 - Channel health monitoring worker + `channel_health` table + disconnect banners.
 - Onboarding polish: signup → connect → first property in 3 minutes.
 - Reconnect Airbnb OAuth (Villa Jamaica + Cozy Loft).

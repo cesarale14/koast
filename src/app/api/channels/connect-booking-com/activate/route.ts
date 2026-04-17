@@ -148,7 +148,9 @@ export async function POST(request: NextRequest) {
     // 2. Ensure webhook exists
     try {
       const webhooks = await channex.listWebhooks();
-      const callbackUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://staycommand.vercel.app"}/api/webhooks/channex`;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appUrl) throw new Error("NEXT_PUBLIC_APP_URL is not set — webhook callback can't be built");
+      const callbackUrl = `${appUrl}/api/webhooks/channex`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = (webhooks.data ?? []).find((wh: any) =>
         wh.attributes?.callback_url === callbackUrl &&
