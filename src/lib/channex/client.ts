@@ -27,25 +27,124 @@ class ChannexClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    console.log(`[Channex] ${options.method ?? "GET"} ${url}`);
+    const method = (options.method ?? "GET").toUpperCase();
+    console.log(`[Channex] ${method} ${url}`);
 
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        "user-api-key": this.apiKey,
-        ...options.headers,
-      },
-    });
+    // Every non-GET call is an outbound mutation we want to reconstruct
+    // later. Read calls don't log (they don't change state; logging them
+    // would bloat the table). See docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md.
+    const shouldLog = method !== "GET";
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "user-api-key": this.apiKey,
+          ...options.headers,
+        },
+      });
+    } catch (err) {
+      if (shouldLog) {
+        await this.logOutbound(endpoint, method, options.body, null, null,
+          err instanceof Error ? err.message : String(err));
+      }
+      throw err;
+    }
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      if (shouldLog) {
+        await this.logOutbound(endpoint, method, options.body, res.status, null,
+          `${res.status} ${res.statusText} — ${body}`);
+      }
       throw new Error(
         `Channex API error: ${res.status} ${res.statusText} — ${body}`
       );
     }
 
-    return res.json();
+    const json = await res.json();
+    if (shouldLog) {
+      await this.logOutbound(endpoint, method, options.body, res.status, json, null);
+    }
+    return json;
+  }
+
+  /**
+   * Insert a row into channex_outbound_log for every mutation. Fire-and-
+   * await but catch-and-continue: logging failure (e.g. DB down) must not
+   * block the Channex call from returning. Channex reliability > log
+   * completeness.
+   *
+   * Extracts rate_plan_id / channex_property_id / date range from the body
+   * when the payload follows Channex's common {values: [{...}]} shape.
+   */
+  private async logOutbound(
+    endpoint: string,
+    method: string,
+    body: BodyInit | null | undefined,
+    responseStatus: number | null,
+    responseBody: unknown | null,
+    errorMessage: string | null
+  ): Promise<void> {
+    try {
+      const { createServiceClient } = await import("@/lib/supabase/service");
+      const { createHash } = await import("node:crypto");
+      const sb = createServiceClient();
+
+      const bodyStr = typeof body === "string" ? body : body == null ? "" : "";
+      const payloadHash = bodyStr ? createHash("sha256").update(bodyStr).digest("hex") : null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let parsed: any = null;
+      if (bodyStr) {
+        try { parsed = JSON.parse(bodyStr); } catch { /* non-JSON body */ }
+      }
+
+      let sample: unknown = null;
+      let entriesCount: number | null = null;
+      let dateFrom: string | null = null;
+      let dateTo: string | null = null;
+      let ratePlanId: string | null = null;
+      let channexPropertyId: string | null = null;
+
+      const valuesArr = Array.isArray(parsed?.values) ? parsed.values : null;
+      if (valuesArr) {
+        sample = valuesArr.slice(0, 3);
+        entriesCount = valuesArr.length;
+        const first = valuesArr[0] ?? {};
+        const last = valuesArr[valuesArr.length - 1] ?? {};
+        dateFrom = first.date_from ?? null;
+        dateTo = last.date_to ?? null;
+        ratePlanId = first.rate_plan_id ?? null;
+        channexPropertyId = first.property_id ?? null;
+      } else if (parsed) {
+        sample = parsed;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sb.from("channex_outbound_log") as any).insert({
+        property_id: null, // resolvable later via channex_property_id join
+        channex_property_id: channexPropertyId,
+        rate_plan_id: ratePlanId,
+        endpoint,
+        method,
+        date_from: dateFrom,
+        date_to: dateTo,
+        entries_count: entriesCount,
+        payload_hash: payloadHash,
+        payload_sample: sample,
+        response_status: responseStatus,
+        response_body: responseBody,
+        error_message: errorMessage,
+      });
+    } catch (err) {
+      console.error(
+        "[channex/log] Failed to record outbound call:",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   // ==================== Properties ====================

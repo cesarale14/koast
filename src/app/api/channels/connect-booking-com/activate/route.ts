@@ -11,6 +11,15 @@ import { createChannexClient } from "@/lib/channex/client";
  * Body: { propertyId: string, channelId: string }
  */
 export async function POST(request: NextRequest) {
+  // Track B Stage 0 gate. BDC calendar pushes are disabled by default
+  // until the safe-restrictions helper (F1-F6) ships in Stage 1. See
+  // docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md for why.
+  if (process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH !== "true") {
+    return NextResponse.json({
+      error: "BDC calendar push is disabled pending safe-restrictions helper (Track B Stage 1). See INCIDENT_POSTMORTEM_BDC_CLOBBER.md.",
+    }, { status: 503 });
+  }
+
   try {
     const { user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
