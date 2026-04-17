@@ -237,6 +237,36 @@ body {
   border-radius: var(--radius-md);
 }
 
+/* ============ KOAST ENTRANCE CHOREOGRAPHY ============ */
+/* Spec: DESIGN_SYSTEM.md Section 16. Keyframes exactly as specified.
+ * Duration/easing defaults chosen during 2026-04-17 pre-work because
+ * Section 16 prescribes shape + easing family but not concrete durations
+ * for fadeSlideIn / cardReveal and no timing for aiGlow. Chosen defaults:
+ *   fadeSlideIn:  400ms ease-out  (inside the "0.4-0.6s" band)
+ *   cardReveal:   500ms ease-out  (inside the "0.4-0.6s" band)
+ *   aiGlow:       3s   ease-in-out infinite  (continuous ambient loop)
+ * Track D copy pass should audit these once there's a shipped UI to tune against.
+ */
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardReveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes aiGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+
+.animate-fadeSlideIn { animation: fadeSlideIn 400ms ease-out both; }
+.animate-cardReveal  { animation: cardReveal  500ms ease-out both; }
+.animate-aiGlow      { animation: aiGlow 3s ease-in-out infinite; }
+
 /* ---------- 3D Depth System — Canopy ---------- */
 
 /* Stat cards — forest green gradient top border */

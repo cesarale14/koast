@@ -53,7 +53,7 @@ Koast is a unified STR (short-term rental) operating system with AI-powered pric
 ---
 
 ## Design System — Koast
-Full details in `DESIGN_SYSTEM.md` (1,119 lines). Key rules:
+Full details in `DESIGN_SYSTEM.md` (462 lines). Key rules:
 - NEVER use default Tailwind grays (`gray-*`, `slate-*`, `zinc-*`). Use Koast tokens.
 - NEVER use Tailwind shadow utilities (`shadow-md`, `shadow-lg`). Use the CSS-variable shadow stacks.
 - NEVER use generic border-radius — see DESIGN_SYSTEM.md Section 4.

@@ -553,7 +553,7 @@ export default function MonthlyView({
                   e.stopPropagation();
                   onBookingClick(seg.booking);
                 }}
-                title={`${label}${guests ? ` · ${guests}` : ""} — ${seg.nights} night${seg.nights !== 1 ? "s" : ""}${seg.conflict ? " · ⚠︎ Overbooking" : ""}`}
+                title={`${label}${guests ? ` · ${guests}` : ""} — ${seg.nights} night${seg.nights !== 1 ? "s" : ""}${seg.conflict ? " · Overbooking" : ""}`}
               >
                 {seg.capLeft && platform && (
                   <div

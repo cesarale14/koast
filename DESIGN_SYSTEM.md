@@ -169,8 +169,10 @@ Refer to the previous DESIGN_SYSTEM.md Section 7 for full calendar spec. All rul
 ```
 airbnb.svg, airbnb-white.svg, airbnb-tile.svg
 booking-com.svg, booking-com-white.svg, booking-com-tile.svg
-vrbo.svg (TODO), koast-tile.svg
+koast-tile.svg
 ```
+
+> VRBO intentionally omitted — re-add when SVG assets are sourced and a property actually uses it.
 
 ### Config at `src/lib/platforms.ts`
 ```tsx
@@ -179,12 +181,11 @@ export const PLATFORMS = {
     icon: '/icons/platforms/airbnb.svg', iconWhite: '/icons/platforms/airbnb-white.svg', tile: '/icons/platforms/airbnb-tile.svg' },
   booking_com: { name: 'Booking.com', color: '#003580', colorLight: 'rgba(0,53,128,0.1)',
     icon: '/icons/platforms/booking-com.svg', iconWhite: '/icons/platforms/booking-com-white.svg', tile: '/icons/platforms/booking-com-tile.svg' },
-  vrbo: { name: 'VRBO', color: '#3145F5', colorLight: 'rgba(49,69,245,0.1)',
-    icon: '/icons/platforms/vrbo.svg', iconWhite: '/icons/platforms/vrbo-white.svg', tile: '/icons/platforms/vrbo-tile.svg' },
   direct: { name: 'Direct', color: '#c49a5a', colorLight: 'rgba(196,154,90,0.1)',
     icon: '/icons/platforms/koast-tile.svg', iconWhite: '/icons/platforms/koast-tile.svg', tile: '/icons/platforms/koast-tile.svg' },
 } as const;
 export type PlatformKey = keyof typeof PLATFORMS;
+// platformKeyFrom() still accepts "vrbo"/"HMA" aliases but returns null — see src/lib/platforms.ts.
 ```
 
 **ALL components MUST use this config. Never hardcode platform icon paths.**
@@ -257,6 +258,10 @@ See previous version — unchanged. Section labels are the #1 Koast visual signa
   <span className="text-[13px] font-medium text-coastal">{message}</span>
 </div>
 ```
+
+### Warning Banner
+
+> 2026-04-17 pre-work note: no formal warning-panel recipe was documented here before. The amber-tide analog of the error banner (below) was used during Track A pre-work at `src/components/dashboard/BookingComConnect.tsx` — linear-gradient from `rgba(212,150,11,0.08)` to `rgba(212,150,11,0.02)`, `1px solid rgba(212,150,11,0.2)` border, `text-amber-tide` heading + icon, `text-tideline` body. Formalize this pattern (and its dismissible/non-dismissible variants) during Track A polish.
 
 ### Error Banner (not dismissible)
 ```tsx
@@ -357,6 +362,8 @@ Every page loads with choreographed entrance. Elements start `opacity: 0; transf
 Dashboard timing: greeting (100ms) → subtitle (200ms) → label (300ms) → cards (350ms, stagger 100ms each) → stats (600ms, stagger 80ms) → chart (850ms) → feed (1000ms) → AI cards (1100ms, 1200ms). Numbers count up from 0 starting at 800ms (1200ms duration, 50 steps). Chart draws left-to-right over 1.5s.
 
 **Rules:** Stagger 80-100ms. Duration 0.4-0.6s. Easing `ease-out`. Apply to ALL pages.
+
+> 2026-04-17 pre-work: the three keyframes above are now implemented in `src/app/globals.css` with utility classes `.animate-fadeSlideIn` (400ms), `.animate-cardReveal` (500ms), `.animate-aiGlow` (3s infinite). Durations/easings were picked inside the spec band; aiGlow's infinite cadence was not specified here originally and was chosen as a slow ambient loop. Track D copy/motion pass should tune once there's a shipped UI to audit.
 
 ### useCountUp hook
 ```tsx

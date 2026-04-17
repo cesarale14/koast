@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { AlertTriangle } from "lucide-react";
 
 type Step = "form" | "connecting" | "authorization" | "activating" | "success" | "ical" | "error";
 
@@ -222,12 +223,18 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
             {/* ---- AUTHORIZATION REQUIRED ---- */}
             {step === "authorization" && (
               <div className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div
+                  className="rounded-[14px] p-4"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(212,150,11,0.08), rgba(212,150,11,0.02))",
+                    border: "1px solid rgba(212,150,11,0.2)",
+                  }}
+                >
                   <div className="flex items-start gap-2.5">
-                    <span className="text-amber-500 text-lg flex-shrink-0">⚠</span>
+                    <AlertTriangle size={18} strokeWidth={2} className="text-amber-tide flex-shrink-0 mt-0.5" />
                     <div>
-                      <h3 className="text-sm font-semibold text-amber-800 mb-1.5">Authorize Channex.io in Booking.com</h3>
-                      <p className="text-[13px] text-amber-700 leading-relaxed">
+                      <h3 className="text-sm font-semibold text-amber-tide mb-1.5">Authorize Channex.io in Booking.com</h3>
+                      <p className="text-[13px] text-tideline leading-relaxed">
                         Booking.com requires one-time authorization before we can sync rates, availability, and reservations for hotel ID <strong>{hotelId}</strong>.
                       </p>
                     </div>
