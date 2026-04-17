@@ -27,6 +27,10 @@ export function isCalendarPushEnabled(): boolean {
  * True if the channel_code string names Booking.com in any form the
  * calendar rate editor has accepted historically (BDC / booking_com /
  * booking-com / booking.com / booking). Case-insensitive.
+ *
+ * USE THIS HELPER — do not inline BDC detection in new code. Alias list
+ * may grow as channel names surface from Channex exports, OTA imports,
+ * or host-typed values; keep a single source of truth.
  */
 export function isBdcChannelCode(code: string | null | undefined): boolean {
   if (!code) return false;

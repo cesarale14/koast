@@ -1,36 +1,7 @@
 import { createAirROIClient } from "./client";
 import type { AirROIListing } from "@/types/airroi";
 
-interface CompSetProperty {
-  id: string;
-  latitude: number | null;
-  longitude: number | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  max_guests: number | null;
-}
-
-interface CompSetResult {
-  propertyId: string;
-  comps: {
-    listing_id: string;
-    name: string;
-    bedrooms: number;
-    adr: number;
-    occupancy: number;
-    revpar: number;
-    distance_km: number | null;
-    photo_url: string | null;
-    latitude: number;
-    longitude: number;
-  }[];
-  summary: {
-    median_adr: number;
-    median_occupancy: number;
-    median_revpar: number;
-    total_comps: number;
-  };
-}
+// ---- Internal helpers ----------------------------------------------------
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
@@ -70,7 +41,7 @@ function mapListing(
     name: listing.listing_info.listing_name,
     bedrooms: listing.property_details.bedrooms,
     adr: Math.round(pm.ttm_avg_rate * 100) / 100,
-    occupancy: Math.round(pm.ttm_occupancy * 10000) / 100, // as percentage
+    occupancy: Math.round(pm.ttm_occupancy * 10000) / 100, // percentage
     revpar: Math.round(pm.ttm_revpar * 100) / 100,
     distance_km: distance,
     photo_url: listing.listing_info.cover_photo_url || null,
@@ -79,73 +50,70 @@ function mapListing(
   };
 }
 
-export async function buildCompSet(property: CompSetProperty): Promise<CompSetResult> {
-  if (!property.latitude || !property.longitude) {
-    throw new Error("Property must have lat/lng to build comp set");
-  }
+type CompRow = ReturnType<typeof mapListing>;
 
-  const airroi = createAirROIClient();
-  const bedrooms = property.bedrooms ?? 2;
-  const baths = property.bathrooms ?? 1;
-  const guests = property.max_guests ?? (bedrooms * 2 + 2);
+// ---- Public result shape ------------------------------------------------
 
-  const result = await airroi.getComparables(
-    property.latitude,
-    property.longitude,
-    bedrooms,
-    baths,
-    guests
-  );
-
-  // Take up to 15 comps
-  const listings = result.listings.slice(0, 15);
-  const comps = listings.map((l) => mapListing(l, property.latitude, property.longitude));
-
-  const adrs = comps.map((c) => c.adr).filter((v) => v > 0);
-  const occs = comps.map((c) => c.occupancy).filter((v) => v > 0);
-  const revpars = comps.map((c) => c.revpar).filter((v) => v > 0);
-
-  return {
-    propertyId: property.id,
-    comps,
-    summary: {
-      median_adr: Math.round(median(adrs) * 100) / 100,
-      median_occupancy: Math.round(median(occs) * 100) / 100,
-      median_revpar: Math.round(median(revpars) * 100) / 100,
-      total_comps: comps.length,
-    },
+export interface CompSetBuildResult {
+  /** Rows inserted into market_comps. 0 if skipped for any reason. */
+  inserted: number;
+  /** Why the insert was skipped (if applicable). */
+  reason?: "disabled" | "no_location" | "insufficient_matches" | "error";
+  /** Count of filtered matches found BEFORE the 3-match threshold check. */
+  count?: number;
+  /** Per-comp rows that were inserted. Empty when skipped. */
+  comps: CompRow[];
+  /** Summary stats over the inserted rows. */
+  summary: {
+    median_adr: number;
+    median_occupancy: number;
+    median_revpar: number;
+    total_comps: number;
   };
 }
 
+// ---- Canonical comp-set builder -----------------------------------------
+
 /**
- * Auto-bootstrap a comp set for a newly-imported property. Called from
- * the property import flow so the Competitor signal (20% weight in the
- * pricing engine) has real data from day 1 instead of starting cold.
+ * Build a filtered comp set for a property and persist it to market_comps.
+ * This is the CANONICAL comp-set function — it replaces the legacy
+ * buildCompSet / storeCompSet pair (the legacy helpers used AirROI's
+ * `/comparables` endpoint with no filters, which was prone to returning
+ * wildly-differentiated listings for co-located properties like Villa
+ * Jamaica and Cozy Loft that share coords but differ in bedroom count).
  *
- * Policy:
+ * Policy (unified across first-time import and daily market_sync refresh):
  *   - Skip if env var KOAST_DISABLE_COMP_BOOTSTRAP === "true"
  *   - Skip if property has no lat/lng
  *   - Query AirROI /listings/search/radius within ~2km (1.3 miles)
  *     filtered by bedrooms when known
  *   - If the property has existing calendar_rates, filter results to
- *     those within ±20% of the property's median rate
+ *     those within ±20% of the property's median rate (price anchor)
  *   - Sort by occupancy desc (proxy for actively-booked = real comps)
  *   - Take top 8
- *   - If <3 matches found, do NOT insert (caller surfaces the "add
- *     comps" prompt via absence of market_comps rows). "Don't silently
- *     succeed with bad data."
+ *   - If <3 matches found, do NOT insert (caller surfaces the "add comps"
+ *     prompt via absence of market_comps rows). Don't silently succeed
+ *     with bad data.
+ *   - Always DELETE-then-INSERT for the property's rows (refresh semantics)
  *
- * Non-blocking: callers should wrap in try/catch; bootstrap failure
- * must not fail the import.
+ * Formerly known as autoBootstrapCompSet. The rename reflects that this
+ * is the canonical build path for BOTH first-time import AND the daily
+ * market_sync.py → /api/market/refresh cycle, unifying on filtered logic
+ * instead of the old buildCompSet's unfiltered top-15 pattern.
+ *
+ * Non-blocking: callers should wrap in try/catch; comp-set failure must
+ * not fail the import or the market refresh.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function autoBootstrapCompSet(supabase: any, propertyId: string): Promise<{
-  inserted: number;
-  reason?: "disabled" | "no_location" | "insufficient_matches" | "error";
-  count?: number;
-}> {
+export async function buildFilteredCompSet(supabase: any, propertyId: string): Promise<CompSetBuildResult> {
+  const empty: CompSetBuildResult = {
+    inserted: 0,
+    comps: [],
+    summary: { median_adr: 0, median_occupancy: 0, median_revpar: 0, total_comps: 0 },
+  };
+
   if (process.env.KOAST_DISABLE_COMP_BOOTSTRAP === "true") {
-    return { inserted: 0, reason: "disabled" };
+    return { ...empty, reason: "disabled" };
   }
 
   const { data: prop } = await supabase
@@ -155,13 +123,13 @@ export async function autoBootstrapCompSet(supabase: any, propertyId: string): P
     .maybeSingle();
 
   if (!prop || prop.latitude == null || prop.longitude == null) {
-    return { inserted: 0, reason: "no_location" };
+    return { ...empty, reason: "no_location" };
   }
 
   const lat = Number(prop.latitude);
   const lng = Number(prop.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return { inserted: 0, reason: "no_location" };
+    return { ...empty, reason: "no_location" };
   }
 
   // Price anchor for the ±20% filter. Not all properties have rate data
@@ -193,29 +161,26 @@ export async function autoBootstrapCompSet(supabase: any, propertyId: string): P
 
   const result = await airroi.searchByRadius(lat, lng, 1.3, filter, 25);
 
-  // AirROISearchResult.results is AirROIListing[] — see src/types/airroi.ts
   const mapped = (result.results ?? []).map((l) => mapListing(l, lat, lng));
 
   let filtered = mapped;
   if (priceAnchor != null) {
     const lo = priceAnchor * 0.8;
     const hi = priceAnchor * 1.2;
-    filtered = mapped.filter((c: ReturnType<typeof mapListing>) => c.adr >= lo && c.adr <= hi);
+    filtered = mapped.filter((c: CompRow) => c.adr >= lo && c.adr <= hi);
   }
 
-  filtered.sort(
-    (a: ReturnType<typeof mapListing>, b: ReturnType<typeof mapListing>) => b.occupancy - a.occupancy
-  );
+  filtered.sort((a: CompRow, b: CompRow) => b.occupancy - a.occupancy);
   const top = filtered.slice(0, 8);
 
   if (top.length < 3) {
-    return { inserted: 0, reason: "insufficient_matches", count: top.length };
+    return { ...empty, reason: "insufficient_matches", count: top.length };
   }
 
   const nowIso = new Date().toISOString();
-  // Replace any existing comps for this property to keep the set fresh.
+  // Replace any existing comps for this property (refresh semantics).
   await supabase.from("market_comps").delete().eq("property_id", propertyId);
-  const rows = top.map((c: ReturnType<typeof mapListing>) => ({
+  const rows = top.map((c: CompRow) => ({
     property_id: propertyId,
     comp_listing_id: c.listing_id,
     comp_name: c.name,
@@ -232,37 +197,22 @@ export async function autoBootstrapCompSet(supabase: any, propertyId: string): P
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertErr } = await (supabase.from("market_comps") as any).insert(rows);
   if (insertErr) {
-    return { inserted: 0, reason: "error" };
+    return { ...empty, reason: "error" };
   }
 
-  return { inserted: top.length };
-}
+  const adrs = top.map((c: CompRow) => c.adr).filter((v: number) => v > 0);
+  const occs = top.map((c: CompRow) => c.occupancy).filter((v: number) => v > 0);
+  const revpars = top.map((c: CompRow) => c.revpar).filter((v: number) => v > 0);
 
-export async function storeCompSet(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  propertyId: string,
-  compSet: CompSetResult
-): Promise<void> {
-  // Delete existing comps for this property
-  await supabase.from("market_comps").delete().eq("property_id", propertyId);
-
-  // Insert new comps
-  if (compSet.comps.length > 0) {
-    const rows = compSet.comps.map((c) => ({
-      property_id: propertyId,
-      comp_listing_id: c.listing_id,
-      comp_name: c.name,
-      comp_bedrooms: c.bedrooms,
-      comp_adr: c.adr,
-      comp_occupancy: c.occupancy,
-      comp_revpar: c.revpar,
-      distance_km: c.distance_km,
-      photo_url: c.photo_url,
-      latitude: c.latitude,
-      longitude: c.longitude,
-    }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from("market_comps") as any).insert(rows);
-  }
+  return {
+    inserted: top.length,
+    count: top.length,
+    comps: top,
+    summary: {
+      median_adr: Math.round(median(adrs) * 100) / 100,
+      median_occupancy: Math.round(median(occs) * 100) / 100,
+      median_revpar: Math.round(median(revpars) * 100) / 100,
+      total_comps: top.length,
+    },
+  };
 }

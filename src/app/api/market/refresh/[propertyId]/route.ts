@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncMarketData, getApiUsage } from "@/lib/airroi/market-sync";
-import { buildCompSet, storeCompSet } from "@/lib/airroi/compsets";
+import { buildFilteredCompSet } from "@/lib/airroi/compsets";
 import { getAuthenticatedUser, verifyPropertyOwnership, verifyServiceKey } from "@/lib/auth/api-auth";
 
 export async function POST(
@@ -43,28 +43,24 @@ export async function POST(
       );
     }
 
-    // Ensure property has defaults for comp search
-    const compProperty = {
-      ...property,
-      bedrooms: property.bedrooms ?? 2,
-      bathrooms: property.bathrooms ?? 1,
-      max_guests: property.max_guests ?? 4,
-    };
-
-    // Force refresh both market snapshot and comp set
-    const [snapshot, compSet] = await Promise.all([
+    // Refresh both market snapshot and comp set in parallel. The comp-set
+    // path now uses buildFilteredCompSet — the same bed/price/radius
+    // filtered logic that runs at property import. Previously market_sync
+    // called buildCompSet (unfiltered top-15 from /comparables) which
+    // clobbered first-time-import rows within 24h; that's resolved by
+    // unifying on this single canonical builder.
+    const [snapshot, compResult] = await Promise.all([
       syncMarketData(supabase, property, true),
-      buildCompSet(compProperty).then(async (cs) => {
-        await storeCompSet(supabase, propertyId, cs);
-        return cs;
-      }),
+      buildFilteredCompSet(supabase, propertyId),
     ]);
 
     return NextResponse.json({
       snapshot,
-      compSet: compSet
-        ? { total_comps: compSet.comps.length, summary: compSet.summary }
-        : null,
+      compSet: {
+        total_comps: compResult.summary.total_comps,
+        summary: compResult.summary,
+        skipped_reason: compResult.reason ?? null,
+      },
       api_usage: getApiUsage(),
     });
   } catch (err) {

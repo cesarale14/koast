@@ -2,7 +2,17 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
-import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
+import {
+  CALENDAR_PUSH_DISABLED_MESSAGE,
+  isCalendarPushEnabled,
+  isBdcChannelCode,
+} from "@/lib/channex/calendar-push-gate";
+import {
+  buildSafeBdcRestrictions,
+  toChannexRestrictionValues,
+  type KoastRestrictionProposal,
+  type SafeRestrictionPlan,
+} from "@/lib/channex/safe-restrictions";
 
 export async function POST(
   _request: Request,
@@ -138,22 +148,87 @@ export async function POST(
       for (const rp of ratePlans) targets.push({ id: rp.id, channel: "legacy" });
     }
 
-    // Per-target, per-date restrictions. For each target channel, use the
-    // per-channel override if one exists for the date, else the base rate.
-    // This ensures manual markups (e.g. BDC +15%) are preserved when the
-    // pricing engine re-pushes — the biggest risk we're fixing here.
-    const restrictionValues: Array<{
-      property_id: string;
-      rate_plan_id: string;
-      date_from: string;
-      date_to: string;
-      rate: number;
-      min_stay_arrival: number;
-      stop_sell: boolean;
-    }> = [];
+    // Per-target push path. For BDC targets, route through the safe-
+    // restrictions helper (pre-flight BDC read + host-state preservation —
+    // see docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md). For non-BDC
+    // targets (Airbnb, Direct), use the existing direct push — Track B
+    // PR A scopes safe-restrictions to BDC only per Q3=A, because Airbnb's
+    // clobber risk profile is different. Airbnb's safety can ride this
+    // same helper if/when an incident surfaces there.
+    let pushed = 0;
+    const failedBatches: Array<{ batch_index: number; date_range: string; error: string; size: number; target: string }> = [];
+    const bdcPlans: Array<{ rate_plan_id: string; plan: SafeRestrictionPlan }> = [];
+    let totalIntended = 0;
+
+    // BDC date window from the baseRates set. Helper expects one contiguous
+    // range; the actual dates it pushes come from koastProposed keys.
+    const bdcDates = baseRates.map((b) => b.date).sort();
+    const bdcDateFrom = bdcDates[0];
+    const bdcDateTo = bdcDates[bdcDates.length - 1];
 
     for (const t of targets) {
       const channelOverrides = overrides.get(t.channel);
+
+      if (isBdcChannelCode(t.channel)) {
+        // Build koastProposed Map for this BDC target.
+        const koastProposed = new Map<string, KoastRestrictionProposal>();
+        for (const base of baseRates) {
+          const override = channelOverrides?.get(base.date);
+          const rateDollars = override?.applied_rate ?? base.applied_rate;
+          const minStay = override?.min_stay ?? base.min_stay ?? 1;
+          const isAvailable = override?.is_available ?? base.is_available;
+          const proposal: KoastRestrictionProposal = {
+            rate: rateDollars,
+            min_stay_arrival: minStay,
+          };
+          if (!isAvailable) proposal.stop_sell = true;
+          koastProposed.set(base.date, proposal);
+        }
+
+        const plan = await buildSafeBdcRestrictions({
+          channex,
+          channexPropertyId: property.channex_property_id,
+          bdcRatePlanId: t.id,
+          dateFrom: bdcDateFrom,
+          dateTo: bdcDateTo,
+          koastProposed,
+        });
+        bdcPlans.push({ rate_plan_id: t.id, plan });
+        const payload = toChannexRestrictionValues(plan, property.channex_property_id, t.id);
+        totalIntended += payload.length;
+
+        for (let i = 0; i < payload.length; i += 200) {
+          const batch = payload.slice(i, i + 200);
+          const firstDate = batch[0]?.date_from ?? "?";
+          const lastDate = batch[batch.length - 1]?.date_to ?? "?";
+          try {
+            await channex.updateRestrictions(batch);
+            pushed += batch.length;
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            failedBatches.push({
+              batch_index: Math.floor(i / 200),
+              date_range: `${firstDate}..${lastDate}`,
+              error: msg,
+              size: batch.length,
+              target: t.channel,
+            });
+            console.error(`[pricing/push BDC-safe] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+          }
+        }
+        continue;
+      }
+
+      // Non-BDC: direct push, existing behavior preserved.
+      const restrictionValues: Array<{
+        property_id: string;
+        rate_plan_id: string;
+        date_from: string;
+        date_to: string;
+        rate: number;
+        min_stay_arrival: number;
+        stop_sell: boolean;
+      }> = [];
       for (const base of baseRates) {
         const override = channelOverrides?.get(base.date);
         const rateDollars = override?.applied_rate ?? base.applied_rate;
@@ -169,31 +244,25 @@ export async function POST(
           stop_sell: !isAvailable,
         });
       }
-    }
-
-    // Push in batches of 200 with per-batch error handling. Previously a
-    // failure in batch N silently aborted batches N+1..end and reported
-    // `pushed` as the partial count without any error signal. Now we track
-    // every batch, collect errors, and surface a partial-failure response
-    // when anything went wrong.
-    let pushed = 0;
-    const failedBatches: Array<{ batch_index: number; date_range: string; error: string; size: number }> = [];
-    for (let i = 0; i < restrictionValues.length; i += 200) {
-      const batch = restrictionValues.slice(i, i + 200);
-      const firstDate = batch[0]?.date_from ?? "?";
-      const lastDate = batch[batch.length - 1]?.date_to ?? "?";
-      try {
-        await channex.updateRestrictions(batch);
-        pushed += batch.length;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        failedBatches.push({
-          batch_index: Math.floor(i / 200),
-          date_range: `${firstDate}..${lastDate}`,
-          error: msg,
-          size: batch.length,
-        });
-        console.error(`[pricing/push] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+      totalIntended += restrictionValues.length;
+      for (let i = 0; i < restrictionValues.length; i += 200) {
+        const batch = restrictionValues.slice(i, i + 200);
+        const firstDate = batch[0]?.date_from ?? "?";
+        const lastDate = batch[batch.length - 1]?.date_to ?? "?";
+        try {
+          await channex.updateRestrictions(batch);
+          pushed += batch.length;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          failedBatches.push({
+            batch_index: Math.floor(i / 200),
+            date_range: `${firstDate}..${lastDate}`,
+            error: msg,
+            size: batch.length,
+            target: t.channel,
+          });
+          console.error(`[pricing/push ${t.channel}] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+        }
       }
     }
 
@@ -206,8 +275,9 @@ export async function POST(
       return NextResponse.json({
         partial_failure: true,
         pushed,
-        total_intended: restrictionValues.length,
+        total_intended: totalIntended,
         failed_batches: failedBatches,
+        bdc_plans: bdcPlans,
         channex_property_id: property.channex_property_id,
         ratePlans: targets.length,
         targets: targets.map((t) => t.channel),
@@ -217,7 +287,8 @@ export async function POST(
 
     return NextResponse.json({
       pushed,
-      total_intended: restrictionValues.length,
+      total_intended: totalIntended,
+      bdc_plans: bdcPlans,
       channex_property_id: property.channex_property_id,
       ratePlans: targets.length,
       targets: targets.map((t) => t.channel),

@@ -3,6 +3,12 @@ import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-au
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled, isBdcChannelCode } from "@/lib/channex/calendar-push-gate";
+import {
+  buildSafeBdcRestrictions,
+  toChannexRestrictionValues,
+  type KoastRestrictionProposal,
+  type SafeRestrictionPlan,
+} from "@/lib/channex/safe-restrictions";
 
 /**
  * Per-channel rate editing API for the calendar right-side panel.
@@ -578,32 +584,66 @@ export async function POST(
       return NextResponse.json({ error: `DB save failed: ${upsertErr.message}` }, { status: 500 });
     }
 
-    // Push rate + (optional) min_stay to Channex. Channex expects cents.
-    // Per our earlier Pool House investigation, some BDC rate types reject
-    // min_stay_arrival pushes ("RATE_IS_A_SLAVE_RATE"); we catch and report
-    // the push error in the response so the UI can surface it.
+    // Push rate + (optional) min_stay to Channex. BDC targets route
+    // through the safe-restrictions helper (pre-flight read + host-state
+    // preservation — see docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md).
+    // Non-BDC targets use the existing direct push.
     const channex = createChannexClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const restrictionValues: any[] = dates.map((d) => ({
-      property_id: channexPropertyId,
-      rate_plan_id: ratePlanId,
-      date_from: d,
-      date_to: d,
-      rate: Math.round(rate * 100),
-      ...(min_stay_arrival != null ? { min_stay_arrival } : {}),
-    }));
-
     let pushed = false;
     let pushError: string | null = null;
-    try {
-      // Batches of 200 to match our existing pattern
-      for (let i = 0; i < restrictionValues.length; i += 200) {
-        await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+    let bdcPlan: SafeRestrictionPlan | null = null;
+
+    if (isBdcChannelCode(channel_code)) {
+      // Build koastProposed for the range — single rate + optional min_stay
+      // applied to every date in [date_from, date_to].
+      const koastProposed = new Map<string, KoastRestrictionProposal>();
+      for (const d of dates) {
+        const proposal: KoastRestrictionProposal = { rate };
+        if (min_stay_arrival != null) proposal.min_stay_arrival = min_stay_arrival;
+        koastProposed.set(d, proposal);
       }
-      pushed = true;
-    } catch (err) {
-      pushError = err instanceof Error ? err.message : String(err);
-      console.warn("[channels/rates POST] Channex push failed:", pushError);
+      try {
+        const plan = await buildSafeBdcRestrictions({
+          channex,
+          channexPropertyId,
+          bdcRatePlanId: ratePlanId,
+          dateFrom: date_from,
+          dateTo: date_to,
+          koastProposed,
+        });
+        bdcPlan = plan;
+        const payload = toChannexRestrictionValues(plan, channexPropertyId, ratePlanId);
+        for (let i = 0; i < payload.length; i += 200) {
+          await channex.updateRestrictions(payload.slice(i, i + 200));
+        }
+        pushed = true;
+      } catch (err) {
+        pushError = err instanceof Error ? err.message : String(err);
+        console.warn("[channels/rates POST BDC-safe] push failed:", pushError);
+      }
+    } else {
+      // Non-BDC: direct push, Channex expects cents. Per our earlier Pool
+      // House investigation, some BDC rate types reject min_stay_arrival
+      // pushes ("RATE_IS_A_SLAVE_RATE") — that path is now BDC-routed
+      // through the helper, so this direct branch is Airbnb/Direct only.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const restrictionValues: any[] = dates.map((d) => ({
+        property_id: channexPropertyId,
+        rate_plan_id: ratePlanId,
+        date_from: d,
+        date_to: d,
+        rate: Math.round(rate * 100),
+        ...(min_stay_arrival != null ? { min_stay_arrival } : {}),
+      }));
+      try {
+        for (let i = 0; i < restrictionValues.length; i += 200) {
+          await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+        }
+        pushed = true;
+      } catch (err) {
+        pushError = err instanceof Error ? err.message : String(err);
+        console.warn("[channels/rates POST] Channex push failed:", pushError);
+      }
     }
 
     invalidatePropertyCache(propertyId);
@@ -615,6 +655,7 @@ export async function POST(
       channel_code,
       rate_plan_id: ratePlanId,
       dates: dates.length,
+      bdc_plan: bdcPlan,
       date_from,
       date_to,
     });

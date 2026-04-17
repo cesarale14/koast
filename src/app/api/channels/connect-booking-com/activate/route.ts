@@ -3,6 +3,12 @@ import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
+import {
+  buildSafeBdcRestrictions,
+  toChannexRestrictionValues,
+  type KoastRestrictionProposal,
+  type SafeRestrictionPlan,
+} from "@/lib/channex/safe-restrictions";
 
 /**
  * POST /api/channels/connect-booking-com/activate
@@ -93,38 +99,62 @@ export async function POST(request: NextRequest) {
       }
 
       // Push restrictions (rate + availability + min_stay + stop_sell) to
-      // the BDC-specific rate plan. If there's no rate plan (legacy), fall
-      // back to pushing only availability to all room types.
+      // the BDC-specific rate plan via the safe-restrictions helper. The
+      // old 365-day write-only sweep was the source of the BDC clobber
+      // incident — see docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md.
+      // The helper pre-fetches current BDC state and only emits writes
+      // for dates where Koast has an opinion AND the change is safe
+      // (BDC-closed dates are fully preserved, rate deltas >10% are
+      // skipped, etc.).
+      //
+      // KNOWN GAP: This retrofit covers rate-plan-level restrictions only.
+      // The legacy `else` branch below pushes availability at the ROOM-TYPE
+      // level via channex.updateAvailability, which is a different endpoint
+      // and is NOT wrapped by safe-restrictions. If room-type availability
+      // has the same default-to-open clobber pattern, it reintroduces a
+      // lesser form of the incident. Audit + retrofit scheduled as Stage 1.5
+      // / early PR B work.
       if (bdcRatePlanId) {
-        const restrictionValues: Array<{
-          property_id: string;
-          rate_plan_id: string;
-          date_from: string;
-          date_to: string;
-          rate?: number;
-          min_stay_arrival: number;
-          stop_sell: boolean;
-          availability?: number;
-        }> = [];
+        // Build the koastProposed Map from our existing rate/booking data.
+        const koastProposed = new Map<string, KoastRestrictionProposal>();
         for (let d = new Date(startStr + "T00:00:00Z"); d <= new Date(endStr + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
           const ds = d.toISOString().split("T")[0];
           const r = rateByDate.get(ds);
           const isBlocked = blockedDates.has(ds);
-          restrictionValues.push({
-            property_id: channexPropertyId,
-            rate_plan_id: bdcRatePlanId,
-            date_from: ds,
-            date_to: ds,
-            rate: r?.applied_rate ? Math.round(Number(r.applied_rate) * 100) : undefined,
-            min_stay_arrival: r?.min_stay ?? 1,
-            stop_sell: isBlocked || r?.is_available === false,
-            availability: isBlocked ? 0 : 1,
-          });
+          const proposal: KoastRestrictionProposal = {};
+          if (r?.applied_rate != null) proposal.rate = Number(r.applied_rate);
+          if (r?.min_stay != null) proposal.min_stay_arrival = r.min_stay;
+          if (isBlocked) {
+            proposal.availability = 0;
+            proposal.stop_sell = true;
+          } else if (r?.is_available === false) {
+            proposal.stop_sell = true;
+          }
+          // Only add dates where Koast has SOME opinion — absent dates
+          // tell the helper "leave BDC alone."
+          if (
+            proposal.rate !== undefined ||
+            proposal.min_stay_arrival !== undefined ||
+            proposal.availability !== undefined ||
+            proposal.stop_sell !== undefined
+          ) {
+            koastProposed.set(ds, proposal);
+          }
         }
-        for (let i = 0; i < restrictionValues.length; i += 200) {
-          await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+
+        const plan: SafeRestrictionPlan = await buildSafeBdcRestrictions({
+          channex,
+          channexPropertyId,
+          bdcRatePlanId,
+          dateFrom: startStr,
+          dateTo: endStr,
+          koastProposed,
+        });
+        const payload = toChannexRestrictionValues(plan, channexPropertyId, bdcRatePlanId);
+        for (let i = 0; i < payload.length; i += 200) {
+          await channex.updateRestrictions(payload.slice(i, i + 200));
         }
-        console.log(`[connect-bdc/activate] Pushed ${restrictionValues.length} restrictions to BDC rate plan ${bdcRatePlanId}`);
+        console.log(`[connect-bdc/activate] Safe-restrictions push: ${payload.length} entries, ${plan.skipped_fields.length} skipped (BDC-closed / rate-delta / etc.)`);
       } else {
         // Legacy path — push availability only
         const availValues = roomTypes.map((rt) => ({

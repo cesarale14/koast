@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildCompSet, storeCompSet } from "@/lib/airroi/compsets";
+import { buildFilteredCompSet } from "@/lib/airroi/compsets";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 
 export async function GET(
@@ -17,7 +17,7 @@ export async function GET(
     const supabase = createServiceClient();
     const propertyId = params.propertyId;
 
-    // Check for cached comps
+    // Check for cached comps — return if <7 days old.
     const { data: cached } = await supabase
       .from("market_comps")
       .select("*")
@@ -25,8 +25,6 @@ export async function GET(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cachedComps = (cached ?? []) as any[];
-
-    // Return cached if less than 7 days old
     if (cachedComps.length > 0) {
       const newest = cachedComps.reduce((a, b) =>
         new Date(a.last_synced) > new Date(b.last_synced) ? a : b
@@ -40,40 +38,24 @@ export async function GET(
       }
     }
 
-    // Fetch property
-    const { data: props } = await supabase
-      .from("properties")
-      .select("id, latitude, longitude, bedrooms, bathrooms, max_guests")
-      .eq("id", propertyId)
-      .limit(1);
+    // Build fresh via the canonical filtered builder (same one used by
+    // property import + daily market_sync refresh). Unified in Track B
+    // Stage 1 PR A — see src/lib/airroi/compsets.ts.
+    const result = await buildFilteredCompSet(supabase, propertyId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const propData = (props ?? []) as any[];
-    if (propData.length === 0) {
-      return NextResponse.json({ error: "Property not found" }, { status: 404 });
+    if (result.inserted === 0) {
+      return NextResponse.json({
+        source: "airroi",
+        comps: [],
+        summary: result.summary,
+        skipped_reason: result.reason ?? null,
+      });
     }
-
-    const property = propData[0];
-    if (!property.latitude || !property.longitude) {
-      return NextResponse.json(
-        { error: "Property has no location data (lat/lng required)" },
-        { status: 400 }
-      );
-    }
-
-    // Build comp set from AirROI (use defaults if bedrooms/baths not set)
-    const compProperty = {
-      ...property,
-      bedrooms: property.bedrooms ?? 2,
-      bathrooms: property.bathrooms ?? 1,
-      max_guests: property.max_guests ?? 4,
-    };
-    const compSet = await buildCompSet(compProperty);
-    await storeCompSet(supabase, propertyId, compSet);
 
     return NextResponse.json({
       source: "airroi",
-      ...compSet,
+      comps: result.comps,
+      summary: result.summary,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
