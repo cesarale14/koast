@@ -1,242 +1,442 @@
-# Koast (StayCommand) — CLAUDE.md
+# Koast (formerly Moora / StayCommand) — CLAUDE.md
 
 ## FIRST STEPS FOR EVERY SESSION
-1. Read this file completely before any work
-2. **Read `DESIGN_SYSTEM.md` before any UI work.** Every component, color, shadow, animation, and spacing must match the design system exactly.
-3. **Read `KOAST_PRODUCT_SPEC.md` for feature requirements.** Any new feature must be checked against the product spec before implementation.
-4. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure
-5. If repomix is stale: `cd ~/staycommand && repomix`
-6. Never run `npm run build` on VPS — use `npx tsc --noEmit` then `git push` (Vercel builds)
+1. Read this file completely before any work.
+2. Read `DESIGN_SYSTEM.md` before any UI work. Every component, color, shadow, animation, and spacing must match the design system exactly.
+3. Read `KOAST_PRODUCT_SPEC.md` for feature requirements before implementation.
+4. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure. If stale: `cd ~/staycommand && repomix`.
+5. Never run `npm run build` on the VPS — use `npx tsc --noEmit` then `git push`. Vercel builds with 8GB RAM.
 
 ## Prompt Format
-Every prompt to Claude Code must start with:
-"Read ~/staycommand/CLAUDE.md and repomix-output.txt first."
+Every prompt to Claude Code should start with:
+"Read ~/staycommand/CLAUDE.md and repomix-output.xml first."
 
 ## Planning Mode
-- Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API+UI+DB changes)
-- Skip ultraplan for small fixes (1-3 files, UI tweaks, single bug fixes)
-- Examples that warrant /ultraplan: design system rollout, channel connection flows, direct booking website, owner portal
-- Examples to skip: fix a logo, change a color, add a button, fix a single API endpoint
+- Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API + UI + DB changes).
+- Skip ultraplan for small fixes (1-3 files, UI tweaks, single bug fixes).
 
 ## Code Rules
-- **Never use sub-agents** — write all code directly
-- Always run `npx tsc --noEmit` before committing
-- Always push to main after committing
-- Return actual error messages in API responses — never return empty 500s
-- Wrap all API handlers in try/catch
-- Never run `npm run build` on VPS (times out, insufficient RAM)
-- ESLint: unused variables cause Vercel build failures — always check before push
+- **Never use sub-agents** — write all code directly.
+- Always run `npx tsc --noEmit` before committing.
+- Always push to `main` after committing. Vercel auto-deploys.
+- Return actual error messages in API responses — never return empty 500s.
+- Wrap all API handlers in try/catch.
+- Never run `npm run build` on VPS (times out, insufficient RAM).
+- ESLint: unused variables break the Vercel build — check before push.
+- **Never use default Tailwind grays, shadows, or generic border-radius** — see DESIGN_SYSTEM.md.
+- **No emojis anywhere** — UI, AI-generated content, or user-visible SMS bodies.
+- **No pulsing/glowing animated dots.** Status indicators are solid colored dots.
+
+---
 
 ## Product Overview
-Koast (formerly Moora / StayCommand) is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. It competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have.
+Koast is a unified STR (short-term rental) operating system with AI-powered pricing, market intelligence, and channel management. Competes with Hospitable, Hostaway, and Guesty — with a 9-signal pricing engine and market intelligence layer that none of them have. Tagline: "Your hosting runs itself."
 
-**Live URL:** https://staycommand.vercel.app
-**GitHub:** cesarale14/staycommand
+- **Live URL:** https://staycommand.vercel.app (will move to app.koasthq.com)
+- **Domain:** koasthq.com (registered, not yet configured)
+- **GitHub:** cesarale14/staycommand
 
 ## Tech Stack
 - **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS
 - **Database:** Supabase PostgreSQL + Auth + Drizzle ORM
-- **Deployment:** Vercel (auto-deploy from GitHub)
-- **VPS:** Virginia 44.195.218.19 (background workers, Python)
-- **Channel Manager:** Channex.io (CERTIFIED, production approved)
+- **Deployment:** Vercel (auto-deploy from GitHub main)
+- **VPS (Virginia, 44.195.218.19):** Koast workers (pricing validator, booking sync, market sync). Cleaned 2026-03-24 (legacy projects removed). BTC5MIN bot is NOT on this VPS — it runs on Ireland.
+- **Channel Manager:** Channex.io (CERTIFIED, production whitelabel active at app.channex.io)
 - **Market Data:** AirROI API
 - **AI Messaging:** Claude API (Anthropic)
 - **SMS:** Twilio
 - **Events:** Ticketmaster API
 - **Weather:** Weather.gov API (free, no key)
-- **Font:** Plus Jakarta Sans (via @fontsource-variable)
+- **Font:** Plus Jakarta Sans via `@fontsource-variable`
+- **Floating UI:** `@floating-ui/react@0.27.19` (positioning for popovers)
 
-## Design System — see DESIGN_SYSTEM.md
+---
 
-**IMPORTANT: Read `DESIGN_SYSTEM.md` before any UI work.** It is the authoritative spec for Koast's visual language. Every component, color, shadow, animation, and spacing must match the design system exactly.
+## Design System — Koast
+Full details in `DESIGN_SYSTEM.md` (1,119 lines). Key rules:
+- NEVER use default Tailwind grays (`gray-*`, `slate-*`, `zinc-*`). Use Koast tokens.
+- NEVER use Tailwind shadow utilities (`shadow-md`, `shadow-lg`). Use the CSS-variable shadow stacks.
+- NEVER use generic border-radius — see DESIGN_SYSTEM.md Section 4.
+- Platform logos must be real SVGs from `/icons/platforms/` via `src/lib/platforms.ts`. Never approximate with colored circles + letters.
+- Revenue chart uses HTML Canvas + `requestAnimationFrame` — no `recharts`, no `chart.js`.
+- Every page has entrance choreography: staggered card reveals, count-up numbers, chart draw animations.
+- Entrance animations use `ease-out`. Hover transitions use `cubic-bezier(0.4, 0, 0.2, 1)`.
 
-The design system ("Koast" direction) replaces the older Canopy tokens. Key references:
+### Color Palette (quick reference)
+```
+Deep Sea   #132e20    Coastal   #17392a    Mangrove  #1f4d38    Tideline  #3d6b52
+Golden     #c49a5a    Driftwood #d4b47a    Sandbar   #e8d5b0
+Shore      #f7f3ec    Dry Sand  #ede7db    Shell     #e2dace
+Coral Reef #c44040    Amber Tide#d4960b    Lagoon    #1a7a5a    Deep Water#2a5a8a
+Bar Dark   #222222  (booking bars — NEVER platform-colored)
+```
 
-- **Color palette**: coastal greens (`--deep-sea`, `--coastal`, `--mangrove`, `--tideline`), golden accents (`--golden`, `--driftwood`, `--sandbar`), sandy neutrals (`--shore`, `--dry-sand`, `--shell`), and semantic tokens (`--coral-reef` danger, `--amber-tide` warning, `--lagoon` success, `--deep-water` info). NEVER use default Tailwind grays.
-- **Font**: Plus Jakarta Sans Variable. Stat numbers use `-0.03em` letter-spacing with 700 weight; section labels are 11px / 700 / uppercase / `+0.06em` tracking in `--golden`.
-- **Shadows**: only the exact stacks defined in DESIGN_SYSTEM.md — never `shadow-md` / `shadow-lg` / other default Tailwind shadows.
-- **Borders**: always use `--dry-sand` / `--shell`, never gray.
-- **Radius**: use the specific radius tokens from the spec, not generic `rounded-md` / `rounded-lg`.
-- **Platform icons**: see `PLATFORM_ICONS.md`. Use the real brand SVGs under `public/icons/platforms/` — never approximate logos with colored circles + letters.
+### Platform Config
+All platform references must go through `src/lib/platforms.ts`. Never hardcode `/icons/platforms/*` paths or brand hex codes.
 
-All tokens live as CSS variables in `globals.css` (:root). Tailwind utility classes map to them (`bg-coastal`, `text-golden`, `bg-shore`, etc).
+```ts
+PLATFORMS.airbnb.tile / .icon / .iconWhite        // coral #FF385C
+PLATFORMS.booking_com.tile / .icon / .iconWhite   // navy  #003580
+PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden #c49a5a
+PLATFORMS.vrbo                                    // WARNING: SVG assets missing (see Known Gaps)
+```
 
-## Key Infrastructure
-- VPS SSH: `C:\Users\cesar\Downloads\LightsailDefaultKey-us-east-1.pem`
-- Supabase: US East, direct connection port 5432 (VPS), pooled port 6543 (Vercel)
-- Workers: `~/staycommand-workers/` on VPS
-- Logs: `/var/log/staycommand/`
-- Workers status: `~/staycommand-workers/status.sh`
+`platformKeyFrom(code)` normalizes `"ABB" / "airbnb"`, `"BDC" / "booking" / "booking.com" / "booking_com" / "booking-com"`, `"HMA" / "vrbo"`, `"direct" / "koast"`.
 
-## Database (28 tables)
-properties, listings, bookings, calendar_rates, market_comps, market_snapshots, messages, cleaning_tasks, review_rules, guest_reviews, pricing_outcomes, local_events, ical_feeds, leads, revenue_checks, property_details, message_templates, cleaners, sms_log, user_preferences, property_channels, channex_room_types, channex_rate_plans, notifications, weather_cache, channex_webhook_log, user_subscriptions, concurrency_locks
+### Legacy Token Cleanup (in progress)
+`bg-brand-500` resolves to `var(--coastal)`, `bg-brand-600` to `var(--deep-sea)`. Current count: **43 `bg-brand-500` occurrences across 17 files; 16 files with `bg-brand-600`; 65 `text-brand-*` occurrences; 132 total `brand-*` references across 24 files.** Migrate each file to Koast tokens when you touch it; deletion of the aliases is a phase-1 milestone.
 
-## Channex Integration (PRODUCTION)
-- Current state: FRESH START — 0 properties in StayCommand, 4 properties in Channex (can't be deleted while mapped to Airbnb channel)
-- Airbnb channel ID: fa3398a3-e7a4-4ff6-b770-1663d8affd45 (active, OAuth connected, 4 listings mapped)
-- Channex properties exist but StayCommand DB is clean — re-import will reconnect them
-- Webhook: POST /api/webhooks/channex (booking events)
-- Revision polling: booking_sync.py every 15 min via systemd
-- Booking sync: bidirectional (webhook instant + revision poll safety net)
-- Availability: StayCommand controls availability. On import, pushes avail=1 for 365 days then blocks booked dates
-- API: app.channex.io/api/v1 (PRODUCTION — whitelabel access active)
-- IMPORTANT: Never push rates via CRS booking API — it overwrites restriction rates. Only push availability (0/1) on booking create/edit/cancel.
-- IMPORTANT: Koast pushes rates to ALL connected channels including Airbnb via Channex rate plans. The calendar's per-channel rate editor can target Airbnb, Booking.com, and Vrbo independently; saving pushes to the channel's dedicated Channex rate plan.
-- IMPORTANT: To block specific dates on BDC, use availability=0 (BookingLimit=0) at the room type level — NOT stop_sell=true, which BDC interprets as closing the entire room/property. Ensure rates are pushed for the full bookable window (today through 18+ months out) — any date with $0 rate triggers "missing prices" warnings in the BDC extranet.
-- IMPORTANT: BDC child/slave rates reject all pushes with RATE_IS_A_SLAVE_RATE. Always identify and target the parent rate code (brute-force candidates around the rate code Channex first reports if needed). Use `POST /channels/{id}/activate` to activate BDC channels — `PUT is_active: true` does not work.
-- IMPORTANT: Channex property and rate plan IDs for new channels come from `GET /rate_plans?filter[property_id]=X` intersected with the channel's `rate_plans` array. Multi-property channels (single Airbnb account covering many listings) expose every linked property's rate plans, so filtering by the property-owned ID set is required to avoid picking the wrong rate plan.
+---
+
+## Active Properties (verified in DB 2026-04-17)
+| Property | Airbnb | Booking.com | channex_property_id |
+|---|---|---|---|
+| **Villa Jamaica** (`bfb0750e-9ae9-4ef4-a7de-988062f6a0ad`) | Listing 1240054136658113220, rate plan `3070d2ad-23a2-4de2-9fab-23840c23908c`, status=active | Hotel 12783847, channel `4c7852e8-122c-4276-a4f2-31960a9a34e4`, rate plan `7439f86d-001f-4557-a181-6c51c01d4c91`, parent rate code **48257326**, status=active | `4d52bb8c-5bee-479a-81ae-2d0a9cb02785` |
+| **Cozy Loft - Tampa** (`57b350de-e0c7-4825-8064-b58a6ec053fb`) | active (ABB), rate plan `17e74f6d-2381-45b8-929d-7174d0290a72` | — | `6928213d-7a2f-449c-90bc-115b1007be45` |
+
+**Previously listed but removed from DB:** Pool House - Tampa, Modern House - Tampa, Stadium Loft - Tampa. Do not reintroduce in docs without checking DB first.
+
+**Airbnb OAuth:** currently disconnected from Channex. Reconnect when PMS is ready for production.
+
+---
+
+## Channex Integration (CRITICAL LEARNINGS)
+- **CERTIFIED** — production approved, whitelabel active at `app.channex.io/api/v1`.
+- **BDC rates:** use `availability=0` at the room-type level to block dates — NOT `stop_sell=true` (BDC interprets that as closing the whole property).
+- **BDC requires rates for the full bookable window** (today → 18+ months). Any date with $0 triggers "missing prices" warnings in BDC extranet.
+- **Slave/child rates reject all pushes** with `RATE_IS_A_SLAVE_RATE`. Always identify and target the parent rate code.
+- **Channel activation:** `POST /channels/{id}/activate` is required. `PUT is_active:true` silently no-ops.
+- **Airbnb rate pushing works** via Channex rate plans. The old "read-only" assumption was wrong.
+- **Webhook idempotency:** dedup every incoming Channex webhook via `channex_webhook_log.revision_id`. Duplicate deliveries ack and skip without re-processing.
+- **Property + rate plan lookup:** `GET /rate_plans?filter[property_id]=X` ∩ the channel's `rate_plans` array. Multi-property channels (one Airbnb account, many listings) expose every linked property's rate plans — filter by property-owned ID set or you'll pick the wrong one.
 
 ### Booking.com Self-Service Connection
-- Flow: User enters Hotel ID → API creates Channex BDC channel → tests connection → if Booking.com hasn't authorized Channex, shows instructions (admin.booking.com → Account → Connectivity Provider → search "Channex") → retry → on success, pushes availability + activates
-- API routes: `/api/channels/connect-booking-com` (create), `/api/channels/connect-booking-com/test` (test auth), `/api/channels/connect-booking-com/activate` (push avail + activate)
-- UI: `BookingComConnect.tsx` modal with form → progress → authorization → success states
-- Channex client methods: `createChannel`, `updateChannel`, `testChannelConnection`, `deleteProperty`, `getRestrictionsBucketed`
-- Channel creation is atomic: a compensating-rollback try/catch tracks every Channex resource created (scaffold property, rate plan, channel) and deletes them on later failure so orphaned entities don't accumulate.
-- Per-property mutex via `concurrency_locks` table prevents two simultaneous connect requests from racing.
-- Connect flow creates a DEDICATED BDC rate plan — it never reuses an existing one, which prevents rate bleed between Airbnb and Booking.com.
-- Name matching (Koast ↔ Channex) uses strict normalized equality (strips " - X" / " in X" / Airbnb rating noise). Ambiguous matches surface as candidates instead of auto-picking.
+- **Flow:** user enters Hotel ID → API creates Channex BDC channel → tests connection → if BDC hasn't authorized Channex, shows instructions (admin.booking.com → Account → Connectivity Provider → search "Channex") → retry → on success, pushes availability + activates.
+- **API routes:** `POST /api/channels/connect-booking-com` (create), `.../test` (test auth), `.../activate` (push avail + activate).
+- **UI:** `BookingComConnect.tsx` modal (form → progress → authorization → success).
+- **Channex client methods:** `createChannel`, `updateChannel`, `testChannelConnection`, `deleteProperty`, `getRestrictionsBucketed`.
+- **Atomic channel creation:** compensating try/catch rollback deletes scaffold property, rate plan, and channel on later failure. Orphans are prevented at source.
+- **Per-property mutex:** 60-second advisory lock in `concurrency_locks` keyed `bdc_connect:{propertyId}`. Concurrent requests return HTTP 409 `connect_in_progress`.
+- **Dedicated rate plan:** every BDC connect creates a NEW rate plan — never reuses an existing one. Prevents rate bleed between Airbnb and Booking.com.
+- **Name matching (Koast ↔ Channex):** strict normalized equality. Strips `" - X"`, `" in X"`, Airbnb rating noise. Ambiguous matches surface as candidates instead of auto-picking.
+
+---
 
 ## Reliability Infrastructure
-- **Webhook idempotency**: Every incoming Channex webhook is dedup'd via `channex_webhook_log.revision_id`. Duplicate deliveries (Channex network retries) are acked and skipped without re-processing — no more duplicate bookings or double availability pushes.
-- **Free-tier enforcement**: `enforce_property_quota` DB trigger (`supabase/migrations/20260413010000_free_tier_property_quota.sql`) blocks at-limit property inserts atomically. Client-side count check remains for fast UX but the trigger is authoritative. Per-tier limits: free=1, pro=15, business=unlimited. Tiers live in `user_subscriptions` (default free for new rows).
-- **BDC connect mutex**: 60-second advisory locks in `concurrency_locks` table keyed `bdc_connect:{propertyId}`. Concurrent requests return 409 `connect_in_progress`. Released on both success and failure paths.
-- **Atomic BDC channel creation**: Compensating rollback on failure deletes scaffold properties, rate plans, and channels that were created before the error. The orphan-scaffold problem that gave us Pool House's misrouted BDC channel is prevented at source.
-- **Rate push partial failure handling**: `/api/pricing/push` wraps each 200-entry batch in try/catch, collects per-batch failures with date ranges, and returns HTTP 207 Multi-Status with `partial_failure: true` instead of silently claiming success after batch N fails.
-- **Scaffold cleanup on import**: When a Channex import matches a Koast property that was previously linked to a scaffold Channex property, the import retargets all `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
-- **iCal preview mode**: `POST /api/ical/add` with `property_id: "preview"` runs the parse/validate flow without writing to the DB and without ownership checks — used by the properties-new Test button. 15-second AbortController timeout prevents hung feeds.
-- **iCal ghost booking cleanup**: Sync cancels bookings whose UID disappears from the feed regardless of whether they were originally iCal-sourced or Channex-sourced. For Channex-linked rows, it also unblocks the affected `calendar_rates` dates so cross-channel availability stays accurate.
+- **Webhook idempotency:** `channex_webhook_log.revision_id` dedup.
+- **Free-tier enforcement:** `enforce_property_quota` DB trigger (`supabase/migrations/20260413010000_free_tier_property_quota.sql`). Limits: free=1, pro=15, business=unlimited. `user_subscriptions` (default free) is authoritative — client-side count check is fast-UX only.
+- **BDC connect mutex:** 60s advisory locks in `concurrency_locks` (migration `20260413020000_concurrency_locks.sql`).
+- **Atomic BDC creation:** compensating rollback on failure.
+- **Rate push partial-failure handling:** `/api/pricing/push` wraps each 200-entry batch in try/catch, returns HTTP 207 multi-status with `partial_failure: true` and per-batch failure date ranges.
+- **Scaffold cleanup on import:** re-import retargets `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
+- **iCal preview mode:** `POST /api/ical/add` with `property_id: "preview"` parses/validates without DB writes or ownership checks. 15s `AbortController` timeout prevents hung feeds.
+- **iCal ghost booking cleanup:** UIDs removed from a feed get cancelled regardless of original source. Channex-linked rows also unblock affected `calendar_rates` to keep cross-channel availability accurate.
+
+---
 
 ## 9-Signal Pricing Engine
 Weights (sum = 1.0):
-- Demand: 0.20 (AirROI market occupancy)
-- Seasonality: 0.15 (learnable from pricing_outcomes after 30+ days)
-- Competitor: 0.20 (comp set percentile)
-- Events: 0.12 (Ticketmaster local events, stacked, capped +40)
-- Gap Night: 0.08 (orphan 1-2 night detection)
-- Booking Pace: 0.08 (smart baseline from historical data)
-- Weather: 0.05 (Weather.gov 14-day forecast, cached in weather_cache)
-- Supply Pressure: 0.05 (month-over-month listing count change)
-- Lead Time: 0.07 (rate position vs market at days-until-check-in)
+- Demand 0.20 (AirROI market occupancy)
+- Competitor 0.20 (comp-set percentile)
+- Seasonality 0.15 (learnable from `pricing_outcomes` after 30+ days)
+- Events 0.12 (Ticketmaster, stacked, capped +40)
+- Gap Night 0.08 (orphan 1-2 night detection)
+- Booking Pace 0.08 (smart baseline from historical data)
+- Lead Time 0.07 (rate position vs market at days-until-check-in)
+- Weather 0.05 (Weather.gov 14-day, cached in `weather_cache`)
+- Supply Pressure 0.05 (month-over-month listing-count change)
 
-## Sidebar Structure
+### Pricing Validator (LIVE — Virginia VPS)
+- **Script:** `~/staycommand-workers/pricing_validator.py`
+- **Unit:** `koast-pricing-validator.service` + `.timer`
+- **Schedule:** daily at 6:00 AM ET / 10:00 UTC
+- **Writes to:** `pricing_recommendations` table (+ `pricing_recommendations_latest` view)
+- **Current data:** 480 rows across 4 daily runs × 2 properties × 60 dates
+
+**Results so far (Apr 14-16, 2026):**
+| Day | Cozy Loft delta | Villa Jamaica delta |
+|---|---|---|
+| Apr 14 | +$6.00 (+8.70%), higher 60/60 | +$14.10 (+8.21%), higher 46/60 (76%), lower 14 |
+| Apr 15 | +$6.00 (+8.70%), higher 60/60 | +$11.60 (+7.07%), higher 42/60 (70%), lower 17 |
+| Apr 16 | +$6.00 (+8.70%), higher 60/60 | +$11.25 (+6.87%), higher 42/60 (70%), lower 17 |
+
+**Status:** collecting daily data. Need ≥14 daily snapshots before confident auto-apply.
+
+### Pricing Tables — actual state
+```sql
+-- Present (migration + DB):
+pricing_recommendations (id, property_id, date, current_rate, suggested_rate,
+                         reason_signals JSONB, delta_abs, delta_pct, created_at)
+pricing_recommendations_latest   -- view, newest snapshot per (property, date)
+
+-- Present (in schema.ts + DB):
+pricing_outcomes  -- used by seasonality signal after 30+ days of data
+
+-- Planned (NO migration yet — do not treat as available):
+-- pricing_rules      -- base/min/max rate + channel markups + auto_apply toggle
+-- pricing_performance -- suggested vs actual vs booked vs revenue_delta
 ```
-(no label): Dashboard, Calendar, Messages
-MANAGE: Properties, Pricing, Reviews, Cleaning
-INSIGHTS: Market Intel, Nearby Listings, Comp Sets
-Bottom: Settings, User avatar (Cesar)
+
+---
+
+## Shipped Pages
+All redesigned April 2026 to the Koast design system.
+
+| Sidebar label | Route | Notes |
+|---|---|---|
+| Dashboard | `/` | Glass cards, canvas revenue chart, AI insight cards (dark deep-sea + golden glow), entrance animations, count-up numbers |
+| Calendar | `/calendar` | Airbnb-style monthly grid, 24-month scroll, dark #222 booking bars with platform logos, per-channel rate editor right panel |
+| Messages | `/messages` | Three-column inbox, AI draft scaffolding, context panel |
+| Properties | `/properties` | Photo-led cards, status bars, channel badges, ChannelPopover on hover |
+| Pricing | `/pricing` | Rate calendar with signal cards, market-context sidebar, apply-suggestion flow |
+| Reviews | `/reviews` | AI review generation (Claude), approve/schedule/edit flow |
+| Turnovers | `/turnovers` | Task list, status pills, cleaner management, auto-create from bookings |
+| Market Intel | `/market-intel` | Glass stats, occupancy/ADR charts, revenue-opportunity AI card |
+| Comp Sets | `/comp-sets` | Glass stats, pinned your-property row, sortable competitive table |
+
+**Not in the sidebar but reachable by URL:**
+| Route | Purpose |
+|---|---|
+| `/properties/[id]` | Property Detail — 280px hero, 3 tabs (Overview / Calendar / Pricing), pricing scorecard with recommendations |
+| `/properties/new` / `/properties/import` | Onboarding entry points |
+| `/nearby-listings` | AirDNA-style browse with AirROI photos |
+| `/analytics` | Portfolio analytics dashboard |
+| `/bookings` | Bookings list |
+| `/channels` / `/channels/connect` / `/channels/sync-log` | Channel management + connect flow + sync log |
+| `/frontdesk` | Direct booking website builder (placeholder) |
+| `/onboarding` | First-run signup → connect → first property |
+| `/certification` / `/channex-certification` | Channex 14-test runner + internal cert tooling |
+| `/settings` | Account settings |
+| `/login` / `/signup` | Dark theme, AuthShell, golden CTA, Google OAuth button (not yet configured) |
+| **Public (no auth):** `/revenue-check` | Lead-gen tool |
+| **Public (no auth):** `/clean/[taskId]/[token]` | Cleaner token landing page |
+
+### Sidebar Structure (actual)
 ```
+(no label):   Dashboard, Calendar, Messages
+MANAGE:       Properties, Pricing, Reviews, Turnovers
+INSIGHTS:     Market Intel, Comp Sets
+```
+Source: `src/app/(dashboard)/layout.tsx`. Nine items total.
 
-## Key Pages & Features
-- **Dashboard:** Visual command center with property status cards (photos + live status), smart actions, events bar, portfolio performance, activity feed
-- **Calendar:** Airbnb-style monthly grid (ONLY monthly view — timeline removed), 24-month continuous scroll, booking bars with platform logos, check-in/checkout overlap, Airbnb-style partial-cell offsets, conflict detection with red stripes, full-width layout with property sidebar (left) and rate/availability settings panel (right). Per-channel rate editor in the right panel shows LIVE rates fetched from Channex per connected channel with sync status indicators (in-sync green check / out-of-sync amber warning), supports per-channel rate overrides stored in `calendar_rates.channel_code`, and includes markup % helpers that auto-derive from the engine base rate.
-- **Pricing:** 9-signal engine, heatmap, signal breakdown, push to OTAs
-- **Market Explorer:** Analytics + interactive Leaflet map (properties, comps, events)
-- **Nearby Listings:** AirDNA-style browse with real Airbnb photos from AirROI
-- **Comp Sets:** Manage competitive set with sortable table + map
-- **Inbox:** AI messaging with Claude-powered drafts
-- **Reviews:** AI-generated reviews with SEO keywords, scheduling
-- **Turnover:** Kanban board, Twilio SMS to cleaners, cleaner management
-- **Revenue Check:** Public lead gen tool at /revenue-check
-- **Frontdesk:** Direct booking website builder (placeholder, coming soon)
-- **Channex Certification:** /channex-certification (14 test runner)
+### Key UI Components
+- `src/lib/platforms.ts` — PLATFORMS config
+- `src/hooks/useCountUp.ts` — animated number count-up
+- `src/components/auth/AuthShell.tsx` — shared dark auth shell
+- `src/components/dashboard/RevenueChart.tsx` — canvas-drawn animated chart
+- `src/components/dashboard/` — AnalyticsDashboard, BookingComConnect, CompMap, ConflictResolution, DashboardClient, IntelMap, MessagesPageTabs, PricingDashboard, PropertiesPage, PropertyDetail, SyncLogDashboard, TemplateManager, TurnoverBoard, UnifiedInbox, WeekCalendar
+- `src/components/channels/ChannelPopover.tsx` — **SHIPPED.** Hover popover (desktop) + mobile bottom sheet. Wired into DashboardClient, PropertiesPage, PropertyDetail, PerChannelRateEditor. Uses `@floating-ui/react`
+- `src/components/calendar/` — CalendarGrid, MonthlyView, BookingBar, BookingSidePanel, CalendarToolbar, DateCell, DateEditPopover, PerChannelRateEditor, PropertyRow, PropertyThumbStrip, ChannelLogo
+- `src/components/ui/` — AddressAutocomplete, EmptyState, EventBadge, Logo, PageSkeleton, PlatformLogo, PropertyAvatar, ReviewBadge, Skeleton, StatCard, Toast
 
-## Calendar Architecture
-- `CalendarGrid.tsx` — Main container, monthly-only (timeline removed), manages state
-- `MonthlyView.tsx` — 24-month scrolling grid with sticky month headers
-- `BookingBar.tsx` — Airbnb-style partial-cell bars (check-in at 50%, checkout at 40%)
-- `CalendarToolbar.tsx` — Thin header bar with title + Today button
-- `DateCell.tsx` — Individual cell with rate display
-- `BookingSidePanel.tsx` — Booking details slide-out
-- Right settings panel: always-visible price/availability settings, date-specific editing on click
-- Booking bars use floatStart/floatEnd fractional cell coordinates for Airbnb-style check-in/checkout offsets
-- Turnover detection: follower/predecessor sets drive 10% overlap seam on same-day handoffs
-- Conflict detection: separate from visual overlap — real overbookings get red diagonal stripes
+### Design Spec Files
+- `DESIGN_SYSTEM.md` — colors, tokens, components, animations, page patterns
+- `KOAST_PRODUCT_SPEC.md` — full product spec, every page, every feature
+- `KOAST_PROJECT_PLAN.md` — 4 parallel tracks, milestones, priorities
+- `PLATFORM_ICONS.md` — platform logo usage + SVG sourcing
+- `docs/mockups/*.html` — 6 HTML visual targets (koast-dashboard-v3, koast-calendar-v2, koast-messages, koast-properties, koast-property-detail, koast-remaining-pages)
 
-## Property Photos
-- User properties: auto-pulled from Airbnb via OG image tag (listing ID from iCal URL)
-- Comp properties: cover_photo_url from AirROI API (stored in market_comps.photo_url)
-- Refresh needed after adding properties: POST /api/market/refresh/{propertyId}
+---
 
-## VPS Workers (~/staycommand-workers/)
-- booking_sync.py: iCal sync + Channex revision polling (every 15 min)
-- pricing_worker.py: Rate calculation + market data refresh
-- market_sync.py: AirROI market data collection
-- All use direct PostgreSQL (psycopg2), not HTTP API routes
-- Systemd services with timers
+## Database (29 tables, verified 2026-04-17)
+`bookings, calendar_rates, channex_rate_plans, channex_room_types, channex_sync_state, channex_webhook_log, cleaners, cleaning_tasks, concurrency_locks, guest_reviews, ical_feeds, leads, listings, local_events, market_comps, market_snapshots, message_templates, messages, pricing_outcomes, pricing_recommendations, properties, property_channels, property_details, revenue_checks, review_rules, sms_log, user_preferences, user_subscriptions, weather_cache`.
+
+**Known gap:** `src/lib/db/schema.ts` exports `notifications = pgTable("notifications", ...)` but **there is no `notifications` table in the DB**. Migration missing. Any runtime use will fail. See Known Gaps below.
+
+---
+
+## VPS Workers (`~/staycommand-workers/` on Virginia 44.195.218.19)
+- `booking_sync.py` — iCal sync + Channex revision polling (every 15 min via systemd timer)
+- `pricing_validator.py` — daily 6 AM ET, writes to `pricing_recommendations` (480 rows so far)
+- `pricing_worker.py` — rate calculation + market refresh
+- `market_sync.py` — AirROI market data collection
+- `ical_parser.py` — iCal feed parsing
+- `db.py` — direct PostgreSQL (psycopg2) shared connection helpers
+- `status.sh` — health check
+
+All workers use direct PostgreSQL (psycopg2), **not** HTTP API routes.
+
+### Unrelated VPS (not Koast infra)
+Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`), Pump.fun memecoin collector, and weather/Kalshi/sports bots. Separate SSH key, separate codebase — do not touch from Koast sessions.
+
+---
 
 ## Development Workflow
-1. Make changes in ~/staycommand
-2. Type check: `npx tsc --noEmit 2>&1 | head -20`
-3. If clean: `git add -A && git commit -m "message" && git push`
-4. Vercel auto-builds with 8GB RAM (~30 seconds)
-5. NEVER run `npm run build` on VPS (times out, insufficient RAM)
+1. Make changes in `~/staycommand`.
+2. `npx tsc --noEmit 2>&1 | head -20`.
+3. If clean: `git add -A && git commit -m "message" && git push`.
+4. Vercel auto-builds (~30s).
+5. Never run `npm run build` on the VPS.
+
+---
+
+## What's Working (production-ready)
+- Channel sync: Airbnb + BDC via Channex (webhooks + iCal + polling)
+- Booking management: create, import, dedup, cross-channel blocking
+- Per-channel rate editing + pushing to Channex
+- Calendar with real booking data and rate display
+- AI review generation (Claude API)
+- Cleaning task auto-creation + Twilio SMS to cleaners
+- Market data from AirROI (comps, ADR, occupancy, demand score)
+- Events from Ticketmaster, weather from Weather.gov
+- ChannelPopover interactive platform badges (desktop hover + mobile bottom sheet)
+- Pricing engine daily validation runs (Virginia VPS timer)
+
+## Known Gaps / Not Wired
+- **Pricing Apply wiring** — Apply buttons exist in Property Detail pricing tab but don't push to Channex yet. Need to call `/api/channels/rates/[propertyId]` with the same flow the calendar rate editor uses.
+- **AI messaging pipeline** — scaffolded in Messages UI, no automation. "AI Drafted" filter is dimmed.
+- **Revenue chart data query** — canvas chart exists; daily revenue aggregation from `bookings` needs fixing. Currently shows empty state.
+- **Dashboard greeting** — may still show auth username instead of display name on some paths.
+- **Channel health monitoring** — no `channel_health` table, no 5-minute worker, no disconnect alert banners.
+- **Auto-apply pricing** — toggle dimmed ("Coming soon"). Unlock after ≥14 days of validation data.
+- **Airbnb OAuth** — disconnected from Channex; reconnect when ready.
+- **Google OAuth** — button on login, needs Supabase Google-provider config.
+- **VRBO platform icons** — `PLATFORMS.vrbo.icon / iconWhite / tile` point at nonexistent SVGs. No property uses VRBO today, but any future VRBO render will break. Add the SVGs or drop VRBO from the PLATFORMS map.
+- **`notifications` table** — referenced in `schema.ts`, missing from DB. Add migration or remove from schema.
+- **User-visible "StayCommand" + 🏠 emoji in SMS bodies** — `src/lib/notifications/index.ts:32,59` and `src/app/api/cleaners/route.ts:138`. Violates rebrand + "no emojis" rule.
+
+---
+
+## UPCOMING FEATURES (Designed, Not Built)
+Items here have a clear design / spec but no shipped code (or only partial wiring).
+
+1. **Pricing Apply wiring.** Apply buttons exist in Property Detail pricing tab but don't push to Channex yet. Wire them to `/api/channels/rates/[propertyId]` mirroring the calendar rate editor's request shape + optimistic UI.
+2. **AI messaging pipeline.**
+   - Auto-draft on incoming messages (reply staged, human-approve).
+   - Auto-send for check-in/checkout reminders.
+   - Operational routing: guest says "towels" → AI drafts reply + SMS task to cleaner. Uses Claude API + Twilio + existing `cleaning_tasks`.
+3. **Channel health monitoring.** Automated 5-minute checks per connected channel. New `channel_health` table. Non-dismissible alert banners on disconnect. Worker mirrors `booking_sync.py` cadence.
+4. **Revenue chart data.** Daily revenue aggregation query from `bookings` → feeds the canvas chart on dashboard. Replace current empty state.
+5. **`pricing_rules` / `pricing_performance` tables.** Documented shape exists in prior drafts but no migration. Write migrations before UI expects them: `pricing_rules (id, property_id, base_rate, min_rate, max_rate, channel_markups JSONB, auto_apply BOOLEAN DEFAULT false)` and `pricing_performance (id, property_id, date, suggested_rate, actual_rate, booked BOOLEAN, revenue_delta)`.
+6. **Auto-apply pricing.** Gated on ≥14 days of validation. Reads `pricing_rules.auto_apply` + `pricing_performance` outcomes to decide whether to push.
+7. **Direct booking website builder (Frontdesk).** `/frontdesk` is a placeholder today.
+8. **Owner portal / multi-user.** Shared property access, role-based permissions.
+
+### ChannelPopover (STATUS: SHIPPED 2026-04-16)
+Prior drafts listed this as "designed, not built." It is **live**. Component at `src/components/channels/ChannelPopover.tsx`, wired into `DashboardClient`, `PropertiesPage`, `PropertyDetail`, `PerChannelRateEditor`. Hover popover on desktop, triggers on property cards, rate-panel headers, and property-detail hero badges. Uses `@floating-ui/react` for positioning. Mobile bottom sheet **behavior** is handled without `vaul` today — if vaul is later desired, it would be a new dep. Future work may add richer management actions inside the popover.
+
+---
+
+## DESIGN PHILOSOPHY
+1. Every interaction should feel premium enough that a host would record their screen and share it.
+2. Platform logos are data surfaces, not decoration — they reveal connection health and channel stats on hover.
+3. AI moments use dark deep-sea cards with ambient golden glow — they stand out from the light product chrome.
+4. The pricing page shows recommendations hosts can act on, not signal dashboards they have to interpret.
+5. No emojis, no pulsing dots, no chart libraries — Canvas-drawn charts, solid status indicators, professional tone.
+6. Entrance choreography on every page — staggered reveals, count-up numbers, chart-draw animations.
+
+---
+
+## COMPETITIVE EDGES
+1. 9-signal pricing engine (no competitor runs all nine).
+2. Per-channel rate control with real-time Channex verification (sync-status green check / amber warning per channel per date).
+3. AI review generation with approve/schedule flow.
+4. Market intelligence with comp-set tracking (AirROI data pipeline).
+5. Interactive platform logos (ChannelPopover — no competing PMS ships this).
+6. Dark AI insight cards on dashboard — the "show me the money" moment.
+7. Canvas-drawn revenue chart with animated draw — video-worthy on first load.
+
+---
+
+## Pending Items (priority order)
+
+### This week
+1. Fix VRBO SVGs (add three files or drop VRBO from PLATFORMS).
+2. Replace "StayCommand" + 🏠 in SMS bodies with Koast copy.
+3. Add `notifications` migration or remove from `schema.ts`.
+
+### Phase 1 — Ship to first 5 hosts (2 weeks)
+- Wire pricing Apply buttons to Channex rate push.
+- Fix revenue chart data query (daily aggregation from `bookings`).
+- Continue pricing validation (currently at 4 days, need 14).
+- Commission Koast logo.
+- Domain setup (koasthq.com → app.koasthq.com on Vercel).
+- Channel health monitoring worker + `channel_health` table + disconnect banners.
+- Onboarding polish: signup → connect → first property in 3 minutes.
+- Reconnect Airbnb OAuth (Villa Jamaica + Cozy Loft).
+- First `brand-*` → Koast-token migration sweep (start with the 17 files touching `bg-brand-500`).
+
+### Phase 2 — Intelligence layer (4 weeks)
+- AI messaging pipeline (auto-draft, auto-send, operational routing).
+- Marketing site on koasthq.com.
+- Revenue Check lead-gen polish (`/revenue-check`).
+
+### Phase 3 — Operations (8 weeks)
+- Pricing auto-apply (after 14+ days validation).
+- Direct booking website builder (Frontdesk).
+- Owner portal / multi-user.
+- Mobile responsive optimization.
+
+---
 
 ## Common Gotchas
-- Drizzle ORM returns camelCase, client expects snake_case — normalize in API routes
-- calendar_rates.rate vs suggested_rate vs applied_rate — suggested is engine output
-- Channex availability for vacation rentals: 1 = available, 0 = booked (not 10/9/8)
-- Full sync should run AFTER certification tests to reset realistic rates
-- iCal feeds: Airbnb has listing ID in URL, Booking.com uses opaque UUID (can't get photos)
-- ESLint: unused variables cause Vercel build failures — always check before push
-- Auth middleware: /revenue-check and /clean are public routes (no auth required)
-- Calendar: GAP constant in MonthlyView.tsx must match --col CSS variable formula: `calc((100% + GAP) / 7)`
-- Calendar bars: width = `calc(var(--col) * span - GAP)` to prevent overflow
-- Booking.com connection requires hotel owner to authorize Channex at admin.booking.com → Account → Connectivity Provider
+1. BDC child/slave rates reject all pushes — find the parent rate code.
+2. `POST /channels/{id}/activate` is required (PUT `is_active:true` silently no-ops).
+3. `availability=0` blocks dates on BDC, NOT `stop_sell=true`.
+4. Rates must cover today → 18+ months — missing dates trigger BDC warnings.
+5. iCal BDC events look like blocks but are real bookings — the parser must treat them as bookings.
+6. iCal sync must push availability to Channex after inserting bookings.
+7. Revenue chart is HTML Canvas + `requestAnimationFrame` — no chart libraries.
+8. Entrance animations use `ease-out`; hover transitions use `cubic-bezier(0.4, 0, 0.2, 1)`.
+9. Drizzle returns camelCase; client expects snake_case — normalize at API route boundary.
+10. Channex availability for vacation rentals: 1=available, 0=booked (not 10/9/8).
+11. `calendar_rates` columns: `rate` vs `suggested_rate` vs `applied_rate` — suggested is engine output.
+12. `/revenue-check` and `/clean` are public routes (auth middleware skips them).
+13. Calendar layout: GAP constant in `MonthlyView.tsx` must match the `--col` formula `calc((100% + GAP) / 7)`; bar width is `calc(var(--col) * span - GAP)` to prevent overflow.
+14. `bg-brand-500` → `var(--coastal)` aliased in `globals.css`; visually correct but each use should be migrated to `bg-coastal` when the file is touched.
+15. ChannelPopover positioning uses `@floating-ui/react` — don't re-implement with raw `position: absolute`.
 
-## Current Priorities
-1. Get 5 real hosts on free tier
-2. Share Revenue Check in STR Facebook groups
-3. Build Frontdesk (direct booking engine)
-4. Connect Villa Jamaica to production Channex + real OTAs
-5. Polish UI based on user feedback
-6. Build intelligent map with layers
+---
 
-## Future
-- Direct booking website builder
-- Owner portal / multi-user access
-- Channex rate pushing from pricing engine (Pro tier feature)
-- Revenue Check landing page for lead gen
-- DESIGN_SYSTEM.md skill file for Claude Code
-- VRBO self-service connection (same pattern as Booking.com)
+## External API Keys (`.env.local` + Vercel)
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DATABASE_URL_POOLED`, `CHANNEX_API_KEY`, `AIRROI_API_KEY`, `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TICKETMASTER_API_KEY`.
 
-## Properties in Database
-- Pool House - Tampa: live on Airbnb (listing 1610418232676616622, rate plan c0f71fee) + Booking.com (hotel 12213286, rate plan 40c81f09, channel 80940967). Parent BDC rate code: 45645116.
-- Villa Jamaica: live on Airbnb (listing 1240054136658113220, rate plan 3070d2ad) + Booking.com (hotel 12783847, rate plan 7439f86d, channel 4c7852e8). Parent BDC rate code: 48257326. VRBO channel exists but inactive.
-- Cozy Loft - Tampa, Modern House - Tampa, Stadium Loft - Tampa: manually created, no Channex link yet.
-
-## External API Keys (in .env.local + Vercel)
-NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
-DATABASE_URL, DATABASE_URL_POOLED, CHANNEX_API_KEY, AIRROI_API_KEY,
-ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER,
-TICKETMASTER_API_KEY
+---
 
 ## Acquisition Strategy
-Target: 400+ active users, $500K ARR → $3-4M acquisition at 6-8x ARR
-Pricing: Free ($0, 1 property), Pro ($79, 15 properties), Business ($149, unlimited)
-Key differentiator: 9-signal pricing + market intelligence + operations in one platform
+- **Target:** 400+ active users, $500K ARR → $3-4M acquisition at 6-8× ARR.
+- **Pricing tiers:** Free ($0, 1 property), Pro ($79, 15 properties), Business ($149, unlimited). Enforced by `enforce_property_quota` DB trigger.
+- **Key differentiator:** 9-signal pricing + market intelligence + operations in one platform.
 
 ## Strategic Decision Framework
 
 ### Prime Directive
-Every feature, architecture choice, and UX decision must be evaluated against one question: "Does this move Koast closer to being the best PMS on the market?"
+Every feature, architecture, and UX decision must be evaluated against: **"Does this move Koast closer to being the best PMS on the market?"**
 
-### Decision Criteria (in priority order)
-1. Host Time Savings — Will this reduce manual work for hosts? Quantify minutes saved per week if possible.
-2. Revenue Impact — Does this directly help hosts earn more? (pricing optimization, occupancy lift, direct bookings, reduced OTA fees)
-3. Competitive Moat — Does this create something Hospitable, Hostaway, or Guesty can't easily replicate? (9-signal engine, market intelligence, AI-powered operations)
-4. Scalability — Will this work for 1 property AND 50 properties without redesign?
-5. User Delight — Is the UX so good hosts would screenshot it and share in STR Facebook groups?
-6. Data Flywheel — Does this generate data that makes Koast smarter over time? (pricing outcomes, booking patterns, market trends)
+### Decision Criteria (priority order)
+1. **Host Time Savings** — quantify minutes/week saved.
+2. **Revenue Impact** — does this directly help hosts earn more?
+3. **Competitive Moat** — can Hospitable / Hostaway / Guesty easily replicate?
+4. **Scalability** — works for 1 property AND 50 without redesign?
+5. **User Delight** — good enough that hosts screenshot and share in STR Facebook groups?
+6. **Data Flywheel** — generates data that makes Koast smarter over time?
 
 ### Build Philosophy
-- Ship features that are 90% polished, not 60% shipped fast
-- Every screen should look like it belongs in a $50M SaaS product
-- If a feature doesn't clearly serve the Prime Directive, defer it
-- Prefer deep integration over surface-level features (e.g., don't just show data — act on it automatically)
-- Always consider: "What would make a host switch FROM their current PMS TO Koast?"
+- Ship 90%-polished, not 60%-shipped-fast.
+- Every screen should look like it belongs in a $50M SaaS product.
+- Defer features that don't clearly serve the Prime Directive.
+- Prefer deep integration over surface features — don't just show data, act on it.
+- Always ask: "What would make a host switch FROM their current PMS TO Koast?"
 
-### Channex Production
-- Production API: app.channex.io/api/v1 (NOT staging)
-- Whitelabel access: ACTIVE
-- All new Channex integration work should target production endpoints
-- Villa Jamaica should be migrated from staging to production
+---
+
+## Recent Commit History (Rebrand + Redesign, Apr 14-16 2026)
+| Commit | Summary |
+|---|---|
+| `a930c7a` | Wire ChannelPopover into dashboard property card badges |
+| `8d8cc21` | Build ChannelPopover with hover popover + mobile bottom sheet |
+| `93c91fc` | Remove duplicate top bar greeting + Sync Now, fix button patterns |
+| `18ef6e6` | Reskin Market Intel + Comp Sets to Koast |
+| `3bf5311` | Reskin Reviews + Turnovers to Koast |
+| `9ab5844` | Property Detail: 280px hero, new Pricing tab, back arrow |
+| `dd2bb15` | Redesign Login + Signup (dark theme, AuthShell) |
+| `546fbf9` | Redesign Messages (three-column inbox) |
+| `3bc11f6` | Redesign Property Detail to Koast mockup |
+| `65f11f7` | Redesign Properties grid to Koast mockup |
+| `3139db4` / `2e681fa` | Calendar v2 redesign + quick fixes |
+| `159a497` / `096e926` | Dashboard quick fixes + unused import cleanup |
+| `ef29f8d` | Redesign Dashboard to Koast v3 mockup |
+| `1132922` | Rebrand Moora/StayCommand shell to Koast |
+| `e681a26` | Koast design system v2, product spec, project plan, mockups, platform icons |
+| `d9223ca` | Pricing engine validation via `pricing_recommendations` table |
+| `1572620` | Add DESIGN_SYSTEM.md + PLATFORM_ICONS.md, rename Moora→Koast in CLAUDE.md |
