@@ -146,7 +146,10 @@ class AirROIClient {
     lng: number,
     radiusMiles: number = 3,
     filters?: Record<string, unknown>,
-    pageSize: number = 25,
+    // AirROI caps pageSize at 10 on /listings/search/radius ("pagination.pageSize
+    // must be less than or equal to 10"). Callers needing more should page
+    // via the offset parameter.
+    pageSize: number = 10,
     offset: number = 0,
     currency: string = "usd"
   ): Promise<AirROISearchResult> {

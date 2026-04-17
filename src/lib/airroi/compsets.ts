@@ -159,9 +159,19 @@ export async function buildFilteredCompSet(supabase: any, propertyId: string): P
   const filter: Record<string, unknown> = {};
   if (prop.bedrooms != null) filter.bedrooms = prop.bedrooms;
 
-  const result = await airroi.searchByRadius(lat, lng, 1.3, filter, 25);
+  // AirROI caps /listings/search/radius at pageSize=10. Page twice to get
+  // ~20 candidates before the ±20% price filter + top-8 cut. Enough density
+  // for realistic comp sets without blowing the 100 req/min rate limit.
+  const [page1, page2] = await Promise.all([
+    airroi.searchByRadius(lat, lng, 1.3, filter, 10, 0),
+    airroi.searchByRadius(lat, lng, 1.3, filter, 10, 10),
+  ]);
+  const combined = [
+    ...(page1.results ?? []),
+    ...(page2.results ?? []),
+  ];
 
-  const mapped = (result.results ?? []).map((l) => mapListing(l, lat, lng));
+  const mapped = combined.map((l) => mapListing(l, lat, lng));
 
   let filtered = mapped;
   if (priceAnchor != null) {
