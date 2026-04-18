@@ -180,6 +180,24 @@ Weights (sum = 1.0):
 ### Quality-aware weighting (PR B)
 Each signal returns a `{value, confidence}` pair (actually `{score, weight, reason, confidence?}` — confidence defaults to 1.0 when omitted). Effective weight = base weight × confidence. Dropped weight redistributes proportionally across remaining signals so the final weights still sum to 1.0. Today only the Competitor signal uses confidence (reads `properties.comp_set_quality`: precise=1.0, fallback=0.5, insufficient=0.0, unknown=0.0). Other signals default to confidence=1.0 until individually upgraded.
 
+### Stage 1 API Surface (PR A–D, shipped)
+Full pricing pipeline lives under `/api/pricing/*`. Safety invariants documented in `INCIDENT_POSTMORTEM_BDC_CLOBBER.md`.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/pricing/calculate/[propertyId]` | GET | One-off engine recalculation (not persisted). |
+| `/api/pricing/rules/[propertyId]` | GET/PUT | Read (auto-create via inference) / update rules. `source` = defaults\|inferred\|host_set. |
+| `/api/pricing/recommendations/[propertyId]` | GET | List recs by `status` (pending\|applied\|dismissed), sorted urgency → date. |
+| `/api/pricing/performance/[propertyId]` | GET | Aggregated outcomes over `window` (7\|30\|60\|90) + daily breakdown. |
+| `/api/pricing/audit/[propertyId]?date=` | GET | Per-date signal breakdown + rules snapshot + auto-apply blocker explainer. |
+| `/api/pricing/apply/[propertyId]` | POST | Apply a pending rec: safe-restrictions push, idempotent via concurrency_locks, writes `pricing_performance`. Env-gated. |
+| `/api/pricing/dismiss` | POST | Mark pending rec as dismissed (affects acceptance_rate). |
+| `/api/pricing/preview-bdc-push/[propertyId]` | POST | Dry-run BDC push, no writes. |
+| `/api/pricing/commit-bdc-push/[propertyId]` | POST | Commit BDC push, HTTP 207 on partial failure. Env-gated. |
+| `/api/pricing/push/[propertyId]` | POST | Per-channel rate push (batched, partial-failure HTTP 207). |
+
+Client hook: `src/hooks/usePricingTab.ts` composes rules + recommendations (pending+applied) + performance into one call with stale-while-revalidate caching. **UI layer should only talk to this hook** — never bypass to raw routes.
+
 ### Pricing Tables — actual state
 ```sql
 -- Present (migration + DB):
@@ -306,7 +324,8 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - Pricing engine daily validation runs (Virginia VPS timer)
 
 ## Known Gaps / Not Wired
-- **Pricing Apply wiring** — `POST /api/pricing/apply/[propertyId]` is live via Track B Stage 1 PR C (safe-restrictions-backed push, idempotent via concurrency_locks, writes `pricing_performance`). Gated by `KOAST_ALLOW_BDC_CALENDAR_PUSH` pending production verification. Property Detail pricing tab UI wiring is PR D.
+- **Property Detail Pricing tab UI** — backend complete (PR D shipped read APIs + `usePricingTab` hook). UI wiring scheduled for the dedicated polish pass immediately after Track B Stage 1. Apply/Dismiss buttons in `/properties/[id]` Pricing tab don't call the live routes yet.
+- **`KOAST_ALLOW_BDC_CALENDAR_PUSH` flag flip** — still default-off on Vercel. Flip happens in a separate session with browser-devtools controlled verification. Once live traffic confirms safe-restrictions works, the flag is removed per the "safety-mechanism conservatism" rule.
 - **AI messaging pipeline** — scaffolded in Messages UI, no automation. "AI Drafted" filter is dimmed.
 - **Revenue chart data query** — canvas chart exists; daily revenue aggregation from `bookings` needs fixing. Currently shows empty state.
 - **Dashboard greeting** — may still show auth username instead of display name on some paths.
@@ -410,10 +429,13 @@ What Koast has that competitors don't.
 ## Pending Items (priority order)
 
 ### This week
-*(All three rebrand-debt items shipped 2026-04-17: VRBO dropped from PLATFORMS, SMS copy rebranded + de-emoji'd, `notifications` migration added.)*
+*(All three rebrand-debt items shipped 2026-04-17: VRBO dropped from PLATFORMS, SMS copy rebranded + de-emoji'd, `notifications` migration added. Track B Stage 1 backend complete 2026-04-17: PR A safe-restrictions + PR B rules/performance + PR C apply route + PR D read APIs and hook.)*
+
+### Next up: Track B Stage 1 polish pass
+- Property Detail Pricing tab UI: wire the recommendations list, performance panel, per-date audit drill-down, and Apply/Dismiss buttons to `usePricingTab` (and `/api/pricing/apply`, `/api/pricing/dismiss`). Design per `KOAST_PRODUCT_SPEC.md` + Design Philosophy item 4 ("pricing page shows actions, not dashboards").
+- Flip `KOAST_ALLOW_BDC_CALENDAR_PUSH` after browser-devtools controlled test against Villa Jamaica.
 
 ### Phase 1 — Ship to first 5 hosts (2 weeks)
-- Wire pricing Apply buttons to Channex rate push.
 - Fix revenue chart data query (daily aggregation from `bookings`).
 - Continue pricing validation (currently at 4 days, need 14).
 - Commission Koast logo.
