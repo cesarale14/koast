@@ -79,8 +79,11 @@ export function KoastBookingBar({
   const showLabel = position === "start" || position === "standalone";
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
-  const leftPad = position === "start" || position === "standalone" ? 22 : 12;
-  const rightPad = position === "end" || position === "standalone" ? 22 : 12;
+  // The pill's left/right caps use a 100px radius on 48px-height bars,
+  // which renders as a full semicircle. Inset content ~32px so the
+  // platform logo clears the visual curve rather than crowding it.
+  const leftPad = position === "start" || position === "standalone" ? 32 : 12;
+  const rightPad = position === "end" || position === "standalone" ? 32 : 12;
   const [hover, setHover] = useState(false);
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
