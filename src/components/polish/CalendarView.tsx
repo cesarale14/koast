@@ -1271,21 +1271,8 @@ function RailBody({
                 Koast suggests
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <KoastRate variant="hero" value={suggestedRate} style={{ color: "var(--shore)" }} />
-              {delta != null && delta !== 0 && (
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: delta > 0 ? "var(--golden)" : "var(--shore)",
-                    opacity: delta > 0 ? 1 : 0.75,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {delta > 0 ? "▲" : "▼"} ${Math.abs(Math.round(delta))}
-                </span>
-              )}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <KoastRate variant="hero" value={suggestedRate} tone="dark" delta={delta} />
               {urgencyChip}
             </div>
             {rec.reason_text && (

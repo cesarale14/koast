@@ -1,10 +1,31 @@
 "use client";
 
 import Image from "next/image";
-import { type CSSProperties, type MouseEvent } from "react";
+import { useState, type CSSProperties, type MouseEvent } from "react";
 import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
 
 type Position = "standalone" | "start" | "middle" | "end";
+
+// Alpha-baked platform backgrounds (per master plan principle 2).
+// Keep element opacity untouched so the white label/logo stay crisp —
+// bake the alpha into the background color instead.
+const BAR_RGBA: Record<PlatformKey, { default: string; hover: string; selected: string }> = {
+  airbnb: {
+    default: "rgba(255, 56, 92, 0.70)",
+    hover: "rgba(255, 56, 92, 0.85)",
+    selected: "rgba(255, 56, 92, 0.95)",
+  },
+  booking_com: {
+    default: "rgba(0, 53, 128, 0.70)",
+    hover: "rgba(0, 53, 128, 0.85)",
+    selected: "rgba(0, 53, 128, 0.95)",
+  },
+  direct: {
+    default: "rgba(196, 154, 90, 0.70)",
+    hover: "rgba(196, 154, 90, 0.85)",
+    selected: "rgba(196, 154, 90, 0.95)",
+  },
+};
 
 interface KoastBookingBarProps {
   platform: PlatformKey;
@@ -60,10 +81,15 @@ export function KoastBookingBar({
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
   const leftPad = position === "start" || position === "standalone" ? 22 : 12;
   const rightPad = position === "end" || position === "standalone" ? 22 : 12;
+  const [hover, setHover] = useState(false);
+  const tones = BAR_RGBA[platform];
+  const background = selected ? tones.selected : hover ? tones.hover : tones.default;
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       title={title}
       aria-label={title}
       className={`koast-booking-bar ${className}`}
@@ -71,8 +97,7 @@ export function KoastBookingBar({
         width: "100%",
         height: 48,
         borderRadius: radiusFor(position),
-        background: config.color,
-        opacity: selected ? 0.95 : 0.7,
+        background,
         color: "#fff",
         display: "flex",
         alignItems: "center",
@@ -87,7 +112,7 @@ export function KoastBookingBar({
         whiteSpace: "nowrap",
         textOverflow: "ellipsis",
         transition:
-          "opacity 180ms cubic-bezier(0.4,0,0.2,1), transform 180ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 180ms cubic-bezier(0.4,0,0.2,1)",
+          "background-color 180ms cubic-bezier(0.4,0,0.2,1), transform 180ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 180ms cubic-bezier(0.4,0,0.2,1)",
         boxShadow: selected ? "0 4px 14px rgba(19,46,32,0.2)" : "none",
         ...style,
       }}
