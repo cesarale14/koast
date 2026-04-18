@@ -461,9 +461,20 @@ what they need to say.]
 
 ## Spec corrections
 
-(Empty at this time. After session 1 ships, any spec deviations are 
-recorded here with reason. Session 2+ prompts read this section as 
-part of pre-flight.)
+### After Session 1.5 (Calendar fixes, commit e48d9d8)
+
+Visual fidelity corrections — caught via browser devtools review 
+of deployed Session 1 build:
+
+3. KoastBookingBar uses alpha-baked platform colors.
+   Default state: platform color at 0.70 alpha. Hover: 0.85 alpha.
+   Never apply CSS opacity to the bar element (would fade text). 
+   Apply alpha in the background color value directly.
+
+4. KoastRate delta semantics are color-encoded.
+   Positive delta: gold, up-triangle. Negative delta: tideline, no 
+   arrow (or quiet down-triangle in tideline). Zero: em-dash in 
+   tideline. Never red. Rate drops are informational, not failures.
 
 ---
 
