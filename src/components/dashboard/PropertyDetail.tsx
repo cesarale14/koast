@@ -81,6 +81,22 @@ interface PropertyDetailProps {
 
 // ============ Helpers ============
 
+// Decode HTML-entity-encoded image URLs from Airbnb iCal sync.
+// Airbnb's CDN URLs contain `&` as query separators; iCal import
+// writes them as `&amp;` which breaks Vercel's /_next/image loader
+// (400 when the proxied CDN request hits the malformed URL). Backend
+// cleanup at the ingest point is the proper fix — see CLAUDE.md
+// "Known Gaps — Image Assets".
+function decodeImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  return url
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 function shortDate(date: string): string {
   return new Date(date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -262,7 +278,7 @@ function HeroSection({
     >
       {property.cover_photo_url ? (
         <Image
-          src={property.cover_photo_url}
+          src={decodeImageUrl(property.cover_photo_url)}
           alt={property.name}
           width={2560}
           height={560}
@@ -417,7 +433,7 @@ function TabBar({
         borderBottom: "1px solid var(--dry-sand)",
         top: 0,
         backgroundColor: "#fff",
-        marginTop: 16,
+        marginTop: -1,
         animationDelay: "200ms",
       }}
     >
@@ -428,11 +444,13 @@ function TabBar({
             key={t}
             type="button"
             onClick={() => onChange(t)}
-            className="pb-3 pt-2 text-[14px] font-semibold transition-colors"
+            className="pb-3 pt-2 text-[14px] transition-colors"
             style={{
               color: active ? "var(--coastal)" : "var(--tideline)",
+              fontWeight: active ? 600 : 500,
               borderBottom: active ? "2px solid var(--golden)" : "2px solid transparent",
               marginBottom: -1,
+              transitionDuration: "120ms",
             }}
             onMouseEnter={(e) => {
               if (!active) e.currentTarget.style.color = "var(--coastal)";
