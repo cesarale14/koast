@@ -82,15 +82,11 @@ export function KoastBookingBar({
   const showLabel = position === "start" || position === "standalone";
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
-  // Desktop: 100px-radius cap on 48px-height bar renders a 24px semicircle;
-  // inset content well past it so the logo sits in the pill's straight
-  // portion. Mobile: shorter bar, tighter inset, no chip wrapper.
-  const leftPad = compact
-    ? position === "start" || position === "standalone" ? 14 : 8
-    : position === "start" || position === "standalone" ? 56 : 12;
-  const rightPad = compact
-    ? position === "end" || position === "standalone" ? 14 : 8
-    : position === "end" || position === "standalone" ? 56 : 12;
+  // Uniform 14px horizontal padding on the bar root. Clears the pill
+  // curve at 42–48px heights and keeps the inset identical across start/
+  // middle/end segments. No chip wrapper — plain logo on both desktop
+  // and mobile.
+  const hPad = 14;
   const [hover, setHover] = useState(false);
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
@@ -112,7 +108,7 @@ export function KoastBookingBar({
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: `0 ${rightPad}px 0 ${leftPad}px`,
+        padding: `0 ${hPad}px`,
         fontSize: 13,
         fontWeight: 600,
         letterSpacing: "-0.005em",
@@ -129,25 +125,13 @@ export function KoastBookingBar({
     >
       {showLabel && (
         <>
-          {compact ? (
-            <Image src={config.iconWhite} alt="" width={12} height={12} style={{ flexShrink: 0 }} />
-          ) : (
-            <span
-              aria-hidden
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.22)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Image src={config.iconWhite} alt="" width={14} height={14} />
-            </span>
-          )}
+          <Image
+            src={config.iconWhite}
+            alt=""
+            width={compact ? 12 : 14}
+            height={compact ? 12 : 14}
+            style={{ flexShrink: 0 }}
+          />
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
         </>
       )}
