@@ -476,6 +476,19 @@ of deployed Session 1 build:
    arrow (or quiet down-triangle in tideline). Zero: em-dash in 
    tideline. Never red. Rate drops are informational, not failures.
 
+### After booking-bar inset fix (commit 7a0345f)
+
+5. KoastBookingBar uses uniform 14px horizontal padding on the bar 
+   root, not position-dependent cap padding. The earlier experiment
+   with 32/44/56px "cap" padding overcorrected — 14px on both sides
+   clears the pill curve at the bar heights used (42–48px desktop,
+   28px mobile) and keeps the inset identical across start/middle/end
+   segments.
+   The platform logo is a plain 14×14 <Image> on desktop, 12×12 on
+   mobile (compact mode). No circular chip wrapper. Border-radius
+   rules (100px cap, 33px continuation) stay untouched — they encode
+   position semantically.
+
 ---
 
 ## Out of scope for polish pass
