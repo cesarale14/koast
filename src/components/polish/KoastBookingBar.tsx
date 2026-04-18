@@ -58,6 +58,8 @@ export function KoastBookingBar({
   const showLabel = position === "start" || position === "standalone";
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
+  const leftPad = position === "start" || position === "standalone" ? 22 : 12;
+  const rightPad = position === "end" || position === "standalone" ? 22 : 12;
   return (
     <button
       type="button"
@@ -74,8 +76,8 @@ export function KoastBookingBar({
         color: "#fff",
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        padding: showLabel ? "0 14px" : "0 10px",
+        gap: 10,
+        padding: `0 ${rightPad}px 0 ${leftPad}px`,
         fontSize: 13,
         fontWeight: 600,
         letterSpacing: "-0.005em",

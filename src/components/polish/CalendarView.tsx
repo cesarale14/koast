@@ -1009,8 +1009,17 @@ function WeekRow({
 }) {
   const cellMinHeight = isMobile ? CELL_MIN_HEIGHT_MOBILE : CELL_MIN_HEIGHT_DESKTOP;
   const cellMinWidth = isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP;
-  const barTop = isMobile ? 28 : 40;
-  const barHeight = isMobile ? 28 : 48;
+  const barTop = isMobile ? 28 : 44;
+  const barHeight = isMobile ? 28 : 42;
+  const bookedDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of rowSegments) {
+      for (let i = 0; i < s.span; i++) {
+        set.add(week.days[s.startCol + i].date);
+      }
+    }
+    return set;
+  }, [rowSegments, week]);
   return (
     <div style={{ position: "relative" }}>
       <div
@@ -1035,7 +1044,13 @@ function WeekRow({
                 opacity: d.inMonth ? 1 : 0.35,
               }}
             >
-              <DayCellContents day={d} rate={rate} rec={rec} isMobile={isMobile} />
+              <DayCellContents
+                day={d}
+                rate={rate}
+                rec={rec}
+                isMobile={isMobile}
+                booked={bookedDates.has(d.date)}
+              />
             </KoastSelectedCell>
           );
         })}
@@ -1080,17 +1095,20 @@ function DayCellContents({
   rate,
   rec,
   isMobile,
+  booked,
 }: {
   day: { date: string; dayNum: number; inMonth: boolean; isToday: boolean; isPast: boolean };
   rate: Rate | undefined;
   rec: PricingRecommendation | undefined;
   isMobile: boolean;
+  booked: boolean;
 }) {
   const showRate = rate && rate.is_available !== false;
   const rateValue = rate?.applied_rate ?? rate?.suggested_rate ?? rate?.base_rate ?? null;
   const closed = rate && rate.is_available === false;
+  const renderRate = !isMobile && !booked;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%" }}>
       <div
         style={{
           display: "flex",
@@ -1122,11 +1140,15 @@ function DayCellContents({
           />
         )}
       </div>
-      {!isMobile && (closed ? (
-        <KoastRate variant="struck" value={rateValue} />
-      ) : showRate ? (
-        <KoastRate variant="quiet" value={rateValue} />
-      ) : null)}
+      {renderRate && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          {closed ? (
+            <KoastRate variant="struck" value={rateValue} />
+          ) : showRate ? (
+            <KoastRate variant="quiet" value={rateValue} />
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
