@@ -80,10 +80,11 @@ export function KoastBookingBar({
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
   // The pill's left/right caps use a 100px radius on 48px-height bars,
-  // which renders as a full semicircle. Inset content ~32px so the
-  // platform logo clears the visual curve rather than crowding it.
-  const leftPad = position === "start" || position === "standalone" ? 32 : 12;
-  const rightPad = position === "end" || position === "standalone" ? 32 : 12;
+  // which renders as a full 24px-wide semicircle. Inset the content past
+  // the widest point of the cap (24px) with visual breathing room so the
+  // platform logo sits clearly within the straight portion of the pill.
+  const leftPad = position === "start" || position === "standalone" ? 44 : 12;
+  const rightPad = position === "end" || position === "standalone" ? 44 : 12;
   const [hover, setHover] = useState(false);
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
@@ -122,7 +123,21 @@ export function KoastBookingBar({
     >
       {showLabel && (
         <>
-          <Image src={config.iconWhite} alt="" width={14} height={14} />
+          <span
+            aria-hidden
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.22)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Image src={config.iconWhite} alt="" width={14} height={14} />
+          </span>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
         </>
       )}
