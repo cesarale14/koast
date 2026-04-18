@@ -1080,7 +1080,8 @@ function WeekRow({
                 checkIn={s.booking.check_in}
                 checkOut={s.booking.check_out}
                 position={s.position}
-                style={{ height: barHeight, fontSize: isMobile ? 11 : 13, padding: isMobile ? "0 8px" : undefined }}
+                compact={isMobile}
+                style={{ height: barHeight, fontSize: isMobile ? 11 : 13 }}
               />
             </div>
           );

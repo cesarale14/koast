@@ -37,6 +37,8 @@ interface KoastBookingBarProps {
   selected?: boolean;
   className?: string;
   style?: CSSProperties;
+  // Compact = mobile: no logo chip, tighter cap padding, smaller logo.
+  compact?: boolean;
 }
 
 const RADIUS_START = 100;
@@ -74,17 +76,21 @@ export function KoastBookingBar({
   selected,
   className = "",
   style,
+  compact = false,
 }: KoastBookingBarProps) {
   const config = PLATFORMS[platform];
   const showLabel = position === "start" || position === "standalone";
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
-  // The pill's left/right caps use a 100px radius on 48px-height bars,
-  // which renders as a full 24px-wide semicircle. Inset the content past
-  // the widest point of the cap (24px) with visual breathing room so the
-  // platform logo sits clearly within the straight portion of the pill.
-  const leftPad = position === "start" || position === "standalone" ? 44 : 12;
-  const rightPad = position === "end" || position === "standalone" ? 44 : 12;
+  // Desktop: 100px-radius cap on 48px-height bar renders a 24px semicircle;
+  // inset content well past it so the logo sits in the pill's straight
+  // portion. Mobile: shorter bar, tighter inset, no chip wrapper.
+  const leftPad = compact
+    ? position === "start" || position === "standalone" ? 14 : 8
+    : position === "start" || position === "standalone" ? 56 : 12;
+  const rightPad = compact
+    ? position === "end" || position === "standalone" ? 14 : 8
+    : position === "end" || position === "standalone" ? 56 : 12;
   const [hover, setHover] = useState(false);
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
@@ -123,21 +129,25 @@ export function KoastBookingBar({
     >
       {showLabel && (
         <>
-          <span
-            aria-hidden
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.22)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Image src={config.iconWhite} alt="" width={14} height={14} />
-          </span>
+          {compact ? (
+            <Image src={config.iconWhite} alt="" width={12} height={12} style={{ flexShrink: 0 }} />
+          ) : (
+            <span
+              aria-hidden
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.22)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Image src={config.iconWhite} alt="" width={14} height={14} />
+            </span>
+          )}
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
         </>
       )}
