@@ -489,6 +489,25 @@ of deployed Session 1 build:
    rules (100px cap, 33px continuation) stay untouched — they encode
    position semantically.
 
+### After Session 2 (PropertyDetail + Pricing tab rebuild)
+
+6. CalendarView gains `showSwitcher?: boolean` (default true). When
+   embedded inside PropertyDetail's Calendar tab, the consumer
+   passes `showSwitcher={false}` to hide the top-chrome property
+   switch button + menu (the surrounding tab already scopes to one
+   property). Extension, not a new primitive.
+
+7. KoastRate delta rendering is canonical. Every consumer on
+   PropertyDetail (Scorecard, RecRow, WhyThisSuggestion audit,
+   Preview Modal change rows) routes delta rendering through the
+   KoastRate primitive's `delta` prop. No bespoke arrow/color logic
+   lives outside the primitive.
+
+8. PreviewModal overlay uses `position: absolute` inside a
+   relative-positioned PricingTab wrapper — NOT `position: fixed` —
+   per the flex-based overlay directive. Toasts still use fixed
+   positioning (they are screen-anchored status, not modal content).
+
 ---
 
 ## Out of scope for polish pass

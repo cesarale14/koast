@@ -54,6 +54,9 @@ interface Props {
   properties: Property[];
   bookings: Booking[];
   rates: Rate[];
+  // When embedded inside PropertyDetail we already know the property;
+  // hide the top-chrome Switch affordance so there's no redundant UI.
+  showSwitcher?: boolean;
 }
 
 const MONTHS_VISIBLE = 4;
@@ -147,7 +150,7 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
   return segs;
 }
 
-export default function CalendarView({ properties, bookings: allBookings, rates: allRates }: Props) {
+export default function CalendarView({ properties, bookings: allBookings, rates: allRates, showSwitcher = true }: Props) {
   const todayStr = toISO(new Date());
   const [activePropertyId, setActivePropertyId] = useState(properties[0]?.id ?? "");
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
@@ -330,6 +333,7 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
         busy={busy}
         isMobile={isMobile}
         onOpenRail={() => setRailOpen(true)}
+        showSwitcher={showSwitcher}
       />
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
@@ -496,6 +500,7 @@ function TopChrome({
   busy,
   isMobile,
   onOpenRail,
+  showSwitcher,
 }: {
   propertyName: string;
   onPrev: () => void;
@@ -512,6 +517,7 @@ function TopChrome({
   busy: string | null;
   isMobile: boolean;
   onOpenRail: () => void;
+  showSwitcher: boolean;
 }) {
   return (
     <div
@@ -557,8 +563,9 @@ function TopChrome({
         <div style={{ position: "relative", minWidth: 0, flex: 1 }}>
           <button
             type="button"
-            onClick={onMenuToggle}
-            aria-label="Switch property"
+            onClick={showSwitcher ? onMenuToggle : undefined}
+            aria-label={showSwitcher ? "Switch property" : propertyName}
+            disabled={!showSwitcher}
             style={{
               display: "flex",
               alignItems: "center",
@@ -570,16 +577,16 @@ function TopChrome({
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: "-0.01em",
-              cursor: "pointer",
+              cursor: showSwitcher ? "pointer" : "default",
               width: "100%",
               overflow: "hidden",
               whiteSpace: "nowrap",
             }}
           >
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{propertyName}</span>
-            <ArrowLeftRight size={14} color="var(--tideline)" style={{ flexShrink: 0 }} />
+            {showSwitcher && <ArrowLeftRight size={14} color="var(--tideline)" style={{ flexShrink: 0 }} />}
           </button>
-          {menuOpen && (
+          {menuOpen && showSwitcher && (
             <PropertyMenu properties={properties} activeId={activeId} onPick={onPropertyPick} />
           )}
         </div>
@@ -615,9 +622,9 @@ function TopChrome({
           )}
         </div>
 
-        {!isMobile && <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />}
+        {!isMobile && showSwitcher && <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />}
 
-        {!isMobile && (
+        {!isMobile && showSwitcher && (
           <div style={{ position: "relative" }}>
             <KoastButton size="sm" variant="secondary" iconLeft={<ArrowLeftRight size={14} />} onClick={onMenuToggle}>
               Switch
