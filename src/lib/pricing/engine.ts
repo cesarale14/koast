@@ -7,6 +7,15 @@ import {
 } from "./signals";
 import { getEventsForDate } from "@/lib/events/cache";
 import { fetchWeatherForecast } from "./weather";
+import { applyPricingRules, type PricingRulesRow, type GuardrailTrip } from "./apply-rules";
+
+export interface RecommendationClamps {
+  raw_engine_suggestion: number;
+  clamped_by: Array<"min_rate" | "max_rate">;
+  guardrail_trips: GuardrailTrip[];
+}
+
+export type RecommendationUrgency = "act_now" | "coming_up" | "review";
 
 export interface CalendarRateUpdate {
   property_id: string;
@@ -16,6 +25,46 @@ export interface CalendarRateUpdate {
   applied_rate: number | null;
   rate_source: "engine";
   factors: Record<string, SignalResult>;
+  /** PR B — rules-layer outcome, surfaced through to pricing_recommendations.reason_signals.clamps. */
+  clamps: RecommendationClamps;
+  /** PR B — plain-English summary of the clamp outcome. null if no clamps tripped. */
+  reason_text: string | null;
+  /** PR B — urgency classification from |raw - current| / current gap. */
+  urgency: RecommendationUrgency;
+}
+
+function buildReasonText(
+  clamps: RecommendationClamps,
+  adjusted: number,
+  rules: PricingRulesRow
+): string | null {
+  const { raw_engine_suggestion, clamped_by, guardrail_trips } = clamps;
+  const raw = Math.round(raw_engine_suggestion);
+  const adj = Math.round(adjusted);
+  // Priority: guardrail trips surface first (they're more specific than min/max clamps).
+  const delta = guardrail_trips.find((t) => t.guardrail === "max_daily_delta");
+  if (delta) {
+    return `Koast suggested $${raw} — limited to $${adj} by your max daily change rule (${Math.round(rules.max_daily_delta_pct * 100)}%).`;
+  }
+  const floor = guardrail_trips.find((t) => t.guardrail === "comp_floor" && !t.skipped_reason);
+  if (floor) {
+    return `Koast suggested $${raw} — raised to $${adj} to stay within ${Math.round(rules.comp_floor_pct * 100)}% of local comps.`;
+  }
+  if (clamped_by.includes("max_rate")) {
+    return `Koast suggested $${raw} — clamped to your max of $${Math.round(rules.max_rate)}. Raise max_rate in rules to unlock higher pricing.`;
+  }
+  if (clamped_by.includes("min_rate")) {
+    return `Koast suggested $${raw} — raised to your min of $${Math.round(rules.min_rate)}.`;
+  }
+  return null;
+}
+
+function classifyUrgency(rawSuggestion: number, currentRate: number | null): RecommendationUrgency {
+  if (currentRate == null || currentRate <= 0) return "review";
+  const gap = Math.abs(rawSuggestion - currentRate) / currentRate;
+  if (gap > 0.15) return "act_now";
+  if (gap > 0.05) return "coming_up";
+  return "review";
 }
 
 export interface PricingConfig {
@@ -71,7 +120,8 @@ export class PricingEngine {
     const currentListings = snapshotRows[0]?.market_supply ?? null;
     const previousListings = snapshotRows[1]?.market_supply ?? null;
 
-    // Comp set
+    // Comp set + quality marker (PR B — competitor signal uses the quality
+    // to report confidence; engine aggregation multiplies weight by it).
     const { data: comps } = await this.supabase
       .from("market_comps")
       .select("comp_adr, comp_occupancy")
@@ -83,6 +133,49 @@ export class PricingEngine {
     const compMedianAdr = compAdrs.length > 0
       ? [...compAdrs].sort((a, b) => a - b)[Math.floor(compAdrs.length / 2)]
       : null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: propQualityRow } = await (this.supabase.from("properties") as any)
+      .select("comp_set_quality")
+      .eq("id", propertyId)
+      .maybeSingle();
+    const compSetQuality: "precise" | "fallback" | "insufficient" | "unknown" =
+      (propQualityRow?.comp_set_quality as "precise" | "fallback" | "insufficient" | "unknown") ?? "unknown";
+
+    // Pre-computed comp set 25th percentile for the comp-floor guardrail.
+    const compSetP25: number | null = compAdrs.length > 0
+      ? [...compAdrs].sort((a, b) => a - b)[Math.floor(compAdrs.length * 0.25)]
+      : null;
+
+    // Pricing rules row (PR B). If absent, we fall back to the cfg-based
+    // defaults — same behavior as before rules landed. If present, the
+    // rules supersede cfg for clamp bounds and daily-delta semantics.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rulesRow } = await (this.supabase.from("pricing_rules") as any)
+      .select("*")
+      .eq("property_id", propertyId)
+      .maybeSingle();
+    const effectiveRules: PricingRulesRow = rulesRow
+      ? {
+          base_rate: Number(rulesRow.base_rate),
+          min_rate: Number(rulesRow.min_rate),
+          max_rate: Number(rulesRow.max_rate),
+          channel_markups: rulesRow.channel_markups ?? {},
+          max_daily_delta_pct: Number(rulesRow.max_daily_delta_pct),
+          comp_floor_pct: Number(rulesRow.comp_floor_pct),
+          seasonal_overrides: rulesRow.seasonal_overrides ?? {},
+          auto_apply: rulesRow.auto_apply === true,
+        }
+      : {
+          base_rate: cfg.base_rate,
+          min_rate: cfg.min_rate,
+          max_rate: cfg.max_rate,
+          channel_markups: {},
+          max_daily_delta_pct: 0.15,
+          comp_floor_pct: 0.85,
+          seasonal_overrides: {},
+          auto_apply: false,
+        };
 
     // Bookings
     const { data: bookingsData } = await this.supabase
@@ -212,33 +305,64 @@ export class PricingEngine {
         currentListings,
         previousListings,
         compMedianAdr,
+        compSetQuality,
       };
       const signals: Record<string, SignalResult> = runAllSignals(ctx);
 
+      // Confidence-aware aggregation (PR B). Each signal's effective
+      // weight = weight * confidence (default 1.0). Total effective weight
+      // is usually <1.0 when any signal returns low confidence; we normalize
+      // back to 1.0 so dropped weight redistributes proportionally across
+      // the remaining signals. Example: if Competitor (w=0.20) reports
+      // confidence=0.5, its effective contribution drops to 0.10 pre-norm,
+      // and the other 8 signals' effective weights scale up to compensate.
+      const sigList = Object.values(signals);
+      const effectiveWeights = sigList.map((s) => s.weight * (s.confidence ?? 1.0));
+      const totalEffective = effectiveWeights.reduce((a, b) => a + b, 0);
       let weightedSum = 0;
-      for (const s of Object.values(signals)) {
-        weightedSum += s.score * s.weight;
+      if (totalEffective > 0) {
+        for (let i = 0; i < sigList.length; i++) {
+          const normalized = effectiveWeights[i] / totalEffective;
+          weightedSum += sigList[i].score * normalized;
+        }
       }
 
-      let suggested = cfg.base_rate * (1 + weightedSum * cfg.max_adjustment);
-      suggested = Math.max(cfg.min_rate, Math.min(cfg.max_rate, suggested));
+      // Raw engine output — what the signals alone want before rules clamp.
+      const rawSuggestion = effectiveRules.base_rate * (1 + weightedSum * cfg.max_adjustment);
 
-      // Smooth: max 15% change from previous day
-      const maxChange = prevSuggested * 0.15;
-      if (suggested > prevSuggested + maxChange) suggested = prevSuggested + maxChange;
-      else if (suggested < prevSuggested - maxChange) suggested = prevSuggested - maxChange;
+      // Apply pricing_rules: min/max clamp, daily-delta cap, comp floor.
+      // prevSuggested on the first iteration is the seed base_rate (see
+      // initialization above); subsequent iterations use the previous day's
+      // rule-adjusted output, keeping the delta chain consistent.
+      const rulesResult = applyPricingRules({
+        rules: effectiveRules,
+        suggestedRate: rawSuggestion,
+        previousAppliedRate: prevSuggested,
+        compSetP25,
+        compSetQuality,
+        date: dateStr,
+      });
+      const suggested = roundToNearest(rulesResult.adjusted_rate, 5);
 
-      suggested = roundToNearest(suggested, 5);
-      suggested = Math.max(cfg.min_rate, Math.min(cfg.max_rate, suggested));
+      const clamps: RecommendationClamps = {
+        raw_engine_suggestion: Math.round(rawSuggestion * 100) / 100,
+        clamped_by: rulesResult.clamped_by,
+        guardrail_trips: rulesResult.guardrail_trips,
+      };
+      const reason_text = buildReasonText(clamps, suggested, effectiveRules);
+      const urgency = classifyUrgency(rawSuggestion, currentRate);
 
       results.push({
         property_id: propertyId,
         date: dateStr,
-        base_rate: cfg.base_rate,
+        base_rate: effectiveRules.base_rate,
         suggested_rate: suggested,
         applied_rate: cfg.pricing_mode === "auto" ? suggested : null,
         rate_source: "engine",
         factors: signals,
+        clamps,
+        reason_text,
+        urgency,
       });
 
       prevSuggested = suggested;

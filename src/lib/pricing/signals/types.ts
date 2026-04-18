@@ -4,6 +4,17 @@ export interface SignalResult {
   score: number;
   weight: number;
   reason: string;
+  /**
+   * How much the engine should trust this signal's output. 1.0 = full trust
+   * (default); lower values dampen the signal's effective weight during
+   * aggregation. Dropped weight redistributes proportionally across the
+   * other signals. See src/lib/pricing/engine.ts aggregation loop.
+   *
+   * PR B: only `competitor` currently returns a non-1.0 value (reads
+   * properties.comp_set_quality). Other signals should return 1.0 or omit
+   * the field entirely until they have a reason to report reduced trust.
+   */
+  confidence?: number;
 }
 
 export interface EventData {
@@ -52,6 +63,13 @@ export interface SignalContext {
   currentListings: number | null;
   previousListings: number | null;
   compMedianAdr: number | null;
+  /**
+   * Quality marker sourced from properties.comp_set_quality. The competitor
+   * signal reads this and maps it to a confidence level so the engine can
+   * down-weight comp-based math when the comp set is approximate. See
+   * src/lib/pricing/signals/competitor.ts.
+   */
+  compSetQuality?: "precise" | "fallback" | "insufficient" | "unknown";
 }
 
 /**

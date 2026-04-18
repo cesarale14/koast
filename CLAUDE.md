@@ -105,7 +105,8 @@ PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden
 
 ## Known Data Quality Issues
 - **Multi-unit properties not modeled.** Villa Jamaica + Cozy Loft share a physical address (same parcel, different rentable units). No `parent_property_id` on `properties` table, no shared-field inheritance. Works for now because the fleet is 2 properties with human operators; will need modeling once a real host has multi-unit listings. Deferred to post-MVP — see `KOAST_OVERHAUL_PLAN.md` Track D item 9.
-- **Comp set quality markers.** Each property has `properties.comp_set_quality` (`precise` | `fallback` | `insufficient`) reflecting whether its `market_comps` come from the strict `filtered_radius` path (precise match on bed/price/radius) or the `similarity_fallback` path (AirROI `/comparables` similarity search, used when precise matches <3). Every `market_comps` row is tagged with `source` (`filtered_radius` | `similarity_fallback`) so downstream consumers can read the quality and down-weight the Competitor pricing signal on fallback data. Track D will surface this to the host and down-weight the signal. Unified single-writer `buildFilteredCompSet` in `src/lib/airroi/compsets.ts` serves `/api/properties/import-from-url`, `/api/market/refresh`, and `/api/market/comps`. Legacy `buildCompSet` + `storeCompSet` deleted.
+- **Comp set quality markers.** Each property has `properties.comp_set_quality` (`precise` | `fallback` | `insufficient`) reflecting whether its `market_comps` come from the strict `filtered_radius` path (precise match on bed/price/radius) or the `similarity_fallback` path (AirROI `/comparables` similarity search, used when precise matches <3). Every `market_comps` row is tagged with `source` (`filtered_radius` | `similarity_fallback`) so downstream consumers can read the quality and down-weight the Competitor pricing signal on fallback data. PR B wires the Competitor signal to read this and return `confidence=1.0/0.5/0.0` accordingly; engine aggregation redistributes dropped weight. Unified single-writer `buildFilteredCompSet` in `src/lib/airroi/compsets.ts` serves `/api/properties/import-from-url`, `/api/market/refresh`, and `/api/market/comps`. Legacy `buildCompSet` + `storeCompSet` deleted.
+- **pricing_rules source markers.** `'defaults'` | `'inferred'` | `'host_set'`. Inference runs when a property has ≥30 days of `calendar_rates` data and produces base_rate/min/max/max_daily_delta from empirical percentiles of the host's own history. `pricing_rules.inferred_from` JSONB stores the summary stats used, enabling re-inference when the algorithm improves. `GET /api/pricing/rules/[propertyId]` auto-creates a row via inference (or falls back to hard-coded defaults) on first call so the UI never sees a 404.
 - **Import-from-url heuristic coordinates.** `src/app/api/properties/import-from-url/route.ts:103-117` applies Tampa-downtown lat/lng (`27.9506, -82.4572`) to any property whose name contains "tampa". Produces wrong coords for any non-Tampa property that happens to include the word. Should be replaced with Google Places Autocomplete-based geocoding during the Channex connection polish — see `KOAST_PROJECT_PLAN.md`.
 - **Property coords are Nominatim street-level, not parcel-level.** Both Villa Jamaica and Cozy Loft (same parcel, `4105 N Jamaica St`) are set to `27.9873607, -82.4944434` — a street-level point from Nominatim, not the specific building. Adequate for 2km AirROI comp radius + Ticketmaster event radius use cases. If parcel-level precision ever matters (walkability scoring, parking instructions, etc.), pull from Google Maps or a paid geocoder.
 - **`/api/channex/setup-webhook` writes to Channex (`createWebhook`) ungated.** Webhook config is NOT in the BDC calendar clobber class per the postmortem scope table — it controls routing, not guest-facing state. Intentionally left unguarded by Stage 0. If a future audit finds webhook writes can affect guest-facing behavior, add to the gate list via `src/lib/channex/calendar-push-gate.ts`.
@@ -175,19 +176,26 @@ Weights (sum = 1.0):
 
 **Status:** collecting daily data. Need ≥14 daily snapshots before confident auto-apply.
 
+### Quality-aware weighting (PR B)
+Each signal returns a `{value, confidence}` pair (actually `{score, weight, reason, confidence?}` — confidence defaults to 1.0 when omitted). Effective weight = base weight × confidence. Dropped weight redistributes proportionally across remaining signals so the final weights still sum to 1.0. Today only the Competitor signal uses confidence (reads `properties.comp_set_quality`: precise=1.0, fallback=0.5, insufficient=0.0, unknown=0.0). Other signals default to confidence=1.0 until individually upgraded.
+
 ### Pricing Tables — actual state
 ```sql
 -- Present (migration + DB):
 pricing_recommendations (id, property_id, date, current_rate, suggested_rate,
-                         reason_signals JSONB, delta_abs, delta_pct, created_at)
+                         reason_signals JSONB, delta_abs, delta_pct, created_at,
+                         status, applied_at, dismissed_at, urgency, reason_text)
 pricing_recommendations_latest   -- view, newest snapshot per (property, date)
+pricing_rules (id, property_id UNIQUE, base_rate, min_rate, max_rate,
+               channel_markups JSONB, max_daily_delta_pct, comp_floor_pct,
+               seasonal_overrides JSONB, auto_apply, source, inferred_from JSONB,
+               CHECK min<=base<=max, delta_pct in (0,1], floor_pct in [0,1])
+pricing_performance (id, property_id, date, suggested_rate, applied_rate,
+                     actual_rate, applied_at, booked, booked_at,
+                     revenue_delta GENERATED, channels_pushed[])
 
 -- Present (in schema.ts + DB):
 pricing_outcomes  -- used by seasonality signal after 30+ days of data
-
--- Planned (NO migration yet — do not treat as available):
--- pricing_rules      -- base/min/max rate + channel markups + auto_apply toggle
--- pricing_performance -- suggested vs actual vs booked vs revenue_delta
 ```
 
 ---
