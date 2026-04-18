@@ -310,6 +310,66 @@ export async function POST(request: NextRequest) {
       console.log(`[webhook] Skipping insert for cancelled booking ${bookingId} (no existing row)`);
     }
 
+    // PR C — Outcome capture for pricing_performance. On booking_new only,
+    // walk every date in the booking's stay and backfill any matching
+    // pricing_performance row (property + date + booked=false) with the
+    // per-night rate from this booking. `booked`, `actual_rate`, and
+    // `booked_at` get set; `revenue_delta` is a generated column so it
+    // computes automatically.
+    //
+    // Per-night rate = total_amount / nights if total_amount present, else
+    // nightly_rate if present, else skip (no signal). Currency is
+    // property-default (assume USD until Track D multi-currency).
+    //
+    // VERIFY: see src/app/api/webhooks/channex/route.ts comment block at
+    // the top of this handler. To simulate: POST the same payload shape
+    // Channex sends to /api/webhooks/channex (signed with the account
+    // secret in prod; dev can bypass) and observe:
+    //   SELECT id, booked, actual_rate, booked_at, revenue_delta
+    //     FROM pricing_performance
+    //     WHERE property_id='<id>' AND date BETWEEN '<ci>' AND '<co - 1 day>';
+    if (action === "created" && bookingStatus !== "cancelled") {
+      try {
+        const nights = Math.max(
+          1,
+          Math.round(
+            (new Date(ba.departure_date + "T00:00:00Z").getTime() -
+             new Date(ba.arrival_date + "T00:00:00Z").getTime()) / 86_400_000
+          )
+        );
+        const totalAmount = ba.amount ? parseFloat(ba.amount) : null;
+        const nightly = totalAmount != null && nights > 0
+          ? Math.round((totalAmount / nights) * 100) / 100
+          : null;
+
+        if (nightly != null && nightly > 0) {
+          const dates: string[] = [];
+          const d = new Date(ba.arrival_date + "T00:00:00Z");
+          const end = new Date(ba.departure_date + "T00:00:00Z");
+          while (d < end) {
+            dates.push(d.toISOString().split("T")[0]);
+            d.setUTCDate(d.getUTCDate() + 1);
+          }
+
+          const bookedAt = new Date().toISOString();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: updated, error: updErr } = await (supabase.from("pricing_performance") as any)
+            .update({ booked: true, actual_rate: nightly, booked_at: bookedAt })
+            .eq("property_id", propertyId)
+            .in("date", dates)
+            .eq("booked", false)
+            .select("id");
+          if (updErr) {
+            console.warn(`[webhook] pricing_performance backfill error for ${bookingId}:`, updErr.message);
+          } else if (updated && updated.length > 0) {
+            console.log(`[webhook] Backfilled ${updated.length} pricing_performance rows for booking ${bookingId} @ $${nightly}/night`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[webhook] pricing_performance backfill failed:`, err instanceof Error ? err.message : err);
+      }
+    }
+
     // Update Channex availability based on action — push for ALL room types
     let availUpdated = false;
     try {

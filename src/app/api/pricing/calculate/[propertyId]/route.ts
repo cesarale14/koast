@@ -82,10 +82,44 @@ export async function POST(
     // Apply to database
     const updated = await engine.applyRates(rates);
 
+    // PR C — write pricing_recommendations rows with the new clamps
+    // metadata + plain-English reason_text + urgency classification so
+    // the PR D UI can surface "Koast wanted $X but your max is $Y" as
+    // an actionable insight. reason_signals merges the engine's factors
+    // (per-signal breakdown) with a `clamps` sub-object containing
+    // raw_engine_suggestion, clamped_by, and guardrail_trips.
+    //
+    // Note: pricing_validator.py also writes pricing_recommendations
+    // (with live-Channex current_rate). These route-written rows have
+    // current_rate=null; the validator fills that in on its daily run.
+    //
+    // VERIFY (browser devtools):
+    //   POST /api/pricing/calculate/<propertyId>  body: {"days":7}
+    //   Expect: { dates_calculated: N, recommendations_written: N, ... }
+    //   Then: SELECT reason_signals, reason_text, urgency, status FROM
+    //         pricing_recommendations WHERE property_id='<id>'
+    //         ORDER BY created_at DESC LIMIT 5;
+    const recRows = rates.map((r) => ({
+      property_id: r.property_id,
+      date: r.date,
+      current_rate: null,
+      suggested_rate: r.suggested_rate,
+      reason_signals: { ...r.factors, clamps: r.clamps },
+      reason_text: r.reason_text,
+      urgency: r.urgency,
+      status: "pending",
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: insErr } = await (supabase.from("pricing_recommendations") as any).insert(recRows);
+    if (insErr) {
+      console.warn("[pricing/calculate] pricing_recommendations insert failed:", insErr.message);
+    }
+
     return NextResponse.json({
       property: propData[0].name,
       dates_calculated: rates.length,
       dates_updated: updated,
+      recommendations_written: insErr ? 0 : recRows.length,
       base_rate: baseRate,
       rate_range: {
         min: Math.min(...rates.map((r) => r.suggested_rate)),
@@ -97,6 +131,9 @@ export async function POST(
         suggested: r.suggested_rate,
         applied: r.applied_rate,
         factors: r.factors,
+        clamps: r.clamps,
+        reason_text: r.reason_text,
+        urgency: r.urgency,
       })),
     });
   } catch (err) {

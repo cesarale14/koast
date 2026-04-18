@@ -145,6 +145,7 @@ PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden
 - **Scaffold cleanup on import:** re-import retargets `channex_room_types` / `channex_rate_plans` / `property_channels` rows to the real property AND deletes the orphaned scaffold via `channex.deleteProperty`.
 - **iCal preview mode:** `POST /api/ical/add` with `property_id: "preview"` parses/validates without DB writes or ownership checks. 15s `AbortController` timeout prevents hung feeds.
 - **iCal ghost booking cleanup:** UIDs removed from a feed get cancelled regardless of original source. Channex-linked rows also unblock affected `calendar_rates` to keep cross-channel availability accurate.
+- **Outcome capture:** Channex `booking_new` webhook backfills matching `pricing_performance` rows (`booked=true`, `actual_rate`, `booked_at`) when a booking lands on a date Koast previously applied a recommendation for. Nightly reconciler at 02:30 UTC (`koast-pricing-performance-reconciler.service/.timer`) catches webhook-delivery failures + iCal-sourced bookings.
 
 ---
 
@@ -164,7 +165,7 @@ Weights (sum = 1.0):
 - **Script:** `~/staycommand-workers/pricing_validator.py`
 - **Unit:** `koast-pricing-validator.service` + `.timer`
 - **Schedule:** daily at 6:00 AM ET / 10:00 UTC
-- **Writes to:** `pricing_recommendations` table (+ `pricing_recommendations_latest` view)
+- **Writes to:** `pricing_recommendations` table (+ `pricing_recommendations_latest` view) — rows now include `reason_signals.clamps` (raw_engine_suggestion, clamped_by, guardrail_trips), `reason_text` (plain-English), `urgency` (act_now/coming_up/review), `status` (pending by default).
 - **Current data:** 480 rows across 4 daily runs × 2 properties × 60 dates
 
 **Results so far (Apr 14-16, 2026):**
@@ -193,6 +194,7 @@ pricing_rules (id, property_id UNIQUE, base_rate, min_rate, max_rate,
 pricing_performance (id, property_id, date, suggested_rate, applied_rate,
                      actual_rate, applied_at, booked, booked_at,
                      revenue_delta GENERATED, channels_pushed[])
+-- Writes: /api/pricing/apply on push success; webhook on booking_new; reconciler nightly.
 
 -- Present (in schema.ts + DB):
 pricing_outcomes  -- used by seasonality signal after 30+ days of data
@@ -304,7 +306,7 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - Pricing engine daily validation runs (Virginia VPS timer)
 
 ## Known Gaps / Not Wired
-- **Pricing Apply wiring** — Apply buttons exist in Property Detail pricing tab but don't push to Channex yet. Need to call `/api/channels/rates/[propertyId]` with the same flow the calendar rate editor uses.
+- **Pricing Apply wiring** — `POST /api/pricing/apply/[propertyId]` is live via Track B Stage 1 PR C (safe-restrictions-backed push, idempotent via concurrency_locks, writes `pricing_performance`). Gated by `KOAST_ALLOW_BDC_CALENDAR_PUSH` pending production verification. Property Detail pricing tab UI wiring is PR D.
 - **AI messaging pipeline** — scaffolded in Messages UI, no automation. "AI Drafted" filter is dimmed.
 - **Revenue chart data query** — canvas chart exists; daily revenue aggregation from `bookings` needs fixing. Currently shows empty state.
 - **Dashboard greeting** — may still show auth username instead of display name on some paths.

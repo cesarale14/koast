@@ -31,21 +31,26 @@ export interface ApplyRulesInput {
 }
 
 export interface GuardrailTrip {
-  guardrail: "max_daily_delta" | "comp_floor";
+  guardrail: "max_daily_delta" | "comp_floor" | "comp_floor_exceeds_max_rate";
   value: number | null;
   threshold: number | null;
   skipped_reason?: string;
+  /** Populated only for 'comp_floor_exceeds_max_rate' — surfaces the
+   *  conflict ("local market wants $X, your max says $Y") so the UI can
+   *  prompt the host to raise their max. */
+  comp_floor_value?: number;
+  max_rate?: number;
 }
 
 export interface ApplyRulesResult {
   adjusted_rate: number;
-  clamped_by: Array<"min_rate" | "max_rate">;
+  clamped_by: Array<"min_rate" | "max_rate" | "comp_floor">;
   guardrail_trips: GuardrailTrip[];
 }
 
 export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
   const { rules, suggestedRate, previousAppliedRate, compSetP25, compSetQuality } = input;
-  const clamped_by: Array<"min_rate" | "max_rate"> = [];
+  const clamped_by: Array<"min_rate" | "max_rate" | "comp_floor"> = [];
   const guardrail_trips: GuardrailTrip[] = [];
 
   // 1) Clamp to [min, max].
@@ -80,8 +85,13 @@ export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
   }
 
   // 3) Comp-floor guardrail. Skip entirely when comp set is insufficient —
-  //    there's no meaningful floor to enforce. Record the skip so callers
-  //    can surface "comp data missing" in the UI reason.
+  //    there's no meaningful floor to enforce. When the computed floor
+  //    EXCEEDS the host's max_rate, we also don't apply it (max_rate is
+  //    an absolute ceiling, not a soft preference); instead we surface
+  //    the conflict as an insight so the host can raise their max if they
+  //    trust the market signal. This is the fix for the Villa Jamaica case
+  //    where inferred max=$230 sat below compSetP25×0.85=$237.58 and
+  //    previously produced $240 outputs that walked up the host's intent.
   if (compSetQuality === "insufficient" || compSetQuality === "unknown") {
     guardrail_trips.push({
       guardrail: "comp_floor",
@@ -91,8 +101,18 @@ export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
     });
   } else if (compSetP25 != null) {
     const floor = compSetP25 * rules.comp_floor_pct;
-    if (adjusted < floor) {
+    if (floor > rules.max_rate) {
+      guardrail_trips.push({
+        guardrail: "comp_floor_exceeds_max_rate",
+        value: null,
+        threshold: null,
+        skipped_reason: "comp_floor_exceeds_max_rate",
+        comp_floor_value: floor,
+        max_rate: rules.max_rate,
+      });
+    } else if (adjusted < floor) {
       adjusted = floor;
+      clamped_by.push("comp_floor");
       guardrail_trips.push({
         guardrail: "comp_floor",
         value: adjusted,

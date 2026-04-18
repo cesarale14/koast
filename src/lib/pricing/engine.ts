@@ -11,7 +11,7 @@ import { applyPricingRules, type PricingRulesRow, type GuardrailTrip } from "./a
 
 export interface RecommendationClamps {
   raw_engine_suggestion: number;
-  clamped_by: Array<"min_rate" | "max_rate">;
+  clamped_by: Array<"min_rate" | "max_rate" | "comp_floor">;
   guardrail_trips: GuardrailTrip[];
 }
 
@@ -41,7 +41,11 @@ function buildReasonText(
   const { raw_engine_suggestion, clamped_by, guardrail_trips } = clamps;
   const raw = Math.round(raw_engine_suggestion);
   const adj = Math.round(adjusted);
-  // Priority: guardrail trips surface first (they're more specific than min/max clamps).
+  // Priority: conflict signals surface first; they're the most actionable.
+  const conflict = guardrail_trips.find((t) => t.guardrail === "comp_floor_exceeds_max_rate");
+  if (conflict) {
+    return `Local comps suggest a floor of $${Math.round(conflict.comp_floor_value ?? 0)} — above your max_rate of $${Math.round(conflict.max_rate ?? rules.max_rate)}. Koast is holding at $${adj}. Consider raising max_rate to capture the market.`;
+  }
   const delta = guardrail_trips.find((t) => t.guardrail === "max_daily_delta");
   if (delta) {
     return `Koast suggested $${raw} — limited to $${adj} by your max daily change rule (${Math.round(rules.max_daily_delta_pct * 100)}%).`;
@@ -59,7 +63,16 @@ function buildReasonText(
   return null;
 }
 
-function classifyUrgency(rawSuggestion: number, currentRate: number | null): RecommendationUrgency {
+function classifyUrgency(
+  rawSuggestion: number,
+  currentRate: number | null,
+  guardrailTrips: GuardrailTrip[]
+): RecommendationUrgency {
+  // A comp_floor-vs-max_rate conflict is always act_now — the host's
+  // guardrails are leaving market money on the table and they should see it.
+  if (guardrailTrips.some((t) => t.guardrail === "comp_floor_exceeds_max_rate")) {
+    return "act_now";
+  }
   if (currentRate == null || currentRate <= 0) return "review";
   const gap = Math.abs(rawSuggestion - currentRate) / currentRate;
   if (gap > 0.15) return "act_now";
@@ -350,7 +363,7 @@ export class PricingEngine {
         guardrail_trips: rulesResult.guardrail_trips,
       };
       const reason_text = buildReasonText(clamps, suggested, effectiveRules);
-      const urgency = classifyUrgency(rawSuggestion, currentRate);
+      const urgency = classifyUrgency(rawSuggestion, currentRate, rulesResult.guardrail_trips);
 
       results.push({
         property_id: propertyId,
