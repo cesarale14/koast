@@ -508,6 +508,60 @@ of deployed Session 1 build:
    per the flex-based overlay directive. Toasts still use fixed
    positioning (they are screen-anchored status, not modal content).
 
+### After Session 2.5 (PropertyDetail Pricing tab layout rebuild)
+
+9. KoastRate renders numeric values through `Intl.NumberFormat('en-US')`.
+   All variants + delta magnitude. "$15,177" not "$15177". Applied
+   once in the primitive — every consumer inherits the formatting.
+
+10. Nullable rates flow through primitives without coalescing.
+    `current_rate=null` renders as em-dash. `delta_abs=null` renders
+    as em-dash. Never substitute `suggested_rate` or a computed
+    value — transparency about missing data is part of the product's
+    honesty.
+
+11. Recommendations lists paginate to 20 per urgency group.
+    "Show N more" expander reveals up to 20 additional rows at a
+    time. Pagination state resets when the underlying rec count
+    changes (new fetch).
+
+12. PropertyDetail Pricing tab uses KoastRail (reversal of earlier
+    spec — the master plan's "NOT USED on PropertyDetail" note was
+    wrong). Decision-heavy surfaces warrant persistent rails;
+    Calendar and PropertyDetail both qualify. Future decision-heavy
+    pages (Market Intel, Reviews) should follow the same pattern.
+
+13. KoastRail supports both dark and light surfaces via a new
+    `variant: 'dark' | 'light'` prop. Light is the default and
+    matches the PropertyDetail Pricing rail (white bg, hairline
+    border). `variant='dark'` swaps to coastal background with a
+    muted rule for the deep-sea Calendar rail or similar future
+    decision surfaces. KoastRail also gains `keyboardToggle` which
+    defaults to true; embedded rails pass `false` when the
+    cmd+/-to-toggle binding would conflict or feel out of place.
+
+14. Full-width dashboard-shaped surfaces use
+    `max-w-[1760px] mx-auto px-10`. PropertyDetail's earlier
+    1200px cap was too narrow for three-row grid layouts. Sessions
+    3+ (Dashboard, Properties list, Market Intel) default to 1760
+    unless their content is narrative (Messages, Reviews thread)
+    in which case 900px is fine.
+
+15. Property hero images use `next/image` with an explicit `sizes`
+    prop (`(max-width: 1760px) 100vw, 1760px`) and `priority`.
+    Never raw `<img>` for hero or card thumbnails — Vercel's image
+    optimizer generates srcset variants at build time and the
+    browser picks the right one. Source-image quality itself is
+    tracked separately in CLAUDE.md → Known Gaps → Image Assets.
+
+16. PortfolioSignalSummary is a composite extension to the polish
+    primitives library, built from KoastCard + KoastSignalBar +
+    KoastEmptyState. Business logic (`aggregateSignalContribution`)
+    lives in `src/lib/pricing/aggregate-signals.ts` so non-UI
+    callers (reports, server-side summaries) can reuse it. When a
+    future surface needs a different aggregation shape, extend the
+    helper rather than duplicating the math.
+
 ---
 
 ## Out of scope for polish pass

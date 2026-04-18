@@ -180,7 +180,7 @@ export default function PropertyDetail({
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <div className="max-w-[1200px] mx-auto px-8">
+      <div className="max-w-[1760px] mx-auto px-10">
         <TabBar tab={tab} onChange={setTab} />
 
         {tab === "Overview" && (
@@ -261,8 +261,15 @@ function HeroSection({
       style={{ height: 280, backgroundColor: "var(--deep-sea)", marginBottom: 0 }}
     >
       {property.cover_photo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={property.cover_photo_url} alt={property.name} className="w-full h-full object-cover" />
+        <Image
+          src={property.cover_photo_url}
+          alt={property.name}
+          width={2560}
+          height={560}
+          sizes="(max-width: 1760px) 100vw, 1760px"
+          priority
+          className="w-full h-full object-cover"
+        />
       ) : (
         <div
           className="w-full h-full flex items-center justify-center"

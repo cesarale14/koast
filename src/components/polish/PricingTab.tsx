@@ -17,15 +17,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Sparkles, Play, ChevronDown, ChevronUp, X, AlertTriangle, Check, RefreshCw, TrendingUp } from "lucide-react";
+import { Sparkles, Play, X, AlertTriangle, Check, RefreshCw, TrendingUp } from "lucide-react";
 import { usePricingTab, type PricingRecommendation, type PricingRules, type PerformanceSummary } from "@/hooks/usePricingTab";
 import KoastButton from "./KoastButton";
 import KoastCard from "./KoastCard";
 import KoastChip from "./KoastChip";
 import KoastRate from "./KoastRate";
-import KoastSelectedCell from "./KoastSelectedCell";
+import KoastRail from "./KoastRail";
 import KoastSignalBar from "./KoastSignalBar";
 import KoastEmptyState from "./KoastEmptyState";
+import PortfolioSignalSummary from "./PortfolioSignalSummary";
 
 // ---------------- Types + utils ----------------
 
@@ -75,9 +76,24 @@ function groupByUrgency(recs: PricingRecommendation[]): Record<Urgency, PricingR
 export default function PricingTab({ propertyId, compSetQuality = "unknown" }: PricingTabProps) {
   const { rules, recommendations, performance, loading, error, refetch } = usePricingTab(propertyId);
   const [previewTarget, setPreviewTarget] = useState<PricingRecommendation[] | null>(null);
+  const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
+  const [railOpen, setRailOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const recsSectionRef = useRef<HTMLDivElement | null>(null);
   const [toast, setToast] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
+
+  const selectedRec = useMemo(
+    () => recommendations.pending.find((r) => r.id === selectedRecId) ?? null,
+    [recommendations.pending, selectedRecId]
+  );
+
+  // Auto-select the highest-urgency rec whenever the rec set changes
+  // and we don't yet have a selection (or the selection vanished).
+  useEffect(() => {
+    if (selectedRecId && recommendations.pending.some((r) => r.id === selectedRecId)) return;
+    const first = recommendations.pending[0]?.id ?? null;
+    setSelectedRecId(first);
+  }, [recommendations.pending, selectedRecId]);
 
   useEffect(() => {
     setMounted(true);
@@ -150,28 +166,84 @@ export default function PricingTab({ propertyId, compSetQuality = "unknown" }: P
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, paddingTop: 24, paddingBottom: 48, position: "relative" }}>
-      <div style={choreographyStyle(mounted, 0)}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 24, paddingBottom: 48, position: "relative" }}>
+      <div style={{ ...rowGridStyle(7, 3), ...choreographyStyle(mounted, 0) }}>
         <Scorecard
           pending={recommendations.pending}
           performance={performance}
           compSetQuality={compSetQuality}
           onReview={scrollToRecs}
         />
+        <PortfolioSignalSummary recommendations={recommendations.pending} />
       </div>
 
-      <div ref={recsSectionRef} style={choreographyStyle(mounted, 120)}>
+      <div
+        ref={recsSectionRef}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 7fr) minmax(0, 3fr)",
+          gap: 20,
+          alignItems: "flex-start",
+          ...choreographyStyle(mounted, 120),
+        }}
+      >
         <RecommendationsList
           pending={recommendations.pending}
-          rules={rules}
-          onApplyOne={handleApplyOneClick}
+          selectedRecId={selectedRecId}
+          onSelectRec={setSelectedRecId}
           onApplyGroup={handleApplyGroup}
-          onDismiss={handleDismiss}
           onCalculate={handleCalculate}
         />
+        <div style={{ position: "sticky", top: 24 }}>
+          <KoastRail
+            open={railOpen}
+            onToggle={() => setRailOpen((o) => !o)}
+            variant="light"
+            keyboardToggle={false}
+            header={
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--tideline)",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Selected
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--coastal)", letterSpacing: "-0.005em" }}>
+                  {selectedRec
+                    ? new Date(selectedRec.date + "T00:00:00").toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "No selection"}
+                </span>
+              </div>
+            }
+          >
+            <SelectedRecRail
+              rec={selectedRec}
+              rules={rules}
+              onApply={() => selectedRec && handleApplyOneClick(selectedRec)}
+              onDismiss={() => selectedRec && handleDismiss(selectedRec)}
+            />
+          </KoastRail>
+        </div>
       </div>
 
-      <div style={choreographyStyle(mounted, 240)}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: 20,
+          alignItems: "flex-start",
+          ...choreographyStyle(mounted, 240),
+        }}
+      >
         <RulesEditor
           propertyId={propertyId}
           rules={rules}
@@ -179,9 +251,6 @@ export default function PricingTab({ propertyId, compSetQuality = "unknown" }: P
           onSaveFailed={(msg) => setToast({ text: msg, tone: "err" })}
           refetch={refetch}
         />
-      </div>
-
-      <div style={choreographyStyle(mounted, 360)}>
         <PerformancePanel
           propertyId={propertyId}
           rules={rules}
@@ -236,6 +305,15 @@ function choreographyStyle(mounted: boolean, delayMs: number): React.CSSProperti
     transform: mounted ? "translateY(0)" : "translateY(12px)",
     transition: "opacity 240ms ease-out, transform 240ms ease-out",
     transitionDelay: `${delayMs}ms`,
+  };
+}
+
+function rowGridStyle(leftFr: number, rightFr: number): React.CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: `minmax(0, ${leftFr}fr) minmax(0, ${rightFr}fr)`,
+    gap: 20,
+    alignItems: "flex-start",
   };
 }
 
@@ -343,7 +421,7 @@ function Scorecard({
               >
                 You could capture
               </span>
-              <KoastRate tone="dark" variant="hero" value={totalDeltaAbs} />
+              <KoastRate tone="dark" variant="hero" value={totalDeltaAbs} style={{ fontSize: 72 }} />
               <span
                 style={{
                   fontSize: 16,
@@ -415,19 +493,19 @@ const sectionLabel: React.CSSProperties = {
 
 // ---------------- Section 2: Recommendations ----------------
 
+const PAGE_SIZE = 20;
+
 function RecommendationsList({
   pending,
-  rules,
-  onApplyOne,
+  selectedRecId,
+  onSelectRec,
   onApplyGroup,
-  onDismiss,
   onCalculate,
 }: {
   pending: PricingRecommendation[];
-  rules: PricingRules | null;
-  onApplyOne: (rec: PricingRecommendation) => void;
+  selectedRecId: string | null;
+  onSelectRec: (id: string) => void;
   onApplyGroup: (recs: PricingRecommendation[]) => void;
-  onDismiss: (rec: PricingRecommendation) => void;
   onCalculate: () => void;
 }) {
   const groups = useMemo(() => groupByUrgency(pending), [pending]);
@@ -459,10 +537,9 @@ function RecommendationsList({
             key={u}
             urgency={u}
             recs={recs}
-            rules={rules}
-            onApplyOne={onApplyOne}
+            selectedRecId={selectedRecId}
+            onSelectRec={onSelectRec}
             onApplyGroup={onApplyGroup}
-            onDismiss={onDismiss}
           />
         );
       })}
@@ -473,20 +550,30 @@ function RecommendationsList({
 function RecGroup({
   urgency,
   recs,
-  rules,
-  onApplyOne,
+  selectedRecId,
+  onSelectRec,
   onApplyGroup,
-  onDismiss,
 }: {
   urgency: Urgency;
   recs: PricingRecommendation[];
-  rules: PricingRules | null;
-  onApplyOne: (rec: PricingRecommendation) => void;
+  selectedRecId: string | null;
+  onSelectRec: (id: string) => void;
   onApplyGroup: (recs: PricingRecommendation[]) => void;
-  onDismiss: (rec: PricingRecommendation) => void;
 }) {
-  const potential = recs.reduce((sum, r) => sum + ((r.suggested_rate ?? 0) - (r.current_rate ?? 0)), 0);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Reset pagination when the underlying set changes.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [recs.length]);
+
+  const potential = recs.reduce((sum, r) => {
+    if (r.current_rate == null || r.suggested_rate == null) return sum;
+    return sum + (r.suggested_rate - r.current_rate);
+  }, 0);
   const chipVariant = urgency === "act_now" ? "danger" : urgency === "coming_up" ? "warning" : "neutral";
+  const visible = recs.slice(0, visibleCount);
+  const remaining = Math.max(0, recs.length - visibleCount);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div
@@ -508,146 +595,102 @@ function RecGroup({
           Apply all
         </KoastButton>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {recs.map((rec) => (
+      <KoastCard variant="elevated" padding={0}>
+        {visible.map((rec, i) => (
           <RecRow
             key={rec.id}
             rec={rec}
-            rules={rules}
-            onApply={() => onApplyOne(rec)}
-            onDismiss={() => onDismiss(rec)}
+            selected={rec.id === selectedRecId}
+            onSelect={() => onSelectRec(rec.id)}
+            isLast={i === visible.length - 1}
           />
         ))}
-      </div>
+      </KoastCard>
+      {remaining > 0 && (
+        <KoastButton variant="ghost" size="sm" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>
+          Show {Math.min(remaining, PAGE_SIZE)} more
+        </KoastButton>
+      )}
     </div>
   );
 }
 
 function RecRow({
   rec,
-  rules,
-  onApply,
-  onDismiss,
+  selected,
+  onSelect,
+  isLast,
 }: {
   rec: PricingRecommendation;
-  rules: PricingRules | null;
-  onApply: () => void;
-  onDismiss: () => void;
+  selected: boolean;
+  onSelect: () => void;
+  isLast: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const delta = (rec.suggested_rate ?? 0) - (rec.current_rate ?? 0);
-
-  const signalRows = useMemo(() => {
-    const raw = (rec.reason_signals ?? {}) as Record<string, unknown>;
-    const entries = Object.entries(raw).filter(([k]) => k !== "clamps");
-    const parsed = entries.map(([id, val]) => {
-      const v = val as { score?: number; weight?: number; confidence?: number; reason?: string };
-      return {
-        id,
-        score: typeof v.score === "number" ? v.score : 0,
-        weight: typeof v.weight === "number" ? v.weight : 0,
-        confidence: typeof v.confidence === "number" ? v.confidence : 1,
-      };
-    });
-    const total = parsed.reduce((s, p) => s + p.weight * p.confidence, 0);
-    return parsed
-      .map((p) => ({ ...p, effective: total > 0 ? (p.weight * p.confidence) / total : 0 }))
-      .sort((a, b) => b.effective - a.effective)
-      .slice(0, 8);
-  }, [rec]);
-
-  const clamps = (rec.reason_signals as { clamps?: { raw_engine_suggestion?: number; clamped_by?: string; guardrail_trips?: Array<{ guardrail?: string; detail?: string }> } })?.clamps ?? null;
+  const delta =
+    rec.current_rate == null || rec.suggested_rate == null
+      ? null
+      : rec.suggested_rate - rec.current_rate;
+  const deltaChipVariant: "success" | "warning" | "neutral" =
+    delta == null ? "neutral" : delta > 0 ? "success" : "neutral";
 
   return (
-    <KoastCard variant="elevated" padding={16}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 140 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--tideline)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            {fmtDateRange(rec.date, rec.date)}
-          </span>
-          <KoastRate value={rec.current_rate} variant="inline" delta={delta} />
-          <span style={{ fontSize: 12, color: "var(--tideline)", fontVariantNumeric: "tabular-nums" }}>
-            → {fmtMoney(rec.suggested_rate)}
-          </span>
-        </div>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <p
-            style={{
-              fontSize: 13,
-              color: "var(--coastal)",
-              lineHeight: 1.5,
-              margin: 0,
-              display: "-webkit-box",
-              WebkitLineClamp: expanded ? "unset" : 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {rec.reason_text ?? "No explanation recorded."}
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <KoastButton variant="primary" size="sm" onClick={onApply}>
-            Apply
-          </KoastButton>
-          <KoastButton variant="ghost" size="sm" onClick={onDismiss}>
-            Dismiss
-          </KoastButton>
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
-            aria-label={expanded ? "Collapse details" : "Expand details"}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 7,
-              border: "1px solid #E5E2DC",
-              background: "#fff",
-              color: "var(--tideline)",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      </div>
-      {expanded && (
-        <div style={{ marginTop: 14, borderTop: "1px solid #E5E2DC", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={sectionLabel}>Top signals</span>
-            {signalRows.map((s) => (
-              <KoastSignalBar key={s.id} label={s.id} score={s.score} weight={s.effective} confidence={s.confidence} />
-            ))}
-          </div>
-          {clamps && (clamps.raw_engine_suggestion != null || clamps.guardrail_trips?.length) && (
-            <KoastCard variant="quiet" padding={14}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={sectionLabel}>What Koast wanted vs your rules</span>
-                {clamps.raw_engine_suggestion != null && (
-                  <div style={{ fontSize: 13, color: "var(--coastal)", lineHeight: 1.5 }}>
-                    Raw engine output: <strong>{fmtMoney(clamps.raw_engine_suggestion)}</strong>
-                    {clamps.clamped_by && <> · clamped by <strong>{clamps.clamped_by}</strong></>}
-                    {rules && <> (min {fmtMoney(rules.min_rate)}, max {fmtMoney(rules.max_rate)})</>}
-                  </div>
-                )}
-                {clamps.guardrail_trips?.length ? (
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--tideline)", lineHeight: 1.5 }}>
-                    {clamps.guardrail_trips.map((t, i) => (
-                      <li key={i}>
-                        <strong>{t.guardrail}</strong>{t.detail ? ` — ${t.detail}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            </KoastCard>
-          )}
-        </div>
-      )}
-    </KoastCard>
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={selected ? "true" : undefined}
+      style={{
+        width: "100%",
+        display: "grid",
+        gridTemplateColumns: "112px 180px minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 16,
+        height: 48,
+        padding: "0 16px",
+        border: "none",
+        borderBottom: isLast ? "none" : "1px solid rgba(229,226,220,0.7)",
+        borderLeft: selected ? "3px solid var(--lagoon)" : "3px solid transparent",
+        background: selected ? "rgba(26,122,90,0.04)" : "transparent",
+        cursor: "pointer",
+        textAlign: "left",
+        color: "inherit",
+        transition: "background-color 180ms cubic-bezier(0.4,0,0.2,1), border-color 180ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--coastal)",
+          letterSpacing: "-0.005em",
+        }}
+      >
+        {fmtDateRange(rec.date, rec.date)}
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        <KoastRate value={rec.current_rate} variant="inline" />
+        <span style={{ fontSize: 11, color: "var(--tideline)" }}>→</span>
+        <KoastRate value={rec.suggested_rate} variant="inline" delta={delta} />
+      </span>
+      <span
+        style={{
+          fontSize: 12,
+          color: "var(--tideline)",
+          lineHeight: 1.4,
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {rec.reason_text ?? "—"}
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end" }}>
+        {delta != null && delta !== 0 && (
+          <KoastChip variant={deltaChipVariant}>
+            {delta > 0 ? "+" : "−"}{fmtMoney(Math.abs(delta))}
+          </KoastChip>
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -964,6 +1007,7 @@ function PerformancePanel({
   const appliedToday = performance?.by_date.filter((d) => d.applied_rate != null && d.date === isoDate(new Date())).length ?? 0;
   const bookedToday = performance?.by_date.filter((d) => d.booked && d.date === isoDate(new Date())).length ?? 0;
   const pendingCount = pending.length;
+  void propertyId;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -985,7 +1029,145 @@ function PerformancePanel({
         <AutoApplyChecklist rules={rules} pending={pending} />
       </div>
       <AccuracyChart performance={performance} />
-      <WhyThisSuggestion propertyId={propertyId} rules={rules} />
+    </div>
+  );
+}
+
+// ---------------- Selected rec rail ----------------
+
+function SelectedRecRail({
+  rec,
+  rules,
+  onApply,
+  onDismiss,
+}: {
+  rec: PricingRecommendation | null;
+  rules: PricingRules | null;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  if (!rec) {
+    return (
+      <div style={{ padding: 24 }}>
+        <KoastEmptyState
+          title="Select a recommendation"
+          body="Pick a row on the left to see Koast's reasoning, signal breakdown, and the apply controls."
+        />
+      </div>
+    );
+  }
+
+  const delta =
+    rec.current_rate == null || rec.suggested_rate == null
+      ? null
+      : rec.suggested_rate - rec.current_rate;
+  const urgencyChip =
+    rec.urgency === "act_now" ? <KoastChip variant="danger">Act now</KoastChip>
+    : rec.urgency === "coming_up" ? <KoastChip variant="warning">Coming up</KoastChip>
+    : <KoastChip variant="neutral">Review</KoastChip>;
+
+  const signalRows = (() => {
+    const raw = (rec.reason_signals ?? {}) as Record<string, unknown>;
+    const entries = Object.entries(raw).filter(([k]) => k !== "clamps");
+    const parsed = entries.map(([id, val]) => {
+      const v = val as { score?: number; weight?: number; confidence?: number };
+      return {
+        id,
+        score: typeof v.score === "number" ? v.score : 0,
+        weight: typeof v.weight === "number" ? v.weight : 0,
+        confidence: typeof v.confidence === "number" ? v.confidence : 1,
+      };
+    });
+    const total = parsed.reduce((s, p) => s + p.weight * p.confidence, 0);
+    return parsed
+      .map((p) => ({ ...p, effective: total > 0 ? (p.weight * p.confidence) / total : 0 }))
+      .sort((a, b) => b.effective - a.effective)
+      .slice(0, 5);
+  })();
+
+  const clamps = (rec.reason_signals as {
+    clamps?: { raw_engine_suggestion?: number; clamped_by?: string; guardrail_trips?: Array<{ guardrail?: string; detail?: string }> };
+  })?.clamps ?? null;
+
+  const dateObj = new Date(rec.date + "T00:00:00");
+
+  return (
+    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <span
+          style={{
+            fontSize: 26,
+            fontWeight: 600,
+            color: "var(--coastal)",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.15,
+          }}
+        >
+          {dateObj.toLocaleDateString("en-US", { weekday: "long" })}
+        </span>
+        {urgencyChip}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--tideline)" }}>
+        {dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <KoastRate variant="hero" value={rec.suggested_rate} style={{ fontSize: 54 }} delta={delta} />
+      </div>
+      <div style={{ fontSize: 12, color: "var(--tideline)" }}>
+        Current: <KoastRate value={rec.current_rate} variant="inline" />
+      </div>
+
+      {rec.reason_text && (
+        <KoastCard variant="quiet" padding={14}>
+          <div style={{ fontSize: 13, color: "var(--coastal)", lineHeight: 1.5 }}>{rec.reason_text}</div>
+        </KoastCard>
+      )}
+
+      {signalRows.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <span style={sectionLabel}>Top signals</span>
+          {signalRows.map((s) => (
+            <KoastSignalBar key={s.id} label={s.id} score={s.score} weight={s.effective} confidence={s.confidence} />
+          ))}
+        </div>
+      )}
+
+      {clamps && (clamps.raw_engine_suggestion != null || clamps.guardrail_trips?.length) && (
+        <KoastCard variant="quiet" padding={12}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={sectionLabel}>What Koast wanted vs your rules</span>
+            {clamps.raw_engine_suggestion != null && (
+              <div style={{ fontSize: 12, color: "var(--coastal)", lineHeight: 1.5 }}>
+                Raw: <strong>{fmtMoney(clamps.raw_engine_suggestion)}</strong>
+                {clamps.clamped_by && <> · clamped by <strong>{clamps.clamped_by}</strong></>}
+              </div>
+            )}
+            {clamps.guardrail_trips?.length ? (
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "var(--tideline)" }}>
+                {clamps.guardrail_trips.map((t, i) => (
+                  <li key={i}><strong>{t.guardrail}</strong>{t.detail ? ` — ${t.detail}` : ""}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </KoastCard>
+      )}
+
+      {rules && (
+        <div style={{ fontSize: 11, color: "var(--tideline)" }}>
+          Rules in effect · min {fmtMoney(rules.min_rate)} · base {fmtMoney(rules.base_rate)} · max {fmtMoney(rules.max_rate)}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <KoastButton variant="ghost" size="md" onClick={onDismiss}>
+          Dismiss
+        </KoastButton>
+        <KoastButton variant="primary" size="md" onClick={onApply}>
+          Apply {rec.suggested_rate != null ? fmtMoney(rec.suggested_rate) : ""}
+        </KoastButton>
+      </div>
     </div>
   );
 }
@@ -1210,116 +1392,6 @@ function LegendSwatch({ color, label }: { color: string; label: string }) {
       <span style={{ width: 10, height: 2, borderRadius: 2, background: color }} />
       {label}
     </span>
-  );
-}
-
-function WhyThisSuggestion({ propertyId, rules }: { propertyId: string; rules: PricingRules | null }) {
-  const [date, setDate] = useState<string>(() => isoDate(new Date(Date.now() + 7 * 86_400_000)));
-  const [audit, setAudit] = useState<{
-    recommendation?: PricingRecommendation;
-    signals_breakdown?: Array<{ signal: string; score: number; weight: number; effective_weight: number; confidence: number }>;
-    comp_set_quality?: string;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setErr(null);
-    fetch(`/api/pricing/audit/${propertyId}?date=${date}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!alive) return;
-        if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        setAudit(body);
-      })
-      .catch((e) => {
-        if (alive) setErr(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [propertyId, date]);
-
-  return (
-    <KoastCard variant="elevated">
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-          <span style={sectionLabel}>Why this suggestion</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            style={{
-              border: "1px solid #E5E2DC",
-              borderRadius: 8,
-              padding: "4px 8px",
-              fontSize: 12,
-              fontFamily: "inherit",
-              color: "var(--coastal)",
-            }}
-          />
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[0, 7, 14, 30].map((offset) => {
-            const d = new Date(Date.now() + offset * 86_400_000);
-            const ds = isoDate(d);
-            const label = offset === 0 ? "Today" : `+${offset}d`;
-            return (
-              <KoastSelectedCell
-                key={ds}
-                selected={ds === date}
-                onClick={() => setDate(ds)}
-                ariaLabel={`Audit ${ds}`}
-                style={{ padding: "4px 10px", fontSize: 11, minWidth: 44, textAlign: "center" }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--coastal)" }}>{label}</div>
-              </KoastSelectedCell>
-            );
-          })}
-        </div>
-        {loading && <div style={{ fontSize: 12, color: "var(--tideline)" }}>Loading…</div>}
-        {err && <div style={{ fontSize: 12, color: "var(--coral-reef)" }}>{err}</div>}
-        {audit?.recommendation ? (
-          <>
-            <KoastRate
-              value={audit.recommendation.current_rate}
-              variant="selected"
-              delta={(audit.recommendation.suggested_rate ?? 0) - (audit.recommendation.current_rate ?? 0)}
-            />
-            <p style={{ fontSize: 13, color: "var(--coastal)", lineHeight: 1.5, margin: 0 }}>
-              {audit.recommendation.reason_text}
-            </p>
-            {audit.signals_breakdown && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {audit.signals_breakdown.slice(0, 8).map((s) => (
-                  <KoastSignalBar
-                    key={s.signal}
-                    label={s.signal}
-                    score={s.score}
-                    weight={s.effective_weight}
-                    confidence={s.confidence}
-                  />
-                ))}
-              </div>
-            )}
-            {rules && (
-              <div style={{ fontSize: 11, color: "var(--tideline)" }}>
-                Rules in effect: min {fmtMoney(rules.min_rate)} · base {fmtMoney(rules.base_rate)} · max {fmtMoney(rules.max_rate)}
-              </div>
-            )}
-          </>
-        ) : (
-          !loading && !err && (
-            <div style={{ fontSize: 12, color: "var(--tideline)" }}>No recommendation for this date.</div>
-          )
-        )}
-      </div>
-    </KoastCard>
   );
 }
 

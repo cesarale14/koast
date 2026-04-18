@@ -40,9 +40,11 @@ function variantSpec(variant: Variant, tone: Tone): VariantSpec {
   }
 }
 
+const NUMBER_FMT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
 function fmt(n: number | null | undefined, currency: string): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return `${currency}${Math.round(n)}`;
+  return `${currency}${NUMBER_FMT.format(Math.round(n))}`;
 }
 
 // Spec (master plan principle 4): color encodes semantic, never fear.
@@ -63,18 +65,19 @@ function renderDelta(delta: number, currency: string, tone: Tone) {
   if (delta === 0) {
     return <span style={{ ...baseStyle, color: quiet }}>—</span>;
   }
+  const mag = NUMBER_FMT.format(Math.abs(Math.round(delta)));
   if (delta > 0) {
     return (
       <span style={{ ...baseStyle, color: "var(--golden)" }}>
         <span style={{ fontSize: 10, lineHeight: 1 }}>▲</span>
-        {currency}{Math.abs(Math.round(delta))}
+        {currency}{mag}
       </span>
     );
   }
   return (
     <span style={{ ...baseStyle, color: quiet }}>
       <span style={{ fontSize: 10, lineHeight: 1, opacity: 0.8 }}>▼</span>
-      {currency}{Math.abs(Math.round(delta))}
+      {currency}{mag}
     </span>
   );
 }

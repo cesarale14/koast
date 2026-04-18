@@ -323,6 +323,10 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - ChannelPopover interactive platform badges (desktop hover + mobile bottom sheet)
 - Pricing engine daily validation runs (Virginia VPS timer)
 
+## Known Gaps — Image Assets
+- **Property hero source resolution.** Today's `properties.cover_photo_url` values are ~720×480 pulled from Airbnb / iCal / imported sources. The Koast hero renders the banner at ~2560×560 (retina, full 1760px container), so `next/image` still upscales a 720-wide source. We wrap with `next/image` + `sizes` so at least we're not requesting a naive 2×+ upscale, but the source itself is the bottleneck. Fix: during import, pull the highest-res variant available (Airbnb's CDN supports `?im_w=2560`) and store that URL instead of the lower-res thumb. Backend-only change — no UI churn — scheduled for the property-import polish pass.
+- **Property card thumbs.** Same source-resolution gap affects card thumbs at 320×200. Same fix (higher-res import) resolves both.
+
 ## Known Gaps / Not Wired
 - **Property Detail Pricing tab UI** — backend complete (PR D shipped read APIs + `usePricingTab` hook). UI wiring scheduled for the dedicated polish pass immediately after Track B Stage 1. Apply/Dismiss buttons in `/properties/[id]` Pricing tab don't call the live routes yet.
 - **`KOAST_ALLOW_BDC_CALENDAR_PUSH` flag flip** — still default-off on Vercel. Flip happens in a separate session with browser-devtools controlled verification. Once live traffic confirms safe-restrictions works, the flag is removed per the "safety-mechanism conservatism" rule.
