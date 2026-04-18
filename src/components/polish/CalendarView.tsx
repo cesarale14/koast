@@ -57,9 +57,13 @@ interface Props {
 }
 
 const MONTHS_VISIBLE = 4;
-const CELL_MIN_HEIGHT = 132;
-const CELL_MIN_WIDTH = 168;
+const CELL_MIN_HEIGHT_DESKTOP = 132;
+const CELL_MIN_HEIGHT_MOBILE = 64;
+const CELL_MIN_WIDTH_DESKTOP = 168;
+const CELL_MIN_WIDTH_MOBILE = 44;
+const MOBILE_BREAKPOINT = 768;
 const DAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const DAY_LABELS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -148,7 +152,8 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
   const [activePropertyId, setActivePropertyId] = useState(properties[0]?.id ?? "");
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [railOpen, setRailOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [startMonth, setStartMonth] = useState(() => {
     const d = new Date();
@@ -159,6 +164,14 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
 
   useEffect(() => {
     setMounted(true);
+    const apply = () => {
+      const mob = window.innerWidth < MOBILE_BREAKPOINT;
+      setIsMobile(mob);
+      setRailOpen(!mob);
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
   }, []);
 
   useEffect(() => {
@@ -315,6 +328,8 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
         }}
         onPushAll={handlePushAll}
         busy={busy}
+        isMobile={isMobile}
+        onOpenRail={() => setRailOpen(true)}
       />
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
@@ -337,11 +352,12 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
               connectedPlatforms={connectedPlatforms}
               performance={performance}
               mounted={mounted}
+              isMobile={isMobile}
             />
           </div>
           <div
             style={{
-              padding: "0 24px 48px",
+              padding: isMobile ? "0 12px 48px" : "0 24px 48px",
               opacity: mounted ? 1 : 0,
               transform: mounted ? "translateY(0)" : "translateY(12px)",
               transition: "opacity 240ms ease-out, transform 240ms ease-out",
@@ -358,12 +374,33 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
                 rateByDate={rateByDate}
                 recByDate={recByDate}
                 selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
+                onSelectDate={(d) => {
+                  setSelectedDate(d);
+                  if (isMobile) setRailOpen(true);
+                }}
                 index={i}
+                isMobile={isMobile}
               />
             ))}
           </div>
         </main>
+
+        {isMobile && railOpen && (
+          <button
+            type="button"
+            aria-label="Close rail"
+            onClick={() => setRailOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(19,46,32,0.3)",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              zIndex: 39,
+            }}
+          />
+        )}
 
         <div
           style={{
@@ -371,11 +408,22 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
             transform: mounted ? "translateX(0)" : "translateX(16px)",
             transition: "opacity 240ms ease-out, transform 240ms ease-out",
             transitionDelay: "240ms",
+            ...(isMobile
+              ? {
+                  position: "fixed",
+                  right: 0,
+                  top: 56,
+                  bottom: 0,
+                  zIndex: 40,
+                  boxShadow: railOpen ? "-12px 0 32px rgba(19,46,32,0.18)" : "none",
+                }
+              : {}),
           }}
         >
           <KoastRail
             open={railOpen}
             onToggle={() => setRailOpen((o) => !o)}
+            width={isMobile ? Math.min(360, typeof window !== "undefined" ? window.innerWidth - 48 : 360) : 360}
             header={
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "var(--tideline)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -446,6 +494,8 @@ function TopChrome({
   onSyncNow,
   onPushAll,
   busy,
+  isMobile,
+  onOpenRail,
 }: {
   propertyName: string;
   onPrev: () => void;
@@ -460,6 +510,8 @@ function TopChrome({
   onSyncNow: () => void;
   onPushAll: () => void;
   busy: string | null;
+  isMobile: boolean;
+  onOpenRail: () => void;
 }) {
   return (
     <div
@@ -470,130 +522,195 @@ function TopChrome({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 24px",
+        padding: isMobile ? "0 12px" : "0 24px",
         background: "#fff",
         position: "relative",
+        gap: 8,
       }}
     >
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 500,
-          color: "var(--tideline)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          letterSpacing: "-0.005em",
-        }}
-      >
-        <span style={{ color: "var(--coastal)", fontWeight: 600 }}>Koast</span>
-        <span style={{ color: "#C8C4BC" }}>›</span>
-        <span>Properties</span>
-        <span style={{ color: "#C8C4BC" }}>›</span>
-        <span style={{ color: "var(--coastal)", fontWeight: 600 }}>{propertyName}</span>
-        <span style={{ color: "#C8C4BC" }}>›</span>
-        <span>Calendar</span>
-      </div>
+      {!isMobile && (
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--tideline)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            letterSpacing: "-0.005em",
+            minWidth: 0,
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ color: "var(--coastal)", fontWeight: 600 }}>Koast</span>
+          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span>Properties</span>
+          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--coastal)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{propertyName}</span>
+          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span>Calendar</span>
+        </div>
+      )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {isMobile && (
+        <div style={{ position: "relative", minWidth: 0, flex: 1 }}>
           <button
-            onClick={onPrev}
-            aria-label="Previous month"
-            style={iconBtnStyle}
+            type="button"
+            onClick={onMenuToggle}
+            aria-label="Switch property"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "transparent",
+              border: "none",
+              padding: "0 4px",
+              color: "var(--coastal)",
+              fontSize: 15,
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
+              cursor: "pointer",
+              width: "100%",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+            }}
           >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{propertyName}</span>
+            <ArrowLeftRight size={14} color="var(--tideline)" style={{ flexShrink: 0 }} />
+          </button>
+          {menuOpen && (
+            <PropertyMenu properties={properties} activeId={activeId} onPick={onPropertyPick} />
+          )}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 4 : 10, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 2 : 6 }}>
+          <button onClick={onPrev} aria-label="Previous month" style={iconBtnStyle}>
             <ChevronLeft size={16} />
           </button>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--coastal)", minWidth: 120, textAlign: "center", letterSpacing: "-0.005em" }}>
-            {label}
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--coastal)",
+              minWidth: isMobile ? 68 : 120,
+              textAlign: "center",
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {isMobile ? label.split(" ")[0] : label}
           </div>
           <button onClick={onNext} aria-label="Next month" style={iconBtnStyle}>
             <ChevronRight size={16} />
           </button>
-          <button onClick={onToday} style={{ ...iconBtnStyle, width: "auto", padding: "0 12px", fontSize: 12, fontWeight: 600, color: "var(--coastal)" }}>
-            Today
-          </button>
-        </div>
-
-        <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />
-
-        <div style={{ position: "relative" }}>
-          <KoastButton
-            size="sm"
-            variant="secondary"
-            iconLeft={<ArrowLeftRight size={14} />}
-            onClick={onMenuToggle}
-          >
-            Switch
-          </KoastButton>
-          {menuOpen && (
-            <div
-              style={{
-                position: "absolute",
-                top: 40,
-                right: 0,
-                background: "#fff",
-                border: "1px solid #E5E2DC",
-                borderRadius: 12,
-                padding: 6,
-                minWidth: 240,
-                zIndex: 20,
-                boxShadow: "0 8px 24px rgba(19,46,32,0.12)",
-              }}
+          {!isMobile && (
+            <button
+              onClick={onToday}
+              style={{ ...iconBtnStyle, width: "auto", padding: "0 12px", fontSize: 12, fontWeight: 600, color: "var(--coastal)" }}
             >
-              {properties.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => onPropertyPick(p.id)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: p.id === activeId ? "#FAFAF7" : "transparent",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: p.id === activeId ? 600 : 500,
-                    color: "var(--coastal)",
-                    textAlign: "left",
-                    letterSpacing: "-0.005em",
-                  }}
-                >
-                  {p.cover_photo_url && (
-                    <div style={{ width: 28, height: 28, borderRadius: 6, overflow: "hidden", position: "relative", flexShrink: 0 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.cover_photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                  )}
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                </button>
-              ))}
-            </div>
+              Today
+            </button>
           )}
         </div>
 
-        <KoastButton
-          size="sm"
-          variant="ghost"
-          iconLeft={<RefreshCw size={14} />}
-          onClick={onSyncNow}
-          loading={busy === "sync"}
-        >
-          Sync
-        </KoastButton>
-        <KoastButton
-          size="sm"
-          variant="primary"
-          iconLeft={<Upload size={14} />}
-          onClick={onPushAll}
-          loading={busy === "push"}
-        >
-          Push to channels
-        </KoastButton>
+        {!isMobile && <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />}
+
+        {!isMobile && (
+          <div style={{ position: "relative" }}>
+            <KoastButton size="sm" variant="secondary" iconLeft={<ArrowLeftRight size={14} />} onClick={onMenuToggle}>
+              Switch
+            </KoastButton>
+            {menuOpen && (
+              <PropertyMenu properties={properties} activeId={activeId} onPick={onPropertyPick} />
+            )}
+          </div>
+        )}
+
+        {isMobile ? (
+          <>
+            <button onClick={onSyncNow} aria-label="Sync now" style={iconBtnStyle} disabled={busy === "sync"}>
+              <RefreshCw size={16} />
+            </button>
+            <button onClick={onPushAll} aria-label="Push to channels" style={{ ...iconBtnStyle, color: "var(--coastal)" }} disabled={busy === "push"}>
+              <Upload size={16} />
+            </button>
+            <button onClick={onOpenRail} aria-label="Open details" style={iconBtnStyle}>
+              <CalendarIcon size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <KoastButton size="sm" variant="ghost" iconLeft={<RefreshCw size={14} />} onClick={onSyncNow} loading={busy === "sync"}>
+              Sync
+            </KoastButton>
+            <KoastButton size="sm" variant="primary" iconLeft={<Upload size={14} />} onClick={onPushAll} loading={busy === "push"}>
+              Push to channels
+            </KoastButton>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function PropertyMenu({
+  properties,
+  activeId,
+  onPick,
+}: {
+  properties: Property[];
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 40,
+        left: 0,
+        right: 0,
+        background: "#fff",
+        border: "1px solid #E5E2DC",
+        borderRadius: 12,
+        padding: 6,
+        minWidth: 240,
+        maxWidth: 320,
+        zIndex: 20,
+        boxShadow: "0 8px 24px rgba(19,46,32,0.12)",
+      }}
+    >
+      {properties.map((p) => (
+        <button
+          key={p.id}
+          onClick={() => onPick(p.id)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "none",
+            background: p.id === activeId ? "#FAFAF7" : "transparent",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: p.id === activeId ? 600 : 500,
+            color: "var(--coastal)",
+            textAlign: "left",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {p.cover_photo_url && (
+            <div style={{ width: 28, height: 28, borderRadius: 6, overflow: "hidden", position: "relative", flexShrink: 0 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.cover_photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+          )}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -619,29 +736,33 @@ function PropertyHero({
   connectedPlatforms,
   performance,
   mounted,
+  isMobile,
 }: {
   property: Property | undefined;
   connectedPlatforms: PlatformKey[];
   performance: { applied_count: number; booked_count: number; dismissed_count: number; acceptance_rate: number | null } | null;
   mounted: boolean;
+  isMobile: boolean;
 }) {
   if (!property) return null;
   const accept = performance?.acceptance_rate;
   const lastSynced = mounted ? "just now" : "—";
+  const thumb = isMobile ? 64 : 132;
+  const title = isMobile ? 24 : 48;
   return (
     <div
       style={{
         display: "flex",
-        gap: 20,
-        padding: "24px",
+        gap: isMobile ? 12 : 20,
+        padding: isMobile ? "16px 12px" : "24px",
         alignItems: "center",
       }}
     >
       <div
         style={{
-          width: 132,
-          height: 132,
-          borderRadius: 16,
+          width: thumb,
+          height: thumb,
+          borderRadius: isMobile ? 12 : 16,
           overflow: "hidden",
           flexShrink: 0,
           background: "#F0ECE3",
@@ -652,10 +773,10 @@ function PropertyHero({
           <img src={property.cover_photo_url} alt={property.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: isMobile ? 6 : 10 }}>
         <div
           style={{
-            fontSize: 48,
+            fontSize: title,
             fontWeight: 700,
             color: "var(--coastal)",
             letterSpacing: "-0.02em",
@@ -716,6 +837,7 @@ function MonthBlock({
   selectedDate,
   onSelectDate,
   index,
+  isMobile,
 }: {
   year: number;
   month: number;
@@ -726,6 +848,7 @@ function MonthBlock({
   selectedDate: string;
   onSelectDate: (d: string) => void;
   index: number;
+  isMobile: boolean;
 }) {
   const segments = useMemo(() => computeBarSegments(bookings, weeks), [bookings, weeks]);
 
@@ -746,8 +869,16 @@ function MonthBlock({
   }, [weeks, bookings, rateByDate, recByDate]);
 
   return (
-    <section style={{ marginTop: index === 0 ? 0 : 32 }}>
-      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12 }}>
+    <section style={{ marginTop: index === 0 ? 0 : isMobile ? 20 : 32 }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: isMobile ? "center" : "flex-end",
+          justifyContent: "space-between",
+          marginBottom: isMobile ? 8 : 12,
+          gap: 8,
+        }}
+      >
         <div>
           <div
             style={{
@@ -762,7 +893,7 @@ function MonthBlock({
           </div>
           <h2
             style={{
-              fontSize: 32,
+              fontSize: isMobile ? 22 : 32,
               fontWeight: 600,
               color: "var(--coastal)",
               letterSpacing: "-0.02em",
@@ -773,12 +904,12 @@ function MonthBlock({
             {MONTH_NAMES[month]}
           </h2>
         </div>
-        <div style={{ display: "flex", gap: 20, alignItems: "baseline" }}>
-          <StatInline label="Occupancy" value={`${stats.occ}%`} />
-          <StatInline label="Revenue" value={`$${stats.revenue.toLocaleString()}`} />
+        <div style={{ display: "flex", gap: isMobile ? 10 : 20, alignItems: "baseline" }}>
+          {!isMobile && <StatInline label="Occupancy" value={`${stats.occ}%`} />}
+          {!isMobile && <StatInline label="Revenue" value={`$${stats.revenue.toLocaleString()}`} />}
           <StatInline
-            label="Act now"
-            value={String(stats.actNow)}
+            label={isMobile ? "Act now" : "Act now"}
+            value={isMobile ? `${stats.actNow} · ${stats.occ}%` : String(stats.actNow)}
             emphasis={stats.actNow > 0}
           />
         </div>
@@ -787,20 +918,21 @@ function MonthBlock({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(7, minmax(${CELL_MIN_WIDTH}px, 1fr))`,
+          gridTemplateColumns: `repeat(7, minmax(${isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP}px, 1fr))`,
           borderBottom: "1px solid #E5E2DC",
-          paddingBottom: 8,
-          marginBottom: 8,
+          paddingBottom: isMobile ? 4 : 8,
+          marginBottom: isMobile ? 4 : 8,
+          textAlign: "center",
         }}
       >
-        {DAY_LABELS.map((d) => (
+        {(isMobile ? DAY_LABELS_SHORT : DAY_LABELS).map((d, i) => (
           <div
-            key={d}
+            key={`${d}-${i}`}
             style={{
               fontSize: 11,
               fontWeight: 600,
               color: "var(--tideline)",
-              letterSpacing: "0.1em",
+              letterSpacing: isMobile ? "0" : "0.1em",
             }}
           >
             {d}
@@ -820,6 +952,7 @@ function MonthBlock({
               recByDate={recByDate}
               selectedDate={selectedDate}
               onSelectDate={onSelectDate}
+              isMobile={isMobile}
             />
           );
         })}
@@ -864,6 +997,7 @@ function WeekRow({
   recByDate,
   selectedDate,
   onSelectDate,
+  isMobile,
 }: {
   week: WeekGrid;
   rowSegments: BarSegment[];
@@ -871,13 +1005,18 @@ function WeekRow({
   recByDate: Map<string, PricingRecommendation>;
   selectedDate: string;
   onSelectDate: (d: string) => void;
+  isMobile: boolean;
 }) {
+  const cellMinHeight = isMobile ? CELL_MIN_HEIGHT_MOBILE : CELL_MIN_HEIGHT_DESKTOP;
+  const cellMinWidth = isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP;
+  const barTop = isMobile ? 28 : 40;
+  const barHeight = isMobile ? 28 : 48;
   return (
     <div style={{ position: "relative" }}>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(7, minmax(${CELL_MIN_WIDTH}px, 1fr))`,
+          gridTemplateColumns: `repeat(7, minmax(${cellMinWidth}px, 1fr))`,
         }}
       >
         {week.days.map((d) => {
@@ -890,9 +1029,13 @@ function WeekRow({
               selected={selected}
               onClick={() => onSelectDate(d.date)}
               ariaLabel={`Select ${d.date}`}
-              style={{ minHeight: CELL_MIN_HEIGHT, padding: "10px 12px", opacity: d.inMonth ? 1 : 0.35 }}
+              style={{
+                minHeight: cellMinHeight,
+                padding: isMobile ? "4px 4px" : "10px 12px",
+                opacity: d.inMonth ? 1 : 0.35,
+              }}
             >
-              <DayCellContents day={d} rate={rate} rec={rec} />
+              <DayCellContents day={d} rate={rate} rec={rec} isMobile={isMobile} />
             </KoastSelectedCell>
           );
         })}
@@ -909,10 +1052,10 @@ function WeekRow({
               key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}`}
               style={{
                 position: "absolute",
-                left: `calc(${leftPct}% + 4px)`,
-                width: `calc(${widthPct}% - 8px)`,
-                top: 40,
-                height: 48,
+                left: `calc(${leftPct}% + 2px)`,
+                width: `calc(${widthPct}% - 4px)`,
+                top: barTop,
+                height: barHeight,
                 pointerEvents: "auto",
               }}
             >
@@ -922,6 +1065,7 @@ function WeekRow({
                 checkIn={s.booking.check_in}
                 checkOut={s.booking.check_out}
                 position={s.position}
+                style={{ height: barHeight, fontSize: isMobile ? 11 : 13, padding: isMobile ? "0 8px" : undefined }}
               />
             </div>
           );
@@ -935,27 +1079,29 @@ function DayCellContents({
   day,
   rate,
   rec,
+  isMobile,
 }: {
   day: { date: string; dayNum: number; inMonth: boolean; isToday: boolean; isPast: boolean };
   rate: Rate | undefined;
   rec: PricingRecommendation | undefined;
+  isMobile: boolean;
 }) {
   const showRate = rate && rate.is_available !== false;
   const rateValue = rate?.applied_rate ?? rate?.suggested_rate ?? rate?.base_rate ?? null;
   const closed = rate && rate.is_available === false;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 6,
+          gap: 4,
         }}
       >
         <span
           style={{
-            fontSize: 14,
+            fontSize: isMobile ? 12 : 14,
             fontWeight: day.isToday ? 700 : 500,
             color: day.isToday ? "var(--coastal)" : day.inMonth ? "var(--coastal)" : "var(--tideline)",
             letterSpacing: "-0.005em",
@@ -967,8 +1113,8 @@ function DayCellContents({
           <span
             title={rec.reason_text ?? "Act now"}
             style={{
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               borderRadius: 999,
               background: "var(--coral-reef)",
               flexShrink: 0,
@@ -976,11 +1122,11 @@ function DayCellContents({
           />
         )}
       </div>
-      {closed ? (
+      {!isMobile && (closed ? (
         <KoastRate variant="struck" value={rateValue} />
       ) : showRate ? (
         <KoastRate variant="quiet" value={rateValue} />
-      ) : null}
+      ) : null)}
     </div>
   );
 }
