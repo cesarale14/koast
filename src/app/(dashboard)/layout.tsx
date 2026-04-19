@@ -393,7 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 // hero + max-w content). Skip the wrapper padding.
                 <div className="page-enter">{children}</div>
               ) : (
-                <div className="max-w-[1200px] mx-auto p-4 md:p-8 page-enter">{children}</div>
+                <div className="p-4 md:p-8 page-enter">{children}</div>
               )}
             </ToastProvider>
           </main>

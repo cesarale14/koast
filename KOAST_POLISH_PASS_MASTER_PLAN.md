@@ -579,6 +579,30 @@ of deployed Session 1 build:
     The Session 2.8 PropertyDetail tab strip predates this primitive
     and will migrate to it on its next touch.
 
+### After Session 3.5 (Dashboard width + copy fixes)
+
+19. The (dashboard) route layout shell must NOT cap width. Each page
+    in the group sets its own `max-w-[1760px]` (or narrower for
+    narrative surfaces) container. The legacy `max-w-[1200px] mx-auto`
+    wrapper was removed in Session 3.5 because it silently squashed
+    every polish-pass page. The shell still applies consistent padding
+    (`p-4 md:p-8`) and the `page-enter` animation hook.
+
+20. Metric strips use explicit responsive column counts, not
+    `auto-fit`. `auto-fit`/`auto-fill` with `minmax()` is convenient
+    but produces unreliable counts at in-between breakpoints — three
+    cards can unexpectedly become a 3-column/1-column hybrid.
+    Prefer `grid-cols-1 md:grid-cols-2 xl:grid-cols-4` (or explicit
+    `repeat(N, 1fr)` with matching media queries) so the count is
+    deterministic at each breakpoint.
+
+21. Action/task card copy follows the urgency + domain eyebrow,
+    sentence-case title, action-verb CTA pattern. ALL CAPS is
+    reserved for eyebrows only. When server-side copy is still
+    shouty, the client-side `formatAction` helper reshapes at the
+    render boundary; the proper long-term fix is to emit polished
+    copy server-side in the command-center endpoint.
+
 ---
 
 ## Out of scope for polish pass

@@ -93,6 +93,7 @@ interface PortfolioSummary {
   totalDelta: number;
   totalActNow: number;
   totalComingUp: number;
+  totalPending: number;
   loading: boolean;
 }
 
@@ -165,13 +166,14 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
     totalDelta: 0,
     totalActNow: 0,
     totalComingUp: 0,
+    totalPending: 0,
     loading: true,
   });
 
   useEffect(() => {
     let alive = true;
     if (propertyIds.length === 0) {
-      setSummary({ byProperty: new Map(), totalDelta: 0, totalActNow: 0, totalComingUp: 0, loading: false });
+      setSummary({ byProperty: new Map(), totalDelta: 0, totalActNow: 0, totalComingUp: 0, totalPending: 0, loading: false });
       return () => {
         alive = false;
       };
@@ -194,6 +196,7 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
       let totalDelta = 0;
       let totalActNow = 0;
       let totalComingUp = 0;
+      let totalPending = 0;
       for (const { pid, recs } of results) {
         const agg = { property_id: pid, totalDelta: 0, actNowCount: 0, comingUpCount: 0, pendingCount: recs.length };
         for (const r of recs) {
@@ -207,8 +210,9 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
         totalDelta += agg.totalDelta;
         totalActNow += agg.actNowCount;
         totalComingUp += agg.comingUpCount;
+        totalPending += agg.pendingCount;
       }
-      setSummary({ byProperty, totalDelta, totalActNow, totalComingUp, loading: false });
+      setSummary({ byProperty, totalDelta, totalActNow, totalComingUp, totalPending, loading: false });
     });
     return () => {
       alive = false;
@@ -412,13 +416,13 @@ function PortfolioHero({
       isPercent: false,
     },
     {
-      eyebrow: "Pending actions",
-      value: portfolio.totalActNow + portfolio.totalComingUp,
+      eyebrow: "Act now",
+      value: portfolio.totalActNow,
       deltaPct: null,
       deltaSuffix: null,
       isPercent: false,
       isCount: true,
-      badge: portfolio.totalActNow > 0 ? `${portfolio.totalActNow} act now` : null,
+      sub: `of ${portfolio.totalPending.toLocaleString()} total pending`,
     },
   ];
   return (
@@ -443,13 +447,7 @@ function PortfolioHero({
           ariaLabel="Time range"
         />
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 16,
-        }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {metrics.map((m) => (
           <MetricCard key={m.eyebrow} {...m} />
         ))}
@@ -465,28 +463,25 @@ interface MetricCardProps {
   deltaSuffix: string | null;
   isPercent: boolean;
   isCount?: boolean;
-  badge?: string | null;
+  sub?: string | null;
 }
 
-function MetricCard({ eyebrow, value, deltaPct, deltaSuffix, isPercent, isCount, badge }: MetricCardProps) {
+function MetricCard({ eyebrow, value, deltaPct, deltaSuffix, isPercent, isCount, sub }: MetricCardProps) {
   const display = isCount ? value.toLocaleString() : isPercent ? `${Math.round(value)}%` : null;
   return (
     <KoastCard variant="elevated">
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--tideline)",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-            }}
-          >
-            {eyebrow}
-          </span>
-          {badge && <KoastChip variant="danger">{badge}</KoastChip>}
-        </div>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "var(--tideline)",
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+          }}
+        >
+          {eyebrow}
+        </span>
         {display != null ? (
           <span
             style={{
@@ -502,6 +497,9 @@ function MetricCard({ eyebrow, value, deltaPct, deltaSuffix, isPercent, isCount,
           </span>
         ) : (
           <KoastRate value={value} variant="hero" style={{ fontSize: 48 }} />
+        )}
+        {sub && (
+          <span style={{ fontSize: 13, color: "var(--tideline)", letterSpacing: "-0.005em" }}>{sub}</span>
         )}
         {deltaPct !== null && (
           <span
@@ -563,19 +561,24 @@ function PropertyGrid({
       </span>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
+          display: "flex",
+          flexWrap: "wrap",
           gap: 20,
+          justifyContent: "center",
         }}
       >
         {cards.map((card, i) => (
-          <PropertyCardTile
+          <div
             key={card.id}
-            card={card}
-            actNowCount={portfolio.byProperty.get(card.id)?.actNowCount ?? 0}
-            onOpen={() => onOpen(card.id)}
-            stagger={i}
-          />
+            style={{ flex: "1 1 400px", maxWidth: 560, minWidth: 0 }}
+          >
+            <PropertyCardTile
+              card={card}
+              actNowCount={portfolio.byProperty.get(card.id)?.actNowCount ?? 0}
+              onOpen={() => onOpen(card.id)}
+              stagger={i}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -914,9 +917,10 @@ function ActionCard({ action }: { action: ActionItem }) {
   const chipVariant: "danger" | "warning" | "neutral" =
     action.urgency >= 80 ? "danger" : action.urgency >= 40 ? "warning" : "neutral";
   const Icon = iconForAction(action.type);
+  const { eyebrow, title, detail } = formatAction(action);
   return (
     <KoastCard variant="elevated">
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <span
           aria-hidden
           style={{
@@ -933,37 +937,50 @@ function ActionCard({ action }: { action: ActionItem }) {
         >
           <Icon size={16} />
         </span>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           <span
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "var(--tideline)",
+              color: chipVariant === "danger" ? "var(--coral-reef)" : "var(--tideline)",
               letterSpacing: "0.12em",
               textTransform: "uppercase",
             }}
           >
-            {action.title}
+            {eyebrow}
           </span>
           <span
             style={{
-              fontSize: 13,
+              fontSize: 14,
+              fontWeight: 600,
               color: "var(--coastal)",
-              lineHeight: 1.4,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
+              letterSpacing: "-0.005em",
+              lineHeight: 1.35,
             }}
           >
-            {action.description}
+            {title}
           </span>
+          {detail && (
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--tideline)",
+                lineHeight: 1.4,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {detail}
+            </span>
+          )}
         </div>
         {action.action && (
-          <Link href={action.action.href}>
-            <KoastButton variant="ghost" size="sm">
-              {action.action.label}
+          <Link href={action.action.href} style={{ flexShrink: 0, marginLeft: 8 }}>
+            <KoastButton variant="ghost" size="sm" iconRight={<ArrowRight size={14} />}>
+              {formatCtaLabel(action.action.label)}
             </KoastButton>
           </Link>
         )}
@@ -977,4 +994,41 @@ function iconForAction(type: string) {
   if (type.includes("check") || type.includes("booking")) return CalendarIcon;
   if (type.includes("message") || type.includes("guest")) return MessageSquare;
   return CheckCircle;
+}
+
+// Reshape the server-provided action into the urgency+domain eyebrow,
+// sentence-case title, detail pattern (per master plan spec correction
+// 21). The command-center endpoint still emits shouty titles; polish
+// happens at the render layer until the server is updated.
+function formatAction(action: ActionItem): { eyebrow: string; title: string; detail: string } {
+  const urgency = action.urgency >= 80 ? "Urgent" : action.urgency >= 40 ? "Today" : null;
+  const domain = domainFor(action.type);
+  const eyebrow = [urgency, domain].filter(Boolean).join(" · ") || "Task";
+  const title = toSentenceCase(action.title);
+  const detail = action.description ?? "";
+  return { eyebrow, title, detail };
+}
+
+function domainFor(type: string): string {
+  if (type.includes("clean") || type.includes("turnover")) return "Cleaning";
+  if (type.includes("pric")) return "Pricing";
+  if (type.includes("check") || type.includes("booking")) return "Bookings";
+  if (type.includes("message") || type.includes("guest")) return "Guests";
+  if (type.includes("channel") || type.includes("sync")) return "Channels";
+  return "Operations";
+}
+
+function toSentenceCase(raw: string): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  const isAllCaps = trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed);
+  if (!isAllCaps) return trimmed;
+  const lowered = trimmed.toLowerCase();
+  return lowered.charAt(0).toUpperCase() + lowered.slice(1);
+}
+
+function formatCtaLabel(raw: string): string {
+  if (!raw) return "View";
+  // "View" fallback for terse server labels; keep longer labels intact.
+  return raw.length > 20 ? "Open" : raw;
 }
