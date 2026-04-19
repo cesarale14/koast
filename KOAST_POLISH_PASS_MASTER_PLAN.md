@@ -666,6 +666,27 @@ of deployed Session 1 build:
     surface stays on Plus Jakarta Sans — do not mix faces on the
     same surface outside of this carve-out.
 
+### After Session 3.9 (handwritten greeting animation)
+
+27. Handwritten greeting animates on first browser-session visit
+    only. Session gate: `sessionStorage["koast:greeting-animated"]`.
+    `prefers-reduced-motion: reduce` bypasses the animation entirely
+    and renders the final state immediately. Source component
+    `src/components/polish/HandwrittenGreeting.tsx` ports the Claude
+    Design handoff reference at `koast-design-system/project/ui_kits/
+    app/components/HandwrittenGreeting.jsx`. The handoff SVG (stroke-
+    based) is archived under `src/components/polish/assets/greeting/`
+    for future session use; the shipped component uses live Fraunces
+    text with expressive axes + clip-path reveal instead, which is
+    what the reference component renders.
+
+28. Fraunces is loaded with its expressive variable-font axes
+    (`opsz`, `SOFT`, `WONK`) via `next/font/google`'s `axes` option.
+    The handwritten greeting uses `font-variation-settings: "opsz"
+    144, "SOFT" 100, "WONK" 1` to get the loose pen-like cadence at
+    large sizes. Other Fraunces consumers (Pricing-intelligence
+    title) use the default axes and stay crisp.
+
 ---
 
 ## Out of scope for polish pass

@@ -27,6 +27,7 @@ import {
 import KoastSegmentedControl from "./KoastSegmentedControl";
 import KoastEmptyState from "./KoastEmptyState";
 import StatusDot from "./StatusDot";
+import HandwrittenGreeting from "./HandwrittenGreeting";
 
 // ---------------- Types ----------------
 
@@ -106,11 +107,14 @@ function decodeImageUrl(url: string | null | undefined): string {
     .replace(/&#39;/g, "'");
 }
 
-function timeOfDayGreeting(): string {
+function timeOfDayKey(): "morning" | "afternoon" | "evening" {
+  // Mirrors the handoff's windows: morning 4am–12pm, afternoon
+  // 12pm–6pm, evening 6pm–4am. Client-side so we respect the host's
+  // local timezone (the server runs UTC).
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h >= 4 && h < 12) return "morning";
+  if (h >= 12 && h < 18) return "afternoon";
+  return "evening";
 }
 
 // Mock a 7-point series from current + prior values. Linear
@@ -320,24 +324,29 @@ function GreetingBlock({
   const first = (user?.split(" ")[0] ?? "").trim() || "host";
   const alert = criticalAlerts[0] ?? null;
   const tone = SYNC_DOT_TONE[summary.syncStatus];
+  const tod = timeOfDayKey();
   return (
     <section>
-      <h1
-        style={{
-          fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
-          fontWeight: 400,
-          fontSize: vp.isMobile ? 28 : 44,
-          letterSpacing: "-0.025em",
-          color: "var(--coastal)",
-          lineHeight: 1.2,
-          margin: 0,
-        }}
-      >
-        {timeOfDayGreeting()}, {first}.{" "}
-        <em style={{ fontStyle: "italic", color: "var(--tideline)", fontWeight: 400 }}>
-          {greetingStatus}
-        </em>
-      </h1>
+      {vp.isMobile ? (
+        <h1
+          style={{
+            fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
+            fontWeight: 400,
+            fontSize: 28,
+            letterSpacing: "-0.025em",
+            color: "var(--coastal)",
+            lineHeight: 1.2,
+            margin: 0,
+          }}
+        >
+          {tod === "morning" ? "Good morning" : tod === "afternoon" ? "Good afternoon" : "Good evening"}, {first}.{" "}
+          <em style={{ fontStyle: "italic", color: "var(--tideline)", fontWeight: 400 }}>
+            {greetingStatus}
+          </em>
+        </h1>
+      ) : (
+        <HandwrittenGreeting timeOfDay={tod} name={first} status={greetingStatus} />
+      )}
       <div
         style={{
           marginTop: 12,
