@@ -603,6 +603,18 @@ of deployed Session 1 build:
     render boundary; the proper long-term fix is to emit polished
     copy server-side in the command-center endpoint.
 
+### After Session 3.6 (null-safe opportunity aggregation)
+
+22. Null-delta recommendations must be filtered out of aggregations
+    rather than summed as zero. Portfolio aggregators track
+    `measurableCount` / `unmeasurableCount` separately and expose
+    a positive-only `upside` sum. When a dominant fraction of recs
+    lack measurable deltas (`current_rate=null`), surface an
+    honest "N pending measurement" subtitle/chip instead of a
+    misleading $0 hero. Proper long-term fix is to backfill
+    `current_rate` at the data layer (booking_sync / rate history)
+    so recs become measurable — tracked as a separate concern.
+
 ---
 
 ## Out of scope for polish pass

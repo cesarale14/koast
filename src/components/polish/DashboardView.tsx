@@ -88,9 +88,21 @@ interface PendingRec {
 }
 
 // Client-side portfolio pricing summary, keyed by property.
+interface PortfolioAgg {
+  property_id: string;
+  totalDelta: number;          // signed sum, measurable recs only
+  upside: number;               // sum of positive deltas (opportunity)
+  measurableCount: number;      // recs with both current_rate + suggested_rate
+  unmeasurableCount: number;    // recs where current_rate is null (no baseline)
+  actNowCount: number;
+  comingUpCount: number;
+  pendingCount: number;
+}
 interface PortfolioSummary {
-  byProperty: Map<string, { property_id: string; totalDelta: number; actNowCount: number; comingUpCount: number; pendingCount: number }>;
+  byProperty: Map<string, PortfolioAgg>;
   totalDelta: number;
+  totalUpside: number;
+  totalUnmeasurable: number;
   totalActNow: number;
   totalComingUp: number;
   totalPending: number;
@@ -164,6 +176,8 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
   const [summary, setSummary] = useState<PortfolioSummary>({
     byProperty: new Map(),
     totalDelta: 0,
+    totalUpside: 0,
+    totalUnmeasurable: 0,
     totalActNow: 0,
     totalComingUp: 0,
     totalPending: 0,
@@ -173,7 +187,16 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
   useEffect(() => {
     let alive = true;
     if (propertyIds.length === 0) {
-      setSummary({ byProperty: new Map(), totalDelta: 0, totalActNow: 0, totalComingUp: 0, totalPending: 0, loading: false });
+      setSummary({
+        byProperty: new Map(),
+        totalDelta: 0,
+        totalUpside: 0,
+        totalUnmeasurable: 0,
+        totalActNow: 0,
+        totalComingUp: 0,
+        totalPending: 0,
+        loading: false,
+      });
       return () => {
         alive = false;
       };
@@ -192,27 +215,55 @@ function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
       })
     ).then((results) => {
       if (!alive) return;
-      const byProperty = new Map<string, { property_id: string; totalDelta: number; actNowCount: number; comingUpCount: number; pendingCount: number }>();
+      const byProperty = new Map<string, PortfolioAgg>();
       let totalDelta = 0;
+      let totalUpside = 0;
+      let totalUnmeasurable = 0;
       let totalActNow = 0;
       let totalComingUp = 0;
       let totalPending = 0;
       for (const { pid, recs } of results) {
-        const agg = { property_id: pid, totalDelta: 0, actNowCount: 0, comingUpCount: 0, pendingCount: recs.length };
+        const agg: PortfolioAgg = {
+          property_id: pid,
+          totalDelta: 0,
+          upside: 0,
+          measurableCount: 0,
+          unmeasurableCount: 0,
+          actNowCount: 0,
+          comingUpCount: 0,
+          pendingCount: recs.length,
+        };
         for (const r of recs) {
-          if (r.current_rate != null && r.suggested_rate != null) {
-            agg.totalDelta += r.suggested_rate - r.current_rate;
+          const measurable = r.current_rate != null && r.suggested_rate != null;
+          if (measurable) {
+            const delta = (r.suggested_rate as number) - (r.current_rate as number);
+            agg.totalDelta += delta;
+            if (delta > 0) agg.upside += delta;
+            agg.measurableCount++;
+          } else {
+            agg.unmeasurableCount++;
           }
           if (r.urgency === "act_now") agg.actNowCount++;
           if (r.urgency === "coming_up") agg.comingUpCount++;
         }
         byProperty.set(pid, agg);
         totalDelta += agg.totalDelta;
+        totalUpside += agg.upside;
+        totalUnmeasurable += agg.unmeasurableCount;
         totalActNow += agg.actNowCount;
         totalComingUp += agg.comingUpCount;
         totalPending += agg.pendingCount;
       }
-      setSummary({ byProperty, totalDelta, totalActNow, totalComingUp, totalPending, loading: false });
+      setSummary({
+        byProperty,
+        totalDelta,
+        totalUpside,
+        totalUnmeasurable,
+        totalActNow,
+        totalComingUp,
+        totalPending,
+        loading: false,
+      });
     });
     return () => {
       alive = false;
@@ -564,7 +615,7 @@ function PropertyGrid({
           display: "flex",
           flexWrap: "wrap",
           gap: 20,
-          justifyContent: "center",
+          justifyContent: cards.length < 4 ? "center" : "flex-start",
         }}
       >
         {cards.map((card, i) => (
@@ -749,11 +800,17 @@ function PricingOpportunities({
       ...agg,
       name: propertyCards.find((p) => p.id === agg.property_id)?.name ?? "Property",
     }))
-    .filter((agg) => agg.totalDelta > 0 || agg.actNowCount > 0)
-    .sort((a, b) => b.totalDelta - a.totalDelta)
+    .filter((agg) => agg.upside > 0 || agg.actNowCount > 0)
+    .sort((a, b) => b.upside - a.upside)
     .slice(0, 3);
 
-  const totalDelta = Math.max(0, portfolio.totalDelta);
+  // Upside (positive-delta sum) is the honest "capture X more" hero.
+  // If the aggregator couldn't measure enough recs, we surface an
+  // explicit "pending measurement" note instead of a misleading $0.
+  const totalUpside = portfolio.totalUpside;
+  const totalUnmeasurable = portfolio.totalUnmeasurable;
+  const showUnmeasurableNote = totalUpside <= 0 && totalUnmeasurable > 0;
+  const upsidePropertyCount = topByOpp.filter((r) => r.upside > 0).length;
   const topPropertyId = topByOpp[0]?.property_id ?? propertyCards[0]?.id;
   const reviewHref = topPropertyId ? `/properties/${topPropertyId}?tab=pricing` : "/properties";
 
@@ -795,16 +852,31 @@ function PricingOpportunities({
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 20, fontWeight: 500, color: "var(--shore)", letterSpacing: "-0.005em" }}>
-              You could capture
-            </span>
-            <KoastRate tone="dark" variant="hero" style={{ fontSize: 64 }} value={totalDelta} />
-            <span style={{ fontSize: 20, fontWeight: 500, color: "rgba(247,243,236,0.78)", letterSpacing: "-0.005em" }}>
-              across {topByOpp.length} propert{topByOpp.length === 1 ? "y" : "ies"}
-            </span>
+            {showUnmeasurableNote ? (
+              <>
+                <span style={{ fontSize: 28, fontWeight: 600, color: "var(--shore)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                  {totalUnmeasurable.toLocaleString()} recs pending measurement
+                </span>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 20, fontWeight: 500, color: "var(--shore)", letterSpacing: "-0.005em" }}>
+                  You could capture
+                </span>
+                <KoastRate tone="dark" variant="hero" style={{ fontSize: 64 }} value={totalUpside} />
+                <span style={{ fontSize: 20, fontWeight: 500, color: "rgba(247,243,236,0.78)", letterSpacing: "-0.005em" }}>
+                  across {upsidePropertyCount} propert{upsidePropertyCount === 1 ? "y" : "ies"}
+                </span>
+              </>
+            )}
           </div>
-          <div style={{ fontSize: 13, color: "rgba(247,243,236,0.78)", lineHeight: 1.5 }}>
-            {portfolio.totalActNow} act-now + {portfolio.totalComingUp} coming-up recommendation{portfolio.totalComingUp === 1 ? "" : "s"} portfolio-wide.
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13, color: "rgba(247,243,236,0.78)", lineHeight: 1.5 }}>
+            <span>
+              {portfolio.totalActNow} act-now + {portfolio.totalComingUp} coming-up recommendation{portfolio.totalComingUp === 1 ? "" : "s"} portfolio-wide.
+            </span>
+            {totalUnmeasurable > 0 && !showUnmeasurableNote && (
+              <KoastChip variant="warning">{totalUnmeasurable.toLocaleString()} pending measurement</KoastChip>
+            )}
           </div>
           <div>
             <Link href={reviewHref}>
@@ -835,34 +907,44 @@ function PricingOpportunities({
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {topByOpp.map((row) => (
-                <Link
-                  key={row.property_id}
-                  href={`/properties/${row.property_id}?tab=pricing`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 0",
-                    borderBottom: "1px solid rgba(229,226,220,0.6)",
-                    gap: 12,
-                    color: "inherit",
-                    textDecoration: "none",
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--coastal)", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.name}
-                  </span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                    <KoastRate
-                      variant="inline"
-                      value={row.totalDelta}
-                      delta={row.totalDelta}
-                    />
-                    <ArrowRight size={14} color="var(--tideline)" />
-                  </span>
-                </Link>
-              ))}
+              {topByOpp.map((row) => {
+                const measurable = row.upside > 0;
+                return (
+                  <Link
+                    key={row.property_id}
+                    href={`/properties/${row.property_id}?tab=pricing`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 0",
+                      borderBottom: "1px solid rgba(229,226,220,0.6)",
+                      gap: 12,
+                      color: "inherit",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--coastal)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {row.name}
+                      </span>
+                      {!measurable && row.unmeasurableCount > 0 && (
+                        <span style={{ fontSize: 11, color: "var(--tideline)" }}>
+                          {row.unmeasurableCount} rec{row.unmeasurableCount === 1 ? "" : "s"} pending measurement
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                      {measurable ? (
+                        <KoastRate variant="inline" value={row.upside} delta={row.upside} />
+                      ) : (
+                        <span style={{ fontSize: 13, color: "var(--tideline)" }}>—</span>
+                      )}
+                      <ArrowRight size={14} color="var(--tideline)" />
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
