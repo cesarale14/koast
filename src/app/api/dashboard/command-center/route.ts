@@ -707,6 +707,132 @@ export async function POST() {
 
     const totalBookingsThisMonth = thisMonthBookings.length;
 
+    // ====== Session 3.7 additions ======
+
+    // criticalAlerts: highest-impact issues the host must see above the
+    // fold. One alert at a time (multi-stack is future work).
+    interface Alert {
+      id: string;
+      type: "cleaning" | "sync" | "pricing" | "message";
+      subject: string;
+      message: string;
+      cta: { label: string; href: string };
+    }
+    const criticalAlerts: Alert[] = [];
+
+    const missingCleaning = cleaningTasks.find((t) => t.scheduled_date === today && !t.cleaner_id);
+    if (missingCleaning) {
+      const propName = propNameMap.get(missingCleaning.property_id) ?? "Property";
+      criticalAlerts.push({
+        id: `clean-${missingCleaning.id}`,
+        type: "cleaning",
+        subject: propName,
+        message: "needs a cleaner for today's checkout.",
+        cta: { label: "Assign cleaner", href: "/turnovers" },
+      });
+    } else if (syncStatus === "disconnected") {
+      criticalAlerts.push({
+        id: "sync-disconnected",
+        type: "sync",
+        subject: "A channel",
+        message: "is disconnected. Rates and availability may not sync.",
+        cta: { label: "Reconnect", href: "/channels" },
+      });
+    }
+
+    // Derive greetingStatus — the italic continuation after "Good X,".
+    let greetingStatus = "Your portfolio is steady.";
+    if (criticalAlerts.length > 0) greetingStatus = "Your portfolio needs attention.";
+    else if (revenueChangePct > 10) greetingStatus = "Your portfolio is performing.";
+    else if (revenueChangePct < -10) greetingStatus = "Something's shifting.";
+
+    // Enrich each propertyCard with primary/secondary status sentences
+    // so DashboardView doesn't have to rederive from the status enum.
+    const enrichedCards = propertyCards.map((c) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const card = c as any;
+      const name = card.name as string;
+      let primaryStatus = "";
+      let secondaryStatus = "";
+      const fmtShort = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      if (card.status === "occupied" && card.guestName && card.checkOut) {
+        primaryStatus = `**${card.guestName.split(" ")[0]} staying until ${fmtShort(card.checkOut)}**`;
+        secondaryStatus = card.nextCheckIn ? `Next booking ${fmtShort(card.nextCheckIn)}` : "No next booking scheduled";
+      } else if (card.status === "checkin_today" && card.guestName) {
+        primaryStatus = `**${card.guestName.split(" ")[0]} checks in today**`;
+        secondaryStatus = card.checkOut ? `Departs ${fmtShort(card.checkOut)}` : "";
+      } else if (card.status === "checkout_today") {
+        primaryStatus = `**Guest checks out today**`;
+        secondaryStatus = card.cleanerName ? `Cleaner: ${card.cleanerName}` : "Cleaner not assigned yet";
+      } else if (card.status === "turnover_today") {
+        primaryStatus = `**Turnover today**`;
+        secondaryStatus = card.cleanerName ? `${card.cleanerName} assigned` : "Cleaner not assigned yet";
+      } else {
+        primaryStatus = card.nextCheckIn
+          ? `**Vacant until ${fmtShort(card.nextCheckIn)}**`
+          : `**Vacant**`;
+        secondaryStatus = card.daysUntilBooked != null
+          ? `Next booking in ${card.daysUntilBooked} day${card.daysUntilBooked === 1 ? "" : "s"}`
+          : "No upcoming bookings";
+      }
+      return { ...card, name, primaryStatus, secondaryStatus };
+    });
+
+    // focusActions: the "Today's focus" right-column cards.
+    // Reuse the actions list but reshape to the new contract.
+    const focusActions = actions.slice(0, 4).map((a) => ({
+      id: a.id,
+      priority: a.urgency >= 80 ? "urgent" : a.urgency >= 40 ? "warn" : "normal",
+      title: a.title,
+      sub: a.description,
+      cta: a.action ?? { label: "View", href: "/" },
+    }));
+
+    // pulseMetrics: portfolio-level trends. Series is null for this
+    // session; DashboardView mocks a 7-point series from current +
+    // prior values client-side. Backfill the real series in a later
+    // session (flagged in CLAUDE.md Known Gaps).
+    const portfolioAdr = occupancyRate > 0 && thisMonthRevenue > 0
+      ? Math.round(thisMonthRevenue / Math.max(1, Math.round((occupancyRate / 100) * 30 * props.length)))
+      : 0;
+    const lastMonthAdr = occupancyRate > 0 && lastMonthRevenue > 0
+      ? Math.round(lastMonthRevenue / Math.max(1, Math.round((occupancyRate / 100) * 30 * props.length)))
+      : 0;
+    const pulseMetrics = [
+      {
+        label: "Revenue",
+        value: thisMonthRevenue,
+        valueDisplay: `$${thisMonthRevenue.toLocaleString()}`,
+        deltaDirection: revenueChangePct > 0 ? "up" : revenueChangePct < 0 ? "down" : "flat",
+        deltaText: `${revenueChangePct > 0 ? "+" : ""}${revenueChangePct}% vs prior`,
+        prior: lastMonthRevenue,
+      },
+      {
+        label: "Occupancy",
+        value: occupancyRate,
+        valueDisplay: `${Math.round(occupancyRate)}%`,
+        deltaDirection: "flat",
+        deltaText: "— no prior data",
+        prior: occupancyRate,
+      },
+      {
+        label: "ADR",
+        value: portfolioAdr,
+        valueDisplay: `$${portfolioAdr.toLocaleString()}`,
+        deltaDirection: portfolioAdr > lastMonthAdr ? "up" : portfolioAdr < lastMonthAdr ? "down" : "flat",
+        deltaText: lastMonthAdr > 0 ? `${portfolioAdr >= lastMonthAdr ? "+" : ""}${Math.round(((portfolioAdr - lastMonthAdr) / Math.max(1, lastMonthAdr)) * 100)}% vs prior` : "no prior data",
+        prior: lastMonthAdr,
+      },
+      {
+        label: "Bookings",
+        value: thisMonthBookings.length,
+        valueDisplay: `${thisMonthBookings.length}`,
+        deltaDirection: thisMonthBookings.length > lastMonthBookings.length ? "up" : thisMonthBookings.length < lastMonthBookings.length ? "down" : "flat",
+        deltaText: `${thisMonthBookings.length >= lastMonthBookings.length ? "+" : ""}${thisMonthBookings.length - lastMonthBookings.length} vs prior`,
+        prior: lastMonthBookings.length,
+      },
+    ];
+
     return NextResponse.json({
       user: { name: userName },
       summary: {
@@ -714,8 +840,12 @@ export async function POST() {
         bookingsThisMonth: totalBookingsThisMonth,
         syncStatus,
       },
-      propertyCards,
+      greetingStatus,
+      criticalAlerts,
+      propertyCards: enrichedCards,
       actions: actions.slice(0, 5),
+      focusActions,
+      pulseMetrics,
       events: eventPills,
       performance: {
         thisMonthRevenue,

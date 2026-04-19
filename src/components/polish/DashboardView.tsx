@@ -1,41 +1,34 @@
 "use client";
 
 /**
- * DashboardView — polish-pass rebuild of the home-route Dashboard.
+ * DashboardView — Session 3.7 rebuild against the "Quiet" design
+ * direction.
  *
- * Five stacked blocks:
- *   1. Greeting + status line
- *   2. Portfolio hero strip (4 metric cards + 7/30/90d toggle)
- *   3. Property card grid
- *   4. Pricing opportunities (dark card + top-3 by-property list)
- *   5. Today's operations (operational tasks)
+ * Five sections, restraint-first visual language:
+ *   1. Greeting + critical alert (conditional)
+ *   2. Your properties (3-col grid + ghost add-card)
+ *   3. Today's focus (dark pricing intel + action cards)
+ *   4. Portfolio pulse (hairline-only metric strip)
+ *   5. Footer
  *
- * Consumes the existing /api/dashboard/command-center endpoint + a
- * client-side aggregation of per-property pricing recommendations.
- * No API changes.
+ * Principles: flat containment, status via colored dots, single
+ * focal card (the dark pricing-intelligence moment), no competing
+ * shadows / gradients. See master plan Principles 8–10.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  Calendar as CalendarIcon,
-  Sparkles,
-  CheckCircle,
-  MessageSquare,
-  Home as HomeIcon,
+  Command as CommandIcon,
+  Plus,
 } from "lucide-react";
-import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
-import KoastButton from "./KoastButton";
-import KoastCard from "./KoastCard";
-import KoastChip from "./KoastChip";
-import KoastRate from "./KoastRate";
-import KoastEmptyState from "./KoastEmptyState";
 import KoastSegmentedControl from "./KoastSegmentedControl";
+import KoastEmptyState from "./KoastEmptyState";
+import StatusDot from "./StatusDot";
 
-// ---------------- Types mirroring command-center response ----------------
+// ---------------- Types ----------------
 
 interface PropertyMetrics {
   revenue: number;
@@ -50,6 +43,8 @@ interface PropertyCard {
   coverPhotoUrl: string | null;
   platforms?: string[];
   status: "occupied" | "vacant" | "turnover_today" | "checkin_today" | "checkout_today";
+  primaryStatus: string;
+  secondaryStatus: string;
   guestName?: string;
   checkIn?: string;
   checkOut?: string;
@@ -57,59 +52,49 @@ interface PropertyCard {
   daysUntilBooked?: number;
   metrics: PropertyMetrics;
 }
-interface ActionItem {
+interface Alert {
   id: string;
-  type: string;
+  type: "cleaning" | "sync" | "pricing" | "message";
+  subject: string;
+  message: string;
+  cta: { label: string; href: string };
+}
+interface FocusAction {
+  id: string;
+  priority: "urgent" | "warn" | "normal";
   title: string;
-  description: string;
-  action?: { label: string; href: string };
-  urgency: number;
+  sub: string;
+  cta: { label: string; href: string };
+}
+interface PulseMetric {
+  label: string;
+  value: number;
+  valueDisplay: string;
+  deltaDirection: "up" | "down" | "flat";
+  deltaText: string;
+  prior: number;
 }
 interface CommandCenterData {
   user: { name: string };
   summary: { propertyCount: number; bookingsThisMonth: number; syncStatus: "synced" | "syncing" | "disconnected" | "none" };
+  greetingStatus: string;
+  criticalAlerts: Alert[];
   propertyCards: PropertyCard[];
-  actions: ActionItem[];
-  performance: {
-    thisMonthRevenue: number;
-    lastMonthRevenue: number;
-    revenueChangePct: number;
-    occupancyRate: number;
-  };
+  focusActions: FocusAction[];
+  pulseMetrics: PulseMetric[];
+  performance: { thisMonthRevenue: number; revenueChangePct: number; occupancyRate: number };
 }
 
 interface PendingRec {
   id: string;
   property_id: string;
   date: string;
+  urgency: "act_now" | "coming_up" | "review" | null;
   current_rate: number | null;
   suggested_rate: number | null;
-  urgency: "act_now" | "coming_up" | "review" | null;
 }
 
-// Client-side portfolio pricing summary, keyed by property.
-interface PortfolioAgg {
-  property_id: string;
-  totalDelta: number;          // signed sum, measurable recs only
-  upside: number;               // sum of positive deltas (opportunity)
-  measurableCount: number;      // recs with both current_rate + suggested_rate
-  unmeasurableCount: number;    // recs where current_rate is null (no baseline)
-  actNowCount: number;
-  comingUpCount: number;
-  pendingCount: number;
-}
-interface PortfolioSummary {
-  byProperty: Map<string, PortfolioAgg>;
-  totalDelta: number;
-  totalUpside: number;
-  totalUnmeasurable: number;
-  totalActNow: number;
-  totalComingUp: number;
-  totalPending: number;
-  loading: boolean;
-}
-
-// ---------------- Utils ----------------
+// ---------------- Helpers ----------------
 
 function decodeImageUrl(url: string | null | undefined): string {
   if (!url) return "";
@@ -128,16 +113,53 @@ function timeOfDayGreeting(): string {
   return "Good evening";
 }
 
-function shortDate(s?: string): string {
-  if (!s) return "";
-  return new Date(s + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// Mock a 7-point series from current + prior values. Linear
+// interpolation with a hint of jitter so the sparkline doesn't look
+// like a straight line. Replace when a real time-series endpoint
+// lands (tracked in CLAUDE.md Known Gaps).
+function mockSeries(current: number, prior: number): number[] | null {
+  if (current === 0 && prior === 0) return null;
+  const pts = 7;
+  const out: number[] = [];
+  for (let i = 0; i < pts; i++) {
+    const t = i / (pts - 1);
+    const base = prior + (current - prior) * t;
+    const wobble = (Math.sin(i * 1.6) * Math.max(current, prior)) * 0.03;
+    out.push(Math.max(0, base + wobble));
+  }
+  return out;
 }
 
-const RANGE_OPTIONS = [
-  { value: "7", label: "7D" },
-  { value: "30", label: "30D" },
-  { value: "90", label: "90D" },
-];
+function renderWithBold(text: string): React.ReactNode {
+  // Lightweight **bold** Markdown handling — primaryStatus uses it.
+  if (!text) return null;
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**")) {
+      return <strong key={i} style={{ fontWeight: 600 }}>{p.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{p}</span>;
+  });
+}
+
+const SYNC_DOT_TONE: Record<CommandCenterData["summary"]["syncStatus"], "ok" | "warn" | "alert" | "muted"> = {
+  synced: "ok",
+  syncing: "warn",
+  disconnected: "alert",
+  none: "muted",
+};
+
+function syncLabel(status: CommandCenterData["summary"]["syncStatus"]): string {
+  if (status === "synced") return "All channels synced";
+  if (status === "syncing") return "Channels syncing";
+  if (status === "disconnected") return "A channel needs reconnection";
+  return "No channels connected";
+}
+
+function propertyStatusTone(status: PropertyCard["status"]): "ok" | "warn" | "alert" | "muted" {
+  if (status === "checkout_today" || status === "turnover_today") return "warn";
+  return "ok";
+}
 
 // ---------------- Hooks ----------------
 
@@ -145,18 +167,13 @@ function useCommandCenter() {
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/dashboard/command-center", { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      if (json.empty) {
-        setData(null);
-      } else {
-        setData(json);
-      }
+      setData(json.empty ? null : json);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -164,953 +181,845 @@ function useCommandCenter() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     void refetch();
   }, [refetch]);
-
   return { data, loading, error, refetch };
 }
 
-function usePortfolioPricing(propertyIds: string[]): PortfolioSummary {
-  const [summary, setSummary] = useState<PortfolioSummary>({
-    byProperty: new Map(),
-    totalDelta: 0,
-    totalUpside: 0,
-    totalUnmeasurable: 0,
-    totalActNow: 0,
-    totalComingUp: 0,
-    totalPending: 0,
-    loading: true,
-  });
-
+function usePendingPerProperty(propertyIds: string[]): Map<string, number> {
+  const [byId, setById] = useState<Map<string, number>>(new Map());
   useEffect(() => {
     let alive = true;
     if (propertyIds.length === 0) {
-      setSummary({
-        byProperty: new Map(),
-        totalDelta: 0,
-        totalUpside: 0,
-        totalUnmeasurable: 0,
-        totalActNow: 0,
-        totalComingUp: 0,
-        totalPending: 0,
-        loading: false,
-      });
+      setById(new Map());
       return () => {
         alive = false;
       };
     }
-    setSummary((s) => ({ ...s, loading: true }));
     Promise.all(
       propertyIds.map(async (pid) => {
         try {
           const res = await fetch(`/api/pricing/recommendations/${pid}?status=pending&limit=500`);
-          if (!res.ok) return { pid, recs: [] as PendingRec[] };
+          if (!res.ok) return { pid, count: 0 };
           const json = (await res.json()) as { recommendations?: PendingRec[] };
-          return { pid, recs: json.recommendations ?? [] };
+          return { pid, count: json.recommendations?.length ?? 0 };
         } catch {
-          return { pid, recs: [] as PendingRec[] };
+          return { pid, count: 0 };
         }
       })
     ).then((results) => {
       if (!alive) return;
-      const byProperty = new Map<string, PortfolioAgg>();
-      let totalDelta = 0;
-      let totalUpside = 0;
-      let totalUnmeasurable = 0;
-      let totalActNow = 0;
-      let totalComingUp = 0;
-      let totalPending = 0;
-      for (const { pid, recs } of results) {
-        const agg: PortfolioAgg = {
-          property_id: pid,
-          totalDelta: 0,
-          upside: 0,
-          measurableCount: 0,
-          unmeasurableCount: 0,
-          actNowCount: 0,
-          comingUpCount: 0,
-          pendingCount: recs.length,
-        };
-        for (const r of recs) {
-          const measurable = r.current_rate != null && r.suggested_rate != null;
-          if (measurable) {
-            const delta = (r.suggested_rate as number) - (r.current_rate as number);
-            agg.totalDelta += delta;
-            if (delta > 0) agg.upside += delta;
-            agg.measurableCount++;
-          } else {
-            agg.unmeasurableCount++;
-          }
-          if (r.urgency === "act_now") agg.actNowCount++;
-          if (r.urgency === "coming_up") agg.comingUpCount++;
-        }
-        byProperty.set(pid, agg);
-        totalDelta += agg.totalDelta;
-        totalUpside += agg.upside;
-        totalUnmeasurable += agg.unmeasurableCount;
-        totalActNow += agg.actNowCount;
-        totalComingUp += agg.comingUpCount;
-        totalPending += agg.pendingCount;
-      }
-      setSummary({
-        byProperty,
-        totalDelta,
-        totalUpside,
-        totalUnmeasurable,
-        totalActNow,
-        totalComingUp,
-        totalPending,
-        loading: false,
-      });
+      const m = new Map<string, number>();
+      for (const { pid, count } of results) m.set(pid, count);
+      setById(m);
     });
     return () => {
       alive = false;
     };
   }, [propertyIds.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return summary;
+  return byId;
 }
 
 // ---------------- Main ----------------
 
 export default function DashboardView() {
-  const router = useRouter();
   const { data, loading, error, refetch } = useCommandCenter();
-  const [range, setRange] = useState("30");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  const [pulseRange, setPulseRange] = useState("30d");
   const propertyIds = useMemo(() => (data?.propertyCards ?? []).map((p) => p.id), [data]);
-  const portfolio = usePortfolioPricing(propertyIds);
+  const pendingByProperty = usePendingPerProperty(propertyIds);
 
   if (error && !data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-10 pt-10">
-        <KoastCard variant="elevated">
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--coral-reef)", marginBottom: 6 }}>
-            Couldn&apos;t load dashboard
-          </div>
-          <div style={{ fontSize: 13, color: "var(--tideline)", marginBottom: 16 }}>{error}</div>
-          <KoastButton variant="secondary" size="sm" onClick={refetch}>
-            Retry
-          </KoastButton>
-        </KoastCard>
+      <div className="max-w-[1760px] mx-auto px-12 pt-14">
+        <p style={{ fontSize: 14, color: "var(--coral-reef)" }}>
+          Couldn&apos;t load dashboard: {error}
+        </p>
+        <button
+          onClick={refetch}
+          style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: "var(--coastal)", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
-
   if (loading && !data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-10 pt-10">
-        <div style={{ fontSize: 13, color: "var(--tideline)" }}>Loading…</div>
+      <div className="max-w-[1760px] mx-auto px-12 pt-14">
+        <p style={{ fontSize: 13, color: "var(--tideline)" }}>Loading…</p>
       </div>
     );
   }
-
   if (!data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-10 pt-10">
-        <KoastCard variant="elevated">
-          <KoastEmptyState
-            icon={<HomeIcon size={36} strokeWidth={1.3} />}
-            title="No properties yet"
-            body="Add your first property to start tracking revenue, bookings, and pricing opportunities."
-            action={
-              <Link href="/properties/new">
-                <KoastButton variant="primary">Add a property</KoastButton>
-              </Link>
-            }
-          />
-        </KoastCard>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-[1760px] mx-auto px-10" style={{ paddingTop: 32, paddingBottom: 48 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-        <div style={choreography(mounted, 0)}>
-          <Greeting user={data.user.name} summary={data.summary} />
-        </div>
-
-        <div style={choreography(mounted, 120)}>
-          <PortfolioHero
-            performance={data.performance}
-            portfolio={portfolio}
-            propertyCount={data.summary.propertyCount}
-            range={range}
-            onRangeChange={setRange}
-          />
-        </div>
-
-        <div style={choreography(mounted, 240)}>
-          <PropertyGrid
-            cards={data.propertyCards}
-            portfolio={portfolio}
-            onOpen={(id) => router.push(`/properties/${id}?tab=overview`)}
-          />
-        </div>
-
-        <div style={choreography(mounted, 360)}>
-          <PricingOpportunities
-            propertyCards={data.propertyCards}
-            portfolio={portfolio}
-          />
-        </div>
-
-        <div style={choreography(mounted, 480)}>
-          <TodaysOperations actions={data.actions} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function choreography(mounted: boolean, delayMs: number): React.CSSProperties {
-  return {
-    opacity: mounted ? 1 : 0,
-    transform: mounted ? "translateY(0)" : "translateY(12px)",
-    transition: "opacity 240ms ease-out, transform 240ms ease-out",
-    transitionDelay: `${delayMs}ms`,
-  };
-}
-
-// ---------------- Block 1: Greeting ----------------
-
-function Greeting({
-  user,
-  summary,
-}: {
-  user: string;
-  summary: CommandCenterData["summary"];
-}) {
-  const syncLabel =
-    summary.syncStatus === "synced"
-      ? "All channels synced"
-      : summary.syncStatus === "syncing"
-      ? "Channels syncing"
-      : summary.syncStatus === "disconnected"
-      ? "A channel needs reconnection"
-      : "No channels connected";
-  const first = (user?.split(" ")[0] ?? "").trim() || "host";
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <h1
-        style={{
-          fontSize: 36,
-          fontWeight: 700,
-          color: "var(--coastal)",
-          letterSpacing: "-0.02em",
-          lineHeight: 1.15,
-          margin: 0,
-        }}
-      >
-        {timeOfDayGreeting()}, {first}
-      </h1>
-      <div style={{ fontSize: 14, color: "var(--tideline)", letterSpacing: "-0.005em" }}>
-        {summary.propertyCount} propert{summary.propertyCount === 1 ? "y" : "ies"} · {summary.bookingsThisMonth} booking{summary.bookingsThisMonth === 1 ? "" : "s"} this month · {syncLabel}
-      </div>
-    </div>
-  );
-}
-
-// ---------------- Block 2: Portfolio hero strip ----------------
-
-function PortfolioHero({
-  performance,
-  portfolio,
-  propertyCount,
-  range,
-  onRangeChange,
-}: {
-  performance: CommandCenterData["performance"];
-  portfolio: PortfolioSummary;
-  propertyCount: number;
-  range: string;
-  onRangeChange: (r: string) => void;
-}) {
-  // The command-center API doesn't currently return 7/90d aggregates —
-  // until a richer endpoint lands the range toggle just switches the
-  // visible baseline for the revenue card. 30D uses thisMonthRevenue;
-  // 7D/90D are flagged as placeholders in the delta copy.
-  const revenue = performance.thisMonthRevenue;
-  const deltaPct = performance.revenueChangePct;
-  void propertyCount;
-  const metrics: Array<MetricCardProps> = [
-    {
-      eyebrow: "Revenue",
-      value: revenue,
-      deltaPct,
-      deltaSuffix: " vs prior",
-      isPercent: false,
-    },
-    {
-      eyebrow: "Occupancy",
-      value: performance.occupancyRate,
-      deltaPct: null,
-      deltaSuffix: null,
-      isPercent: true,
-    },
-    {
-      eyebrow: "Avg nightly rate",
-      value:
-        performance.thisMonthRevenue > 0 && performance.occupancyRate > 0
-          ? Math.round(performance.thisMonthRevenue / Math.max(1, Math.round((performance.occupancyRate / 100) * 30 * propertyCount)))
-          : 0,
-      deltaPct: null,
-      deltaSuffix: null,
-      isPercent: false,
-    },
-    {
-      eyebrow: "Act now",
-      value: portfolio.totalActNow,
-      deltaPct: null,
-      deltaSuffix: null,
-      isPercent: false,
-      isCount: true,
-      sub: `of ${portfolio.totalPending.toLocaleString()} total pending`,
-    },
-  ];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "var(--tideline)",
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-          }}
-        >
-          Portfolio · past {range} days
-        </span>
-        <KoastSegmentedControl
-          size="sm"
-          options={RANGE_OPTIONS}
-          value={range}
-          onChange={onRangeChange}
-          ariaLabel="Time range"
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {metrics.map((m) => (
-          <MetricCard key={m.eyebrow} {...m} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface MetricCardProps {
-  eyebrow: string;
-  value: number;
-  deltaPct: number | null;
-  deltaSuffix: string | null;
-  isPercent: boolean;
-  isCount?: boolean;
-  sub?: string | null;
-}
-
-function MetricCard({ eyebrow, value, deltaPct, deltaSuffix, isPercent, isCount, sub }: MetricCardProps) {
-  const display = isCount ? value.toLocaleString() : isPercent ? `${Math.round(value)}%` : null;
-  return (
-    <KoastCard variant="elevated">
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "var(--tideline)",
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-          }}
-        >
-          {eyebrow}
-        </span>
-        {display != null ? (
-          <span
-            style={{
-              fontSize: 48,
-              fontWeight: 700,
-              color: "var(--coastal)",
-              letterSpacing: "-0.02em",
-              lineHeight: 1.15,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {display}
-          </span>
-        ) : (
-          <KoastRate value={value} variant="hero" style={{ fontSize: 48 }} />
-        )}
-        {sub && (
-          <span style={{ fontSize: 13, color: "var(--tideline)", letterSpacing: "-0.005em" }}>{sub}</span>
-        )}
-        {deltaPct !== null && (
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: deltaPct >= 0 ? "var(--golden)" : "var(--tideline)",
-              letterSpacing: "-0.005em",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {deltaPct >= 0 ? "▲" : "▼"} {Math.abs(deltaPct)}%{deltaSuffix}
-          </span>
-        )}
-      </div>
-    </KoastCard>
-  );
-}
-
-// ---------------- Block 3: Property grid ----------------
-
-function PropertyGrid({
-  cards,
-  portfolio,
-  onOpen,
-}: {
-  cards: PropertyCard[];
-  portfolio: PortfolioSummary;
-  onOpen: (id: string) => void;
-}) {
-  if (cards.length === 0) {
-    return (
-      <KoastCard variant="elevated">
+      <div className="max-w-[1760px] mx-auto px-12 pt-14">
         <KoastEmptyState
-          icon={<HomeIcon size={36} strokeWidth={1.3} />}
           title="No properties yet"
-          body="Add your first property to start tracking revenue, bookings, and pricing opportunities."
+          body="Add your first property to see your Dashboard."
           action={
-            <Link href="/properties/new">
-              <KoastButton variant="primary">Add a property</KoastButton>
+            <Link href="/properties/new" style={{ fontSize: 13, fontWeight: 600, color: "var(--coastal)" }}>
+              Add a property →
             </Link>
           }
         />
-      </KoastCard>
+      </div>
     );
   }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--tideline)",
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-        }}
-      >
-        Your properties
-      </span>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 20,
-          justifyContent: cards.length < 4 ? "center" : "flex-start",
-        }}
-      >
-        {cards.map((card, i) => (
-          <div
-            key={card.id}
-            style={{ flex: "1 1 400px", maxWidth: 560, minWidth: 0 }}
-          >
-            <PropertyCardTile
-              card={card}
-              actNowCount={portfolio.byProperty.get(card.id)?.actNowCount ?? 0}
-              onOpen={() => onOpen(card.id)}
-              stagger={i}
-            />
-          </div>
-        ))}
-      </div>
+    <div className="max-w-[1760px] mx-auto px-12" style={{ paddingTop: 56, paddingBottom: 96 }}>
+      <GreetingBlock user={data.user.name} summary={data.summary} greetingStatus={data.greetingStatus} criticalAlerts={data.criticalAlerts} />
+      <PropertiesBlock cards={data.propertyCards} pendingByProperty={pendingByProperty} />
+      <TodaysFocusBlock performance={data.performance} summary={data.summary} focusActions={data.focusActions} />
+      <PortfolioPulseBlock metrics={data.pulseMetrics} range={pulseRange} onRangeChange={setPulseRange} />
+      <FooterBlock syncStatus={data.summary.syncStatus} />
     </div>
   );
 }
 
-function PropertyCardTile({
-  card,
-  actNowCount,
-  onOpen,
-  stagger,
+// ---------------- Section 1: Greeting + critical alert ----------------
+
+function GreetingBlock({
+  user,
+  summary,
+  greetingStatus,
+  criticalAlerts,
 }: {
-  card: PropertyCard;
-  actNowCount: number;
-  onOpen: () => void;
-  stagger: number;
+  user: string;
+  summary: CommandCenterData["summary"];
+  greetingStatus: string;
+  criticalAlerts: Alert[];
 }) {
-  const platformKeys = (card.platforms ?? []).map((p) => platformKeyFrom(p)).filter((k): k is PlatformKey => !!k);
-  const status = statusCopy(card);
+  const first = (user?.split(" ")[0] ?? "").trim() || "host";
+  const alert = criticalAlerts[0] ?? null;
+  const tone = SYNC_DOT_TONE[summary.syncStatus];
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "block",
-        borderRadius: 16,
-        transitionDelay: `${stagger * 40}ms`,
-      }}
-    >
-      <KoastCard variant="elevated" padding={0}>
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            aspectRatio: "16 / 9",
-            background: "#F0ECE3",
-            borderRadius: "16px 16px 0 0",
-            overflow: "hidden",
-          }}
-        >
-          {card.coverPhotoUrl && (
-            <Image
-              src={decodeImageUrl(card.coverPhotoUrl)}
-              alt={card.name}
-              fill
-              sizes="(max-width: 1760px) 50vw, 880px"
-              style={{ objectFit: "cover" }}
-            />
-          )}
-        </div>
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                color: "var(--coastal)",
-                letterSpacing: "-0.01em",
-                lineHeight: 1.3,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              {card.name}
-            </span>
-            {actNowCount > 0 && <KoastChip variant="danger">{actNowCount} act now</KoastChip>}
-          </div>
-          {card.location && (
-            <div style={{ fontSize: 13, color: "var(--tideline)" }}>{card.location}</div>
-          )}
-          {platformKeys.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {platformKeys.map((k) => {
-                const p = PLATFORMS[k];
-                return (
-                  <KoastChip key={k} variant="success" iconLeft={<Image src={p.icon} alt="" width={12} height={12} />}>
-                    {p.name}
-                  </KoastChip>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ fontSize: 13, color: "var(--coastal)", lineHeight: 1.4 }}>{status}</div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 8,
-              borderTop: "1px solid #E5E2DC",
-              paddingTop: 12,
-            }}
-          >
-            <MiniStat label="Revenue" value={`$${card.metrics.revenue.toLocaleString()}`} />
-            <MiniStat label="Occupancy" value={`${card.metrics.occupancy}%`} />
-            <MiniStat label="ADR" value={`$${card.metrics.adr.toLocaleString()}`} />
-            <MiniStat label="Act now" value={String(actNowCount)} emphasis={actNowCount > 0} />
-          </div>
-        </div>
-      </KoastCard>
-    </button>
+    <section>
+      <h1
+        style={{
+          fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
+          fontWeight: 400,
+          fontSize: 44,
+          letterSpacing: "-0.025em",
+          color: "var(--coastal)",
+          lineHeight: 1.2,
+          margin: 0,
+        }}
+      >
+        {timeOfDayGreeting()}, {first}.{" "}
+        <em style={{ fontStyle: "italic", color: "var(--tideline)", fontWeight: 400 }}>
+          {greetingStatus}
+        </em>
+      </h1>
+      <div
+        style={{
+          marginTop: 12,
+          fontSize: 13,
+          color: "var(--tideline)",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <span>{summary.propertyCount} {summary.propertyCount === 1 ? "property" : "properties"}</span>
+        <span style={{ color: "#C8C4BC" }}>·</span>
+        <span>{summary.bookingsThisMonth} {summary.bookingsThisMonth === 1 ? "booking" : "bookings"} this month</span>
+        <span style={{ color: "#C8C4BC" }}>·</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <StatusDot tone={tone} />
+          {syncLabel(summary.syncStatus)}
+        </span>
+      </div>
+      {alert && <CriticalAlertRow alert={alert} />}
+    </section>
   );
 }
 
-function MiniStat({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+function CriticalAlertRow({ alert }: { alert: Alert }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span
+    <div
+      style={{
+        marginTop: 28,
+        paddingTop: 14,
+        paddingBottom: 14,
+        borderTop: "1px solid var(--hairline, #E5E2DC)",
+        borderBottom: "1px solid var(--hairline, #E5E2DC)",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}
+    >
+      <StatusDot tone="alert" halo size={8} />
+      <span style={{ flex: 1, fontSize: 13, color: "var(--coastal)", lineHeight: 1.5 }}>
+        <strong style={{ fontWeight: 600 }}>{alert.subject}</strong> {alert.message}
+      </span>
+      <Link
+        href={alert.cta.href}
         style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "var(--tideline)",
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--coastal)",
+          textDecoration: "none",
+          flexShrink: 0,
+          transition: "color 160ms cubic-bezier(0.4,0,0.2,1)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLAnchorElement).style.color = "var(--golden)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLAnchorElement).style.color = "var(--coastal)";
         }}
       >
-        {label}
-      </span>
-      <span
+        {alert.cta.label} →
+      </Link>
+    </div>
+  );
+}
+
+// ---------------- Section 2: Your properties ----------------
+
+function PropertiesBlock({
+  cards,
+  pendingByProperty,
+}: {
+  cards: PropertyCard[];
+  pendingByProperty: Map<string, number>;
+}) {
+  const showGhost = cards.length <= 2;
+  const maxShown = Math.min(cards.length, showGhost ? cards.length : 6);
+  const visible = cards.slice(0, maxShown);
+  return (
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader title="Your properties" action={<Link href="/properties" style={headerLinkStyle}>Manage all →</Link>} />
+      <div
         style={{
-          fontSize: 18,
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 20,
+        }}
+      >
+        {visible.map((card) => (
+          <PropertyCardTile key={card.id} card={card} pending={pendingByProperty.get(card.id) ?? 0} />
+        ))}
+        {showGhost && <GhostAddCard />}
+      </div>
+    </section>
+  );
+}
+
+function PropertyCardTile({ card, pending }: { card: PropertyCard; pending: number }) {
+  const [hover, setHover] = useState(false);
+  const tone = propertyStatusTone(card.status);
+  return (
+    <Link
+      href={`/properties/${card.id}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
+        borderRadius: 16,
+        background: "#fff",
+        boxShadow: hover
+          ? "0 10px 30px rgba(19,46,32,0.08), 0 0 0 1px #d8d3c9"
+          : "0 0 0 1px var(--hairline, #E5E2DC)",
+        transform: hover ? "translateY(-2px)" : "translateY(0)",
+        transition: "box-shadow 300ms cubic-bezier(0.4,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: 200,
+          background: "linear-gradient(135deg, var(--driftwood), var(--coastal))",
+        }}
+      >
+        {card.coverPhotoUrl && (
+          <Image
+            src={decodeImageUrl(card.coverPhotoUrl)}
+            alt={card.name}
+            fill
+            sizes="(max-width: 1100px) 50vw, 33vw"
+            style={{ objectFit: "cover" }}
+          />
+        )}
+      </div>
+      <div style={{ padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <StatusDot tone={tone} size={7} halo={tone === "alert" || tone === "warn"} />
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 20,
+              fontWeight: 600,
+              color: "var(--coastal)",
+              letterSpacing: "-0.015em",
+              lineHeight: 1.25,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {card.name}
+          </h3>
+        </div>
+        {card.location && (
+          <div style={{ marginTop: 4, marginLeft: 15, fontSize: 13, color: "var(--tideline)" }}>
+            {card.location}
+          </div>
+        )}
+        <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
+          <div style={{ color: "var(--coastal)" }}>{renderWithBold(card.primaryStatus)}</div>
+          {card.secondaryStatus && (
+            <div style={{ color: "var(--tideline)", marginTop: 2 }}>{card.secondaryStatus}</div>
+          )}
+        </div>
+        <div
+          style={{
+            marginTop: 22,
+            paddingTop: 20,
+            borderTop: "1px solid var(--hairline, #E5E2DC)",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+          }}
+        >
+          <StatCell label="Revenue 30d" value={`$${card.metrics.revenue.toLocaleString()}`} />
+          <StatCell label="Occupancy" value={`${card.metrics.occupancy}%`} divider />
+          <StatCell label="ADR" value={`$${card.metrics.adr.toLocaleString()}`} divider />
+        </div>
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: "1px dashed var(--hairline, #E5E2DC)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          {pending > 0 ? (
+            <>
+              <span style={{ fontSize: 12, color: "var(--tideline)" }}>
+                <span style={{ fontWeight: 600, color: "var(--coral-reef)" }}>{pending} pending</span> pricing recs
+              </span>
+              <PendingLink href={`/properties/${card.id}?tab=pricing`} />
+            </>
+          ) : (
+            <span style={{ fontSize: 12, color: "var(--tideline)" }}>All caught up</span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function PendingLink({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        fontSize: 12,
+        color: "var(--tideline)",
+        textDecoration: "none",
+        fontWeight: 500,
+        transition: "color 160ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.color = "var(--coastal)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.color = "var(--tideline)";
+      }}
+    >
+      Review →
+    </Link>
+  );
+}
+
+function StatCell({ label, value, divider }: { label: string; value: string; divider?: boolean }) {
+  return (
+    <div
+      style={{
+        padding: divider ? "0 0 0 20px" : "0 20px 0 0",
+        borderLeft: divider ? "1px solid var(--hairline, #E5E2DC)" : undefined,
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--tideline)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 20,
           fontWeight: 600,
-          color: emphasis ? "var(--coral-reef)" : "var(--coastal)",
+          color: "var(--coastal)",
           letterSpacing: "-0.01em",
           fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
-      </span>
+      </div>
     </div>
   );
 }
 
-function statusCopy(card: PropertyCard): string {
-  switch (card.status) {
-    case "occupied":
-      return card.guestName
-        ? `${card.guestName} staying${card.checkOut ? ` through ${shortDate(card.checkOut)}` : ""}`
-        : "Guest staying";
-    case "checkin_today":
-      return card.guestName ? `${card.guestName} checking in today` : "Check-in today";
-    case "checkout_today":
-      return "Checkout today";
-    case "turnover_today":
-      return "Turnover today";
-    case "vacant":
-      return card.nextCheckIn
-        ? `Vacant until ${shortDate(card.nextCheckIn)}${card.daysUntilBooked != null ? ` (${card.daysUntilBooked}d)` : ""}`
-        : "Vacant — no upcoming bookings";
-  }
-}
-
-// ---------------- Block 4: Pricing opportunities ----------------
-
-function PricingOpportunities({
-  propertyCards,
-  portfolio,
-}: {
-  propertyCards: PropertyCard[];
-  portfolio: PortfolioSummary;
-}) {
-  const topByOpp = Array.from(portfolio.byProperty.values())
-    .map((agg) => ({
-      ...agg,
-      name: propertyCards.find((p) => p.id === agg.property_id)?.name ?? "Property",
-    }))
-    .filter((agg) => agg.upside > 0 || agg.actNowCount > 0)
-    .sort((a, b) => b.upside - a.upside)
-    .slice(0, 3);
-
-  // Upside (positive-delta sum) is the honest "capture X more" hero.
-  // If the aggregator couldn't measure enough recs, we surface an
-  // explicit "pending measurement" note instead of a misleading $0.
-  const totalUpside = portfolio.totalUpside;
-  const totalUnmeasurable = portfolio.totalUnmeasurable;
-  const showUnmeasurableNote = totalUpside <= 0 && totalUnmeasurable > 0;
-  const upsidePropertyCount = topByOpp.filter((r) => r.upside > 0).length;
-  const topPropertyId = topByOpp[0]?.property_id ?? propertyCards[0]?.id;
-  const reviewHref = topPropertyId ? `/properties/${topPropertyId}?tab=pricing` : "/properties";
-
+function GhostAddCard() {
+  const [hover, setHover] = useState(false);
   return (
-    <div
+    <Link
+      href="/properties/new"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 7fr) minmax(0, 3fr)",
-        gap: 20,
-        alignItems: "stretch",
+        borderRadius: 16,
+        border: `1.5px dashed ${hover ? "var(--driftwood)" : "var(--hairline, #E5E2DC)"}`,
+        background: hover ? "rgba(196,154,90,0.03)" : "transparent",
+        color: hover ? "var(--coastal)" : "var(--tideline)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+        padding: "40px 24px",
+        textDecoration: "none",
+        transition: "border-color 200ms cubic-bezier(0.4,0,0.2,1), background-color 200ms cubic-bezier(0.4,0,0.2,1), color 200ms cubic-bezier(0.4,0,0.2,1)",
+        minHeight: 380,
       }}
     >
-      <KoastCard variant="dark" padding={28}>
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: -60,
-            right: -60,
-            width: 240,
-            height: 240,
-            background: "radial-gradient(circle, rgba(196,154,90,0.28), rgba(196,154,90,0) 70%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Sparkles size={14} color="var(--golden)" />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--golden)",
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-              }}
-            >
-              This week&apos;s pricing opportunities
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-            {showUnmeasurableNote ? (
-              <>
-                <span style={{ fontSize: 28, fontWeight: 600, color: "var(--shore)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
-                  {totalUnmeasurable.toLocaleString()} recs pending measurement
-                </span>
-              </>
-            ) : (
-              <>
-                <span style={{ fontSize: 20, fontWeight: 500, color: "var(--shore)", letterSpacing: "-0.005em" }}>
-                  You could capture
-                </span>
-                <KoastRate tone="dark" variant="hero" style={{ fontSize: 64 }} value={totalUpside} />
-                <span style={{ fontSize: 20, fontWeight: 500, color: "rgba(247,243,236,0.78)", letterSpacing: "-0.005em" }}>
-                  across {upsidePropertyCount} propert{upsidePropertyCount === 1 ? "y" : "ies"}
-                </span>
-              </>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13, color: "rgba(247,243,236,0.78)", lineHeight: 1.5 }}>
-            <span>
-              {portfolio.totalActNow} act-now + {portfolio.totalComingUp} coming-up recommendation{portfolio.totalComingUp === 1 ? "" : "s"} portfolio-wide.
-            </span>
-            {totalUnmeasurable > 0 && !showUnmeasurableNote && (
-              <KoastChip variant="warning">{totalUnmeasurable.toLocaleString()} pending measurement</KoastChip>
-            )}
-          </div>
-          <div>
-            <Link href={reviewHref}>
-              <KoastButton variant="primary" size="md" iconRight={<ArrowRight size={14} />}>
-                Review all
-              </KoastButton>
-            </Link>
-          </div>
-        </div>
-      </KoastCard>
-
-      <KoastCard variant="elevated">
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--tideline)",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-            }}
-          >
-            By property
-          </span>
-          {topByOpp.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--tideline)" }}>
-              {portfolio.loading ? "Loading…" : "No pending opportunities."}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {topByOpp.map((row) => {
-                const measurable = row.upside > 0;
-                return (
-                  <Link
-                    key={row.property_id}
-                    href={`/properties/${row.property_id}?tab=pricing`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 0",
-                      borderBottom: "1px solid rgba(229,226,220,0.6)",
-                      gap: 12,
-                      color: "inherit",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--coastal)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {row.name}
-                      </span>
-                      {!measurable && row.unmeasurableCount > 0 && (
-                        <span style={{ fontSize: 11, color: "var(--tideline)" }}>
-                          {row.unmeasurableCount} rec{row.unmeasurableCount === 1 ? "" : "s"} pending measurement
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                      {measurable ? (
-                        <KoastRate variant="inline" value={row.upside} delta={row.upside} />
-                      ) : (
-                        <span style={{ fontSize: 13, color: "var(--tideline)" }}>—</span>
-                      )}
-                      <ArrowRight size={14} color="var(--tideline)" />
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </KoastCard>
-    </div>
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          border: "1.5px solid currentColor",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Plus size={22} strokeWidth={1.3} />
+      </span>
+      <span style={{ fontSize: 15, fontWeight: 600 }}>Add a property</span>
+      <span style={{ fontSize: 12, color: "var(--tideline)", maxWidth: 220, textAlign: "center", lineHeight: 1.5 }}>
+        Connect Airbnb, Booking.com, or set up direct
+      </span>
+    </Link>
   );
 }
 
-// ---------------- Block 5: Today's operations ----------------
+// ---------------- Section 3: Today's focus ----------------
 
-function TodaysOperations({ actions }: { actions: ActionItem[] }) {
-  if (actions.length === 0) {
-    return (
-      <KoastCard variant="elevated">
-        <KoastEmptyState
-          icon={<CheckCircle size={36} strokeWidth={1.3} />}
-          title="All caught up"
-          body="No operational tasks waiting. Koast will surface new items here as they come in."
-        />
-      </KoastCard>
-    );
-  }
+function TodaysFocusBlock({
+  performance,
+  summary,
+  focusActions,
+}: {
+  performance: CommandCenterData["performance"];
+  summary: CommandCenterData["summary"];
+  focusActions: FocusAction[];
+}) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--tideline)",
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-        }}
-      >
-        Today&apos;s operations
-      </span>
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader title="Today's focus" />
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))",
-          gap: 12,
+          gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)",
+          gap: 24,
+          alignItems: "stretch",
         }}
       >
-        {actions.map((action) => (
-          <ActionCard key={action.id} action={action} />
-        ))}
+        <PricingIntelligenceCard performance={performance} propertyCount={summary.propertyCount} />
+        <ActionCardStack actions={focusActions} />
       </div>
+    </section>
+  );
+}
+
+function PricingIntelligenceCard({ performance, propertyCount }: { performance: CommandCenterData["performance"]; propertyCount: number }) {
+  // Dynamic copy: when real opportunities exist, hero switches to
+  // revenue framing. Absent that, the learning copy carries.
+  const hasUpside = false; // TODO: wire from portfolio pricing hook when the property-level upside data is aggregated server-side
+  const title = hasUpside
+    ? "$0 across your portfolio."
+    : "Measuring your rates, quietly.";
+  const sub = hasUpside
+    ? `Act-now + coming-up recommendations are surfaced per property. Acceptance: — (30d).`
+    : `Koast is learning your rate patterns across ${propertyCount} propert${propertyCount === 1 ? "y" : "ies"} and 90 forward dates. Once we've captured more channel rates, we'll surface real opportunities here.`;
+  void performance;
+
+  return (
+    <article
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 20,
+        padding: "44px 48px",
+        color: "var(--shore)",
+        background: "linear-gradient(150deg, #17392a 0%, #132e20 55%, #0e2419 100%)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        minHeight: 320,
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: "-30%",
+          right: "-15%",
+          width: 500,
+          height: 500,
+          background: "radial-gradient(circle, rgba(196,154,90,0.2) 0%, rgba(196,154,90,0) 55%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 28 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "var(--driftwood)",
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+          }}
+        >
+          Pricing intelligence
+        </span>
+        <h2
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
+            fontWeight: 400,
+            fontSize: 36,
+            color: "var(--shore)",
+            letterSpacing: "-0.02em",
+            maxWidth: 540,
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </h2>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14,
+            color: "var(--sandbar)",
+            lineHeight: 1.6,
+            maxWidth: 560,
+          }}
+        >
+          {sub}
+        </p>
+      </div>
+      <div style={{ position: "relative", display: "flex", gap: 10, marginTop: 32 }}>
+        <Link
+          href="/properties"
+          style={{
+            background: "var(--golden)",
+            color: "var(--deep-sea)",
+            fontWeight: 600,
+            fontSize: 13,
+            padding: "11px 18px",
+            borderRadius: 8,
+            textDecoration: "none",
+            letterSpacing: "-0.005em",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          {hasUpside ? "Review recommendations" : "Review rules"}
+        </Link>
+        <Link
+          href="/pricing"
+          style={{
+            background: "transparent",
+            color: "var(--sandbar)",
+            fontWeight: 500,
+            fontSize: 13,
+            padding: "11px 18px",
+            borderRadius: 8,
+            border: "1px solid rgba(232,213,176,0.22)",
+            textDecoration: "none",
+            letterSpacing: "-0.005em",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          What we&apos;re learning
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function ActionCardStack({ actions }: { actions: FocusAction[] }) {
+  if (actions.length === 0) {
+    return (
+      <article
+        style={{
+          borderRadius: 12,
+          border: "1px solid var(--hairline, #E5E2DC)",
+          padding: 24,
+          background: "#fff",
+        }}
+      >
+        <KoastEmptyState title="You're all caught up" body="Nothing needs your attention right now." />
+      </article>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {actions.slice(0, 4).map((action) => (
+        <ActionCard key={action.id} action={action} />
+      ))}
     </div>
   );
 }
 
-function ActionCard({ action }: { action: ActionItem }) {
-  const chipVariant: "danger" | "warning" | "neutral" =
-    action.urgency >= 80 ? "danger" : action.urgency >= 40 ? "warning" : "neutral";
-  const Icon = iconForAction(action.type);
-  const { eyebrow, title, detail } = formatAction(action);
+function ActionCard({ action }: { action: FocusAction }) {
+  const [hover, setHover] = useState(false);
+  const tone = action.priority === "urgent" ? "alert" : action.priority === "warn" ? "warn" : "muted";
   return (
-    <KoastCard variant="elevated">
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <span
-          aria-hidden
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: chipVariant === "danger" ? "rgba(196,64,64,0.1)" : chipVariant === "warning" ? "rgba(212,150,11,0.1)" : "rgba(23,57,42,0.05)",
-            color: chipVariant === "danger" ? "var(--coral-reef)" : chipVariant === "warning" ? "var(--amber-tide)" : "var(--tideline)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Icon size={16} />
-        </span>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: chipVariant === "danger" ? "var(--coral-reef)" : "var(--tideline)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-            }}
-          >
-            {eyebrow}
-          </span>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--coastal)",
-              letterSpacing: "-0.005em",
-              lineHeight: 1.35,
-            }}
-          >
-            {title}
-          </span>
-          {detail && (
-            <span
-              style={{
-                fontSize: 13,
-                color: "var(--tideline)",
-                lineHeight: 1.4,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-              }}
-            >
-              {detail}
-            </span>
-          )}
+    <Link
+      href={action.cta.href}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "16px 20px",
+        border: `1px solid ${hover ? "#d8d3c9" : "var(--hairline, #E5E2DC)"}`,
+        borderRadius: 12,
+        background: "#fff",
+        textDecoration: "none",
+        color: "inherit",
+        transition: "border-color 180ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+    >
+      <StatusDot tone={tone} size={8} halo={tone === "alert"} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--deep-sea)", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {action.title}
         </div>
-        {action.action && (
-          <Link href={action.action.href} style={{ flexShrink: 0, marginLeft: 8 }}>
-            <KoastButton variant="ghost" size="sm" iconRight={<ArrowRight size={14} />}>
-              {formatCtaLabel(action.action.label)}
-            </KoastButton>
-          </Link>
-        )}
+        <div style={{ marginTop: 2, fontSize: 12, color: "var(--tideline)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {action.sub}
+        </div>
       </div>
-    </KoastCard>
+      <ArrowRight
+        size={16}
+        style={{
+          color: hover ? "var(--coastal)" : "rgba(61,107,82,0.4)",
+          transition: "color 180ms cubic-bezier(0.4,0,0.2,1)",
+          flexShrink: 0,
+        }}
+      />
+    </Link>
   );
 }
 
-function iconForAction(type: string) {
-  if (type.includes("clean") || type.includes("turnover")) return Sparkles;
-  if (type.includes("check") || type.includes("booking")) return CalendarIcon;
-  if (type.includes("message") || type.includes("guest")) return MessageSquare;
-  return CheckCircle;
+// ---------------- Section 4: Portfolio pulse ----------------
+
+const PULSE_RANGE_OPTIONS = [
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
+  { value: "1y", label: "1y" },
+];
+
+function PortfolioPulseBlock({
+  metrics,
+  range,
+  onRangeChange,
+}: {
+  metrics: PulseMetric[];
+  range: string;
+  onRangeChange: (r: string) => void;
+}) {
+  return (
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader
+        title="Portfolio pulse"
+        action={
+          <KoastSegmentedControl
+            size="sm"
+            options={PULSE_RANGE_OPTIONS}
+            value={range}
+            onChange={onRangeChange}
+            ariaLabel="Portfolio pulse range"
+          />
+        }
+      />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${metrics.length || 4}, 1fr)`,
+          gap: 0,
+          paddingTop: 28,
+          borderTop: "1px solid var(--hairline, #E5E2DC)",
+        }}
+      >
+        {metrics.map((m, i) => (
+          <PulseMetricCell key={m.label} metric={m} isFirst={i === 0} isLast={i === metrics.length - 1} />
+        ))}
+      </div>
+    </section>
+  );
 }
 
-// Reshape the server-provided action into the urgency+domain eyebrow,
-// sentence-case title, detail pattern (per master plan spec correction
-// 21). The command-center endpoint still emits shouty titles; polish
-// happens at the render layer until the server is updated.
-function formatAction(action: ActionItem): { eyebrow: string; title: string; detail: string } {
-  const urgency = action.urgency >= 80 ? "Urgent" : action.urgency >= 40 ? "Today" : null;
-  const domain = domainFor(action.type);
-  const eyebrow = [urgency, domain].filter(Boolean).join(" · ") || "Task";
-  const title = toSentenceCase(action.title);
-  const detail = action.description ?? "";
-  return { eyebrow, title, detail };
+function PulseMetricCell({ metric, isFirst, isLast }: { metric: PulseMetric; isFirst: boolean; isLast: boolean }) {
+  const series = mockSeries(metric.value, metric.prior);
+  const deltaColor = metric.deltaDirection === "up" ? "var(--lagoon)" : metric.deltaDirection === "down" ? "var(--coral-reef)" : "var(--tideline)";
+  const deltaPrefix = metric.deltaDirection === "up" ? "▲ " : metric.deltaDirection === "down" ? "▼ " : "— ";
+  return (
+    <div
+      style={{
+        padding: `0 ${isLast ? 0 : 32}px 0 ${isFirst ? 0 : 32}px`,
+        borderLeft: isFirst ? undefined : "1px solid var(--hairline, #E5E2DC)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--tideline)",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginBottom: 12,
+        }}
+      >
+        {metric.label}
+      </div>
+      <div
+        style={{
+          fontSize: 32,
+          fontWeight: 600,
+          color: "var(--deep-sea)",
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.025em",
+          lineHeight: 1,
+        }}
+      >
+        {metric.valueDisplay}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 12,
+          fontWeight: 500,
+          color: deltaColor,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {deltaPrefix}{metric.deltaText.replace(/^[+\-]?\d+%?\s*/, "")}
+      </div>
+      {series && series.length >= 3 && (
+        <Sparkline series={series} direction={metric.deltaDirection} />
+      )}
+    </div>
+  );
 }
 
-function domainFor(type: string): string {
-  if (type.includes("clean") || type.includes("turnover")) return "Cleaning";
-  if (type.includes("pric")) return "Pricing";
-  if (type.includes("check") || type.includes("booking")) return "Bookings";
-  if (type.includes("message") || type.includes("guest")) return "Guests";
-  if (type.includes("channel") || type.includes("sync")) return "Channels";
-  return "Operations";
+function Sparkline({ series, direction }: { series: number[]; direction: "up" | "down" | "flat" }) {
+  const w = 120;
+  const h = 32;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const range = Math.max(0.001, max - min);
+  const step = w / Math.max(1, series.length - 1);
+  const points = series.map((v, i) => `${i * step},${h - ((v - min) / range) * h}`);
+  const linePath = `M ${points.join(" L ")}`;
+  const areaPath = `${linePath} L ${w},${h} L 0,${h} Z`;
+  const stroke = direction === "up" ? "#1a7a5a" : direction === "down" ? "#c44040" : "#c49a5a";
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      width="100%"
+      height={32}
+      style={{ marginTop: 14, display: "block" }}
+    >
+      <path d={areaPath} fill={stroke} fillOpacity={0.06} />
+      <path d={linePath} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
-function toSentenceCase(raw: string): string {
-  if (!raw) return "";
-  const trimmed = raw.trim();
-  const isAllCaps = trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed);
-  if (!isAllCaps) return trimmed;
-  const lowered = trimmed.toLowerCase();
-  return lowered.charAt(0).toUpperCase() + lowered.slice(1);
+// ---------------- Section 5: Footer ----------------
+
+function FooterBlock({ syncStatus }: { syncStatus: CommandCenterData["summary"]["syncStatus"] }) {
+  const syncText = syncStatus === "synced" ? "just now" : syncStatus === "syncing" ? "syncing now" : "unknown";
+  return (
+    <footer
+      style={{
+        marginTop: 64,
+        paddingTop: 32,
+        borderTop: "1px solid var(--hairline, #E5E2DC)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <div style={{ fontSize: 13, color: "var(--tideline)" }}>
+        Last sync {syncText}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 12, color: "var(--tideline)" }}>
+        <Link href="/docs" style={{ color: "inherit", textDecoration: "none" }}>Docs</Link>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <CommandIcon size={12} />?
+        </span>
+        <Link href="/settings" style={{ color: "inherit", textDecoration: "none" }}>Settings</Link>
+      </div>
+    </footer>
+  );
 }
 
-function formatCtaLabel(raw: string): string {
-  if (!raw) return "View";
-  // "View" fallback for terse server labels; keep longer labels intact.
-  return raw.length > 20 ? "Open" : raw;
+// ---------------- Shared ----------------
+
+function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 20,
+        gap: 12,
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--tideline)",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+        }}
+      >
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
 }
+
+const headerLinkStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--tideline)",
+  textDecoration: "none",
+  fontWeight: 500,
+};

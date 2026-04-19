@@ -136,6 +136,29 @@ Concrete translations:
   longer.
 - Never pulse. Never bounce. Never shimmer except for loading skeletons.
 
+### 8. Restraint over decoration
+
+When in doubt, remove. Every visual element must earn its weight.
+Hairlines over borders, colored dots over chips, plain text over
+pills where possible. This principle overrides earlier session
+ambitions when they stacked visual weight (shadows + chips + filled
+icon backgrounds + tinted status overlays) on a single surface.
+
+### 9. Single visual focal point per page
+
+Each page has exactly one dramatic moment. Dashboard's is the dark
+Pricing intelligence card in "Today's focus." PropertyDetail's is
+the Scorecard. Everything else is flat, light, or ambient. No
+competing gradients, no competing shadows, no second dark card on
+the same surface.
+
+### 10. Status through color, not chrome
+
+A 7–8px colored dot next to a label communicates state better than
+a bordered chip with background fill. Reserve filled chips for
+user-facing CTAs or high-contrast labels ("Add property"). Ambient
+surfaces like Dashboard rely on StatusDot + plain text for state.
+
 ### 7. No PDF feel
 
 A working heuristic: if a printed screenshot would look defensible as 
@@ -614,6 +637,34 @@ of deployed Session 1 build:
     misleading $0 hero. Proper long-term fix is to backfill
     `current_rate` at the data layer (booking_sync / rate history)
     so recs become measurable — tracked as a separate concern.
+
+### After Session 3.7 (Dashboard Quiet-direction rebuild)
+
+23. Dashboard uses plain `<article>`/`<div>` elements, not KoastCard,
+    when the design calls for hairline-only containment without
+    elevation. KoastCard is for elevated/dark/quiet contexts across
+    PropertyDetail and PricingTab; Dashboard's Quiet direction uses
+    flat containment (hairline border, 16px radius, no shadow at
+    rest) for property + action cards.
+
+24. StatusDot is the default state-language primitive on ambient
+    surfaces. 7–8px colored dot, optional 3px halo, four tones: ok
+    (lagoon), warn (amber), alert (coral), muted (tideline 40%).
+    Replaces filled status chips and icon-background chips as the
+    state-expression primitive on Dashboard and action cards.
+
+25. Sparkline trend strokes follow the data direction, not the
+    product's Koast-moment palette. Up → lagoon, flat → golden,
+    down → coral-reef. This is the one Dashboard exception to the
+    "never red for merely negative numbers" rule (Spec Correction 4)
+    — sparklines visualize a directional signal where red for down
+    is universally expected (finance convention).
+
+26. Fraunces serif is the Dashboard display face for the Greeting
+    headline and the Pricing-intelligence card title. Loaded via
+    `next/font/google` in `src/app/layout.tsx`. Every other Koast
+    surface stays on Plus Jakarta Sans — do not mix faces on the
+    same surface outside of this carve-out.
 
 ---
 
