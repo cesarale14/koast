@@ -163,6 +163,25 @@ function propertyStatusTone(status: PropertyCard["status"]): "ok" | "warn" | "al
 
 // ---------------- Hooks ----------------
 
+// Viewport breakpoints shared across Dashboard sections. Matches the
+// Session 3.7 spec (< 720 collapses to single-column, < 1100 collapses
+// multi-column grids to 2-col) and stacks vertical layouts on mobile.
+function useViewport() {
+  const [vp, setVp] = useState<{ isMobile: boolean; isNarrow: boolean }>(
+    { isMobile: false, isNarrow: false }
+  );
+  useEffect(() => {
+    const apply = () => {
+      const w = window.innerWidth;
+      setVp({ isMobile: w < 720, isNarrow: w < 1100 });
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
+  return vp;
+}
+
 function useCommandCenter() {
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,13 +244,15 @@ function usePendingPerProperty(propertyIds: string[]): Map<string, number> {
 
 export default function DashboardView() {
   const { data, loading, error, refetch } = useCommandCenter();
+  const vp = useViewport();
   const [pulseRange, setPulseRange] = useState("30d");
   const propertyIds = useMemo(() => (data?.propertyCards ?? []).map((p) => p.id), [data]);
   const pendingByProperty = usePendingPerProperty(propertyIds);
+  const containerPaddingClass = vp.isMobile ? "px-5" : "px-12";
 
   if (error && !data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-12 pt-14">
+      <div className={`max-w-[1760px] mx-auto ${containerPaddingClass} pt-14`}>
         <p style={{ fontSize: 14, color: "var(--coral-reef)" }}>
           Couldn&apos;t load dashboard: {error}
         </p>
@@ -246,14 +267,14 @@ export default function DashboardView() {
   }
   if (loading && !data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-12 pt-14">
+      <div className={`max-w-[1760px] mx-auto ${containerPaddingClass} pt-14`}>
         <p style={{ fontSize: 13, color: "var(--tideline)" }}>Loading…</p>
       </div>
     );
   }
   if (!data) {
     return (
-      <div className="max-w-[1760px] mx-auto px-12 pt-14">
+      <div className={`max-w-[1760px] mx-auto ${containerPaddingClass} pt-14`}>
         <KoastEmptyState
           title="No properties yet"
           body="Add your first property to see your Dashboard."
@@ -268,12 +289,15 @@ export default function DashboardView() {
   }
 
   return (
-    <div className="max-w-[1760px] mx-auto px-12" style={{ paddingTop: 56, paddingBottom: 96 }}>
-      <GreetingBlock user={data.user.name} summary={data.summary} greetingStatus={data.greetingStatus} criticalAlerts={data.criticalAlerts} />
-      <PropertiesBlock cards={data.propertyCards} pendingByProperty={pendingByProperty} />
-      <TodaysFocusBlock performance={data.performance} summary={data.summary} focusActions={data.focusActions} />
-      <PortfolioPulseBlock metrics={data.pulseMetrics} range={pulseRange} onRangeChange={setPulseRange} />
-      <FooterBlock syncStatus={data.summary.syncStatus} />
+    <div
+      className={`max-w-[1760px] mx-auto ${containerPaddingClass}`}
+      style={{ paddingTop: vp.isMobile ? 32 : 56, paddingBottom: vp.isMobile ? 64 : 96 }}
+    >
+      <GreetingBlock user={data.user.name} summary={data.summary} greetingStatus={data.greetingStatus} criticalAlerts={data.criticalAlerts} vp={vp} />
+      <PropertiesBlock cards={data.propertyCards} pendingByProperty={pendingByProperty} vp={vp} />
+      <TodaysFocusBlock performance={data.performance} summary={data.summary} focusActions={data.focusActions} vp={vp} />
+      <PortfolioPulseBlock metrics={data.pulseMetrics} range={pulseRange} onRangeChange={setPulseRange} vp={vp} />
+      <FooterBlock syncStatus={data.summary.syncStatus} vp={vp} />
     </div>
   );
 }
@@ -285,11 +309,13 @@ function GreetingBlock({
   summary,
   greetingStatus,
   criticalAlerts,
+  vp,
 }: {
   user: string;
   summary: CommandCenterData["summary"];
   greetingStatus: string;
   criticalAlerts: Alert[];
+  vp: { isMobile: boolean; isNarrow: boolean };
 }) {
   const first = (user?.split(" ")[0] ?? "").trim() || "host";
   const alert = criticalAlerts[0] ?? null;
@@ -300,7 +326,7 @@ function GreetingBlock({
         style={{
           fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
           fontWeight: 400,
-          fontSize: 44,
+          fontSize: vp.isMobile ? 28 : 44,
           letterSpacing: "-0.025em",
           color: "var(--coastal)",
           lineHeight: 1.2,
@@ -315,11 +341,11 @@ function GreetingBlock({
       <div
         style={{
           marginTop: 12,
-          fontSize: 13,
+          fontSize: vp.isMobile ? 12 : 13,
           color: "var(--tideline)",
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: vp.isMobile ? 8 : 12,
           flexWrap: "wrap",
         }}
       >
@@ -332,29 +358,32 @@ function GreetingBlock({
           {syncLabel(summary.syncStatus)}
         </span>
       </div>
-      {alert && <CriticalAlertRow alert={alert} />}
+      {alert && <CriticalAlertRow alert={alert} vp={vp} />}
     </section>
   );
 }
 
-function CriticalAlertRow({ alert }: { alert: Alert }) {
+function CriticalAlertRow({ alert, vp }: { alert: Alert; vp: { isMobile: boolean } }) {
   return (
     <div
       style={{
-        marginTop: 28,
+        marginTop: vp.isMobile ? 20 : 28,
         paddingTop: 14,
         paddingBottom: 14,
         borderTop: "1px solid var(--hairline, #E5E2DC)",
         borderBottom: "1px solid var(--hairline, #E5E2DC)",
         display: "flex",
-        alignItems: "center",
-        gap: 14,
+        alignItems: vp.isMobile ? "flex-start" : "center",
+        flexDirection: vp.isMobile ? "column" : "row",
+        gap: vp.isMobile ? 8 : 14,
       }}
     >
-      <StatusDot tone="alert" halo size={8} />
-      <span style={{ flex: 1, fontSize: 13, color: "var(--coastal)", lineHeight: 1.5 }}>
-        <strong style={{ fontWeight: 600 }}>{alert.subject}</strong> {alert.message}
-      </span>
+      <div style={{ display: "flex", alignItems: vp.isMobile ? "flex-start" : "center", gap: 14, flex: 1, minWidth: 0 }}>
+        <StatusDot tone="alert" halo size={8} style={{ marginTop: vp.isMobile ? 6 : 0 }} />
+        <span style={{ flex: 1, fontSize: 13, color: "var(--coastal)", lineHeight: 1.5 }}>
+          <strong style={{ fontWeight: 600 }}>{alert.subject}</strong> {alert.message}
+        </span>
+      </div>
       <Link
         href={alert.cta.href}
         style={{
@@ -363,6 +392,8 @@ function CriticalAlertRow({ alert }: { alert: Alert }) {
           color: "var(--coastal)",
           textDecoration: "none",
           flexShrink: 0,
+          alignSelf: vp.isMobile ? "flex-start" : "center",
+          paddingLeft: vp.isMobile ? 22 : 0,
           transition: "color 160ms cubic-bezier(0.4,0,0.2,1)",
         }}
         onMouseEnter={(e) => {
@@ -383,25 +414,28 @@ function CriticalAlertRow({ alert }: { alert: Alert }) {
 function PropertiesBlock({
   cards,
   pendingByProperty,
+  vp,
 }: {
   cards: PropertyCard[];
   pendingByProperty: Map<string, number>;
+  vp: { isMobile: boolean; isNarrow: boolean };
 }) {
   const showGhost = cards.length <= 2;
   const maxShown = Math.min(cards.length, showGhost ? cards.length : 6);
   const visible = cards.slice(0, maxShown);
+  const columns = vp.isMobile ? 1 : vp.isNarrow ? 2 : 3;
   return (
-    <section style={{ marginTop: 72 }}>
+    <section style={{ marginTop: vp.isMobile ? 40 : 72 }}>
       <SectionHeader title="Your properties" action={<Link href="/properties" style={headerLinkStyle}>Manage all →</Link>} />
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 20,
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          gap: vp.isMobile ? 12 : 20,
         }}
       >
         {visible.map((card) => (
-          <PropertyCardTile key={card.id} card={card} pending={pendingByProperty.get(card.id) ?? 0} />
+          <PropertyCardTile key={card.id} card={card} pending={pendingByProperty.get(card.id) ?? 0} vp={vp} />
         ))}
         {showGhost && <GhostAddCard />}
       </div>
@@ -409,7 +443,7 @@ function PropertiesBlock({
   );
 }
 
-function PropertyCardTile({ card, pending }: { card: PropertyCard; pending: number }) {
+function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: number; vp: { isMobile: boolean } }) {
   const [hover, setHover] = useState(false);
   const tone = propertyStatusTone(card.status);
   return (
@@ -435,7 +469,7 @@ function PropertyCardTile({ card, pending }: { card: PropertyCard; pending: numb
         style={{
           position: "relative",
           width: "100%",
-          height: 200,
+          height: vp.isMobile ? 160 : 200,
           background: "linear-gradient(135deg, var(--driftwood), var(--coastal))",
         }}
       >
@@ -444,12 +478,12 @@ function PropertyCardTile({ card, pending }: { card: PropertyCard; pending: numb
             src={decodeImageUrl(card.coverPhotoUrl)}
             alt={card.name}
             fill
-            sizes="(max-width: 1100px) 50vw, 33vw"
+            sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw"
             style={{ objectFit: "cover" }}
           />
         )}
       </div>
-      <div style={{ padding: 24 }}>
+      <div style={{ padding: vp.isMobile ? 18 : 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <StatusDot tone={tone} size={7} halo={tone === "alert" || tone === "warn"} />
           <h3
@@ -622,30 +656,32 @@ function TodaysFocusBlock({
   performance,
   summary,
   focusActions,
+  vp,
 }: {
   performance: CommandCenterData["performance"];
   summary: CommandCenterData["summary"];
   focusActions: FocusAction[];
+  vp: { isMobile: boolean; isNarrow: boolean };
 }) {
   return (
-    <section style={{ marginTop: 72 }}>
+    <section style={{ marginTop: vp.isMobile ? 40 : 72 }}>
       <SectionHeader title="Today's focus" />
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)",
-          gap: 24,
+          gridTemplateColumns: vp.isNarrow ? "minmax(0, 1fr)" : "minmax(0, 1.5fr) minmax(0, 1fr)",
+          gap: vp.isMobile ? 16 : 24,
           alignItems: "stretch",
         }}
       >
-        <PricingIntelligenceCard performance={performance} propertyCount={summary.propertyCount} />
+        <PricingIntelligenceCard performance={performance} propertyCount={summary.propertyCount} vp={vp} />
         <ActionCardStack actions={focusActions} />
       </div>
     </section>
   );
 }
 
-function PricingIntelligenceCard({ performance, propertyCount }: { performance: CommandCenterData["performance"]; propertyCount: number }) {
+function PricingIntelligenceCard({ performance, propertyCount, vp }: { performance: CommandCenterData["performance"]; propertyCount: number; vp: { isMobile: boolean } }) {
   // Dynamic copy: when real opportunities exist, hero switches to
   // revenue framing. Absent that, the learning copy carries.
   const hasUpside = false; // TODO: wire from portfolio pricing hook when the property-level upside data is aggregated server-side
@@ -663,13 +699,13 @@ function PricingIntelligenceCard({ performance, propertyCount }: { performance: 
         position: "relative",
         overflow: "hidden",
         borderRadius: 20,
-        padding: "44px 48px",
+        padding: vp.isMobile ? "28px 24px" : "44px 48px",
         color: "var(--shore)",
         background: "linear-gradient(150deg, #17392a 0%, #132e20 55%, #0e2419 100%)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 320,
+        minHeight: vp.isMobile ? 240 : 320,
       }}
     >
       <div
@@ -701,7 +737,7 @@ function PricingIntelligenceCard({ performance, propertyCount }: { performance: 
             margin: 0,
             fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
             fontWeight: 400,
-            fontSize: 36,
+            fontSize: vp.isMobile ? 24 : 36,
             color: "var(--shore)",
             letterSpacing: "-0.02em",
             maxWidth: 540,
@@ -844,13 +880,16 @@ function PortfolioPulseBlock({
   metrics,
   range,
   onRangeChange,
+  vp,
 }: {
   metrics: PulseMetric[];
   range: string;
   onRangeChange: (r: string) => void;
+  vp: { isMobile: boolean; isNarrow: boolean };
 }) {
+  const cols = vp.isMobile ? 2 : metrics.length || 4;
   return (
-    <section style={{ marginTop: 72 }}>
+    <section style={{ marginTop: vp.isMobile ? 40 : 72 }}>
       <SectionHeader
         title="Portfolio pulse"
         action={
@@ -866,28 +905,36 @@ function PortfolioPulseBlock({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${metrics.length || 4}, 1fr)`,
-          gap: 0,
-          paddingTop: 28,
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          columnGap: vp.isMobile ? 16 : 0,
+          rowGap: vp.isMobile ? 24 : 0,
+          paddingTop: vp.isMobile ? 20 : 28,
           borderTop: "1px solid var(--hairline, #E5E2DC)",
         }}
       >
         {metrics.map((m, i) => (
-          <PulseMetricCell key={m.label} metric={m} isFirst={i === 0} isLast={i === metrics.length - 1} />
+          <PulseMetricCell
+            key={m.label}
+            metric={m}
+            isFirst={vp.isMobile ? i % 2 === 0 : i === 0}
+            isLast={vp.isMobile ? i % 2 === 1 : i === metrics.length - 1}
+            vp={vp}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function PulseMetricCell({ metric, isFirst, isLast }: { metric: PulseMetric; isFirst: boolean; isLast: boolean }) {
+function PulseMetricCell({ metric, isFirst, isLast, vp }: { metric: PulseMetric; isFirst: boolean; isLast: boolean; vp: { isMobile: boolean } }) {
   const series = mockSeries(metric.value, metric.prior);
   const deltaColor = metric.deltaDirection === "up" ? "var(--lagoon)" : metric.deltaDirection === "down" ? "var(--coral-reef)" : "var(--tideline)";
   const deltaPrefix = metric.deltaDirection === "up" ? "▲ " : metric.deltaDirection === "down" ? "▼ " : "— ";
+  const padX = vp.isMobile ? 0 : 32;
   return (
     <div
       style={{
-        padding: `0 ${isLast ? 0 : 32}px 0 ${isFirst ? 0 : 32}px`,
+        padding: `0 ${isLast ? 0 : padX}px 0 ${isFirst ? 0 : padX}px`,
         borderLeft: isFirst ? undefined : "1px solid var(--hairline, #E5E2DC)",
       }}
     >
@@ -898,14 +945,14 @@ function PulseMetricCell({ metric, isFirst, isLast }: { metric: PulseMetric; isF
           color: "var(--tideline)",
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          marginBottom: 12,
+          marginBottom: vp.isMobile ? 8 : 12,
         }}
       >
         {metric.label}
       </div>
       <div
         style={{
-          fontSize: 32,
+          fontSize: vp.isMobile ? 24 : 32,
           fontWeight: 600,
           color: "var(--deep-sea)",
           fontVariantNumeric: "tabular-nums",
@@ -960,17 +1007,19 @@ function Sparkline({ series, direction }: { series: number[]; direction: "up" | 
 
 // ---------------- Section 5: Footer ----------------
 
-function FooterBlock({ syncStatus }: { syncStatus: CommandCenterData["summary"]["syncStatus"] }) {
+function FooterBlock({ syncStatus, vp }: { syncStatus: CommandCenterData["summary"]["syncStatus"]; vp: { isMobile: boolean } }) {
   const syncText = syncStatus === "synced" ? "just now" : syncStatus === "syncing" ? "syncing now" : "unknown";
   return (
     <footer
       style={{
-        marginTop: 64,
-        paddingTop: 32,
+        marginTop: vp.isMobile ? 40 : 64,
+        paddingTop: vp.isMobile ? 20 : 32,
         borderTop: "1px solid var(--hairline, #E5E2DC)",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        alignItems: vp.isMobile ? "flex-start" : "center",
+        justifyContent: vp.isMobile ? "flex-start" : "space-between",
+        flexDirection: vp.isMobile ? "column" : "row",
+        gap: vp.isMobile ? 10 : 0,
       }}
     >
       <div style={{ fontSize: 13, color: "var(--tideline)" }}>
