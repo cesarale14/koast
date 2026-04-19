@@ -562,6 +562,23 @@ of deployed Session 1 build:
     future surface needs a different aggregation shape, extend the
     helper rather than duplicating the math.
 
+### After Session 3 (Dashboard rebuild)
+
+17. Next/image + `remotePatterns` are a deploy-time contract.
+    Adding a new image host requires both the `<Image>` usage AND
+    an entry in `next.config.mjs` `images.remotePatterns`. Without
+    the config entry, `/_next/image` returns 400 with
+    INVALID_IMAGE_OPTIMIZE_REQUEST. Audit hosts with
+    `SELECT DISTINCT SUBSTRING(cover_photo_url FROM '^https?://([^/]+)')
+    FROM properties WHERE cover_photo_url IS NOT NULL;` before
+    adding properties from a new source.
+
+18. KoastSegmentedControl is the canonical pill-toggle primitive.
+    Binary/ternary choices (Today's range, active/inactive filters,
+    view switches) render through it instead of bespoke pill groups.
+    The Session 2.8 PropertyDetail tab strip predates this primitive
+    and will migrate to it on its next touch.
+
 ---
 
 ## Out of scope for polish pass
