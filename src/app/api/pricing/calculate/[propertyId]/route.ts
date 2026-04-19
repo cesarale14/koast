@@ -89,9 +89,11 @@ export async function POST(
     // (per-signal breakdown) with a `clamps` sub-object containing
     // raw_engine_suggestion, clamped_by, and guardrail_trips.
     //
-    // Note: pricing_validator.py also writes pricing_recommendations
-    // (with live-Channex current_rate). These route-written rows have
-    // current_rate=null; the validator fills that in on its daily run.
+    // Dedup contract: the pricing_recs_unique_pending_per_date partial
+    // unique index enforces one pending row per (property_id, date).
+    // We clear pending rows for the target window first, then insert
+    // fresh. This keeps pricing_validator.py's "latest snapshot"
+    // semantics intact while preventing inflation across repeat runs.
     //
     // VERIFY (browser devtools):
     //   POST /api/pricing/calculate/<propertyId>  body: {"days":7}
@@ -109,6 +111,16 @@ export async function POST(
       urgency: r.urgency,
       status: "pending",
     }));
+    const recDates = recRows.map((r) => r.date);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: delErr } = await (supabase.from("pricing_recommendations") as any)
+      .delete()
+      .eq("property_id", propertyId)
+      .eq("status", "pending")
+      .in("date", recDates);
+    if (delErr) {
+      console.warn("[pricing/calculate] pricing_recommendations clear failed:", delErr.message);
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: insErr } = await (supabase.from("pricing_recommendations") as any).insert(recRows);
     if (insErr) {
