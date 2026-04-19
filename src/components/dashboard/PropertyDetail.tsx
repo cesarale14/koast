@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Home,
   Settings,
@@ -136,10 +136,27 @@ export default function PropertyDetail({
   calendarRates,
   channels = [],
 }: PropertyDetailProps) {
-  const [tab, setTab] = useState<"Overview" | "Calendar" | "Pricing">("Overview");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<"Overview" | "Calendar" | "Pricing">(() => {
+    const fromUrl = searchParams?.get("tab")?.toLowerCase();
+    if (fromUrl === "pricing") return "Pricing";
+    if (fromUrl === "calendar") return "Calendar";
+    return "Overview";
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showBdcConnect, setShowBdcConnect] = useState(false);
-  const router = useRouter();
+
+  const onTabChange = useCallback(
+    (next: "Overview" | "Calendar" | "Pricing") => {
+      setTab(next);
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.set("tab", next.toLowerCase());
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   const bdcChannel = channels.find((c) => c.channel_code === "BDC");
 
@@ -197,7 +214,7 @@ export default function PropertyDetail({
       />
 
       <div className="max-w-[1760px] mx-auto px-10">
-        <TabBar tab={tab} onChange={setTab} />
+        <TabBar tab={tab} onChange={onTabChange} />
 
         {tab === "Overview" && (
           <OverviewTab
@@ -428,41 +445,64 @@ function TabBar({
   const tabs: ("Overview" | "Calendar" | "Pricing")[] = ["Overview", "Calendar", "Pricing"];
   return (
     <div
-      className="flex gap-6 pd-anim sticky z-[3]"
+      className="pd-anim"
       style={{
-        borderBottom: "1px solid var(--dry-sand)",
-        top: 0,
-        backgroundColor: "#fff",
-        marginTop: -1,
+        display: "flex",
+        justifyContent: "center",
+        marginTop: 24,
         animationDelay: "200ms",
       }}
     >
+      <div
+        role="tablist"
+        style={{
+          display: "inline-flex",
+          gap: 4,
+          padding: 4,
+          borderRadius: 999,
+          background: "#F5F1E8",
+        }}
+      >
       {tabs.map((t) => {
         const active = tab === t;
         return (
           <button
             key={t}
+            role="tab"
+            aria-selected={active}
             type="button"
             onClick={() => onChange(t)}
-            className="pb-3 pt-2 text-[14px] transition-colors"
             style={{
+              padding: "8px 18px",
+              borderRadius: 999,
+              border: "none",
+              background: active ? "#fff" : "transparent",
               color: active ? "var(--coastal)" : "var(--tideline)",
+              fontSize: 13,
               fontWeight: active ? 600 : 500,
-              borderBottom: active ? "2px solid var(--golden)" : "2px solid transparent",
-              marginBottom: -1,
-              transitionDuration: "120ms",
+              letterSpacing: "-0.005em",
+              cursor: "pointer",
+              boxShadow: active ? "0 1px 3px rgba(19,46,32,0.08)" : "none",
+              transition: "background-color 160ms cubic-bezier(0.4,0,0.2,1), color 160ms cubic-bezier(0.4,0,0.2,1), box-shadow 160ms cubic-bezier(0.4,0,0.2,1)",
             }}
             onMouseEnter={(e) => {
-              if (!active) e.currentTarget.style.color = "var(--coastal)";
+              if (!active) {
+                e.currentTarget.style.background = "rgba(23,57,42,0.04)";
+                e.currentTarget.style.color = "var(--coastal)";
+              }
             }}
             onMouseLeave={(e) => {
-              if (!active) e.currentTarget.style.color = "var(--tideline)";
+              if (!active) {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--tideline)";
+              }
             }}
           >
             {t}
           </button>
         );
       })}
+      </div>
     </div>
   );
 }
