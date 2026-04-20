@@ -2,10 +2,12 @@
 
 ## FIRST STEPS FOR EVERY SESSION
 1. Read this file completely before any work.
-2. Read `DESIGN_SYSTEM.md` before any UI work. Every component, color, shadow, animation, and spacing must match the design system exactly.
-3. Read `KOAST_PRODUCT_SPEC.md` for feature requirements before implementation.
-4. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure. If stale: `cd ~/staycommand && repomix`.
-5. Never run `npm run build` on the VPS — use `npx tsc --noEmit` then `git push`. Vercel builds with 8GB RAM.
+2. Read `docs/POLISH_PASS_HANDOFF.md` — current polish-pass state (sessions 1–5a shipped), architectural invariants, new primitives + API routes, binding spec corrections. Start here if picking up UI work.
+3. Read `DESIGN_SYSTEM.md` before any UI work. Every component, color, shadow, animation, and spacing must match the design system exactly.
+4. Read `KOAST_POLISH_PASS_MASTER_PLAN.md` if doing polish-pass work — the 30+ spec corrections are binding.
+5. Read `KOAST_PRODUCT_SPEC.md` for feature requirements before implementation.
+6. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure. If stale: `cd ~/staycommand && repomix`.
+7. Never run `npm run build` on the VPS — use `npx tsc --noEmit` then `git push`. Vercel builds with 8GB RAM.
 
 ## Prompt Format
 Every prompt to Claude Code should start with:
@@ -26,6 +28,38 @@ Every prompt to Claude Code should start with:
 - **Never use default Tailwind grays, shadows, or generic border-radius** — see DESIGN_SYSTEM.md.
 - **No emojis anywhere** — UI, AI-generated content, or user-visible SMS bodies.
 - **No pulsing/glowing animated dots.** Status indicators are solid colored dots.
+
+---
+
+## Polish Pass — Current State (as of 2026-04-20, commit 10950d1)
+
+A multi-session polish pass rebuilt the core UI surfaces. Every session is its own commit on `main`. Detailed arc + invariants in `docs/POLISH_PASS_HANDOFF.md`.
+
+**Shipped sessions:**
+- **1**: Calendar rebuild + 9 shared primitives under `src/components/polish/` (ac2674c)
+- **1.5**: Booking bar alpha colors + rate delta semantics (e48d9d8 → 7a0345f)
+- **2 / 2.5 / 2.6 / 2.7 / 2.8**: PropertyDetail + Pricing tab rebuild, 1760px container, hero image pipeline, tab strip → segmented pill with URL `?tab=` (45911dd → 4d4ce0a)
+- **3 / 3.5 / 3.6 / 3.7 / 3.8 / 3.9**: Dashboard rebuild to "Quiet" design direction with Fraunces greeting + HandwrittenGreeting animation + mobile responsive (3148768 → 5d4f5f0)
+- **4 / 4.5**: Top bar command palette + PlatformPills on property cards (3791e1a → c00d6f7)
+- **5.5**: Unified platform tiles across Dashboard + Properties (0766720)
+- **Backend**: pricing_recommendations dedup (0606d3d), per-platform apply + calendar_rates upsert (b44410f), Channex per-platform audit doc (cbe7085)
+- **5a**: Calendar Month Grid rebuild with two-tab sidebar (Pricing / Availability), `/api/calendar/rates` + `/api/calendar/rates/apply` endpoints, six new components under `src/components/polish/calendar/` (8b5e93d)
+
+**New primitives (`src/components/polish/`)**: KoastButton, KoastCard (4 variants), KoastChip (5 variants), KoastRate (hero/selected/inline/quiet/struck + delta), KoastBookingBar, KoastRail (light/dark), KoastSelectedCell, KoastSignalBar, KoastEmptyState, KoastSegmentedControl, StatusDot, PortfolioSignalSummary, PlatformPills, HandwrittenGreeting, TopBarSearch, CommandPalette. Calendar-specific subfolder: CalendarSidebar, PricingTab, AvailabilityTab, WhyThisRate, RateCell, SyncButton.
+
+**Orchestrator components**: `DashboardView.tsx` (Dashboard home), `CalendarView.tsx` (Calendar), `PricingTab.tsx` (PropertyDetail Pricing tab). All under `src/components/polish/`.
+
+**Binding rules from the polish pass** (full list in master plan §"Spec corrections", 33 entries):
+- `calendar_rates` two-tier model: base row (`channel_code IS NULL`) + per-channel overrides. Unique index on `(property_id, date, channel_code) NULLS NOT DISTINCT`.
+- Never red for merely negative numbers (rate drops are tideline, not coral). Finance-convention sparklines are the one exception.
+- Platform logos always via `src/lib/platforms.ts`. `PLATFORMS[key].tileColor` backs the 22×22 brand-colored tile (Direct overrides to deep-sea).
+- Dashboard uses plain `<article>`/`<div>` + StatusDot, not KoastCard. Quiet direction.
+- Fraunces is Dashboard-display-face only (greeting + pricing-intelligence title + Calendar sidebar date header).
+- `max-w-[1760px] mx-auto px-10` for dashboard-shaped surfaces. Layout shell does NOT cap width.
+- `/api/pricing/apply` + `/api/calendar/rates/apply` share the multi-channel dispatch pattern: BDC through `buildSafeBdcRestrictions`, non-BDC direct.
+- `KOAST_ALLOW_BDC_CALENDAR_PUSH` gate is still in place; flip in Vercel env after the controlled browser-devtools test.
+
+**Known gaps accumulated**: direct-booking flag, property hero source resolution, HTML-entity-encoded image URLs (render-time decode workaround), pulse metric time-series (client-mocked), per-rec per-platform rates not yet modeled, BDC current_rate caching. Session-5a-specific followups in `docs/SESSION_5a_HANDOFF.md`.
 
 ---
 
@@ -440,11 +474,16 @@ What Koast has that competitors don't.
 ## Pending Items (priority order)
 
 ### This week
-*(All three rebrand-debt items shipped 2026-04-17: VRBO dropped from PLATFORMS, SMS copy rebranded + de-emoji'd, `notifications` migration added. Track B Stage 1 backend complete 2026-04-17: PR A safe-restrictions + PR B rules/performance + PR C apply route + PR D read APIs and hook.)*
+*(Rebrand-debt items shipped 2026-04-17. Track B Stage 1 backend complete 2026-04-17: PR A safe-restrictions + PR B rules/performance + PR C apply route + PR D read APIs and hook. Polish pass sessions 1–5a shipped 2026-04-17 through 2026-04-20 — see `docs/POLISH_PASS_HANDOFF.md` for the arc.)*
 
-### Next up: Track B Stage 1 polish pass
-- Property Detail Pricing tab UI: wire the recommendations list, performance panel, per-date audit drill-down, and Apply/Dismiss buttons to `usePricingTab` (and `/api/pricing/apply`, `/api/pricing/dismiss`). Design per `KOAST_PRODUCT_SPEC.md` + Design Philosophy item 4 ("pricing page shows actions, not dashboards").
+### Next up: Polish-pass roadmap
+- **5a.1** (small): fix `/api/calendar/rates` channel_name bug + `/api/pricing/apply` should `.upsert()` instead of `.insert()` on `pricing_performance`.
+- **5b** (Gantt view): portfolio view with virtualization, sticky headers on both axes, density toggle.
+- **5c** (Multi-date + primitives): ship `KoastEditableField` + `KoastPendingChangesBar` + `KoastBulkEditBar` as standalone primitives, then adopt in Calendar.
+- **Session 6** (Properties list upgrade): migrate to primitives, property-level min-stay lands here, bulk edit across properties.
+- **5d** (auto-sync + revert): 90s idle auto-apply, 5-min undo toast — Koast-wide after primitives exist.
 - Flip `KOAST_ALLOW_BDC_CALENDAR_PUSH` after browser-devtools controlled test against Villa Jamaica.
+- Three open questions from Cesar: 2-tier vs 3-tier min-stay hierarchy; where bulk edit matters first; build cross-cutting primitives in 5c or keep Calendar-specific.
 
 ### Phase 1 — Ship to first 5 hosts (2 weeks)
 - Fix revenue chart data query (daily aggregation from `bookings`).
