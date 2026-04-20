@@ -32,69 +32,58 @@ export default function PlatformPills({ platforms }: PlatformPillsProps) {
     .sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   const isEmpty = ordered.length === 0;
 
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+  if (isEmpty) {
+    return (
       <span
         style={{
-          fontSize: 9,
-          fontWeight: 600,
+          fontSize: 11,
+          fontStyle: "italic",
           color: "var(--tideline)",
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          opacity: 0.6,
+          padding: "3px 10px",
+          borderRadius: 999,
+          border: "1px solid var(--dry-sand)",
+          background: "#fff",
+          display: "inline-block",
         }}
       >
-        Connected on
+        No channels
       </span>
-      {isEmpty ? (
-        <span
-          style={{
-            fontSize: 11,
-            fontStyle: "italic",
-            color: "var(--tideline)",
-            padding: "3px 10px",
-            borderRadius: 999,
-            border: "1px solid var(--dry-sand)",
-            background: "#fff",
-          }}
-        >
-          No channels
-        </span>
-      ) : (
-        <div role="list" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {ordered.map((p) => {
-            const config = PLATFORMS[TO_PLATFORM_KEY[p]];
-            return (
-              <span
-                key={p}
-                role="listitem"
-                aria-label={`Connected on ${config.name}`}
-                title={config.name}
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 999,
-                  border: "1px solid var(--dry-sand)",
-                  background: "#fff",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 3,
-                  transition: "border-color 180ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLSpanElement).style.borderColor = "var(--driftwood)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLSpanElement).style.borderColor = "var(--dry-sand)";
-                }}
-              >
-                <Image src={config.icon} alt="" width={14} height={14} />
-              </span>
-            );
-          })}
-        </div>
-      )}
+    );
+  }
+
+  return (
+    <div role="list" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {ordered.map((p) => {
+        const config = PLATFORMS[TO_PLATFORM_KEY[p]];
+        return (
+          <span
+            key={p}
+            role="listitem"
+            aria-label={`Connected on ${config.name}`}
+            title={config.name}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              border: "1px solid var(--dry-sand)",
+              background: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 5,
+              transition: "border-color 180ms ease",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLSpanElement).style.borderColor = "var(--driftwood)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLSpanElement).style.borderColor = "var(--dry-sand)";
+            }}
+          >
+            <Image src={config.icon} alt="" width={18} height={18} />
+          </span>
+        );
+      })}
     </div>
   );
 }

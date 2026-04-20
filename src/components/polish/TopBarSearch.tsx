@@ -1,23 +1,19 @@
 "use client";
 
 /**
- * TopBarSearch — centered pill search input in the Dashboard top bar.
- *
- * Cmd/Ctrl+K focuses from anywhere on the page. Hidden below 900px
- * (mobile gets an icon-button expansion in a future session). Typing
- * is accepted but submitting does nothing until a global search
- * endpoint exists.
+ * TopBarSearch — centered pill in the Dashboard top bar that triggers
+ * the CommandPalette overlay. It is a <button>, not an <input>. The
+ * ⌘K shortcut lives inside CommandPalette itself so it works even
+ * when this trigger is hidden (mobile).
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
+import { OPEN_EVENT } from "./CommandPalette";
 
 const HIDE_BELOW = 900;
 
 export default function TopBarSearch() {
-  const ref = useRef<HTMLInputElement | null>(null);
-  const [value, setValue] = useState("");
-  const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -27,111 +23,66 @@ export default function TopBarSearch() {
     return () => window.removeEventListener("resize", apply);
   }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      if ((e.metaKey || e.ctrlKey) && key === "k") {
-        e.preventDefault();
-        ref.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
-  const onSubmit = useCallback((e: React.FormEvent) => {
-    // TODO(search): wire to global search handler when backend search
-    // endpoint exists. Stub: submit is a no-op for now.
-    e.preventDefault();
-  }, []);
-
   if (!visible) return null;
 
-  const showHint = !focused && value.length === 0;
-
   return (
-    <form
-      onSubmit={onSubmit}
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new CustomEvent(OPEN_EVENT))}
+      aria-label="Open search"
+      className="koast-topbar-search"
       style={{
         flex: 1,
         display: "flex",
-        justifyContent: "center",
+        alignItems: "center",
+        gap: 10,
+        position: "relative",
         minWidth: 0,
         maxWidth: 440,
         margin: "0 auto",
+        height: 36,
+        padding: "0 14px",
+        borderRadius: 999,
+        border: "1px solid transparent",
+        background: "rgba(235,231,223,0.5)",
+        color: "var(--coastal)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: 13,
+        fontWeight: 400,
+        textAlign: "left",
+        transition: "background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease",
       }}
     >
-      <label
+      <Search size={16} style={{ color: "var(--tideline)", opacity: 0.6, flexShrink: 0 }} />
+      <span style={{ flex: 1, color: "var(--tideline)", opacity: 0.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        Search properties, guests, messages…
+      </span>
+      <kbd
+        aria-hidden
         style={{
-          position: "relative",
-          display: "block",
-          width: "100%",
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "2px 6px",
+          borderRadius: 4,
+          background: "rgba(61,107,82,0.1)",
+          color: "var(--tideline)",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: 10,
+          letterSpacing: "0.02em",
+          flexShrink: 0,
         }}
       >
-        <Search
-          size={16}
-          style={{
-            position: "absolute",
-            left: 14,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: "var(--tideline)",
-            opacity: 0.6,
-            pointerEvents: "none",
-          }}
-        />
-        <input
-          ref={ref}
-          type="search"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder="Search properties, guests, messages…"
-          aria-label="Search"
-          style={{
-            width: "100%",
-            height: 36,
-            padding: "10px 52px 10px 42px",
-            borderRadius: 999,
-            border: `1px solid ${focused ? "var(--dry-sand)" : "transparent"}`,
-            background: focused ? "#fff" : "rgba(235,231,223,0.5)",
-            color: "var(--coastal)",
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: 400,
-            outline: "none",
-            boxShadow: focused ? "0 0 0 3px rgba(196,154,90,0.08)" : "none",
-            transition:
-              "background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease",
-          }}
-        />
-        {showHint && (
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              right: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 2,
-              padding: "2px 6px",
-              borderRadius: 4,
-              background: "rgba(61,107,82,0.1)",
-              color: "var(--tideline)",
-              fontSize: 10,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              letterSpacing: "0.02em",
-              pointerEvents: "none",
-              transition: "opacity 160ms ease",
-            }}
-          >
-            ⌘K
-          </span>
-        )}
-      </label>
-    </form>
+        ⌘K
+      </kbd>
+      <style jsx>{`
+        .koast-topbar-search:focus-visible {
+          outline: none;
+          background: #fff;
+          border-color: var(--dry-sand);
+          box-shadow: 0 0 0 3px rgba(196, 154, 90, 0.08);
+        }
+      `}</style>
+    </button>
   );
 }

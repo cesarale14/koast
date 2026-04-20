@@ -703,6 +703,25 @@ of deployed Session 1 build:
     approximate platform logos) — Session 4 did NOT duplicate them
     under `src/components/polish/assets/platforms/` as the session
     prompt suggested; that would have forked the source of truth.
+    Superseded by Spec Correction 32 — eyebrow dropped, pills scale
+    up.
+
+### After Session 4.5 (command palette + pill polish)
+
+31. Top bar search is a command palette TRIGGER, not a live input.
+    The visible pill in the top bar is a `<button>` that opens an
+    overlay command palette on click or ⌘K. This decision reserves
+    the global-search feature space for a future Vercel/Linear-style
+    palette. The current overlay is a placeholder shell; real search
+    results land in a future session. The ⌘K listener lives inside
+    CommandPalette itself so the shortcut works even when the
+    trigger is hidden (mobile).
+
+32. PlatformPills render at 32×32 pill / 18×18 logo / 10px gap with
+    no eyebrow label. The logos carry their own brand recognition
+    — a descriptive eyebrow dilutes the signal. Empty state stays
+    a muted "No channels" italic pill. Supersedes the eyebrow +
+    22×22 pattern from Spec Correction 30.
 
 ---
 

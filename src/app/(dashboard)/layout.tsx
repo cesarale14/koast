@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import TopBarSearch from "@/components/polish/TopBarSearch";
+import CommandPalette from "@/components/polish/CommandPalette";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
@@ -401,6 +402,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
+      <CommandPalette />
     </div>
   );
 }
