@@ -703,8 +703,7 @@ of deployed Session 1 build:
     approximate platform logos) — Session 4 did NOT duplicate them
     under `src/components/polish/assets/platforms/` as the session
     prompt suggested; that would have forked the source of truth.
-    Superseded by Spec Correction 32 — eyebrow dropped, pills scale
-    up.
+    **Superseded by Spec Corrections 32 + 33.**
 
 ### After Session 4.5 (command palette + pill polish)
 
@@ -721,7 +720,31 @@ of deployed Session 1 build:
     no eyebrow label. The logos carry their own brand recognition
     — a descriptive eyebrow dilutes the signal. Empty state stays
     a muted "No channels" italic pill. Supersedes the eyebrow +
-    22×22 pattern from Spec Correction 30.
+    22×22 pattern from Spec Correction 30. **Superseded by Spec
+    Correction 33 (white-chip style dropped in favor of the
+    brand-colored-tile style already in use on /properties).**
+
+### After Session 5.5 (unified platform tiles across Dashboard + Properties)
+
+33. Platform connection tiles use the unified brand-colored-tile
+    style across all pages: 22×22 tile, 6px radius, brand color at
+    75% alpha bg (`{tileColor}bf` 8-digit hex), 1px white inset
+    border (`rgba(255,255,255,0.2)`), 12×12 white-silhouette logo,
+    `backdrop-filter: blur(8px)`. Hover bumps alpha to 85%
+    (`{tileColor}d9`). No scale, no shadow at rest. This overrides
+    the 32×32 white-pill style from Spec Correction 32 (Session 4.5)
+    — the colored-tile aesthetic reads more viscerally as "this
+    property is LIT UP on these channels."
+    The tile color is sourced from a new `tileColor` field on
+    `PLATFORMS` in `src/lib/platforms.ts`: Airbnb + Booking.com
+    reuse their brand `color`; Direct overrides from golden
+    `#c49a5a` to Koast deep-sea `#132e20` (the Direct tile is a
+    Koast moment, not a golden-accent surface).
+    Session 5.5 refactored the Dashboard `PlatformPills` to the new
+    style; the inline JSX on `PropertiesPage.tsx` (still wrapped in
+    `ChannelPopover` for the hover popover) is visually identical
+    today and is tracked to migrate to the shared primitive in
+    Session 6.
 
 ---
 

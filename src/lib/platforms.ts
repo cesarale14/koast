@@ -7,6 +7,11 @@ export const PLATFORMS = {
     name: "Airbnb",
     color: "#FF385C",
     colorLight: "rgba(255,56,92,0.1)",
+    // tileColor backs the 22×22 brand-colored tile used on Dashboard
+    // + Properties cards. For Airbnb + Booking.com it matches `color`;
+    // for Direct we override to Koast deep-sea (the 'Direct' tile is
+    // a Koast moment, not a golden-accent surface — see Spec Correction 33).
+    tileColor: "#FF385C",
     icon: "/icons/platforms/airbnb.svg",
     iconWhite: "/icons/platforms/airbnb-white.svg",
     tile: "/icons/platforms/airbnb-tile.svg",
@@ -15,6 +20,7 @@ export const PLATFORMS = {
     name: "Booking.com",
     color: "#003580",
     colorLight: "rgba(0,53,128,0.1)",
+    tileColor: "#003580",
     icon: "/icons/platforms/booking-com.svg",
     iconWhite: "/icons/platforms/booking-com-white.svg",
     tile: "/icons/platforms/booking-com-tile.svg",
@@ -27,6 +33,7 @@ export const PLATFORMS = {
     name: "Direct",
     color: "#c49a5a",
     colorLight: "rgba(196,154,90,0.1)",
+    tileColor: "#132e20",
     icon: "/icons/platforms/koast-tile.svg",
     iconWhite: "/icons/platforms/koast-tile.svg",
     tile: "/icons/platforms/koast-tile.svg",
