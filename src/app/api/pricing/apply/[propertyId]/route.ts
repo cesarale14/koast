@@ -51,7 +51,22 @@ import {
   buildSafeBdcRestrictions,
   toChannexRestrictionValues,
   type KoastRestrictionProposal,
+  type SafeRestrictionPlan,
 } from "@/lib/channex/safe-restrictions";
+import { isBdcChannelCode } from "@/lib/channex/calendar-push-gate";
+
+// Map a property_channels channel_code (upper-case, e.g. 'BDC' / 'ABB')
+// to the pricing_performance `channels_pushed` slug convention (lower-
+// case 'booking_com' / 'airbnb'). Defined here instead of inline so the
+// backfill script + other readers can share the same mapping.
+function channelSlugFor(code: string): string {
+  const c = code.toUpperCase();
+  if (c === "BDC") return "booking_com";
+  if (c === "ABB") return "airbnb";
+  if (c === "VRBO") return "vrbo";
+  if (c === "DIRECT") return "direct";
+  return code.toLowerCase();
+}
 
 export async function POST(
   request: NextRequest,
@@ -115,16 +130,29 @@ export async function POST(
       }
       const channexPropertyId: string = prop.channex_property_id;
 
+      // Session 4.6: multi-channel dispatch. Every active channel with a
+      // registered rate plan receives the approved rate. BDC routes through
+      // buildSafeBdcRestrictions (pre-flight read + safe-merge); non-BDC
+      // targets push directly. Matches the pattern used by /api/pricing/push.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: bdcLink } = await (supabase.from("property_channels") as any)
-        .select("settings, status")
+      const { data: channelLinks } = await (supabase.from("property_channels") as any)
+        .select("channel_code, channel_name, settings, status")
         .eq("property_id", propertyId)
-        .eq("channel_code", "BDC")
-        .maybeSingle();
-      const bdcRatePlanId: string | undefined = bdcLink?.settings?.rate_plan_id;
-      if (!bdcRatePlanId) {
+        .eq("status", "active");
+
+      type RatePlanTarget = { id: string; channel: string };
+      const targets: RatePlanTarget[] = [];
+      for (const link of ((channelLinks ?? []) as Array<{
+        channel_code: string;
+        channel_name: string;
+        settings: { rate_plan_id?: string } | null;
+      }>)) {
+        const rpId = link.settings?.rate_plan_id;
+        if (rpId) targets.push({ id: rpId, channel: link.channel_code });
+      }
+      if (targets.length === 0) {
         return NextResponse.json(
-          { error: "No BDC channel with a rate plan configured for this property" },
+          { error: "No connected channel with a rate plan configured for this property" },
           { status: 400 }
         );
       }
@@ -185,59 +213,116 @@ export async function POST(
       const dateTo = dates[dates.length - 1];
 
       const channex = createChannexClient();
-      const plan = await buildSafeBdcRestrictions({
-        channex,
-        channexPropertyId,
-        bdcRatePlanId,
-        dateFrom,
-        dateTo,
-        koastProposed,
-      });
+      const failedBatches: Array<{ batch_index: number; date_range: string; error: string; size: number; target: string }> = [];
+      // Per-date per-channel success tracking. Keys are dates; values
+      // are the set of channel_codes (upper-case, e.g. 'BDC') that
+      // accepted the push for that date.
+      const successByDate = new Map<string, Set<string>>();
+      const bdcPlans: Array<{ rate_plan_id: string; channel: string; plan: SafeRestrictionPlan }> = [];
 
-      if (plan.entries_to_push.length === 0) {
-        return NextResponse.json({
-          plan,
-          applied_count: 0,
-          skipped_count: recs.length,
-          performance_rows_created: 0,
-          note: "safe_restrictions_skipped_all_entries",
-        });
-      }
-
-      const payload = toChannexRestrictionValues(plan, channexPropertyId, bdcRatePlanId);
-      const failedBatches: Array<{ batch_index: number; date_range: string; error: string; size: number }> = [];
-      const successfullyPushedDates = new Set<string>();
-
-      for (let i = 0; i < payload.length; i += 200) {
-        const batch = payload.slice(i, i + 200);
-        const firstDate = batch[0]?.date_from ?? "?";
-        const lastDate = batch[batch.length - 1]?.date_to ?? "?";
-        try {
-          await channex.updateRestrictions(batch);
-          for (const entry of batch) {
-            successfullyPushedDates.add(entry.date_from);
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          failedBatches.push({
-            batch_index: Math.floor(i / 200),
-            date_range: `${firstDate}..${lastDate}`,
-            error: msg,
-            size: batch.length,
+      // Per-target push loop. Each target = one Channex rate plan = one
+      // platform (BDC, ABB, etc.). BDC runs through safe-restrictions;
+      // non-BDC targets push directly.
+      for (const t of targets) {
+        if (isBdcChannelCode(t.channel)) {
+          const plan = await buildSafeBdcRestrictions({
+            channex,
+            channexPropertyId,
+            bdcRatePlanId: t.id,
+            dateFrom,
+            dateTo,
+            koastProposed,
           });
-          console.error(`[pricing/apply] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+          bdcPlans.push({ rate_plan_id: t.id, channel: t.channel, plan });
+          if (plan.entries_to_push.length === 0) continue;
+          const payload = toChannexRestrictionValues(plan, channexPropertyId, t.id);
+          for (let i = 0; i < payload.length; i += 200) {
+            const batch = payload.slice(i, i + 200);
+            const firstDate = batch[0]?.date_from ?? "?";
+            const lastDate = batch[batch.length - 1]?.date_to ?? "?";
+            try {
+              await channex.updateRestrictions(batch);
+              for (const entry of batch) {
+                if (!successByDate.has(entry.date_from)) successByDate.set(entry.date_from, new Set());
+                successByDate.get(entry.date_from)!.add(t.channel);
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              failedBatches.push({
+                batch_index: Math.floor(i / 200),
+                date_range: `${firstDate}..${lastDate}`,
+                error: msg,
+                size: batch.length,
+                target: t.channel,
+              });
+              console.error(`[pricing/apply ${t.channel}] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+            }
+          }
+          continue;
+        }
+
+        // Non-BDC direct push. Same shape as /api/pricing/push — one
+        // entry per date using the rec's suggested_rate in cents.
+        const restrictionValues: Array<{
+          property_id: string;
+          rate_plan_id: string;
+          date_from: string;
+          date_to: string;
+          rate: number;
+          min_stay_arrival: number;
+          stop_sell: boolean;
+        }> = [];
+        for (const rec of recs) {
+          restrictionValues.push({
+            property_id: channexPropertyId,
+            rate_plan_id: t.id,
+            date_from: rec.date,
+            date_to: rec.date,
+            rate: Math.round(rec.suggested_rate * 100),
+            min_stay_arrival: 1,
+            stop_sell: false,
+          });
+        }
+        for (let i = 0; i < restrictionValues.length; i += 200) {
+          const batch = restrictionValues.slice(i, i + 200);
+          const firstDate = batch[0]?.date_from ?? "?";
+          const lastDate = batch[batch.length - 1]?.date_to ?? "?";
+          try {
+            await channex.updateRestrictions(batch);
+            for (const entry of batch) {
+              if (!successByDate.has(entry.date_from)) successByDate.set(entry.date_from, new Set());
+              successByDate.get(entry.date_from)!.add(t.channel);
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            failedBatches.push({
+              batch_index: Math.floor(i / 200),
+              date_range: `${firstDate}..${lastDate}`,
+              error: msg,
+              size: batch.length,
+              target: t.channel,
+            });
+            console.error(`[pricing/apply ${t.channel}] Batch ${i / 200} failed (${firstDate}..${lastDate}): ${msg}`);
+          }
         }
       }
 
-      // For each successfully-pushed date that had a source recommendation,
-      // upsert a pricing_performance row + flip the rec to 'applied'.
+      // Consolidate: for each date that had AT LEAST ONE successful
+      // channel push, write pricing_performance + flip the rec status
+      // + upsert calendar_rates rows (one per-channel override plus
+      // one base row). The base row keeps channel_code NULL so
+      // downstream "what's my current rate for this date?" readers
+      // find the applied value without having to know which channels
+      // accepted.
       const appliedAt = new Date().toISOString();
       const perfRows: Array<Record<string, unknown>> = [];
       const appliedRecIds: string[] = [];
-      const pushedDatesArr = Array.from(successfullyPushedDates);
-      for (const date of pushedDatesArr) {
+      const calendarRateUpserts: Array<Record<string, unknown>> = [];
+      const successEntries = Array.from(successByDate.entries());
+      for (const [date, channelSet] of successEntries) {
         const rec = recByDate.get(date);
-        if (!rec) continue;
+        if (!rec || channelSet.size === 0) continue;
+        const slugs = (Array.from(channelSet) as string[]).map(channelSlugFor);
         perfRows.push({
           property_id: propertyId,
           date: rec.date,
@@ -245,10 +330,33 @@ export async function POST(
           applied_rate: rec.suggested_rate,
           applied_at: appliedAt,
           booked: false,
-          channels_pushed: ["booking_com"],
+          channels_pushed: slugs,
         });
         appliedRecIds.push(rec.id);
+        // Per-channel rows — one per successful channel push.
+        for (const code of Array.from(channelSet) as string[]) {
+          calendarRateUpserts.push({
+            property_id: propertyId,
+            date: rec.date,
+            channel_code: code,
+            applied_rate: rec.suggested_rate,
+            rate_source: "engine",
+            is_available: true,
+          });
+        }
+        // Base row (channel_code NULL) — the property-level master
+        // rate is also updated since one recommendation applies
+        // uniformly across all its targets.
+        calendarRateUpserts.push({
+          property_id: propertyId,
+          date: rec.date,
+          channel_code: null,
+          applied_rate: rec.suggested_rate,
+          rate_source: "engine",
+          is_available: true,
+        });
       }
+
       let performance_rows_created = 0;
       if (perfRows.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -259,6 +367,19 @@ export async function POST(
           performance_rows_created = perfRows.length;
         }
       }
+
+      let calendar_rates_upserted = 0;
+      if (calendarRateUpserts.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: crErr } = await (supabase.from("calendar_rates") as any)
+          .upsert(calendarRateUpserts, { onConflict: "property_id,date,channel_code" });
+        if (crErr) {
+          console.warn("[pricing/apply] calendar_rates upsert failed:", crErr.message);
+        } else {
+          calendar_rates_upserted = calendarRateUpserts.length;
+        }
+      }
+
       if (appliedRecIds.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase.from("pricing_recommendations") as any)
@@ -267,10 +388,13 @@ export async function POST(
       }
 
       const responseBody = {
-        plan,
+        plan: bdcPlans[0]?.plan ?? null, // first BDC plan for backwards compat
+        bdc_plans: bdcPlans,
         applied_count: appliedRecIds.length,
         skipped_count: recs.length - appliedRecIds.length,
         performance_rows_created,
+        calendar_rates_upserted,
+        targets: targets.map((t) => t.channel),
         applied_at: appliedAt,
         ...(failedBatches.length > 0
           ? { partial_failure: true, failed_batches: failedBatches }
