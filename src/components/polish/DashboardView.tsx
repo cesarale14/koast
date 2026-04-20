@@ -327,39 +327,12 @@ function GreetingBlock({
   const tod = timeOfDayKey();
   return (
     <section>
-      {vp.isMobile ? (
-        <div>
-          <h1
-            style={{
-              fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
-              fontWeight: 400,
-              fontSize: 28,
-              letterSpacing: "-0.025em",
-              color: "var(--coastal)",
-              lineHeight: 1.2,
-              margin: 0,
-            }}
-          >
-            {tod === "morning" ? "Good morning" : tod === "afternoon" ? "Good afternoon" : "Good evening"}, {first}.
-          </h1>
-          <div
-            style={{
-              marginTop: 6,
-              fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
-              fontWeight: 400,
-              fontStyle: "italic",
-              fontSize: 22,
-              letterSpacing: "-0.02em",
-              color: "var(--tideline)",
-              lineHeight: 1.25,
-            }}
-          >
-            {greetingStatus}
-          </div>
-        </div>
-      ) : (
-        <HandwrittenGreeting timeOfDay={tod} name={first} status={greetingStatus} />
-      )}
+      <HandwrittenGreeting
+        timeOfDay={tod}
+        name={first}
+        status={greetingStatus}
+        compact={vp.isMobile}
+      />
       <div
         style={{
           marginTop: 12,

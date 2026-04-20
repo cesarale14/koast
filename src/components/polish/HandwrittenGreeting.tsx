@@ -9,9 +9,8 @@
  * SVG — the effect comes from clip-path + variable font axes giving
  * Fraunces a hand-lettered cadence at large sizes.
  *
- * Animation plays once per browser session. The session gate uses
- * sessionStorage("koast:greeting-animated"); prefers-reduced-motion
- * users see the final state instantly.
+ * Animation plays on every mount. `prefers-reduced-motion` users see
+ * the final state instantly.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +19,7 @@ interface HandwrittenGreetingProps {
   timeOfDay: "morning" | "afternoon" | "evening";
   name: string;
   status: string;
+  compact?: boolean;
 }
 
 // Explicitly target the Google Fonts @import family (loaded in
@@ -40,13 +40,15 @@ function greetingPrefix(tod: "morning" | "afternoon" | "evening"): string {
   return "Good evening";
 }
 
-export default function HandwrittenGreeting({ timeOfDay, name, status }: HandwrittenGreetingProps) {
+export default function HandwrittenGreeting({ timeOfDay, name, status, compact = false }: HandwrittenGreetingProps) {
   const line1 = `${greetingPrefix(timeOfDay)}, ${name}.`;
   const line2 = status;
+  const line1Size = compact ? 34 : 72;
+  const line2Size = compact ? 24 : 56;
 
-  // Compute the initial animate state once; we want SSR + first client
-  // paint to agree, and we want the animation to play exactly once per
-  // browser session.
+  // Always animate on mount (unless the user has reduced motion on).
+  // SSR renders the final state; the first client render flips to the
+  // primed pre-animation state and kicks off the reveal.
   const [animate, setAnimate] = useState<boolean>(false);
   const [fontsReady, setFontsReady] = useState<boolean>(false);
 
@@ -58,15 +60,10 @@ export default function HandwrittenGreeting({ timeOfDay, name, status }: Handwri
   // First client render — decide whether to animate.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const already = sessionStorage.getItem("koast:greeting-animated") === "1";
     const reducedMotion =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const shouldAnimate = !already && !reducedMotion;
-    setAnimate(shouldAnimate);
-    if (shouldAnimate) {
-      sessionStorage.setItem("koast:greeting-animated", "1");
-    }
+    setAnimate(!reducedMotion);
   }, []);
 
   // Wait for Fraunces to load before measuring widths — otherwise the
@@ -173,7 +170,7 @@ export default function HandwrittenGreeting({ timeOfDay, name, status }: Handwri
           ref={l1Ref}
           style={{
             ...DISPLAY_BASE,
-            fontSize: 72,
+            fontSize: line1Size,
             letterSpacing: "-0.025em",
             color: "var(--deep-sea)",
             clipPath: restingClip,
@@ -190,7 +187,7 @@ export default function HandwrittenGreeting({ timeOfDay, name, status }: Handwri
             style={{
               ...DISPLAY_BASE,
               fontStyle: "italic",
-              fontSize: 56,
+              fontSize: line2Size,
               letterSpacing: "-0.02em",
               color: "var(--tideline)",
               lineHeight: 1.05,
