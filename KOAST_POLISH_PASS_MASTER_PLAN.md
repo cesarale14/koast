@@ -687,6 +687,23 @@ of deployed Session 1 build:
     large sizes. Other Fraunces consumers (Pricing-intelligence
     title) use the default axes and stay crisp.
 
+### After Session 4 (Dashboard finishing touches)
+
+29. Top bar search is a platform-level affordance. Placeholder
+    "Search properties, guests, messages…" communicates cross-entity
+    search. Cmd/Ctrl+K focuses the input from anywhere. Pill sits
+    centered in the layout shell top bar on desktop, hidden below
+    900px (mobile icon-button expansion deferred).
+
+30. Property cards surface channel connection via a "CONNECTED ON"
+    eyebrow + 22px non-interactive pill logos between the location
+    line and the context block. Supported enum: 'airbnb' | 'booking'
+    | 'direct'. Logos reuse canonical `/public/icons/platforms/` SVGs
+    through `src/lib/platforms.ts` (DESIGN_SYSTEM.md rule: never
+    approximate platform logos) — Session 4 did NOT duplicate them
+    under `src/components/polish/assets/platforms/` as the session
+    prompt suggested; that would have forked the source of truth.
+
 ---
 
 ## Out of scope for polish pass

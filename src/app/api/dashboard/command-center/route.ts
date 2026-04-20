@@ -278,6 +278,17 @@ export async function POST() {
       const ratingAgg = ratingSumByProp.get(prop.id);
       const pRating = ratingAgg && ratingAgg.count > 0 ? Math.round((ratingAgg.sum / ratingAgg.count) * 10) / 10 : 0;
 
+      // Reduce `platforms` (may include vrbo/unknown values) to the
+      // Dashboard-card enum {airbnb | booking | direct}. 'direct' has
+      // no canonical flag on the schema yet (no direct_booking_enabled
+      // column); when that flag lands it becomes another map entry.
+      const connectedPlatforms = Array.from(new Set(platforms.flatMap((p) => {
+        if (p === "airbnb") return ["airbnb" as const];
+        if (p === "booking_com") return ["booking" as const];
+        if (p === "direct") return ["direct" as const];
+        return [] as const;
+      })));
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const card: any = {
         id: prop.id,
@@ -286,6 +297,7 @@ export async function POST() {
         location: [prop.city, prop.state].filter(Boolean).join(", ") || null,
         platform: platforms[0] ?? null,
         platforms,
+        connectedPlatforms,
         status,
         tonightRate: tonightRateMap.get(prop.id) || null,
         metrics: {

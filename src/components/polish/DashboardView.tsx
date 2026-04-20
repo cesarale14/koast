@@ -28,6 +28,7 @@ import KoastSegmentedControl from "./KoastSegmentedControl";
 import KoastEmptyState from "./KoastEmptyState";
 import StatusDot from "./StatusDot";
 import HandwrittenGreeting from "./HandwrittenGreeting";
+import PlatformPills, { type ConnectedPlatform } from "./PlatformPills";
 
 // ---------------- Types ----------------
 
@@ -43,6 +44,7 @@ interface PropertyCard {
   location: string | null;
   coverPhotoUrl: string | null;
   platforms?: string[];
+  connectedPlatforms?: ConnectedPlatform[];
   status: "occupied" | "vacant" | "turnover_today" | "checkin_today" | "checkout_today";
   primaryStatus: string;
   secondaryStatus: string;
@@ -504,7 +506,10 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
             {card.location}
           </div>
         )}
-        <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
+        <div style={{ marginTop: 10, marginBottom: 0 }}>
+          <PlatformPills platforms={card.connectedPlatforms ?? []} />
+        </div>
+        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5 }}>
           <div style={{ color: "var(--coastal)" }}>{renderWithBold(card.primaryStatus)}</div>
           {card.secondaryStatus && (
             <div style={{ color: "var(--tideline)", marginTop: 2 }}>{card.secondaryStatus}</div>

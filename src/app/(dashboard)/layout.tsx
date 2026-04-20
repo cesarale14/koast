@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
+import TopBarSearch from "@/components/polish/TopBarSearch";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
@@ -362,10 +363,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="main-offset flex-1 flex flex-col min-h-screen">
           {/* Topbar */}
           <header
-            className="h-14 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b bg-white"
+            className="h-14 flex-shrink-0 flex items-center justify-between gap-4 px-4 md:px-6 border-b bg-white"
             style={{ borderColor: "var(--dry-sand)" }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               <button
                 className="md:hidden transition-colors"
                 style={{ color: "var(--coastal)" }}
@@ -377,7 +378,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
               </span>
             </div>
-            <div className="flex items-center gap-2 md:gap-3">
+            <TopBarSearch />
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
               <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
                 <Bell size={20} strokeWidth={1.5} />
               </button>

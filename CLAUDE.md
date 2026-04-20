@@ -323,6 +323,9 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - ChannelPopover interactive platform badges (desktop hover + mobile bottom sheet)
 - Pricing engine daily validation runs (Virginia VPS timer)
 
+## Known Gaps — Direct Booking Flag
+- **No canonical flag for "direct booking enabled."** `propertyCards[].connectedPlatforms` (Dashboard) should include `'direct'` when a property accepts direct bookings, but the schema has no `direct_booking_enabled` column on `properties` (nor a counterpart on `property_channels`). Session 4 derives `'direct'` only when the legacy `platforms` list already contains `'direct'` — which happens today only via an obscure Channex mapping path. Real implementation: add a boolean column (`properties.direct_booking_enabled`), surface a toggle in Property Settings, and update the Dashboard derivation to read it.
+
 ## Known Gaps — Pulse Metric Time Series
 - **Dashboard sparkline data.** `pulseMetrics` in `/api/dashboard/command-center` returns only `value` + `prior`; the Dashboard mocks a 7-point series client-side via linear interpolation + gentle wobble. When a real daily time-series endpoint lands (likely a new `/api/dashboard/pulse?range=30d` surface backed by `bookings` aggregations), swap the client mock for real `series: number[]` per metric. Shape is already defined; only the data source needs upgrading.
 
