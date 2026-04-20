@@ -1,3 +1,11 @@
+/* Fraunces with expressive axes (opsz, SOFT, WONK) for the handwritten
+ * greeting in HandwrittenGreeting.tsx. next/font/google (src/app/layout.tsx)
+ * loads the weight + italic variants; this @import layers the expressive
+ * axes on top. They render from a secondary font-family name so we never
+ * reach for them on non-greeting Fraunces usage.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

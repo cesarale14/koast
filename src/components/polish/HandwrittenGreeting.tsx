@@ -22,8 +22,11 @@ interface HandwrittenGreetingProps {
   status: string;
 }
 
+// Explicitly target the Google Fonts @import family (loaded in
+// globals.css) rather than the next/font CSS variable — the @import
+// version exposes the opsz/SOFT/WONK axes required by the handoff.
 const DISPLAY_BASE: React.CSSProperties = {
-  fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
+  fontFamily: "'Fraunces', Georgia, serif",
   fontWeight: 400,
   fontVariationSettings: '"opsz" 144, "SOFT" 100, "WONK" 1',
   lineHeight: 1,

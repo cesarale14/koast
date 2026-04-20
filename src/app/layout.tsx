@@ -5,15 +5,14 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 
 // Fraunces is the Dashboard greeting + pricing-intelligence display face.
-// The handwritten greeting uses Fraunces' expressive variable-font axes
-// (opsz, SOFT, WONK) for a looser, pen-like rendering at large sizes;
-// we load them via next/font/google `axes` so the UI can hit
-// font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1 directly.
+// next/font/google's Fraunces manifest only permits a narrow axes set
+// at build time, so we load the expressive axes (opsz / SOFT / WONK)
+// separately — see globals.css. next/font still owns the weight +
+// italic variants for the rest of the product.
 const fraunces = Fraunces({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   style: ["normal", "italic"],
-  axes: ["opsz", "SOFT", "WONK"],
   variable: "--font-fraunces",
   display: "swap",
 });
