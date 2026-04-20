@@ -9,19 +9,16 @@ import {
   Upload,
   ArrowLeftRight,
   Calendar as CalendarIcon,
-  Sparkles,
 } from "lucide-react";
 import { usePricingTab, type PricingRecommendation } from "@/hooks/usePricingTab";
 import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
 import KoastButton from "./KoastButton";
-import KoastCard from "./KoastCard";
 import KoastChip from "./KoastChip";
 import KoastRate from "./KoastRate";
 import KoastBookingBar from "./KoastBookingBar";
 import KoastRail from "./KoastRail";
+import CalendarSidebar from "./calendar/CalendarSidebar";
 import KoastSelectedCell from "./KoastSelectedCell";
-import KoastSignalBar from "./KoastSignalBar";
-import KoastEmptyState from "./KoastEmptyState";
 
 interface Property {
   id: string;
@@ -54,6 +51,10 @@ interface Props {
   properties: Property[];
   bookings: Booking[];
   rates: Rate[];
+  // Dates (ISO strings) that have at least one per-channel rate
+  // override — the grid renders a golden hairline indicator on those
+  // cells. Server-prefetched in page.tsx via a parallel query.
+  overrideDatesByProperty?: Record<string, string[]>;
   // When embedded inside PropertyDetail we already know the property;
   // hide the top-chrome Switch affordance so there's no redundant UI.
   showSwitcher?: boolean;
@@ -150,7 +151,13 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
   return segs;
 }
 
-export default function CalendarView({ properties, bookings: allBookings, rates: allRates, showSwitcher = true }: Props) {
+export default function CalendarView({
+  properties,
+  bookings: allBookings,
+  rates: allRates,
+  overrideDatesByProperty,
+  showSwitcher = true,
+}: Props) {
   const todayStr = toISO(new Date());
   const [activePropertyId, setActivePropertyId] = useState(properties[0]?.id ?? "");
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
@@ -200,6 +207,11 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
     return m;
   }, [allRates, activePropertyId]);
 
+  const overrideDates = useMemo(() => {
+    const arr = overrideDatesByProperty?.[activePropertyId] ?? [];
+    return new Set(arr);
+  }, [overrideDatesByProperty, activePropertyId]);
+
   const connectedPlatforms = useMemo(() => {
     const set = new Set<PlatformKey>();
     for (const b of bookings) {
@@ -226,7 +238,7 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
   }, [recommendations.pending]);
 
   const selectedRec = recByDate.get(selectedDate) ?? null;
-  const selectedRate = rateByDate.get(selectedDate) ?? null;
+  void selectedRec;
 
   const goPrev = useCallback(() => {
     setStartMonth((s) => ({
@@ -246,48 +258,11 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
     setSelectedDate(toISO(d));
   }, []);
 
-  const handleApply = useCallback(async () => {
-    if (!selectedRec) return;
-    setBusy("apply");
-    try {
-      const res = await fetch(`/api/pricing/apply/${activePropertyId}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          recommendation_ids: [selectedRec.id],
-          idempotency_key: `apply-${selectedRec.id}-${Date.now()}`,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setToast({ text: `Applied: ${data.applied_count ?? 1} date(s)`, tone: "ok" });
-      await refetch();
-    } catch (err) {
-      setToast({ text: err instanceof Error ? err.message : "Apply failed", tone: "err" });
-    } finally {
-      setBusy(null);
-    }
-  }, [activePropertyId, selectedRec, refetch]);
-
-  const handleDismiss = useCallback(async () => {
-    if (!selectedRec) return;
-    setBusy("dismiss");
-    try {
-      const res = await fetch(`/api/pricing/dismiss`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ recommendation_id: selectedRec.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setToast({ text: "Dismissed", tone: "ok" });
-      await refetch();
-    } catch (err) {
-      setToast({ text: err instanceof Error ? err.message : "Dismiss failed", tone: "err" });
-    } finally {
-      setBusy(null);
-    }
-  }, [selectedRec, refetch]);
+  // Apply / Dismiss from the pricing sidebar was replaced by the
+  // CalendarSidebar editor (Session 5a). Recommendation-driven apply
+  // still exists on PropertyDetail; the Calendar sidebar writes ad-hoc
+  // per-platform rates via /api/calendar/rates/apply.
+  void refetch;
 
   const handlePushAll = useCallback(async () => {
     if (!activePropertyId) return;
@@ -377,6 +352,7 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
                 bookings={bookings}
                 rateByDate={rateByDate}
                 recByDate={recByDate}
+                overrideDates={overrideDates}
                 selectedDate={selectedDate}
                 onSelectDate={(d) => {
                   setSelectedDate(d);
@@ -443,15 +419,21 @@ export default function CalendarView({ properties, bookings: allBookings, rates:
               </div>
             }
           >
-            <RailBody
-              selectedDate={selectedDate}
-              rate={selectedRate}
-              rec={selectedRec}
-              rules={rules}
-              onApply={handleApply}
-              onDismiss={handleDismiss}
-              busy={busy}
-              lastSyncedText={performance ? "live" : "—"}
+            <CalendarSidebar
+              propertyId={activePropertyId}
+              date={selectedDate}
+              isBooked={Boolean(selectedRec) === false && bookings.some((b) => b.check_in <= selectedDate && b.check_out > selectedDate)}
+              rulesSummary={
+                rules
+                  ? {
+                      min_rate: rules.min_rate != null ? Number(rules.min_rate) : null,
+                      base_rate: rules.base_rate != null ? Number(rules.base_rate) : null,
+                      max_rate: rules.max_rate != null ? Number(rules.max_rate) : null,
+                      source: rules.source ?? null,
+                    }
+                  : null
+              }
+              onToast={(text, tone) => setToast({ text, tone })}
             />
           </KoastRail>
         </div>
@@ -841,6 +823,7 @@ function MonthBlock({
   bookings,
   rateByDate,
   recByDate,
+  overrideDates,
   selectedDate,
   onSelectDate,
   index,
@@ -852,6 +835,7 @@ function MonthBlock({
   bookings: Booking[];
   rateByDate: Map<string, Rate>;
   recByDate: Map<string, PricingRecommendation>;
+  overrideDates: Set<string>;
   selectedDate: string;
   onSelectDate: (d: string) => void;
   index: number;
@@ -955,6 +939,7 @@ function MonthBlock({
               key={wIdx}
               week={week}
               rowSegments={rowSegs}
+              overrideDates={overrideDates}
               rateByDate={rateByDate}
               recByDate={recByDate}
               selectedDate={selectedDate}
@@ -1002,6 +987,7 @@ function WeekRow({
   rowSegments,
   rateByDate,
   recByDate,
+  overrideDates,
   selectedDate,
   onSelectDate,
   isMobile,
@@ -1010,6 +996,7 @@ function WeekRow({
   rowSegments: BarSegment[];
   rateByDate: Map<string, Rate>;
   recByDate: Map<string, PricingRecommendation>;
+  overrideDates: Set<string>;
   selectedDate: string;
   onSelectDate: (d: string) => void;
   isMobile: boolean;
@@ -1057,6 +1044,7 @@ function WeekRow({
                 rec={rec}
                 isMobile={isMobile}
                 booked={bookedDates.has(d.date)}
+                hasOverride={overrideDates.has(d.date)}
               />
             </KoastSelectedCell>
           );
@@ -1104,12 +1092,14 @@ function DayCellContents({
   rec,
   isMobile,
   booked,
+  hasOverride,
 }: {
   day: { date: string; dayNum: number; inMonth: boolean; isToday: boolean; isPast: boolean };
   rate: Rate | undefined;
   rec: PricingRecommendation | undefined;
   isMobile: boolean;
   booked: boolean;
+  hasOverride: boolean;
 }) {
   const showRate = rate && rate.is_available !== false;
   const rateValue = rate?.applied_rate ?? rate?.suggested_rate ?? rate?.base_rate ?? null;
@@ -1149,211 +1139,28 @@ function DayCellContents({
         )}
       </div>
       {renderRate && (
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
           {closed ? (
             <KoastRate variant="struck" value={rateValue} />
           ) : showRate ? (
             <KoastRate variant="quiet" value={rateValue} />
           ) : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------- Rail ----------------
-
-function RailBody({
-  selectedDate,
-  rate,
-  rec,
-  rules,
-  onApply,
-  onDismiss,
-  busy,
-  lastSyncedText,
-}: {
-  selectedDate: string;
-  rate: Rate | null;
-  rec: PricingRecommendation | null;
-  rules: ReturnType<typeof usePricingTab>["rules"];
-  onApply: () => void;
-  onDismiss: () => void;
-  busy: string | null;
-  lastSyncedText: string;
-}) {
-  const dateObj = new Date(selectedDate + "T00:00:00");
-  const currentRate = rate?.applied_rate ?? rate?.base_rate ?? null;
-  const suggestedRate = rec?.suggested_rate ?? rate?.suggested_rate ?? null;
-  const delta =
-    currentRate != null && suggestedRate != null ? suggestedRate - currentRate : null;
-
-  const urgencyChip = rec?.urgency
-    ? rec.urgency === "act_now"
-      ? <KoastChip variant="danger">Act now</KoastChip>
-      : rec.urgency === "coming_up"
-      ? <KoastChip variant="warning">Coming up</KoastChip>
-      : <KoastChip variant="neutral">Review</KoastChip>
-    : null;
-
-  const signalRows = useMemo(() => {
-    if (!rec?.reason_signals) return [];
-    const raw = rec.reason_signals as Record<string, unknown>;
-    const entries = Object.entries(raw).filter(([k]) => k !== "clamps");
-    const parsed = entries.map(([id, val]) => {
-      const v = val as { score?: number; weight?: number; confidence?: number; reason?: string };
-      return {
-        id,
-        score: typeof v.score === "number" ? v.score : 0,
-        weight: typeof v.weight === "number" ? v.weight : 0,
-        confidence: typeof v.confidence === "number" ? v.confidence : 1,
-      };
-    });
-    const total = parsed.reduce((s, p) => s + p.weight * p.confidence, 0);
-    return parsed
-      .map((p) => ({
-        ...p,
-        effective: total > 0 ? (p.weight * p.confidence) / total : 0,
-      }))
-      .sort((a, b) => b.effective - a.effective)
-      .slice(0, 5);
-  }, [rec]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: 20 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <div
-          style={{
-            fontSize: 32,
-            fontWeight: 600,
-            color: "var(--coastal)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1.15,
-          }}
-        >
-          {dateObj.toLocaleDateString("en-US", { weekday: "long" })}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            color: "var(--tideline)",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-          }}
-        >
-          {lastSyncedText}
-        </div>
-      </div>
-      <div style={{ fontSize: 13, color: "var(--tideline)", letterSpacing: "-0.005em" }}>
-        {dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-      </div>
-
-      <KoastCard variant="quiet">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--tideline)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            Current rate
-          </div>
-        </div>
-        <KoastRate variant="selected" value={currentRate} />
-      </KoastCard>
-
-      {rec ? (
-        <KoastCard variant="dark">
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: -40,
-              right: -40,
-              width: 180,
-              height: 180,
-              background: "radial-gradient(circle, rgba(196,154,90,0.28), rgba(196,154,90,0) 70%)",
-              pointerEvents: "none",
-            }}
-          />
-          <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Sparkles size={14} color="var(--golden)" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--golden)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                Koast suggests
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <KoastRate variant="hero" value={suggestedRate} tone="dark" delta={delta} />
-              {urgencyChip}
-            </div>
-            {rec.reason_text && (
-              <p style={{ fontSize: 13, lineHeight: 1.5, color: "rgba(247,243,236,0.82)", margin: 0 }}>
-                {rec.reason_text}
-              </p>
-            )}
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <KoastButton size="md" variant="primary" onClick={onApply} loading={busy === "apply"}>
-                Apply
-              </KoastButton>
-              <KoastButton size="md" variant="ghost" onClick={onDismiss} loading={busy === "dismiss"} style={{ color: "var(--shore)" }}>
-                Dismiss
-              </KoastButton>
-            </div>
-          </div>
-        </KoastCard>
-      ) : (
-        <KoastEmptyState
-          icon={<CalendarIcon size={36} strokeWidth={1.3} />}
-          title="No recommendation for this date"
-          body="The engine hasn't surfaced a change for this night. Your current rate is the right call."
-        />
-      )}
-
-      {signalRows.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--tideline)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}
-          >
-            Top signals
-          </div>
-          {signalRows.map((s) => (
-            <KoastSignalBar
-              key={s.id}
-              label={s.id}
-              score={s.score}
-              weight={s.effective}
-              confidence={s.confidence}
+          {hasOverride && showRate && (
+            <span
+              aria-hidden
+              title="Per-channel rate overrides exist for this date"
+              style={{
+                width: 8,
+                height: 1.5,
+                background: "var(--golden)",
+                borderRadius: 1,
+                display: "block",
+              }}
             />
-          ))}
+          )}
         </div>
-      )}
-
-      {rules && (
-        <KoastCard variant="quiet">
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--tideline)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom: 8,
-            }}
-          >
-            Rules · {rules.source}
-          </div>
-          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--coastal)", fontVariantNumeric: "tabular-nums" }}>
-            <span>min ${rules.min_rate}</span>
-            <span style={{ color: "var(--tideline)" }}>·</span>
-            <span>base ${rules.base_rate}</span>
-            <span style={{ color: "var(--tideline)" }}>·</span>
-            <span>max ${rules.max_rate}</span>
-          </div>
-        </KoastCard>
       )}
     </div>
   );
 }
+

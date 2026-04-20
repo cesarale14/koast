@@ -44,7 +44,12 @@ export default async function CalendarPage() {
 
   const propertyIds = properties.map((p) => p.id);
   const svc = createServiceClient();
-  const [bookingsRes, ratesRes] = await Promise.all([
+  // Three parallel queries. The `overrides` call returns only (property, date)
+  // tuples for rows where channel_code is NOT NULL — it feeds the golden
+  // hairline indicator on grid cells that have active per-channel rate
+  // overrides (Session 5a). Kept as a lightweight discovery query; the
+  // actual override rates load on demand when the sidebar opens.
+  const [bookingsRes, ratesRes, overridesRes] = await Promise.all([
     svc
       .from("bookings")
       .select(
@@ -61,6 +66,13 @@ export default async function CalendarPage() {
       )
       .in("property_id", propertyIds)
       .is("channel_code", null)
+      .gte("date", today)
+      .lte("date", end),
+    svc
+      .from("calendar_rates")
+      .select("property_id, date")
+      .in("property_id", propertyIds)
+      .not("channel_code", "is", null)
       .gte("date", today)
       .lte("date", end),
   ]);
@@ -88,5 +100,21 @@ export default async function CalendarPage() {
     rate_source: string;
   }[];
 
-  return <CalendarView properties={properties} bookings={bookings} rates={rates} />;
+  const overrideRows = (overridesRes.data ?? []) as { property_id: string; date: string }[];
+  const overrideDatesByProperty: Record<string, string[]> = {};
+  for (const r of overrideRows) {
+    if (!overrideDatesByProperty[r.property_id]) overrideDatesByProperty[r.property_id] = [];
+    if (!overrideDatesByProperty[r.property_id].includes(r.date)) {
+      overrideDatesByProperty[r.property_id].push(r.date);
+    }
+  }
+
+  return (
+    <CalendarView
+      properties={properties}
+      bookings={bookings}
+      rates={rates}
+      overrideDatesByProperty={overrideDatesByProperty}
+    />
+  );
 }

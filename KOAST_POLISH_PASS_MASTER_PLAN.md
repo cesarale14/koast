@@ -666,6 +666,31 @@ of deployed Session 1 build:
     surface stays on Plus Jakarta Sans — do not mix faces on the
     same surface outside of this carve-out.
 
+### Session 5a shipped (Calendar Month Grid rebuild + two-tab sidebar)
+
+Calendar Month Grid rebuilt with a two-tab sidebar editor
+(Pricing / Availability), per-platform rate editing, and a golden
+hairline indicator on grid cells with active channel overrides.
+
+- New endpoints:
+  - `GET /api/calendar/rates?property_id=…&date=…` — returns master
+    + per-platform rate bundle for a single date.
+  - `POST /api/calendar/rates/apply` — writes master or platform
+    rate with wipe_overrides semantics. Dispatches to every active
+    channel (BDC through safe-restrictions, non-BDC direct).
+- New components under `src/components/polish/calendar/`:
+  CalendarSidebar, PricingTab, AvailabilityTab, WhyThisRate,
+  RateCell, SyncButton.
+- Calendar page adds a parallel overrides-discovery query; the grid
+  renders a 8×1.5px golden hairline under cells that have
+  per-channel overrides.
+- The inline `RailBody` on CalendarView was removed; the rail now
+  mounts `<CalendarSidebar />`.
+- Spec correction implicit in this session: the legacy rail's
+  recommendation-accept flow on /calendar is superseded by the new
+  two-tab editor. PropertyDetail's Pricing tab remains the canonical
+  recommendation-acceptance surface.
+
 ### After Session 3.9 (handwritten greeting animation)
 
 27. Handwritten greeting animates on first browser-session visit
