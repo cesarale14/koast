@@ -102,14 +102,19 @@ export default function PricingTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
-      {/* Master rate */}
+      {/* Master (base) rate — user-visible label is "Base rate across
+          all channels" per Session 5a.2 spec; variable + API names
+          keep the `master` convention for continuity. */}
       <section>
-        <div style={eyebrowStyle}>Master rate</div>
-        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={eyebrowStyle}>Base rate across all channels</div>
+        <div
+          title="Applies to every channel unless a per-channel override is set."
+          style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}
+        >
           <RateCell
             value={master?.applied_rate ?? master?.base_rate ?? null}
             placeholder="Set rate"
-            ariaLabel="Master rate"
+            ariaLabel="Base rate across all channels"
             onCommit={handleMasterCommit}
           />
           {master?.suggested_rate != null && master.suggested_rate !== (master.applied_rate ?? master.base_rate) && (
