@@ -371,10 +371,18 @@ export async function POST(
 
       let performance_rows_created = 0;
       if (perfRows.length > 0) {
+        // Upsert (not insert): re-applying the same rec for the same
+        // (property, date) overwrites the prior row. The
+        // pricing_performance_prop_date_unique index (migration
+        // 20260421000000) backs this onConflict target. Prior apply
+        // attempts are overwritten — historical audit trail is out of
+        // scope; add a separate pricing_apply_events log if/when it's
+        // needed.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: perfErr } = await (supabase.from("pricing_performance") as any).insert(perfRows);
+        const { error: perfErr } = await (supabase.from("pricing_performance") as any)
+          .upsert(perfRows, { onConflict: "property_id,date" });
         if (perfErr) {
-          console.warn("[pricing/apply] pricing_performance insert failed:", perfErr.message);
+          console.warn("[pricing/apply] pricing_performance upsert failed:", perfErr.message);
         } else {
           performance_rows_created = perfRows.length;
         }
