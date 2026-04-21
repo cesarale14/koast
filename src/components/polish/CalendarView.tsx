@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -232,6 +233,7 @@ export default function CalendarView({
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -340,6 +342,34 @@ export default function CalendarView({
     }
   }, [activePropertyId]);
 
+  // Channex → Koast pull. Hits the existing /api/channex/sync route with
+  // the active property_id in the body; that route upserts both bookings
+  // and calendar_rates (base rows, channel_code NULL). On success we
+  // router.refresh() so the server-component calendar page re-queries
+  // Supabase and the grid re-renders with the newly pulled rates —
+  // without a full page reload.
+  const handleSyncNow = useCallback(async () => {
+    if (!activePropertyId) return;
+    setBusy("sync");
+    try {
+      const res = await fetch(`/api/channex/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: activePropertyId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const rateCount = data.rates ?? 0;
+      const bookingDelta = (data.bookings_new ?? 0) + (data.bookings_updated ?? 0);
+      setToast({ text: `Synced ${rateCount} rates, ${bookingDelta} bookings`, tone: "ok" });
+      router.refresh();
+    } catch (err) {
+      setToast({ text: err instanceof Error ? err.message : "Sync failed", tone: "err" });
+    } finally {
+      setBusy(null);
+    }
+  }, [activePropertyId, router]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#fff" }}>
       <TopChrome
@@ -356,15 +386,7 @@ export default function CalendarView({
           setActivePropertyId(id);
           setPropertyMenuOpen(false);
         }}
-        onSyncNow={async () => {
-          setBusy("sync");
-          try {
-            await fetch(`/api/channex/sync/property/${activePropertyId}`, { method: "POST" });
-            setToast({ text: "Sync requested", tone: "ok" });
-          } finally {
-            setBusy(null);
-          }
-        }}
+        onSyncNow={handleSyncNow}
         onPushAll={handlePushAll}
         busy={busy}
         isMobile={isMobile}
