@@ -32,21 +32,21 @@ Sources consulted:
 
 | # | Category | ✅ | 🟡 | 🔵 | 🟣 | ⚪ | ❌ | Total |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | Onboarding & Account | 6 | 3 | 3 | 1 | 1 | 2 | 16 |
-| 2 | Calendar & Availability | 14 | 5 | 3 | 4 | 0 | 0 | 26 |
-| 3 | Pricing Engine | 18 | 4 | 2 | 3 | 1 | 0 | 28 |
-| 4 | Channel Management | 17 | 3 | 1 | 1 | 1 | 1 | 24 |
-| 5 | Messaging & AI Inbox | 5 | 3 | 5 | 0 | 2 | 1 | 16 |
-| 6 | Market Intelligence | 10 | 2 | 1 | 2 | 0 | 0 | 15 |
-| 7 | Operations (Turnovers / Cleaning) | 9 | 1 | 2 | 1 | 0 | 0 | 13 |
-| 8 | Reporting & Analytics | 6 | 3 | 2 | 2 | 1 | 0 | 14 |
-| 9 | AI Capabilities | 3 | 2 | 5 | 1 | 2 | 0 | 13 |
-| 10 | Team & Roles | 1 | 0 | 0 | 1 | 2 | 1 | 5 |
-| 11 | Infrastructure & Platform | 17 | 3 | 3 | 2 | 0 | 0 | 25 |
-| 12 | Direct Booking (Frontdesk) | 0 | 1 | 0 | 0 | 6 | 0 | 7 |
-| | **Totals** | **106** | **30** | **27** | **18** | **16** | **5** | **202** |
+| 1 | Onboarding & Account | 15 | 5 | 3 | 1 | 1 | 1 | 26 |
+| 2 | Calendar & Availability | 23 | 3 | 3 | 4 | 0 | 1 | 34 |
+| 3 | Pricing Engine | 42 | 2 | 2 | 2 | 1 | 0 | 49 |
+| 4 | Channel Management | 42 | 2 | 1 | 1 | 1 | 1 | 48 |
+| 5 | Messaging & AI Inbox | 9 | 1 | 7 | 0 | 2 | 1 | 20 |
+| 6 | Market Intelligence | 17 | 1 | 1 | 2 | 0 | 0 | 21 |
+| 7 | Operations (Turnovers / Cleaning) | 13 | 1 | 2 | 1 | 0 | 0 | 17 |
+| 8 | Reporting & Analytics | 14 | 3 | 0 | 2 | 1 | 0 | 20 |
+| 9 | AI Capabilities | 5 | 1 | 7 | 1 | 2 | 0 | 16 |
+| 10 | Team & Roles | 4 | 0 | 0 | 1 | 2 | 1 | 8 |
+| 11 | Infrastructure & Platform | 24 | 2 | 1 | 6 | 0 | 2 | 35 |
+| 12 | Direct Booking (Frontdesk) | 1 | 1 | 0 | 0 | 6 | 0 | 8 |
+| | **Totals** | **209** | **22** | **27** | **21** | **16** | **7** | **302** |
 
-Status distribution: 52% ✅ SHIPPED · 15% 🟡 PARTIAL · 13% 🔵 PLANNED · 9% 🟣 ROADMAPPED · 8% ⚪ VISION · 2% ❌ NOT STARTED.
+Status distribution: 69% ✅ SHIPPED · 7% 🟡 PARTIAL · 9% 🔵 PLANNED · 7% 🟣 ROADMAPPED · 5% ⚪ VISION · 2% ❌ NOT STARTED.
 
 ---
 
