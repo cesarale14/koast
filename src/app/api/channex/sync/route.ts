@@ -11,6 +11,18 @@ function detectPlatform(otaName: string | null | undefined): string {
   return "direct";
 }
 
+// Uppercase channel_code → lowercase slug used in response payloads
+// and pricing_performance.channels_pushed (matches the helper in
+// /api/pricing/apply). Kept inline rather than imported cross-route.
+function channelSlugFor(code: string): string {
+  const c = code.toUpperCase();
+  if (c === "BDC") return "booking_com";
+  if (c === "ABB") return "airbnb";
+  if (c === "VRBO") return "vrbo";
+  if (c === "DIRECT") return "direct";
+  return code.toLowerCase();
+}
+
 // POST: sync bookings + rates from Channex for the current user's connected
 // properties. Body { property_id?: uuid } limits the sync to one property.
 export async function POST(request: NextRequest) {
@@ -58,7 +70,10 @@ export async function POST(request: NextRequest) {
       name: string;
       bookings_new: number;
       bookings_updated: number;
-      rates: number;
+      rates: number;                                   // kept for frontend compat (see 2ed92e9)
+      rates_total: number;                             // same value as `rates`, explicit name
+      rates_by_channel: Record<string, number>;        // { airbnb?, booking_com?, vrbo?, direct? }
+      rate_error?: string;                             // Channex API error surfaced here
       error?: string;
     }[] = [];
     const errors: string[] = [];
@@ -124,31 +139,90 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Best-effort rate sync — don't fail the whole run if restrictions
-        // aren't available for this channex property.
+        // Per-channel rate pull. The legacy getRestrictions wrapper
+        // called /restrictions without filter[restrictions]=rate, which
+        // Channex interprets as "availability only" — that's why the
+        // route used to report rates:0 on every call even when hosts
+        // had active rate changes on Airbnb. We now use the bucketed
+        // endpoint (same variant pricing_validator.py uses, and the
+        // only one that returns rate data). Each (rate_plan_id, date)
+        // lands as a per-channel calendar_rates override keyed by
+        // channel_code from property_channels. Base rows
+        // (channel_code=NULL) are engine intent and never touched
+        // here — readers already prefer channel override first, base
+        // fallback.
+        const ratesByChannel: Record<string, number> = {};
+        let rateErrorMsg: string | undefined;
         try {
-          const restrictions = await channex.getRestrictions(channexId, today, endDate);
-          for (const r of restrictions) {
-            const ra = r.attributes;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const rateTable = supabase.from("calendar_rates") as any;
-            await rateTable.upsert(
-              {
-                property_id: prop.id,
-                date: ra.date,
-                applied_rate: ra.rate ? (ra.rate / 100).toFixed(2) : null,
-                base_rate: ra.rate ? (ra.rate / 100).toFixed(2) : null,
-                min_stay: ra.min_stay_arrival || 1,
-                is_available: !ra.stop_sell,
-                rate_source: "manual",
-                channel_code: null,
-              },
-              { onConflict: "property_id,date,channel_code" }
-            );
-            rateCount++;
+          // Build rate_plan_id → channel_code map from property_channels.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: channelRows } = await (supabase.from("property_channels") as any)
+            .select("channel_code, settings")
+            .eq("property_id", prop.id)
+            .eq("status", "active");
+          const planToChannel = new Map<string, string>();
+          for (const row of ((channelRows ?? []) as Array<{ channel_code: string; settings: { rate_plan_id?: string } | null }>)) {
+            const rpId = row.settings?.rate_plan_id;
+            if (rpId) planToChannel.set(rpId, row.channel_code.toUpperCase());
+          }
+
+          const bucketed = await channex.getRestrictionsBucketed(
+            channexId,
+            today,
+            endDate,
+            ["rate", "availability", "min_stay_arrival", "stop_sell"]
+          );
+          const pulledAt = new Date().toISOString();
+
+          for (const [ratePlanId, byDate] of Object.entries(bucketed)) {
+            const channelCode = planToChannel.get(ratePlanId);
+            if (!channelCode) {
+              console.log(`[channex/sync] Unmapped rate plan ${ratePlanId} for ${prop.name} — skipping`);
+              continue;
+            }
+            for (const [date, rateData] of Object.entries(byDate)) {
+              const rawRate = rateData.rate;
+              if (rawRate == null || rawRate === "") continue;
+              // Channex bucketed /restrictions returns rate as a decimal
+              // string in whole currency units ("200.00"), NOT cents —
+              // verified against docs + ~/staycommand-workers/pricing_validator.py:91
+              // (which calls the same endpoint and does float(rate) with
+              // no division). The legacy non-bucketed endpoint returned
+              // an integer in minor units; don't carry that assumption
+              // over here.
+              const rateDollars = typeof rawRate === "string" ? parseFloat(rawRate) : Number(rawRate);
+              if (!Number.isFinite(rateDollars) || rateDollars <= 0) continue;
+              const rateDollar = rateDollars.toFixed(2);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const rateTable = supabase.from("calendar_rates") as any;
+              const { error: upErr } = await rateTable.upsert(
+                {
+                  property_id: prop.id,
+                  date,
+                  channel_code: channelCode,
+                  applied_rate: rateDollar,
+                  base_rate: rateDollar,
+                  min_stay: rateData.min_stay_arrival ?? 1,
+                  is_available: !rateData.stop_sell,
+                  rate_source: "manual_per_channel",
+                  channex_rate_plan_id: ratePlanId,
+                  last_channex_rate: rateDollar,
+                  last_pushed_at: pulledAt,
+                },
+                { onConflict: "property_id,date,channel_code" }
+              );
+              if (upErr) {
+                console.warn(`[channex/sync] Upsert error ${prop.name} ${channelCode} ${date}:`, upErr.message);
+                continue;
+              }
+              const slug = channelSlugFor(channelCode);
+              ratesByChannel[slug] = (ratesByChannel[slug] ?? 0) + 1;
+              rateCount++;
+            }
           }
         } catch (rateErr) {
-          console.warn(`[channex/sync] Rates skipped for ${prop.name}:`, rateErr instanceof Error ? rateErr.message : rateErr);
+          rateErrorMsg = rateErr instanceof Error ? rateErr.message : String(rateErr);
+          console.warn(`[channex/sync] Rate pull failed for ${prop.name}: ${rateErrorMsg}`);
         }
 
         totalBookingsInserted += newCount;
@@ -161,6 +235,9 @@ export async function POST(request: NextRequest) {
           bookings_new: newCount,
           bookings_updated: updatedCount,
           rates: rateCount,
+          rates_total: rateCount,
+          rates_by_channel: ratesByChannel,
+          ...(rateErrorMsg ? { rate_error: rateErrorMsg } : {}),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -171,6 +248,8 @@ export async function POST(request: NextRequest) {
           bookings_new: newCount,
           bookings_updated: updatedCount,
           rates: rateCount,
+          rates_total: rateCount,
+          rates_by_channel: {},
           error: msg,
         });
       }
