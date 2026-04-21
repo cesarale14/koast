@@ -1118,19 +1118,19 @@ function WeekRow({
           const cellPct = 100 / 7;
           const leftPct = s.startCol * cellPct;
           const widthPct = s.span * cellPct;
-          // Airbnb mechanic: seam pills shift 4px left; overhang
-          // pills stretch 16px past their right cell boundary. The
-          // left offset is added back into the width calc so the
-          // right edge stays put.
-          const leftOffsetPx = s.hasSeam ? -4 : 0;
+          // Airbnb mechanic: the overlap is purely the previous
+          // pill's 16px overhang bleeding past its cell boundary.
+          // Check-in pills start at their cell's left edge — no
+          // negative offset — and the white seam border makes the
+          // layering read cleanly.
           const rightOverhangPx = s.hasOverhang ? 16 : 0;
           return (
             <div
               key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}`}
               style={{
                 position: "absolute",
-                left: `calc(${leftPct}% + ${leftOffsetPx}px)`,
-                width: `calc(${widthPct}% + ${rightOverhangPx - leftOffsetPx}px)`,
+                left: `${leftPct}%`,
+                width: `calc(${widthPct}% + ${rightOverhangPx}px)`,
                 bottom: 6,
                 height: barHeight,
                 pointerEvents: "auto",

@@ -114,17 +114,31 @@ export function KoastBookingBar({
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
 
-  // Subtle border on every non-flat, non-seam edge. Flat edges (where
-  // the pill continues into another cell) stay borderless; the seam
-  // overrides the left border with a hard white hairline.
+  // Edge rendering has two modes:
+  //   - Default: subtle rgba(255,255,255,0.18) border on non-flat edges
+  //     only. Flat edges (continuation into another cell) stay
+  //     borderless so adjacent segments visually merge.
+  //   - Seam (same-day turnover check-in): hard 1.33px solid white
+  //     border on ALL edges so the pill reads as a distinct layer
+  //     sitting on top of the previous booking's 16px overhang.
+  //     Right edge still respects the shape rule so a flat-right pill
+  //     (continues rightward) stays borderless on that edge.
+  //   NOTE: full white border only works because the pills are opaque
+  //   enough to cover the underlying tail. If the alpha is ever raised
+  //   to true transparency this edge treatment needs revisiting.
   const hasLeftRound = shape === "both" || shape === "right";
   const hasRightRound = shape === "both" || shape === "left";
+  const SEAM_BORDER = "1.33px solid #ffffff";
+  const borderTop = hasSeam ? SEAM_BORDER : SUBTLE_BORDER;
+  const borderBottom = hasSeam ? SEAM_BORDER : SUBTLE_BORDER;
   const borderLeft = hasSeam
-    ? "1.33px solid #ffffff"
+    ? SEAM_BORDER
     : hasLeftRound
     ? SUBTLE_BORDER
     : "none";
-  const borderRight = hasRightRound ? SUBTLE_BORDER : "none";
+  const borderRight = hasSeam
+    ? (hasRightRound ? SEAM_BORDER : "none")
+    : (hasRightRound ? SUBTLE_BORDER : "none");
 
   const iconSize = compact ? 20 : 34;
 
@@ -152,8 +166,8 @@ export function KoastBookingBar({
         letterSpacing: "-0.005em",
         cursor: "pointer",
         border: "none",
-        borderTop: SUBTLE_BORDER,
-        borderBottom: SUBTLE_BORDER,
+        borderTop,
+        borderBottom,
         borderLeft,
         borderRight,
         overflow: "hidden",
