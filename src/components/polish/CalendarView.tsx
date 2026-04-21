@@ -1118,22 +1118,22 @@ function WeekRow({
           const cellPct = 100 / 7;
           const leftPct = s.startCol * cellPct;
           const widthPct = s.span * cellPct;
-          // Apr 21 turnover tuning: split the turnover cell 10/90.
-          // The check-out pill's tail extends 10% of one cell width
-          // past its boundary; the check-in pill sits 10% into its
-          // cell so its left edge lands exactly where the check-out
-          // tail ends. The two pills meet at the seam with just
-          // their tips layered via the white seam border.
-          const tipPct = cellPct / 10; // 10% of a single cell in row-%
-          const leftShiftPct = s.hasSeam ? tipPct : 0;
+          // Apr 21 turnover tuning: only the TIPS overlap.
+          // Check-out pill's tail extends ~20% of one cell width
+          // into the turnover cell. Check-in pill starts at its
+          // cell's left edge (no offset) and sits on top via DOM
+          // order — its 1.33px white seam border marks the
+          // boundary; only the check-out's tail tip remains
+          // visible beyond the overlap.
+          const tipPct = cellPct / 5; // 20% of a single cell in row-%
           const rightShiftPct = s.hasOverhang ? tipPct : 0;
           return (
             <div
               key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}`}
               style={{
                 position: "absolute",
-                left: `${leftPct + leftShiftPct}%`,
-                width: `${widthPct + rightShiftPct - leftShiftPct}%`,
+                left: `${leftPct}%`,
+                width: `${widthPct + rightShiftPct}%`,
                 bottom: 6,
                 height: barHeight,
                 pointerEvents: "auto",
