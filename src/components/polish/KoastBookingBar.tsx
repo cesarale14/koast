@@ -4,11 +4,18 @@ import Image from "next/image";
 import { useState, type CSSProperties, type MouseEvent } from "react";
 import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
 
+// New (Apr 21) API modeled on Airbnb's multicalendar mechanic:
+//   - `borderRadius` drives the pill cap shape (both/left/right/none).
+//   - `hasSeam` adds a 1.33px solid white left border where this pill
+//     sits on top of a preceding pill's tail (same-day turnover).
+// The old `position` prop is preserved as an alias that maps to the
+// new shapes so existing callers (Calendar's WeekRow) can transition
+// incrementally.
+
 type Position = "standalone" | "start" | "middle" | "end";
+type BarBorderRadius = "both" | "left" | "right" | "none";
 
 // Alpha-baked platform backgrounds (per master plan principle 2).
-// Keep element opacity untouched so the white label/logo stay crisp —
-// bake the alpha into the background color instead.
 const BAR_RGBA: Record<PlatformKey, { default: string; hover: string; selected: string }> = {
   airbnb: {
     default: "rgba(255, 56, 92, 0.70)",
@@ -32,28 +39,43 @@ interface KoastBookingBarProps {
   guest: string | null;
   checkIn: string;
   checkOut: string;
-  position: Position;
+  /** Legacy prop preserved for inline mockups / non-calendar callers. */
+  position?: Position;
+  /** Preferred — matches Calendar segment's shape exactly. */
+  borderRadius?: BarBorderRadius;
+  /** When true, add the 1.33px white left border (turnover seam). */
+  hasSeam?: boolean;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   selected?: boolean;
   className?: string;
   style?: CSSProperties;
-  // Compact = mobile: no logo chip, tighter cap padding, smaller logo.
+  /** Compact = mobile rendering (tighter padding, smaller icon). */
   compact?: boolean;
 }
 
-const RADIUS_START = 100;
-const RADIUS_CONTINUE = 33;
-
-function radiusFor(position: Position): string {
+function positionToRadius(position: Position): BarBorderRadius {
   switch (position) {
     case "standalone":
-      return `${RADIUS_START}px`;
+      return "both";
     case "start":
-      return `${RADIUS_START}px ${RADIUS_CONTINUE}px ${RADIUS_CONTINUE}px ${RADIUS_START}px`;
+      return "left";
     case "middle":
-      return `${RADIUS_CONTINUE}px`;
+      return "none";
     case "end":
-      return `${RADIUS_CONTINUE}px ${RADIUS_START}px ${RADIUS_START}px ${RADIUS_CONTINUE}px`;
+      return "right";
+  }
+}
+
+function radiusCss(shape: BarBorderRadius): string {
+  switch (shape) {
+    case "both":
+      return "100px";
+    case "left":
+      return "100px 0 0 100px";
+    case "right":
+      return "0 100px 100px 0";
+    case "none":
+      return "0";
   }
 }
 
@@ -66,30 +88,46 @@ function firstAndInitial(name: string | null): string {
   return last ? `${first} ${last}.` : first;
 }
 
+const SUBTLE_BORDER = "1px solid rgba(255,255,255,0.18)";
+
 export function KoastBookingBar({
   platform,
   guest,
   checkIn,
   checkOut,
   position,
+  borderRadius: borderRadiusProp,
+  hasSeam = false,
   onClick,
   selected,
   className = "",
   style,
   compact = false,
 }: KoastBookingBarProps) {
+  const shape: BarBorderRadius = borderRadiusProp ?? (position ? positionToRadius(position) : "both");
   const config = PLATFORMS[platform];
-  const showLabel = position === "start" || position === "standalone";
+  const showLabel = shape === "left" || shape === "both";
   const label = firstAndInitial(guest);
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
-  // Uniform 14px horizontal padding on the bar root. Clears the pill
-  // curve at 42–48px heights and keeps the inset identical across start/
-  // middle/end segments. No chip wrapper — plain logo on both desktop
-  // and mobile.
-  const hPad = 14;
+  const hPad = compact ? 10 : 14;
   const [hover, setHover] = useState(false);
   const tones = BAR_RGBA[platform];
   const background = selected ? tones.selected : hover ? tones.hover : tones.default;
+
+  // Subtle border on every non-flat, non-seam edge. Flat edges (where
+  // the pill continues into another cell) stay borderless; the seam
+  // overrides the left border with a hard white hairline.
+  const hasLeftRound = shape === "both" || shape === "right";
+  const hasRightRound = shape === "both" || shape === "left";
+  const borderLeft = hasSeam
+    ? "1.33px solid #ffffff"
+    : hasLeftRound
+    ? SUBTLE_BORDER
+    : "none";
+  const borderRight = hasRightRound ? SUBTLE_BORDER : "none";
+
+  const iconSize = compact ? 20 : 34;
+
   return (
     <button
       type="button"
@@ -101,8 +139,8 @@ export function KoastBookingBar({
       className={`koast-booking-bar ${className}`}
       style={{
         width: "100%",
-        height: 48,
-        borderRadius: radiusFor(position),
+        height: "100%",
+        borderRadius: radiusCss(shape),
         background,
         color: "#fff",
         display: "flex",
@@ -114,24 +152,40 @@ export function KoastBookingBar({
         letterSpacing: "-0.005em",
         cursor: "pointer",
         border: "none",
+        borderTop: SUBTLE_BORDER,
+        borderBottom: SUBTLE_BORDER,
+        borderLeft,
+        borderRight,
         overflow: "hidden",
         whiteSpace: "nowrap",
         textOverflow: "ellipsis",
-        transition:
-          "background-color 180ms cubic-bezier(0.4,0,0.2,1), transform 180ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 180ms cubic-bezier(0.4,0,0.2,1)",
-        boxShadow: selected ? "0 4px 14px rgba(19,46,32,0.2)" : "none",
+        transition: "background-color 180ms cubic-bezier(0.4,0,0.2,1)",
+        boxShadow: "none",
         ...style,
       }}
     >
       {showLabel && (
         <>
-          <Image
-            src={config.iconWhite}
-            alt=""
-            width={compact ? 12 : 14}
-            height={compact ? 12 : 14}
-            style={{ flexShrink: 0 }}
-          />
+          <span
+            aria-hidden
+            style={{
+              width: iconSize,
+              height: iconSize,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Image
+              src={config.iconWhite}
+              alt=""
+              width={Math.round(iconSize * 0.55)}
+              height={Math.round(iconSize * 0.55)}
+            />
+          </span>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
         </>
       )}

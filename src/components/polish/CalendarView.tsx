@@ -114,23 +114,28 @@ function buildMonthWeeks(year: number, month: number, todayStr: string): WeekGri
   return weeks;
 }
 
+// Bar segment shape — matches Airbnb's multicalendar mechanic
+// (Apr 21 rewrite). One segment per booking per week row.
+//
+//   borderRadius: 'both'   = fully rounded, free both ends
+//                 'left'   = round left cap, flat right (continues right)
+//                 'right'  = flat left, round right cap (continues from left)
+//                 'none'   = flat both (middle week of a multi-week stay)
+//   hasOverhang:  true when this segment's right edge is a same-day
+//                 turnover — the pill extends +16px past its cell
+//                 boundary to visually bleed into the next pill's start.
+//   hasSeam:      true when this segment's left edge is a same-day
+//                 turnover — the pill shifts −4px left and paints a
+//                 1.33px solid white left border, creating the crisp
+//                 seam where it sits on the previous booking's tail.
 interface BarSegment {
   booking: Booking;
   weekIdx: number;
   startCol: number;
   span: number;
-  position: "standalone" | "start" | "middle" | "end";
-  // Same-day turnover flags — when a date has both an outgoing
-  // check-out and an incoming check-in from a DIFFERENT booking,
-  // we render the two pills overlapping on that cell:
-  //   isTurnoverTail: this is an extra segment for the check-out
-  //     booking covering the turnover cell, anchored to the left
-  //     ~57% of the cell with a small right overhang.
-  //   isTurnoverStartOffset: this segment's first cell shifts right
-  //     to the 45% mark with a left-edge shadow so it sits visibly
-  //     on top of the tail.
-  isTurnoverTail?: boolean;
-  isTurnoverStartOffset?: boolean;
+  borderRadius: "both" | "left" | "right" | "none";
+  hasOverhang: boolean;
+  hasSeam: boolean;
 }
 
 function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[] {
@@ -140,7 +145,7 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
   const lastDate = weeks[weeks.length - 1].days[6].date;
 
   // Build the set of turnover dates — dates that have both a
-  // check-out (from one booking) and a check-in (from a different
+  // check-out (from one booking) and a check-in (from a DIFFERENT
   // booking).
   const inDates = new Map<string, string[]>();
   const outDates = new Map<string, string[]>();
@@ -159,25 +164,28 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
   for (const date of outDateList) {
     const outs = outDates.get(date) ?? [];
     const ins = inDates.get(date) ?? [];
-    // Turnover only if at least one incoming booking is DIFFERENT
-    // from any outgoing booking (otherwise it's the same booking
-    // chained across check-out/in).
     if (ins.some((iid) => !outs.includes(iid))) turnoverDates.add(date);
   }
 
-  for (const b of bookings) {
+  // DOM-order layering: later check-in paints on top of earlier ones.
+  // computeBarSegments emits segments in the booking iteration order,
+  // so sort bookings ASC by check_in first.
+  const sorted = [...bookings].sort((a, b) => a.check_in.localeCompare(b.check_in));
+
+  for (const b of sorted) {
     if (b.check_out <= firstDate || b.check_in > lastDate) continue;
     const start = b.check_in < firstDate ? firstDate : b.check_in;
-    const endExclusive = b.check_out > lastDate ? new Date(parseISO(lastDate).getTime() + 86_400_000).toISOString().slice(0, 10) : b.check_out;
+    const endExclusive = b.check_out > lastDate
+      ? new Date(parseISO(lastDate).getTime() + 86_400_000).toISOString().slice(0, 10)
+      : b.check_out;
     const startIdx = daysBetween(firstDate, start);
     const endIdx = daysBetween(firstDate, endExclusive) - 1; // inclusive last night
     if (endIdx < startIdx) continue;
 
-    const isTurnoverIn = turnoverDates.has(b.check_in) && b.check_in === start;
-    const isTurnoverOut = turnoverDates.has(b.check_out) && b.check_out <= lastDate;
+    const checkInIsTurnover = turnoverDates.has(b.check_in) && b.check_in === start;
+    const checkOutIsTurnover = turnoverDates.has(b.check_out) && b.check_out <= lastDate;
 
     let cur = startIdx;
-    let firstSegmentEmitted = false;
     while (cur <= endIdx) {
       const weekIdx = Math.floor(cur / 7);
       const colInWeek = cur % 7;
@@ -185,29 +193,20 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
       const span = lastInWeek - cur + 1;
       const startsHere = b.check_in >= firstDate && cur === startIdx;
       const endsHere = b.check_out <= lastDate && lastInWeek === endIdx;
-      const position: BarSegment["position"] =
-        startsHere && endsHere ? "standalone" : startsHere ? "start" : endsHere ? "end" : "middle";
-      const isTurnoverStartOffset = !firstSegmentEmitted && isTurnoverIn;
-      segs.push({ booking: b, weekIdx, startCol: colInWeek, span, position, isTurnoverStartOffset });
-      firstSegmentEmitted = true;
-      cur = lastInWeek + 1;
-    }
 
-    // Emit a tail segment on the check-out day when it is a turnover.
-    // The turnover cell shows both the outgoing booking's tail and
-    // the incoming booking's offset head (which is set above).
-    if (isTurnoverOut) {
-      const tailIdx = daysBetween(firstDate, b.check_out);
-      const tailWeek = Math.floor(tailIdx / 7);
-      const tailCol = tailIdx % 7;
+      const borderRadius: BarSegment["borderRadius"] =
+        startsHere && endsHere ? "both" : startsHere ? "left" : endsHere ? "right" : "none";
+
       segs.push({
         booking: b,
-        weekIdx: tailWeek,
-        startCol: tailCol,
-        span: 1,
-        position: "end",
-        isTurnoverTail: true,
+        weekIdx,
+        startCol: colInWeek,
+        span,
+        borderRadius,
+        hasOverhang: endsHere && checkOutIsTurnover,
+        hasSeam: startsHere && checkInIsTurnover,
       });
+      cur = lastInWeek + 1;
     }
   }
   return segs;
@@ -1117,50 +1116,25 @@ function WeekRow({
           const platform = platformKeyFrom(s.booking.platform);
           if (!platform) return null;
           const cellPct = 100 / 7;
-
-          // Pill geometry: anchored to the BOTTOM of the cell (6px
-          // gap from the cell's bottom edge, auto-adapts to any row
-          // height). Left / width depend on turnover flags.
-          let leftCalc: string;
-          let widthCalc: string;
-          let zIndex = 2;
-          let extraShadow: string | undefined;
-
-          if (s.isTurnoverTail) {
-            // Tail sits at the left ~57% of the cell with a 6px
-            // overhang past the cell boundary — the head pill covers
-            // it on the right.
-            const leftPct = s.startCol * cellPct;
-            leftCalc = `calc(${leftPct}% + 2px)`;
-            widthCalc = `calc(${cellPct * 0.57}% + 6px)`;
-            zIndex = 1;
-          } else if (s.isTurnoverStartOffset) {
-            // Head — shift the segment's left edge 45% into its
-            // first cell so it visibly overlaps the outgoing tail.
-            const leftPct = s.startCol * cellPct + cellPct * 0.45;
-            const widthPct = (s.span - 0.45) * cellPct;
-            leftCalc = `calc(${leftPct}% + 2px)`;
-            widthCalc = `calc(${widthPct}% - 4px)`;
-            zIndex = 3;
-            extraShadow = "-2px 0 4px rgba(0,0,0,0.25)";
-          } else {
-            const leftPct = s.startCol * cellPct;
-            const widthPct = s.span * cellPct;
-            leftCalc = `calc(${leftPct}% + 2px)`;
-            widthCalc = `calc(${widthPct}% - 4px)`;
-          }
-
+          const leftPct = s.startCol * cellPct;
+          const widthPct = s.span * cellPct;
+          // Airbnb mechanic: seam pills shift 4px left; overhang
+          // pills stretch 16px past their right cell boundary. The
+          // left offset is added back into the width calc so the
+          // right edge stays put.
+          const leftOffsetPx = s.hasSeam ? -4 : 0;
+          const rightOverhangPx = s.hasOverhang ? 16 : 0;
           return (
             <div
-              key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}-${s.isTurnoverTail ? "tail" : s.isTurnoverStartOffset ? "head" : "body"}`}
+              key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}`}
               style={{
                 position: "absolute",
-                left: leftCalc,
-                width: widthCalc,
+                left: `calc(${leftPct}% + ${leftOffsetPx}px)`,
+                width: `calc(${widthPct}% + ${rightOverhangPx - leftOffsetPx}px)`,
                 bottom: 6,
                 height: barHeight,
                 pointerEvents: "auto",
-                zIndex,
+                overflow: "visible",
               }}
             >
               <KoastBookingBar
@@ -1168,14 +1142,10 @@ function WeekRow({
                 guest={s.booking.guest_name}
                 checkIn={s.booking.check_in}
                 checkOut={s.booking.check_out}
-                position={s.position}
+                borderRadius={s.borderRadius}
+                hasSeam={s.hasSeam}
                 compact={isMobile}
-                style={{
-                  height: barHeight,
-                  fontSize: isMobile ? 11 : 13,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  boxShadow: extraShadow,
-                }}
+                style={{ height: barHeight, fontSize: isMobile ? 11 : 13 }}
               />
             </div>
           );
