@@ -15,22 +15,25 @@ import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
 type Position = "standalone" | "start" | "middle" | "end";
 type BarBorderRadius = "both" | "left" | "right" | "none";
 
-// Alpha-baked platform backgrounds (per master plan principle 2).
+// Full-opacity platform backgrounds (supersedes Spec Correction #3's
+// 0.70/0.85/0.95 alpha ladder — per-direction Apr 21). The seamed
+// overlap on same-day turnovers relies on opaque fills to cover the
+// outgoing pill's 16px tail cleanly.
 const BAR_RGBA: Record<PlatformKey, { default: string; hover: string; selected: string }> = {
   airbnb: {
-    default: "rgba(255, 56, 92, 0.70)",
-    hover: "rgba(255, 56, 92, 0.85)",
-    selected: "rgba(255, 56, 92, 0.95)",
+    default: "rgb(255, 56, 92)",
+    hover: "rgb(255, 80, 115)",
+    selected: "rgb(235, 40, 75)",
   },
   booking_com: {
-    default: "rgba(0, 53, 128, 0.70)",
-    hover: "rgba(0, 53, 128, 0.85)",
-    selected: "rgba(0, 53, 128, 0.95)",
+    default: "rgb(0, 53, 128)",
+    hover: "rgb(20, 75, 155)",
+    selected: "rgb(0, 40, 105)",
   },
   direct: {
-    default: "rgba(196, 154, 90, 0.70)",
-    hover: "rgba(196, 154, 90, 0.85)",
-    selected: "rgba(196, 154, 90, 0.95)",
+    default: "rgb(196, 154, 90)",
+    hover: "rgb(212, 170, 108)",
+    selected: "rgb(176, 136, 74)",
   },
 };
 
