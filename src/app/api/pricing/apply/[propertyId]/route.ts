@@ -219,6 +219,15 @@ export async function POST(
       // accepted the push for that date.
       const successByDate = new Map<string, Set<string>>();
       const bdcPlans: Array<{ rate_plan_id: string; channel: string; plan: SafeRestrictionPlan }> = [];
+      // Session 5a.1 Fix 3: per-channel calendar_rates overrides populated
+      // *inside* the batch-success branch so only entries actually accepted
+      // by Channex land in local state. Entries skipped by
+      // buildSafeBdcRestrictions never enter a batch, so they never reach
+      // this list — matching the "don't update local state for un-pushed
+      // entries" rule. No base (channel_code IS NULL) rows are written
+      // here; applying a rec is a per-channel action.
+      const appliedAt = new Date().toISOString();
+      const calendarRateUpserts: Array<Record<string, unknown>> = [];
 
       // Per-target push loop. Each target = one Channex rate plan = one
       // platform (BDC, ABB, etc.). BDC runs through safe-restrictions;
@@ -245,6 +254,20 @@ export async function POST(
               for (const entry of batch) {
                 if (!successByDate.has(entry.date_from)) successByDate.set(entry.date_from, new Set());
                 successByDate.get(entry.date_from)!.add(t.channel);
+                const rec = recByDate.get(entry.date_from);
+                if (rec) {
+                  calendarRateUpserts.push({
+                    property_id: propertyId,
+                    date: entry.date_from,
+                    channel_code: t.channel,
+                    applied_rate: rec.suggested_rate,
+                    rate_source: "engine",
+                    is_available: true,
+                    channex_rate_plan_id: t.id,
+                    last_pushed_at: appliedAt,
+                    last_channex_rate: rec.suggested_rate,
+                  });
+                }
               }
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
@@ -292,6 +315,20 @@ export async function POST(
             for (const entry of batch) {
               if (!successByDate.has(entry.date_from)) successByDate.set(entry.date_from, new Set());
               successByDate.get(entry.date_from)!.add(t.channel);
+              const rec = recByDate.get(entry.date_from);
+              if (rec) {
+                calendarRateUpserts.push({
+                  property_id: propertyId,
+                  date: entry.date_from,
+                  channel_code: t.channel,
+                  applied_rate: rec.suggested_rate,
+                  rate_source: "engine",
+                  is_available: true,
+                  channex_rate_plan_id: t.id,
+                  last_pushed_at: appliedAt,
+                  last_channex_rate: rec.suggested_rate,
+                });
+              }
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -307,17 +344,14 @@ export async function POST(
         }
       }
 
-      // Consolidate: for each date that had AT LEAST ONE successful
-      // channel push, write pricing_performance + flip the rec status
-      // + upsert calendar_rates rows (one per-channel override plus
-      // one base row). The base row keeps channel_code NULL so
-      // downstream "what's my current rate for this date?" readers
-      // find the applied value without having to know which channels
-      // accepted.
-      const appliedAt = new Date().toISOString();
+      // Consolidate pricing_performance rows: for each date that had AT
+      // LEAST ONE successful channel push, emit one performance row
+      // tagging which channels accepted. calendar_rates is already
+      // populated per-entry inside the batch loop above (Session 5a.1
+      // Fix 3) — one override row per successfully-pushed (date,
+      // channel) pair, no base row.
       const perfRows: Array<Record<string, unknown>> = [];
       const appliedRecIds: string[] = [];
-      const calendarRateUpserts: Array<Record<string, unknown>> = [];
       const successEntries = Array.from(successByDate.entries());
       for (const [date, channelSet] of successEntries) {
         const rec = recByDate.get(date);
@@ -333,28 +367,6 @@ export async function POST(
           channels_pushed: slugs,
         });
         appliedRecIds.push(rec.id);
-        // Per-channel rows — one per successful channel push.
-        for (const code of Array.from(channelSet) as string[]) {
-          calendarRateUpserts.push({
-            property_id: propertyId,
-            date: rec.date,
-            channel_code: code,
-            applied_rate: rec.suggested_rate,
-            rate_source: "engine",
-            is_available: true,
-          });
-        }
-        // Base row (channel_code NULL) — the property-level master
-        // rate is also updated since one recommendation applies
-        // uniformly across all its targets.
-        calendarRateUpserts.push({
-          property_id: propertyId,
-          date: rec.date,
-          channel_code: null,
-          applied_rate: rec.suggested_rate,
-          rate_source: "engine",
-          is_available: true,
-        });
       }
 
       let performance_rows_created = 0;

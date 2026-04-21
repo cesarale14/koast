@@ -25,7 +25,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const CHANNEL_NAME_FALLBACK: Record<string, string> = {
+// Authoritative channel display-name source. `property_channels.channel_name`
+// used to back this, but that column has historically stored the *property*
+// name for some rows (e.g. "Villa Jamaica" on ABB) instead of the channel
+// display name. Sourcing from this registry decouples the sidebar from
+// that data-quality issue.
+const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
   BDC: "Booking.com",
   ABB: "Airbnb",
   VRBO: "Vrbo",
@@ -64,14 +69,15 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Active channels registered for this property.
+    // Active channels registered for this property. We only need channel_code —
+    // the display name comes from CHANNEL_DISPLAY_NAMES, not from the DB.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: channelRows } = await (supabase.from("property_channels") as any)
-      .select("channel_code, channel_name")
+      .select("channel_code")
       .eq("property_id", propertyId)
       .eq("status", "active");
-    const channels = ((channelRows ?? []) as Array<{ channel_code: string; channel_name: string | null }>)
-      .map((c) => ({ channel_code: c.channel_code.toUpperCase(), channel_name: c.channel_name }));
+    const channels = ((channelRows ?? []) as Array<{ channel_code: string }>)
+      .map((c) => ({ channel_code: c.channel_code.toUpperCase() }));
 
     // Master (base) row — channel_code IS NULL.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,7 +114,7 @@ export async function GET(request: NextRequest) {
       const overrides_master = override?.applied_rate != null && override.applied_rate !== masterApplied;
       return {
         channel_code: c.channel_code,
-        channel_name: c.channel_name ?? CHANNEL_NAME_FALLBACK[c.channel_code] ?? c.channel_code,
+        channel_name: CHANNEL_DISPLAY_NAMES[c.channel_code] ?? c.channel_code,
         applied_rate: applied,
         overrides_master,
       };
