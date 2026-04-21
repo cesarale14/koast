@@ -1095,7 +1095,15 @@ function WeekRow({
               style={{
                 minHeight: cellMinHeight,
                 padding: isMobile ? "4px 4px" : "10px 12px",
-                opacity: d.inMonth ? 1 : 0.35,
+                // Three states of visual emphasis:
+                //   - out-of-month cells: 0.35 (deeply faded)
+                //   - past in-month days: 0.5  (muted grey feel, still legible)
+                //   - today + future:     1.0  (full contrast)
+                // Past-day mute only affects the cell contents (date number,
+                // rate, recommendation dot). Booking bars are positioned in a
+                // separate layer above the grid, so they stay full-contrast
+                // even on historical dates.
+                opacity: !d.inMonth ? 0.35 : d.isPast ? 0.5 : 1,
               }}
             >
               <DayCellContents
