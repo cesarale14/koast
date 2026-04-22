@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateReviewResponse } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
+import { createChannexClient } from "@/lib/channex/client";
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +22,7 @@ export async function POST(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reviewTable = supabase.from("guest_reviews") as any;
     const { data: reviews } = await reviewTable
-      .select("id, booking_id, property_id, incoming_text, incoming_rating, response_draft")
+      .select("id, booking_id, property_id, incoming_text, incoming_rating, response_draft, channex_review_id")
       .eq("id", params.reviewId)
       .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,18 +30,39 @@ export async function POST(
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
     if (action === "approve") {
-      // Approve: move draft (or edited text) to final
+      // Session 6 — "approve" is the actual SEND. Call Channex's
+      // /reviews/:id/reply, and only mark the local row as sent when
+      // Channex accepts. Hand-seeded rows without a channex_review_id
+      // skip the network call and save locally as before (legacy
+      // behavior for pre-sync test rows).
       const finalText = body.response_text ?? review.response_draft;
       if (!finalText) {
         return NextResponse.json({ error: "No draft to approve. Generate a draft first." }, { status: 400 });
       }
+
+      if (review.channex_review_id) {
+        try {
+          const channex = createChannexClient();
+          await channex.respondToReview(review.channex_review_id, finalText);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[reviews/respond] Channex reply failed for ${review.channex_review_id}: ${msg}`);
+          return NextResponse.json({ error: `Channex reply failed: ${msg}` }, { status: 502 });
+        }
+      } else {
+        console.warn(`[reviews/respond] ${params.reviewId} has no channex_review_id — saving locally only`);
+      }
+
+      const sentAt = new Date().toISOString();
       await reviewTable.update({
         response_draft: finalText,
         response_final: finalText,
         response_sent: true,
+        status: "published",
+        published_at: sentAt,
       }).eq("id", params.reviewId);
 
-      return NextResponse.json({ response_text: finalText, sent: true });
+      return NextResponse.json({ response_text: finalText, sent: true, published_at: sentAt });
     }
 
     // Generate draft

@@ -8,6 +8,39 @@ import type {
   ChannexRestrictionAttrs,
 } from "./types";
 
+// Session 6 — Channex Reviews entity shape. Derived from live-probe
+// data against Villa Jamaica. Airbnb reviews populate `scores` (per-
+// category breakdown) + `raw_content.{public_review,private_feedback}`;
+// BDC reviews use the same outer envelope but may omit private_feedback
+// and use a different `scores` category set.
+export interface ChannexReviewAttrs {
+  id: string;
+  ota: string;                            // "AirBNB" / "BookingCom" / "Expedia"
+  ota_reservation_id: string | null;
+  received_at: string | null;             // ISO timestamp
+  inserted_at: string | null;             // ISO timestamp
+  updated_at: string | null;
+  expired_at: string | null;              // reply deadline
+  is_hidden: boolean;
+  is_replied: boolean;
+  is_expired: boolean;
+  guest_name: string | null;
+  overall_score: number | null;           // 0-10 scale on Airbnb
+  content: string | null;                 // concatenated public + private
+  raw_content?: {
+    public_review?: string | null;
+    private_feedback?: string | null;
+  } | null;
+  scores?: Array<{ category: string; score: number }> | null;
+  reply?: Record<string, unknown> | null;
+  tags?: string[] | null;
+  meta?: Record<string, unknown> | null;
+}
+
+// `attributes.id` is always the review's canonical UUID, so the
+// flattened ChannexReview is just the attributes themselves.
+export type ChannexReview = ChannexReviewAttrs;
+
 const DEFAULT_BASE_URL = "https://app.channex.io/api/v1";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -642,6 +675,38 @@ class ChannexClient {
     return this.request("/restrictions", {
       method: "POST",
       body: JSON.stringify({ values }),
+    });
+  }
+
+  // ==================== Reviews ====================
+
+  /**
+   * GET /api/v1/reviews?filter[property_id]=<uuid>&page[limit]=<n>
+   * Returns the Channex review entities for a property. Paginates via
+   * page[number] + page[limit]; default limit is 10. Session 6.
+   */
+  async getReviews(
+    propertyId: string,
+    options: { limit?: number; page?: number } = {}
+  ): Promise<ChannexReview[]> {
+    const limit = options.limit ?? 50;
+    const page = options.page ?? 1;
+    const url = `/reviews?filter[property_id]=${propertyId}&page[limit]=${limit}&page[number]=${page}`;
+    const res = await this.request<{ data?: Array<{ id: string; attributes: ChannexReviewAttrs }> }>(url);
+    // `attributes.id` and the envelope `id` are always identical for
+    // Channex review entities; the flattened ChannexReview type is
+    // just the attributes themselves.
+    return (res.data ?? []).map((r) => r.attributes);
+  }
+
+  /**
+   * POST /api/v1/reviews/:review_id/reply
+   * Body: { reply: { reply: "<text>" } }
+   */
+  async respondToReview(reviewId: string, response: string): Promise<AnyResponse> {
+    return this.request(`/reviews/${reviewId}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ reply: { reply: response } }),
     });
   }
 
