@@ -121,18 +121,22 @@ export default function CalendarSidebar({ propertyId, date, selectedDates, booke
   );
 
   const applyBaseBulk = useCallback(
-    async (rate: number, dates: string[]): Promise<{ ok: boolean; error?: string }> => {
+    async (rate: number, dates: string[], masterPush?: boolean): Promise<{
+      ok: boolean;
+      error?: string;
+      channels?: Record<string, { pushed: number; failed: Array<{ date: string; error: string }> }>;
+    }> => {
       try {
         const res = await fetch(`/api/calendar/base-rate/${propertyId}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ dates, rate }),
+          body: JSON.stringify({ dates, rate, masterPush: masterPush === true }),
         });
         const body = await res.json();
         if (!res.ok) {
           return { ok: false, error: body?.error ?? `HTTP ${res.status}` };
         }
-        return { ok: true };
+        return { ok: true, channels: body.channels };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }

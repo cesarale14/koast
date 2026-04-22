@@ -51,7 +51,11 @@ interface Props {
   loading: boolean;
   onToast?: (text: string, tone: "ok" | "err") => void;
   onApplyPlatformBulk: (channelCode: string, rate: number, dates: string[]) => Promise<{ ok: boolean; perDate?: PerDateStatus[]; error?: string }>;
-  onApplyBaseBulk: (rate: number, dates: string[]) => Promise<{ ok: boolean; error?: string }>;
+  onApplyBaseBulk: (rate: number, dates: string[], masterPush?: boolean) => Promise<{
+    ok: boolean;
+    error?: string;
+    channels?: Record<string, { pushed: number; failed: Array<{ date: string; error: string }> }>;
+  }>;
   onRefresh: () => Promise<void>;
 }
 
@@ -124,6 +128,11 @@ export default function PricingTab({
     BDC: "",
   });
 
+  // Session 5b.4 — ephemeral master-push toggle on the Base card.
+  // Resets on mount, selection change, commit, and cancel. Never
+  // persisted; master-push should always be an in-the-moment choice.
+  const [masterPush, setMasterPush] = useState(false);
+
   // Modal state — which card triggered the modal, and its precomputed
   // DateDiff[] so the user sees a stable snapshot while the server call
   // is in flight.
@@ -137,6 +146,21 @@ export default function PricingTab({
     }
     return [];
   }, [bundleByDate]);
+
+  // Session 5b.4 — active-channel list with display names for the
+  // master-push toggle label and the modal's per-platform columns.
+  // Currently scoped to channels the base master-push path knows how
+  // to handle (ABB / BDC). Extend when new channels come online.
+  const activeChannelsList = useMemo<Array<{ code: string; name: string }>>(() => {
+    const supported: Record<string, string> = { ABB: "Airbnb", BDC: "Booking.com" };
+    return channels.filter((c) => supported[c]).map((c) => ({ code: c, name: supported[c] }));
+  }, [channels]);
+
+  const masterPushLabel = useMemo(() => {
+    if (activeChannelsList.length === 0) return null;
+    const names = activeChannelsList.map((c) => c.name).join(" + ");
+    return `Also push to ${names}`;
+  }, [activeChannelsList]);
 
   // Selected dates present in the loaded bundle map (ignoring dates
   // that failed to load). These drive all per-card computations.
@@ -158,10 +182,13 @@ export default function PricingTab({
 
   // Reset draft when selection changes — otherwise a stale draft from
   // a previous selection would bleed into the new card display.
+  // Session 5b.4 — the master-push toggle also resets here so it
+  // never bleeds across selections.
   const loadedKey = useMemo(() => loadedDates.join("|"), [loadedDates]);
   useEffect(() => {
     setDraftByCard({ base: "", ABB: "", BDC: "" });
     setModalFor(null);
+    setMasterPush(false);
     // Intentionally keyed on the serialized loadedDates so identity
     // churn doesn't thrash.
   }, [loadedKey]);
@@ -192,19 +219,36 @@ export default function PricingTab({
       onToast?.("No dates loaded", "err");
       return;
     }
+    const doingMasterPush = card === "base" && masterPush && activeChannelsList.length > 0;
     // Multi-date → open modal. Single-date → fire immediately.
     if (loadedDates.length > 1) {
-      const diffs: DateDiff[] = loadedDates.map((d) => ({
-        date: d,
-        oldRate: perDateRate(bundleByDate.get(d)!, card),
-        newRate: rate,
-        hasBooking: bookedDates.has(d),
-      }));
+      const diffs: DateDiff[] = loadedDates.map((d) => {
+        const bundle = bundleByDate.get(d)!;
+        const perChannelOld: Record<string, number | null> = {};
+        if (doingMasterPush) {
+          for (const c of activeChannelsList) {
+            const p = bundle.platforms.find((x) => x.channel_code.toUpperCase() === c.code);
+            perChannelOld[c.code] = p?.overrides_master ? p.applied_rate : null;
+          }
+        }
+        return {
+          date: d,
+          oldRate: perDateRate(bundle, card),
+          newRate: rate,
+          hasBooking: bookedDates.has(d),
+          perChannelOld: doingMasterPush ? perChannelOld : undefined,
+        };
+      });
       const mode: BulkModalMode = card === "base"
-        ? { kind: "base", overridesAffected: loadedDates.filter((d) => {
-            const b = bundleByDate.get(d)!;
-            return b.platforms.some((p) => p.overrides_master);
-          }).length }
+        ? {
+            kind: "base",
+            masterPush: doingMasterPush,
+            activeChannels: doingMasterPush ? activeChannelsList : undefined,
+            overridesAffected: loadedDates.filter((d) => {
+              const b = bundleByDate.get(d)!;
+              return b.platforms.some((p) => p.overrides_master);
+            }).length,
+          }
         : { kind: "platform", platform: card === "ABB" ? "Airbnb" : "Booking.com" };
       setModalFor({ card, newRate: rate, diffs, mode });
       return;
@@ -212,12 +256,17 @@ export default function PricingTab({
     // Single-date — direct push, no modal.
     const onlyDate = loadedDates[0];
     if (card === "base") {
-      const r = await onApplyBaseBulk(rate, [onlyDate]);
+      const r = await onApplyBaseBulk(rate, [onlyDate], doingMasterPush);
       if (!r.ok) {
         onToast?.(r.error ?? "Base rate update failed", "err");
         return;
       }
-      onToast?.("Base rate updated", "ok");
+      if (doingMasterPush) {
+        const names = activeChannelsList.map((c) => c.name).join(" + ");
+        onToast?.(`Base rate saved, pushed to ${names}`, "ok");
+      } else {
+        onToast?.("Base rate updated", "ok");
+      }
     } else {
       const r = await onApplyPlatformBulk(card, rate, [onlyDate]);
       if (!r.ok) {
@@ -229,20 +278,50 @@ export default function PricingTab({
       onToast?.(`${platformName} rate updated${pushed === 0 ? " (no push)" : ""}`, "ok");
     }
     setDraftByCard((d) => ({ ...d, [card]: "" }));
+    if (card === "base") setMasterPush(false);
     await onRefresh();
-  }, [draftParsed, loadedDates, bundleByDate, bookedDates, onApplyBaseBulk, onApplyPlatformBulk, onToast, onRefresh]);
+  }, [draftParsed, loadedDates, bundleByDate, bookedDates, onApplyBaseBulk, onApplyPlatformBulk, onToast, onRefresh, masterPush, activeChannelsList]);
 
   // Modal commit — calls the bulk helper and returns null on total
   // success or a partial-failure shape. Throws on total failure (the
   // modal treats thrown errors as total failure via onDone).
   const handleModalCommit = useCallback(async (): Promise<{ diffs: DateDiff[] } | null> => {
     if (!modalFor) return null;
-    const { card, newRate, diffs } = modalFor;
+    const { card, newRate, diffs, mode } = modalFor;
     const dates = diffs.map((d) => d.date);
     if (card === "base") {
-      const r = await onApplyBaseBulk(newRate, dates);
+      const wantsMasterPush = mode.kind === "base" && mode.masterPush === true;
+      const r = await onApplyBaseBulk(newRate, dates, wantsMasterPush);
       if (!r.ok) throw new Error(r.error ?? "Base rate update failed");
-      return null;
+      if (!wantsMasterPush) return null;
+      // Master-push: inspect per-channel failures for partial-failure UX.
+      const ch = r.channels ?? {};
+      const failedByChannel = new Map<string, Map<string, string>>();
+      let anyFailed = false;
+      for (const code of Object.keys(ch)) {
+        const fails = ch[code].failed;
+        if (fails.length === 0) continue;
+        anyFailed = true;
+        const m = new Map<string, string>();
+        for (const f of fails) m.set(f.date, f.error);
+        failedByChannel.set(code, m);
+      }
+      if (!anyFailed) return null;
+      const annotated = diffs.map((d) => {
+        const perChannelStatus: Record<string, "ok" | "failed"> = {};
+        const perChannelErrors: Record<string, string> = {};
+        for (const code of Object.keys(ch)) {
+          const fail = failedByChannel.get(code)?.get(d.date);
+          if (fail) {
+            perChannelStatus[code] = "failed";
+            perChannelErrors[code] = fail;
+          } else {
+            perChannelStatus[code] = "ok";
+          }
+        }
+        return { ...d, perChannelStatus, perChannelErrors };
+      });
+      return { diffs: annotated };
     }
     const r = await onApplyPlatformBulk(card, newRate, dates);
     if (!r.ok) throw new Error(r.error ?? "Push failed");
@@ -259,15 +338,32 @@ export default function PricingTab({
   }, [modalFor, onApplyBaseBulk, onApplyPlatformBulk]);
 
   const handleModalDone = useCallback((msg: string) => {
-    onToast?.(msg, "ok");
+    // For base + master-push total success, synthesize a richer toast
+    // that names the channels we pushed to — the modal's own message
+    // doesn't have master-push context.
+    let toastMsg = msg;
+    if (
+      modalFor?.card === "base" &&
+      modalFor.mode.kind === "base" &&
+      modalFor.mode.masterPush
+    ) {
+      const names = activeChannelsList.map((c) => c.name).join(" + ");
+      const n = modalFor.diffs.length;
+      toastMsg = `${n} base rate${n === 1 ? "" : "s"} updated, pushed to ${names}`;
+    }
+    onToast?.(toastMsg, "ok");
     setDraftByCard((d) => ({ ...d, ...(modalFor ? { [modalFor.card]: "" } : {}) }));
+    if (modalFor?.card === "base") setMasterPush(false);
     setModalFor(null);
     void onRefresh();
-  }, [onToast, onRefresh, modalFor]);
+  }, [onToast, onRefresh, modalFor, activeChannelsList]);
 
   const handleModalCancel = useCallback(() => {
+    // Reset toggle on cancel too — master-push should always be a
+    // fresh active decision.
+    if (modalFor?.card === "base") setMasterPush(false);
     setModalFor(null);
-  }, []);
+  }, [modalFor]);
 
   const handleMinStay = useCallback((v: number) => {
     void v;
@@ -308,6 +404,29 @@ export default function PricingTab({
               Koast suggests ${Math.round(anchorBundle.master.suggested_rate)}
             </div>
           )}
+        {masterPushLabel && (
+          <label
+            style={{
+              marginTop: 10,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: "var(--coastal)",
+              fontWeight: 400,
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={masterPush}
+              onChange={(e) => setMasterPush(e.target.checked)}
+              style={{ width: 14, height: 14, accentColor: "var(--coastal)" }}
+            />
+            <span>{masterPushLabel}</span>
+          </label>
+        )}
       </section>
 
       <section>

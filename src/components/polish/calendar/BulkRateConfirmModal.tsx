@@ -24,11 +24,28 @@ export interface DateDiff {
   /** Populated after commit if partial failure. */
   status?: "ok" | "failed";
   error?: string;
+  /** Session 5b.4 — per-channel snapshot for the base master-push
+   *  variant. Keyed by uppercase channel_code ("ABB", "BDC"). Value
+   *  is the currently-saved override applied_rate, or null when the
+   *  channel inherits from base on that date. */
+  perChannelOld?: Record<string, number | null>;
+  /** Session 5b.4 — per-channel push outcome, populated on partial
+   *  failure by the master-push commit handler. */
+  perChannelStatus?: Record<string, "ok" | "failed">;
+  perChannelErrors?: Record<string, string>;
 }
 
 export type BulkModalMode =
   | { kind: "platform"; platform: "Airbnb" | "Booking.com" }
-  | { kind: "base"; overridesAffected: number };
+  | {
+      kind: "base";
+      overridesAffected: number;
+      masterPush: boolean;
+      /** Required when masterPush=true. Drives the extra per-platform
+       *  columns in the diff table. Keyed by channel_code (uppercase)
+       *  with a display name. */
+      activeChannels?: Array<{ code: string; name: string }>;
+    };
 
 interface Props {
   mode: BulkModalMode;
@@ -89,11 +106,19 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
 
   const isPlatform = mode.kind === "platform";
   const platformName = isPlatform ? mode.platform : null;
+  const isMasterPush = mode.kind === "base" && mode.masterPush === true;
+  const activeChannels = mode.kind === "base" ? (mode.activeChannels ?? []) : [];
 
   const title = isPlatform
     ? `Push ${changingCount} change${changingCount === 1 ? "" : "s"} to ${platformName}?`
+    : isMasterPush
+    ? `Update base rate and push to all channels?`
     : `Update base rate for ${sorted.length} date${sorted.length === 1 ? "" : "s"}?`;
-  const commitLabel = isPlatform ? "Push to channels" : "Save base rate";
+  const commitLabel = isPlatform
+    ? "Push to channels"
+    : isMasterPush
+    ? "Push to all channels"
+    : "Save base rate";
 
   const rowsToRender = committed ?? sorted;
 
@@ -150,7 +175,15 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
       style={overlayStyle}
       onClick={phase === "committing" ? undefined : onCancel}
     >
-      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{
+          ...panelStyle,
+          // Master-push variant needs extra horizontal room for the
+          // per-platform columns. 720px is the cap.
+          width: isMasterPush ? "min(720px, 100%)" : panelStyle.width,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <header style={headerStyle}>
           <div id="bulk-rate-modal-title" style={titleStyle}>{title}</div>
           <div style={subtitleStyle}>{fmtRange(sorted.map((d) => d.date))}</div>
@@ -161,9 +194,12 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
             <thead>
               <tr>
                 <th style={thStyle}>Date</th>
-                <th style={thRightStyle}>Current</th>
+                <th style={thRightStyle}>{isMasterPush ? "Base" : "Current"}</th>
                 <th style={thCenterStyle} />
                 <th style={thRightStyle}>New</th>
+                {isMasterPush && activeChannels.map((c) => (
+                  <th key={c.code} style={thRightStyle}>{c.name}</th>
+                ))}
                 {phase === "partial" && <th style={thCenterStyle}>Status</th>}
               </tr>
             </thead>
@@ -200,6 +236,44 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
                         <strong>{fmtMoney(newV)}</strong>
                       )}
                     </td>
+                    {isMasterPush && activeChannels.map((c) => {
+                      const prev = d.perChannelOld?.[c.code] ?? null;
+                      const status = d.perChannelStatus?.[c.code];
+                      const err = d.perChannelErrors?.[c.code];
+                      const willChange = prev !== newV;
+                      return (
+                        <td key={c.code} style={tdRightStyle}>
+                          {prev != null ? (
+                            willChange ? (
+                              <>
+                                <span style={{ color: "var(--tideline)", textDecoration: "line-through" }}>{fmtMoney(prev)}</span>
+                                <br />
+                                <strong>{fmtMoney(newV)}</strong>
+                              </>
+                            ) : (
+                              <span style={{ color: "var(--tideline)" }}>{fmtMoney(prev)}</span>
+                            )
+                          ) : (
+                            <>
+                              <span style={{ color: "var(--tideline)" }}>inherits</span>
+                              <br />
+                              <strong>{fmtMoney(newV)}</strong>
+                            </>
+                          )}
+                          {phase === "partial" && status && (
+                            <div style={{ marginTop: 2 }}>
+                              {status === "ok" ? (
+                                <Check size={12} color="var(--lagoon)" aria-label={`${c.name} pushed`} />
+                              ) : (
+                                <span title={err ?? "Failed"} aria-label={`${c.name} failed: ${err ?? "unknown"}`}>
+                                  <XIcon size={12} color="var(--coral-reef)" />
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
                     {phase === "partial" && (
                       <td style={tdCenterStyle}>
                         {d.status === "ok" ? (
@@ -234,7 +308,7 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
                 Changes push to {platformName} via Channex. Reflects within 5–15 minutes.
               </div>
             )}
-            {!isPlatform && (
+            {!isPlatform && !isMasterPush && (
               <>
                 <div style={{ color: "var(--tideline)", marginTop: 4 }}>
                   Base rate updates apply to Koast&apos;s pricing engine only. Your Airbnb and Booking.com rates are not changed.
@@ -244,6 +318,18 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
                     {mode.overridesAffected} of {sorted.length} dates have per-platform overrides — those overrides stay unchanged and continue to apply.
                   </div>
                 )}
+              </>
+            )}
+            {isMasterPush && (
+              <>
+                {mode.kind === "base" && mode.overridesAffected > 0 && (
+                  <div style={{ color: "var(--tideline)", marginTop: 4 }}>
+                    {mode.overridesAffected} of {sorted.length} dates have existing per-platform overrides that will be replaced with the new base rate.
+                  </div>
+                )}
+                <div style={{ color: "var(--tideline)", marginTop: 4 }}>
+                  Changes push via Channex. Airbnb and Booking.com reflect within 5–15 minutes.
+                </div>
               </>
             )}
           </div>
