@@ -7,17 +7,24 @@ interface KoastSelectedCellProps {
   children: ReactNode;
   style?: CSSProperties;
   onClick?: () => void;
+  /** Session 5b.3 — drag-selection support. Optional. */
+  onMouseDown?: () => void;
+  onMouseEnterDrag?: () => void;
   ariaLabel?: string;
   hoverable?: boolean;
 }
 
-export function KoastSelectedCell({ selected, children, style, onClick, ariaLabel, hoverable = true }: KoastSelectedCellProps) {
+export function KoastSelectedCell({ selected, children, style, onClick, onMouseDown, onMouseEnterDrag, ariaLabel, hoverable = true }: KoastSelectedCellProps) {
   const [hover, setHover] = useState(false);
   const showHover = hoverable && hover && !selected;
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => {
+        setHover(true);
+        if (onMouseEnterDrag) onMouseEnterDrag();
+      }}
       onMouseLeave={() => setHover(false)}
       aria-label={ariaLabel}
       aria-selected={selected}

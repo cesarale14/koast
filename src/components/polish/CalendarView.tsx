@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  Upload,
   ArrowLeftRight,
   Calendar as CalendarIcon,
 } from "lucide-react";
@@ -243,6 +242,16 @@ export default function CalendarView({
   const [toast, setToast] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
   const router = useRouter();
 
+  // Session 5b.3 — multi-date selection.
+  // Single-date (click) path keeps `selectedDate` as the anchor. When a
+  // user drags across cells, `dragAnchor` + `dragCurrent` define a live
+  // range that's visualized mid-drag; on mouseup, if the range has >1
+  // date it's committed into `selectedRange`. Single click clears the
+  // range. Escape resets to the single anchor.
+  const [dragAnchor, setDragAnchor] = useState<string | null>(null);
+  const [dragCurrent, setDragCurrent] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | null>(null);
+
   useEffect(() => {
     setMounted(true);
     const apply = () => {
@@ -311,6 +320,81 @@ export default function CalendarView({
   const selectedRec = recByDate.get(selectedDate) ?? null;
   void selectedRec;
 
+  // Expand a [start, end] inclusive date range into an array of ISO
+  // dates. Handles both directions (start > end swaps).
+  const expandRange = useCallback((a: string, b: string): string[] => {
+    const startStr = a <= b ? a : b;
+    const endStr = a <= b ? b : a;
+    const out: string[] = [];
+    const cur = new Date(startStr + "T00:00:00Z");
+    const end = new Date(endStr + "T00:00:00Z");
+    while (cur <= end) {
+      out.push(cur.toISOString().split("T")[0]);
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return out;
+  }, []);
+
+  // Canonical selection: what rows the sidebar acts on. During a
+  // drag, the live anchor→current range drives the preview; on
+  // mouseup it's either committed to selectedRange (>1 date) or
+  // collapsed back to a single-date click.
+  const selectedDates = useMemo<string[]>(() => {
+    if (dragAnchor && dragCurrent) return expandRange(dragAnchor, dragCurrent);
+    if (selectedRange) return expandRange(selectedRange.start, selectedRange.end);
+    return [selectedDate];
+  }, [dragAnchor, dragCurrent, selectedRange, selectedDate, expandRange]);
+
+  const selectedDatesSet = useMemo(() => new Set(selectedDates), [selectedDates]);
+
+  const handleCellMouseDown = useCallback((d: string) => {
+    setDragAnchor(d);
+    setDragCurrent(d);
+    // Collapse any committed range while a fresh drag starts.
+    setSelectedRange(null);
+    setSelectedDate(d);
+  }, []);
+
+  const handleCellMouseEnterDrag = useCallback((d: string) => {
+    setDragCurrent((prev) => (prev == null ? prev : d));
+  }, []);
+
+  // Global mouseup commits the drag into a selectedRange when >1 date.
+  useEffect(() => {
+    function finish() {
+      setDragAnchor((anchor) => {
+        if (anchor == null) return anchor;
+        let nextCurrent: string | null = null;
+        setDragCurrent((cur) => {
+          nextCurrent = cur;
+          return null;
+        });
+        const endDate = nextCurrent ?? anchor;
+        if (endDate !== anchor) {
+          const a = anchor <= endDate ? anchor : endDate;
+          const b = anchor <= endDate ? endDate : anchor;
+          setSelectedRange({ start: a, end: b });
+        }
+        return null;
+      });
+    }
+    window.addEventListener("mouseup", finish);
+    return () => window.removeEventListener("mouseup", finish);
+  }, []);
+
+  // Escape clears the committed range and returns to single-date.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSelectedRange(null);
+        setDragAnchor(null);
+        setDragCurrent(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const goPrev = useCallback(() => {
     setStartMonth((s) => ({
       year: s.month === 0 ? s.year - 1 : s.year,
@@ -335,20 +419,10 @@ export default function CalendarView({
   // per-platform rates via /api/calendar/rates/apply.
   void refetch;
 
-  const handlePushAll = useCallback(async () => {
-    if (!activePropertyId) return;
-    setBusy("push");
-    try {
-      const res = await fetch(`/api/pricing/push/${activePropertyId}`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setToast({ text: "Rates pushed to channels", tone: "ok" });
-    } catch (err) {
-      setToast({ text: err instanceof Error ? err.message : "Push failed", tone: "err" });
-    } finally {
-      setBusy(null);
-    }
-  }, [activePropertyId]);
+  // Session 5b.3 — handlePushAll removed. The global "Push to channels"
+  // header button was ambiguous about what it pushed; per-card Save
+  // in the sidebar (single or bulk via modal) now covers all push
+  // workflows.
 
   // Channex → Koast pull. Hits the existing /api/channex/sync route with
   // the active property_id in the body; that route upserts both bookings
@@ -395,7 +469,6 @@ export default function CalendarView({
           setPropertyMenuOpen(false);
         }}
         onSyncNow={handleSyncNow}
-        onPushAll={handlePushAll}
         busy={busy}
         isMobile={isMobile}
         onOpenRail={() => setRailOpen(true)}
@@ -445,10 +518,14 @@ export default function CalendarView({
                 recByDate={recByDate}
                 overrideDates={overrideDates}
                 selectedDate={selectedDate}
+                selectedDatesSet={selectedDatesSet}
                 onSelectDate={(d) => {
                   setSelectedDate(d);
+                  setSelectedRange(null);
                   if (isMobile) setRailOpen(true);
                 }}
+                onCellMouseDown={handleCellMouseDown}
+                onCellMouseEnterDrag={handleCellMouseEnterDrag}
                 index={i}
                 isMobile={isMobile}
               />
@@ -513,6 +590,8 @@ export default function CalendarView({
             <CalendarSidebar
               propertyId={activePropertyId}
               date={selectedDate}
+              selectedDates={selectedDates}
+              bookedDates={new Set(bookings.flatMap((b) => expandRange(b.check_in, b.check_out).slice(0, -1)))}
               isBooked={Boolean(selectedRec) === false && bookings.some((b) => b.check_in <= selectedDate && b.check_out > selectedDate)}
               rulesSummary={
                 rules
@@ -569,7 +648,6 @@ function TopChrome({
   onMenuToggle,
   onPropertyPick,
   onSyncNow,
-  onPushAll,
   busy,
   isMobile,
   onOpenRail,
@@ -586,7 +664,6 @@ function TopChrome({
   onMenuToggle: () => void;
   onPropertyPick: (id: string) => void;
   onSyncNow: () => void;
-  onPushAll: () => void;
   busy: string | null;
   isMobile: boolean;
   onOpenRail: () => void;
@@ -713,22 +790,14 @@ function TopChrome({
             <button onClick={onSyncNow} aria-label="Sync now" style={iconBtnStyle} disabled={busy === "sync"}>
               <RefreshCw size={16} />
             </button>
-            <button onClick={onPushAll} aria-label="Push to channels" style={{ ...iconBtnStyle, color: "var(--coastal)" }} disabled={busy === "push"}>
-              <Upload size={16} />
-            </button>
             <button onClick={onOpenRail} aria-label="Open details" style={iconBtnStyle}>
               <CalendarIcon size={16} />
             </button>
           </>
         ) : (
-          <>
-            <KoastButton size="sm" variant="ghost" iconLeft={<RefreshCw size={14} />} onClick={onSyncNow} loading={busy === "sync"}>
-              Sync
-            </KoastButton>
-            <KoastButton size="sm" variant="primary" iconLeft={<Upload size={14} />} onClick={onPushAll} loading={busy === "push"}>
-              Push to channels
-            </KoastButton>
-          </>
+          <KoastButton size="sm" variant="ghost" iconLeft={<RefreshCw size={14} />} onClick={onSyncNow} loading={busy === "sync"}>
+            Sync
+          </KoastButton>
         )}
       </div>
     </div>
@@ -916,7 +985,10 @@ function MonthBlock({
   recByDate,
   overrideDates,
   selectedDate,
+  selectedDatesSet,
   onSelectDate,
+  onCellMouseDown,
+  onCellMouseEnterDrag,
   index,
   isMobile,
 }: {
@@ -928,7 +1000,10 @@ function MonthBlock({
   recByDate: Map<string, PricingRecommendation>;
   overrideDates: Set<string>;
   selectedDate: string;
+  selectedDatesSet: Set<string>;
   onSelectDate: (d: string) => void;
+  onCellMouseDown: (d: string) => void;
+  onCellMouseEnterDrag: (d: string) => void;
   index: number;
   isMobile: boolean;
 }) {
@@ -1034,7 +1109,10 @@ function MonthBlock({
               rateByDate={rateByDate}
               recByDate={recByDate}
               selectedDate={selectedDate}
+              selectedDatesSet={selectedDatesSet}
               onSelectDate={onSelectDate}
+              onCellMouseDown={onCellMouseDown}
+              onCellMouseEnterDrag={onCellMouseEnterDrag}
               isMobile={isMobile}
             />
           );
@@ -1080,7 +1158,10 @@ function WeekRow({
   recByDate,
   overrideDates,
   selectedDate,
+  selectedDatesSet,
   onSelectDate,
+  onCellMouseDown,
+  onCellMouseEnterDrag,
   isMobile,
 }: {
   week: WeekGrid;
@@ -1089,9 +1170,17 @@ function WeekRow({
   recByDate: Map<string, PricingRecommendation>;
   overrideDates: Set<string>;
   selectedDate: string;
+  selectedDatesSet: Set<string>;
   onSelectDate: (d: string) => void;
+  onCellMouseDown: (d: string) => void;
+  onCellMouseEnterDrag: (d: string) => void;
   isMobile: boolean;
 }) {
+  // `selectedDate` is the single-click anchor; kept in the signature
+  // for back-compat with any future caller that reads it, but the
+  // cell's "selected" visual now derives from selectedDatesSet so
+  // multi-date drag selections render correctly.
+  void selectedDate;
   const cellMinHeight = isMobile ? CELL_MIN_HEIGHT_MOBILE : CELL_MIN_HEIGHT_DESKTOP;
   const cellMinWidth = isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP;
   const barHeight = isMobile ? 28 : 42;
@@ -1115,12 +1204,14 @@ function WeekRow({
         {week.days.map((d) => {
           const rate = rateByDate.get(d.date);
           const rec = recByDate.get(d.date);
-          const selected = selectedDate === d.date;
+          const selected = selectedDatesSet.has(d.date);
           return (
             <KoastSelectedCell
               key={d.date}
               selected={selected}
               onClick={() => onSelectDate(d.date)}
+              onMouseDown={() => onCellMouseDown(d.date)}
+              onMouseEnterDrag={() => onCellMouseEnterDrag(d.date)}
               ariaLabel={`Select ${d.date}`}
               style={{
                 minHeight: cellMinHeight,

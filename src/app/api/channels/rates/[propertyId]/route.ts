@@ -81,6 +81,33 @@ const CHANNEL_NAME: Record<string, string> = {
 // them via their dedicated Channex rate plans.
 const READ_ONLY_CHANNELS = new Set<string>();
 
+// Group a sorted array of ISO dates into contiguous sub-ranges. Used
+// by the BDC bulk path so each safe-restrictions call covers one
+// continuous {date_from, date_to} span.
+function groupContiguousDates(sorted: string[]): Array<{ from: string; to: string; dates: string[] }> {
+  const groups: Array<{ from: string; to: string; dates: string[] }> = [];
+  if (sorted.length === 0) return groups;
+  let groupStart = sorted[0];
+  let groupEnd = sorted[0];
+  let acc: string[] = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(groupEnd + "T00:00:00Z");
+    const next = new Date(sorted[i] + "T00:00:00Z");
+    const delta = (next.getTime() - prev.getTime()) / 86_400_000;
+    if (delta === 1) {
+      groupEnd = sorted[i];
+      acc.push(sorted[i]);
+    } else {
+      groups.push({ from: groupStart, to: groupEnd, dates: acc });
+      groupStart = sorted[i];
+      groupEnd = sorted[i];
+      acc = [sorted[i]];
+    }
+  }
+  groups.push({ from: groupStart, to: groupEnd, dates: acc });
+  return groups;
+}
+
 // ==========================================================================
 // GET
 // ==========================================================================
@@ -447,9 +474,10 @@ export async function POST(
     // difference is that this gate is conditional on the body's target
     // channel. See src/lib/channex/calendar-push-gate.ts + the postmortem.
     const body = await request.json().catch(() => ({}));
-    const { date_from, date_to, channel_code, rate, min_stay_arrival } = body as {
+    const { date_from, date_to, dates: datesIn, channel_code, rate, min_stay_arrival } = body as {
       date_from?: string;
       date_to?: string;
+      dates?: unknown;
       channel_code?: string;
       rate?: number;
       min_stay_arrival?: number;
@@ -467,9 +495,13 @@ export async function POST(
     const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
     if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    if (!date_from || !date_to || !channel_code || rate == null) {
+    // Session 5b.3: accept either { dates: string[] } (bulk multi-date)
+    // OR { date_from, date_to } (legacy contiguous range). Both paths
+    // funnel into the same `dates` list below.
+    const hasDates = Array.isArray(datesIn) && datesIn.length > 0;
+    if (!channel_code || rate == null || (!hasDates && (!date_from || !date_to))) {
       return NextResponse.json(
-        { error: "date_from, date_to, channel_code, rate are required" },
+        { error: "channel_code, rate, and either dates[] or date_from+date_to are required" },
         { status: 400 }
       );
     }
@@ -546,14 +578,33 @@ export async function POST(
       );
     }
 
-    // Generate the date list (inclusive)
-    const dates: string[] = [];
-    for (let d = new Date(date_from + "T00:00:00Z"); d <= new Date(date_to + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
-      dates.push(d.toISOString().split("T")[0]);
+    // Build the canonical date list — either explicit `dates[]` from
+    // the bulk caller or an inclusive range generated from
+    // date_from/date_to for the legacy callers. Deduped + sorted.
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    const dateSet = new Set<string>();
+    if (hasDates) {
+      for (const d of datesIn as unknown[]) {
+        if (typeof d !== "string" || !DATE_RE.test(d)) {
+          return NextResponse.json({ error: `invalid date: ${String(d)}` }, { status: 400 });
+        }
+        dateSet.add(d);
+      }
+    } else {
+      for (let d = new Date(date_from + "T00:00:00Z"); d <= new Date(date_to + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+        dateSet.add(d.toISOString().split("T")[0]);
+      }
     }
+    const dates = Array.from(dateSet).sort();
     if (dates.length === 0) {
       return NextResponse.json({ error: "Empty date range" }, { status: 400 });
     }
+    const effectiveDateFrom = dates[0];
+    const effectiveDateTo = dates[dates.length - 1];
+
+    // Group dates into contiguous sub-ranges — defined at module scope
+    // below (groupContiguousDates) to satisfy strict-mode "no function
+    // decls in blocks."
 
     // Persist per-channel override rows in calendar_rates. Strict separation:
     // the base row (channel_code = NULL) is NOT touched — the pricing engine
@@ -587,45 +638,56 @@ export async function POST(
     // Push rate + (optional) min_stay to Channex. BDC targets route
     // through the safe-restrictions helper (pre-flight read + host-state
     // preservation — see docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md).
-    // Non-BDC targets use the existing direct push.
+    // Non-BDC targets use the existing direct push. For non-contiguous
+    // multi-date bulk pushes (5b.3), BDC loops over contiguous sub-ranges.
     const channex = createChannexClient();
     let pushed = false;
     let pushError: string | null = null;
     let bdcPlan: SafeRestrictionPlan | null = null;
+    // Per-date outcome map, populated as each batch/range resolves.
+    const dateStatus: Record<string, "ok" | "failed"> = {};
+    const dateErrors: Record<string, string> = {};
 
     if (isBdcChannelCode(channel_code)) {
-      // Build koastProposed for the range — single rate + optional min_stay
-      // applied to every date in [date_from, date_to].
-      const koastProposed = new Map<string, KoastRestrictionProposal>();
-      for (const d of dates) {
-        const proposal: KoastRestrictionProposal = { rate };
-        if (min_stay_arrival != null) proposal.min_stay_arrival = min_stay_arrival;
-        koastProposed.set(d, proposal);
-      }
-      try {
-        const plan = await buildSafeBdcRestrictions({
-          channex,
-          channexPropertyId,
-          bdcRatePlanId: ratePlanId,
-          dateFrom: date_from,
-          dateTo: date_to,
-          koastProposed,
-        });
-        bdcPlan = plan;
-        const payload = toChannexRestrictionValues(plan, channexPropertyId, ratePlanId);
-        for (let i = 0; i < payload.length; i += 200) {
-          await channex.updateRestrictions(payload.slice(i, i + 200));
+      const groups = groupContiguousDates(dates);
+      for (const g of groups) {
+        const koastProposed = new Map<string, KoastRestrictionProposal>();
+        for (const d of g.dates) {
+          const proposal: KoastRestrictionProposal = { rate };
+          if (min_stay_arrival != null) proposal.min_stay_arrival = min_stay_arrival;
+          koastProposed.set(d, proposal);
         }
-        pushed = true;
-      } catch (err) {
-        pushError = err instanceof Error ? err.message : String(err);
-        console.warn("[channels/rates POST BDC-safe] push failed:", pushError);
+        try {
+          const plan = await buildSafeBdcRestrictions({
+            channex,
+            channexPropertyId,
+            bdcRatePlanId: ratePlanId,
+            dateFrom: g.from,
+            dateTo: g.to,
+            koastProposed,
+          });
+          if (!bdcPlan) bdcPlan = plan; // retain first plan for backwards-compat in response
+          const payload = toChannexRestrictionValues(plan, channexPropertyId, ratePlanId);
+          for (let i = 0; i < payload.length; i += 200) {
+            await channex.updateRestrictions(payload.slice(i, i + 200));
+          }
+          for (const d of g.dates) dateStatus[d] = "ok";
+          pushed = true;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[channels/rates POST BDC-safe] push failed ${g.from}..${g.to}: ${msg}`);
+          pushError = pushError ?? msg;
+          for (const d of g.dates) {
+            dateStatus[d] = "failed";
+            dateErrors[d] = msg;
+          }
+        }
       }
     } else {
-      // Non-BDC: direct push, Channex expects cents. Per our earlier Pool
-      // House investigation, some BDC rate types reject min_stay_arrival
-      // pushes ("RATE_IS_A_SLAVE_RATE") — that path is now BDC-routed
-      // through the helper, so this direct branch is Airbnb/Direct only.
+      // Non-BDC: direct push, Channex expects cents. One Channex call per
+      // 200-date chunk (Channex's standard batch limit). Track per-date
+      // status per batch so the UI can render a granular success/failure
+      // breakdown in the bulk-edit modal.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const restrictionValues: any[] = dates.map((d) => ({
         property_id: channexPropertyId,
@@ -635,18 +697,32 @@ export async function POST(
         rate: Math.round(rate * 100),
         ...(min_stay_arrival != null ? { min_stay_arrival } : {}),
       }));
-      try {
-        for (let i = 0; i < restrictionValues.length; i += 200) {
-          await channex.updateRestrictions(restrictionValues.slice(i, i + 200));
+      for (let i = 0; i < restrictionValues.length; i += 200) {
+        const slice = restrictionValues.slice(i, i + 200);
+        const batchDates = dates.slice(i, i + 200);
+        try {
+          await channex.updateRestrictions(slice);
+          for (const d of batchDates) dateStatus[d] = "ok";
+          pushed = true;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[channels/rates POST] Channex push failed batch ${i}: ${msg}`);
+          pushError = pushError ?? msg;
+          for (const d of batchDates) {
+            dateStatus[d] = "failed";
+            dateErrors[d] = msg;
+          }
         }
-        pushed = true;
-      } catch (err) {
-        pushError = err instanceof Error ? err.message : String(err);
-        console.warn("[channels/rates POST] Channex push failed:", pushError);
       }
     }
 
     invalidatePropertyCache(propertyId);
+
+    const perDate = dates.map((d) => ({
+      date: d,
+      status: dateStatus[d] ?? "failed",
+      ...(dateErrors[d] ? { error: dateErrors[d] } : {}),
+    }));
 
     return NextResponse.json({
       ok: true,
@@ -655,9 +731,10 @@ export async function POST(
       channel_code,
       rate_plan_id: ratePlanId,
       dates: dates.length,
+      per_date: perDate,
       bdc_plan: bdcPlan,
-      date_from,
-      date_to,
+      date_from: effectiveDateFrom,
+      date_to: effectiveDateTo,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

@@ -1,16 +1,24 @@
 "use client";
 
 /**
- * Pricing tab for the Calendar sidebar. Master rate on top + stacked
- * per-platform rows + WhyThisRate disclosure + min-stay stepper.
+ * Pricing tab for the Calendar sidebar — Session 5b.3 multi-date
+ * edition. Three independent rate cards (Base / Airbnb / Booking.com)
+ * each display the currently-saved value for the selected date set
+ * (single value when uniform, "$min–$max" when divergent), accept
+ * inline edits, and fire a Save that either pushes immediately
+ * (single date) or opens a BulkRateConfirmModal (multi date).
+ *
+ * Data input: `bundleByDate` — a Map<date, RateBundle> fetched by
+ * the parent CalendarSidebar. Each card derives its display value
+ * by reducing across the selected dates.
  */
 
 import Image from "next/image";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
-import RateCell from "./RateCell";
 import WhyThisRate from "./WhyThisRate";
+import BulkRateConfirmModal, { type DateDiff, type BulkModalMode } from "./BulkRateConfirmModal";
 
 export interface PlatformEntry {
   channel_code: string;
@@ -33,18 +41,23 @@ export interface RateBundle {
   platforms: PlatformEntry[];
 }
 
+type PerDateStatus = { date: string; status: "ok" | "failed"; error?: string };
+
 interface Props {
   propertyId: string;
-  date: string;
-  bundle: RateBundle | null;
+  selectedDates: string[];
+  bookedDates: Set<string>;
+  bundleByDate: Map<string, RateBundle>;
   loading: boolean;
-  onApplyMaster: (rate: number, wipeOverrides: boolean) => Promise<void>;
-  onApplyPlatform: (channelCode: string, rate: number) => Promise<void>;
-  onResetPlatform: (channelCode: string) => Promise<void>;
-  onUpdateMinStay: (value: number) => Promise<void>;
+  onToast?: (text: string, tone: "ok" | "err") => void;
+  onApplyPlatformBulk: (channelCode: string, rate: number, dates: string[]) => Promise<{ ok: boolean; perDate?: PerDateStatus[]; error?: string }>;
+  onApplyBaseBulk: (rate: number, dates: string[]) => Promise<{ ok: boolean; error?: string }>;
+  onRefresh: () => Promise<void>;
 }
 
-// Map property_channels channel_code to PlatformKey (for logos).
+type CardKey = "base" | "ABB" | "BDC";
+
+// Map channel_code → PlatformKey for logo lookup.
 function toPlatformKey(code: string): PlatformKey | null {
   const c = code.toUpperCase();
   if (c === "ABB" || c === "AIRBNB") return "airbnb";
@@ -53,258 +66,431 @@ function toPlatformKey(code: string): PlatformKey | null {
   return null;
 }
 
+// Reduce a list of numeric values to { min, max, uniform? }.
+// Returns null when the list is empty.
+function summarize(values: Array<number | null>): { min: number; max: number; uniform: boolean } | null {
+  const nums = values.filter((v): v is number => v != null);
+  if (nums.length === 0) return null;
+  let min = nums[0];
+  let max = nums[0];
+  for (const n of nums) {
+    if (n < min) min = n;
+    if (n > max) max = n;
+  }
+  return { min, max, uniform: min === max };
+}
+
+function fmtMoney(n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
+  return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtSummary(summary: { min: number; max: number; uniform: boolean } | null): string {
+  if (!summary) return "";
+  if (summary.uniform) return fmtMoney(summary.min);
+  return `${fmtMoney(summary.min)}–${fmtMoney(summary.max)}`;
+}
+
+// Per-card effective rate for a single date:
+//   base  → bundle.master.applied_rate (falls back to base_rate)
+//   ABB/BDC → platform override's applied_rate (falls back to master's rate if no override)
+function perDateRate(bundle: RateBundle, card: CardKey): number | null {
+  const master = bundle.master;
+  const masterVal = master.applied_rate ?? master.base_rate ?? null;
+  if (card === "base") return masterVal;
+  const p = bundle.platforms.find((x) => x.channel_code.toUpperCase() === card);
+  return p?.applied_rate ?? masterVal;
+}
+
 export default function PricingTab({
-  propertyId: _propertyId,
-  date: _date,
-  bundle,
+  propertyId,
+  selectedDates,
+  bookedDates,
+  bundleByDate,
   loading,
-  onApplyMaster,
-  onApplyPlatform,
-  onResetPlatform,
-  onUpdateMinStay,
+  onToast,
+  onApplyPlatformBulk,
+  onApplyBaseBulk,
+  onRefresh,
 }: Props) {
-  void _propertyId;
-  void _date;
-  const [wipeChoice, setWipeChoice] = useState<"all" | "base" | null>(null);
-  const [masterEditPending, setMasterEditPending] = useState<number | null>(null);
+  void propertyId;
 
-  const master = bundle?.master;
-  const platforms = bundle?.platforms ?? [];
-  const overrideCount = platforms.filter((p) => p.overrides_master).length;
-  const minStay = master?.min_stay ?? 1;
+  // Per-card input state. Each card independently tracks whether the
+  // user has typed a value that diverges from the card's display value.
+  const [draftByCard, setDraftByCard] = useState<Record<CardKey, string>>({
+    base: "",
+    ABB: "",
+    BDC: "",
+  });
 
-  const handleMasterCommit = useCallback(
-    async (rate: number) => {
-      if (overrideCount === 0) {
-        await onApplyMaster(rate, false);
+  // Modal state — which card triggered the modal, and its precomputed
+  // DateDiff[] so the user sees a stable snapshot while the server call
+  // is in flight.
+  const [modalFor, setModalFor] = useState<null | { card: CardKey; newRate: number; diffs: DateDiff[]; mode: BulkModalMode }>(null);
+
+  // Available channel codes based on whichever bundle happens to be
+  // loaded (they all share the same connected channels for a property).
+  const channels = useMemo<string[]>(() => {
+    for (const bundle of Array.from(bundleByDate.values())) {
+      return bundle.platforms.map((p) => p.channel_code.toUpperCase());
+    }
+    return [];
+  }, [bundleByDate]);
+
+  // Selected dates present in the loaded bundle map (ignoring dates
+  // that failed to load). These drive all per-card computations.
+  const loadedDates = useMemo(
+    () => selectedDates.filter((d) => bundleByDate.has(d)).sort(),
+    [selectedDates, bundleByDate]
+  );
+
+  // Per-card summary: min/max/uniform across loadedDates.
+  const summaryByCard = useMemo<Record<CardKey, ReturnType<typeof summarize>>>(() => {
+    const fn = (card: CardKey) =>
+      summarize(loadedDates.map((d) => perDateRate(bundleByDate.get(d)!, card)));
+    return { base: fn("base"), ABB: fn("ABB"), BDC: fn("BDC") };
+  }, [bundleByDate, loadedDates]);
+
+  // Factors from the anchor date (first selected) drive WhyThisRate.
+  const anchorBundle = loadedDates[0] ? bundleByDate.get(loadedDates[0])! : null;
+  const minStay = anchorBundle?.master?.min_stay ?? 1;
+
+  // Reset draft when selection changes — otherwise a stale draft from
+  // a previous selection would bleed into the new card display.
+  const loadedKey = useMemo(() => loadedDates.join("|"), [loadedDates]);
+  useEffect(() => {
+    setDraftByCard({ base: "", ABB: "", BDC: "" });
+    setModalFor(null);
+    // Intentionally keyed on the serialized loadedDates so identity
+    // churn doesn't thrash.
+  }, [loadedKey]);
+
+  const draftParsed = useCallback((card: CardKey): number | null => {
+    const s = draftByCard[card].trim();
+    if (s === "") return null;
+    const n = parseFloat(s);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [draftByCard]);
+
+  const isDirty = useCallback((card: CardKey): boolean => {
+    const draft = draftParsed(card);
+    if (draft == null) return false;
+    const summary = summaryByCard[card];
+    if (!summary) return true;
+    if (!summary.uniform) return true; // any concrete uniform value is a change vs a range
+    return draft !== summary.min;
+  }, [draftParsed, summaryByCard]);
+
+  const handleCardSave = useCallback(async (card: CardKey) => {
+    const rate = draftParsed(card);
+    if (rate == null) {
+      onToast?.("Enter a valid rate first", "err");
+      return;
+    }
+    if (loadedDates.length === 0) {
+      onToast?.("No dates loaded", "err");
+      return;
+    }
+    // Multi-date → open modal. Single-date → fire immediately.
+    if (loadedDates.length > 1) {
+      const diffs: DateDiff[] = loadedDates.map((d) => ({
+        date: d,
+        oldRate: perDateRate(bundleByDate.get(d)!, card),
+        newRate: rate,
+        hasBooking: bookedDates.has(d),
+      }));
+      const mode: BulkModalMode = card === "base"
+        ? { kind: "base", overridesAffected: loadedDates.filter((d) => {
+            const b = bundleByDate.get(d)!;
+            return b.platforms.some((p) => p.overrides_master);
+          }).length }
+        : { kind: "platform", platform: card === "ABB" ? "Airbnb" : "Booking.com" };
+      setModalFor({ card, newRate: rate, diffs, mode });
+      return;
+    }
+    // Single-date — direct push, no modal.
+    const onlyDate = loadedDates[0];
+    if (card === "base") {
+      const r = await onApplyBaseBulk(rate, [onlyDate]);
+      if (!r.ok) {
+        onToast?.(r.error ?? "Base rate update failed", "err");
         return;
       }
-      // Overrides exist — surface the radio prompt.
-      setMasterEditPending(rate);
-      setWipeChoice(null);
-    },
-    [overrideCount, onApplyMaster]
-  );
+      onToast?.("Base rate updated", "ok");
+    } else {
+      const r = await onApplyPlatformBulk(card, rate, [onlyDate]);
+      if (!r.ok) {
+        onToast?.(r.error ?? "Push failed", "err");
+        return;
+      }
+      const pushed = r.perDate?.filter((p) => p.status === "ok").length ?? 1;
+      const platformName = card === "ABB" ? "Airbnb" : "Booking.com";
+      onToast?.(`${platformName} rate updated${pushed === 0 ? " (no push)" : ""}`, "ok");
+    }
+    setDraftByCard((d) => ({ ...d, [card]: "" }));
+    await onRefresh();
+  }, [draftParsed, loadedDates, bundleByDate, bookedDates, onApplyBaseBulk, onApplyPlatformBulk, onToast, onRefresh]);
 
-  const handleMasterConfirm = useCallback(
-    async (choice: "all" | "base") => {
-      if (masterEditPending == null) return;
-      await onApplyMaster(masterEditPending, choice === "all");
-      setMasterEditPending(null);
-      setWipeChoice(null);
-    },
-    [masterEditPending, onApplyMaster]
-  );
+  // Modal commit — calls the bulk helper and returns null on total
+  // success or a partial-failure shape. Throws on total failure (the
+  // modal treats thrown errors as total failure via onDone).
+  const handleModalCommit = useCallback(async (): Promise<{ diffs: DateDiff[] } | null> => {
+    if (!modalFor) return null;
+    const { card, newRate, diffs } = modalFor;
+    const dates = diffs.map((d) => d.date);
+    if (card === "base") {
+      const r = await onApplyBaseBulk(newRate, dates);
+      if (!r.ok) throw new Error(r.error ?? "Base rate update failed");
+      return null;
+    }
+    const r = await onApplyPlatformBulk(card, newRate, dates);
+    if (!r.ok) throw new Error(r.error ?? "Push failed");
+    // Inspect per-date outcomes; if any failed, surface partial failure.
+    const per = r.perDate ?? [];
+    const statusByDate = new Map(per.map((p) => [p.date, p] as const));
+    const anyFailed = per.some((p) => p.status === "failed");
+    if (!anyFailed) return null;
+    const annotated = diffs.map((d) => {
+      const s = statusByDate.get(d.date);
+      return { ...d, status: s?.status ?? "ok" as const, error: s?.error };
+    });
+    return { diffs: annotated };
+  }, [modalFor, onApplyBaseBulk, onApplyPlatformBulk]);
 
-  if (loading && !bundle) {
+  const handleModalDone = useCallback((msg: string) => {
+    onToast?.(msg, "ok");
+    setDraftByCard((d) => ({ ...d, ...(modalFor ? { [modalFor.card]: "" } : {}) }));
+    setModalFor(null);
+    void onRefresh();
+  }, [onToast, onRefresh, modalFor]);
+
+  const handleModalCancel = useCallback(() => {
+    setModalFor(null);
+  }, []);
+
+  const handleMinStay = useCallback((v: number) => {
+    void v;
+    onToast?.("Min stay edit persists in Session 5d", "ok");
+  }, [onToast]);
+
+  if (loading && bundleByDate.size === 0) {
     return <div style={{ padding: 16, fontSize: 13, color: "var(--tideline)" }}>Loading rates…</div>;
   }
 
+  const baseSummary = summaryByCard.base;
+  const basePlaceholder = baseSummary ? fmtSummary(baseSummary) : "Set rate";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
-      {/* Master (base) rate — user-visible label is "Base rate across
-          all channels" per Session 5a.2 spec; variable + API names
-          keep the `master` convention for continuity. */}
       <section>
         <div style={eyebrowStyle}>Base rate across all channels</div>
         <div
           title="Applies to every channel unless a per-channel override is set."
-          style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}
+          style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}
         >
-          <RateCell
-            value={master?.applied_rate ?? master?.base_rate ?? null}
-            placeholder="Set rate"
-            ariaLabel="Base rate across all channels"
-            onCommit={handleMasterCommit}
+          <RateInput
+            display={basePlaceholder}
+            value={draftByCard.base}
+            onChange={(v) => setDraftByCard((d) => ({ ...d, base: v }))}
+            onEscape={() => setDraftByCard((d) => ({ ...d, base: "" }))}
+            onEnter={() => void handleCardSave("base")}
+            ariaLabel="Base rate across all dates"
           />
-          {master?.suggested_rate != null && master.suggested_rate !== (master.applied_rate ?? master.base_rate) && (
-            <span style={{ fontSize: 12, color: "var(--tideline)" }}>
-              Koast suggests ${Math.round(master.suggested_rate)}
-            </span>
+          {isDirty("base") && (
+            <SaveButton onClick={() => void handleCardSave("base")} />
           )}
         </div>
-        {masterEditPending != null && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid var(--dry-sand)",
-              background: "#FAFAF7",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            <div style={{ fontSize: 12, color: "var(--coastal)", lineHeight: 1.45 }}>
-              This date has {overrideCount} platform override{overrideCount === 1 ? "" : "s"}. How should ${masterEditPending} apply?
+        {anchorBundle?.master?.suggested_rate != null &&
+          baseSummary?.uniform &&
+          anchorBundle.master.suggested_rate !== baseSummary.min && (
+            <div style={{ marginTop: 6, fontSize: 12, color: "var(--tideline)" }}>
+              Koast suggests ${Math.round(anchorBundle.master.suggested_rate)}
             </div>
-            <label style={radioRowStyle}>
-              <input
-                type="radio"
-                name="master-wipe"
-                checked={wipeChoice === "all"}
-                onChange={() => setWipeChoice("all")}
-              />
-              <span>
-                <strong>Apply to all platforms</strong> (clears {overrideCount} override{overrideCount === 1 ? "" : "s"})
-              </span>
-            </label>
-            <label style={radioRowStyle}>
-              <input
-                type="radio"
-                name="master-wipe"
-                checked={wipeChoice === "base"}
-                onChange={() => setWipeChoice("base")}
-              />
-              <span>
-                <strong>Update base only</strong> (keep overrides)
-              </span>
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setMasterEditPending(null)}
-                style={{ ...btnStyle, background: "transparent", border: "1px solid var(--dry-sand)", color: "var(--tideline)" }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!wipeChoice}
-                onClick={() => void handleMasterConfirm(wipeChoice!)}
-                style={{ ...btnStyle, background: "var(--coastal)", color: "var(--shore)", opacity: wipeChoice ? 1 : 0.5 }}
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        )}
+          )}
       </section>
 
-      {/* Per-platform rows */}
       <section>
         <div style={eyebrowStyle}>Per platform</div>
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          {platforms.length === 0 && (
+          {channels.length === 0 && (
             <div style={{ fontSize: 12, color: "var(--tideline)" }}>No channels connected.</div>
           )}
-          {platforms.map((p) => (
-            <PlatformRow
-              key={p.channel_code}
-              entry={p}
-              masterRate={master?.applied_rate ?? master?.base_rate ?? null}
-              onApply={(rate) => onApplyPlatform(p.channel_code, rate)}
-              onReset={() => onResetPlatform(p.channel_code)}
-            />
-          ))}
+          {channels.map((code) => {
+            const cardKey = (code.toUpperCase() === "ABB" ? "ABB" : code.toUpperCase() === "BDC" ? "BDC" : null) as CardKey | null;
+            if (!cardKey) return null; // unsupported channel in this session
+            const summary = summaryByCard[cardKey];
+            const placeholder = summary ? fmtSummary(summary) : "Set rate";
+            const baseSummaryMatch =
+              summary && summaryByCard.base && summary.uniform && summaryByCard.base.uniform && summary.min === summaryByCard.base.min;
+            const inherits = summary == null ? false : baseSummaryMatch ?? false;
+            const platformKey = toPlatformKey(code);
+            const platform = platformKey ? PLATFORMS[platformKey] : null;
+            const tileColor = platform?.tileColor ?? "#3d6b52";
+            const platformName = platformKey === "airbnb" ? "Airbnb" : platformKey === "booking_com" ? "Booking.com" : code;
+            return (
+              <div
+                key={code}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid var(--dry-sand)",
+                  background: "#fff",
+                }}
+              >
+                <span
+                  aria-label={platformName}
+                  title={platformName}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background: `${tileColor}bf`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    cursor: "help",
+                  }}
+                >
+                  {platform && <Image src={platform.iconWhite} alt="" width={12} height={12} />}
+                </span>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                  {inherits && (
+                    <span style={{ fontSize: 11, color: "var(--tideline)", fontStyle: "italic" }} title="No per-platform override exists; this card falls back to the base rate.">
+                      inherits base
+                    </span>
+                  )}
+                  <RateInput
+                    display={placeholder}
+                    value={draftByCard[cardKey]}
+                    onChange={(v) => setDraftByCard((d) => ({ ...d, [cardKey]: v }))}
+                    onEscape={() => setDraftByCard((d) => ({ ...d, [cardKey]: "" }))}
+                    onEnter={() => void handleCardSave(cardKey)}
+                    ariaLabel={`${platformName} rate`}
+                    size="sm"
+                  />
+                  {isDirty(cardKey) && (
+                    <SaveButton onClick={() => void handleCardSave(cardKey)} size="sm" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Min stay */}
       <section>
         <div style={eyebrowStyle}>Min stay</div>
         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => void onUpdateMinStay(Math.max(1, minStay - 1))}
-            style={stepBtn}
-            aria-label="Decrease min stay"
-          >
+          <button type="button" onClick={() => handleMinStay(Math.max(1, minStay - 1))} style={stepBtn} aria-label="Decrease min stay">
             <Minus size={14} />
           </button>
           <span style={{ fontSize: 15, fontWeight: 600, color: "var(--coastal)", minWidth: 30, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
             {minStay}
           </span>
-          <button
-            type="button"
-            onClick={() => void onUpdateMinStay(minStay + 1)}
-            style={stepBtn}
-            aria-label="Increase min stay"
-          >
+          <button type="button" onClick={() => handleMinStay(minStay + 1)} style={stepBtn} aria-label="Increase min stay">
             <Plus size={14} />
           </button>
           <span style={{ fontSize: 12, color: "var(--tideline)" }}>night{minStay === 1 ? "" : "s"}</span>
         </div>
       </section>
 
-      {/* Why this rate */}
-      <WhyThisRate factors={master?.factors ?? null} />
+      <WhyThisRate factors={anchorBundle?.master?.factors ?? null} />
+
+      {modalFor && (
+        <BulkRateConfirmModal
+          mode={modalFor.mode}
+          diffs={modalFor.diffs}
+          onCancel={handleModalCancel}
+          onCommit={handleModalCommit}
+          onDone={handleModalDone}
+        />
+      )}
     </div>
   );
 }
 
-function PlatformRow({
-  entry,
-  masterRate,
-  onApply,
-  onReset,
+// Inline text input that renders the currently-saved display value as
+// placeholder text (range "$100–$150" or single "$185") and accepts
+// pure-number typing. Escape clears; Enter commits via the parent's
+// onEnter callback.
+function RateInput({
+  display,
+  value,
+  onChange,
+  onEscape,
+  onEnter,
+  ariaLabel,
+  size = "md",
 }: {
-  entry: PlatformEntry;
-  masterRate: number | null;
-  onApply: (rate: number) => Promise<void>;
-  onReset: () => Promise<void>;
+  display: string;
+  value: string;
+  onChange: (v: string) => void;
+  onEscape: () => void;
+  onEnter: () => void;
+  ariaLabel: string;
+  size?: "sm" | "md";
 }) {
-  const key = toPlatformKey(entry.channel_code);
-  const platform = key ? PLATFORMS[key] : null;
-  const tileColor = platform?.tileColor ?? "#3d6b52";
-  const bg = `${tileColor}bf`;
   return (
-    <div
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      value={value}
+      placeholder={display}
+      onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onEscape();
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          onEnter();
+        }
+      }}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 10px",
-        borderRadius: 10,
-        border: "1px solid var(--dry-sand)",
+        width: size === "sm" ? 90 : 120,
+        height: size === "sm" ? 30 : 36,
+        padding: "0 10px",
+        fontSize: size === "sm" ? 13 : 15,
+        fontWeight: 600,
+        color: "var(--coastal)",
         background: "#fff",
+        border: "1px solid var(--dry-sand)",
+        borderRadius: 8,
+        textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
+        outline: "none",
+      }}
+    />
+  );
+}
+
+function SaveButton({ onClick, size = "md" }: { onClick: () => void; size?: "sm" | "md" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        height: size === "sm" ? 30 : 36,
+        padding: size === "sm" ? "0 12px" : "0 14px",
+        borderRadius: 8,
+        border: "none",
+        background: "var(--coastal)",
+        color: "var(--shore)",
+        fontSize: size === "sm" ? 12 : 13,
+        fontWeight: 600,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
       }}
     >
-      <span
-        aria-hidden
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 6,
-          border: "1px solid rgba(255,255,255,0.2)",
-          background: bg,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        {platform && <Image src={platform.iconWhite} alt="" width={12} height={12} />}
-      </span>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--coastal)" }}>{entry.channel_name}</div>
-        {entry.overrides_master && masterRate != null && (
-          <button
-            type="button"
-            onClick={() => void onReset()}
-            style={{
-              alignSelf: "flex-start",
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              fontSize: 11,
-              color: "var(--tideline)",
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
-          >
-            Reset to master (${Math.round(masterRate)})
-          </button>
-        )}
-      </div>
-      <RateCell
-        value={entry.applied_rate}
-        ariaLabel={`${entry.channel_name} rate`}
-        onCommit={(r) => onApply(r)}
-        size="sm"
-      />
-    </div>
+      Save
+    </button>
   );
 }
 
@@ -314,25 +500,6 @@ const eyebrowStyle: React.CSSProperties = {
   color: "var(--tideline)",
   letterSpacing: "0.12em",
   textTransform: "uppercase",
-};
-
-const radioRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  fontSize: 13,
-  color: "var(--coastal)",
-  cursor: "pointer",
-};
-
-const btnStyle: React.CSSProperties = {
-  height: 32,
-  padding: "0 14px",
-  borderRadius: 8,
-  border: "none",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
 };
 
 const stepBtn: React.CSSProperties = {
