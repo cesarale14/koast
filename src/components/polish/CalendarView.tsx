@@ -1302,14 +1302,15 @@ function WeekRow({
           // visible beyond the overlap.
           const tipPct = cellPct / 5; // 20% of a single cell in row-%
           const rightShiftPct = s.hasOverhang ? tipPct : 0;
-          // Month-boundary cut effect. Instead of a gradient fade the
-          // clipped edge gets a small corner-curve via overflow-clip
-          // on the wrapper — keeps the pill mostly square but softens
-          // the cut so it doesn't look razor-sliced.
+          // Month-boundary cut effect. The clipped edge gets a
+          // corner-curve via overflow-clip on the wrapper — pronounced
+          // enough to read as intentional rounding on both corners of
+          // the cut side (top and bottom), not a subtle softening.
+          const CUT_RADIUS_PX = 14;
           let cutRadius: string | undefined;
-          if (s.fadeLeft && s.fadeRight) cutRadius = "6px";
-          else if (s.fadeLeft) cutRadius = "6px 0 0 6px";
-          else if (s.fadeRight) cutRadius = "0 6px 6px 0";
+          if (s.fadeLeft && s.fadeRight) cutRadius = `${CUT_RADIUS_PX}px`;
+          else if (s.fadeLeft) cutRadius = `${CUT_RADIUS_PX}px 0 0 ${CUT_RADIUS_PX}px`;
+          else if (s.fadeRight) cutRadius = `0 ${CUT_RADIUS_PX}px ${CUT_RADIUS_PX}px 0`;
           const overflow = cutRadius ? "hidden" : "visible";
           // Every pill gets a small right-side gap so it doesn't butt
           // against the neighboring cell's left edge. For same-week
