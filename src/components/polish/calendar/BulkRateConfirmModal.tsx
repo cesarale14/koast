@@ -12,7 +12,8 @@
  * array to render inline success/failure markers without re-fetching.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, X as XIcon } from "lucide-react";
 
 export interface DateDiff {
@@ -117,7 +118,31 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
     }
   }
 
-  return (
+  // Portal mount target. SSR-safe: on server, createPortal needs a
+  // DOM element that doesn't exist yet, so we short-circuit to null.
+  // The modal is client-only anyway — triggered by user interaction.
+  const [mountTarget, setMountTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setMountTarget(document.body);
+  }, []);
+
+  // Escape = Cancel (matches backdrop-click). Disabled during commit
+  // so a stray key doesn't interrupt the push mid-flight.
+  useEffect(() => {
+    if (phase === "committing") return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, onCancel]);
+
+  if (!mountTarget) return null;
+
+  const ui = (
     <div
       role="dialog"
       aria-modal="true"
@@ -222,7 +247,7 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
               </>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={buttonRowStyle}>
             <button
               type="button"
               onClick={onCancel}
@@ -251,6 +276,8 @@ export default function BulkRateConfirmModal({ mode, diffs, onCancel, onCommit, 
       </div>
     </div>
   );
+
+  return createPortal(ui, mountTarget);
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -265,7 +292,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const panelStyle: React.CSSProperties = {
-  width: "min(560px, 100%)",
+  width: "min(600px, 100%)",
   maxHeight: "90vh",
   background: "#fff",
   borderRadius: 14,
@@ -276,15 +303,15 @@ const panelStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  padding: "18px 20px 12px",
+  padding: "22px 24px 14px",
   borderBottom: "1px solid var(--dry-sand)",
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 19,
   fontWeight: 600,
   color: "var(--coastal)",
-  letterSpacing: "-0.01em",
+  letterSpacing: "-0.015em",
 };
 
 const subtitleStyle: React.CSSProperties = {
@@ -322,20 +349,24 @@ const tdRightStyle: React.CSSProperties = { ...tdStyle, textAlign: "right", font
 const tdCenterStyle: React.CSSProperties = { ...tdStyle, textAlign: "center" };
 
 const footerStyle: React.CSSProperties = {
-  padding: "14px 20px",
+  padding: "16px 24px 18px",
   borderTop: "1px solid var(--dry-sand)",
   display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 16,
+  flexDirection: "column",
+  gap: 12,
   background: "#FAFAF7",
 };
 
 const summaryStyle: React.CSSProperties = {
-  flex: 1,
   fontSize: 12,
   color: "var(--coastal)",
   lineHeight: 1.5,
+};
+
+const buttonRowStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 8,
 };
 
 const btnStyle: React.CSSProperties = {

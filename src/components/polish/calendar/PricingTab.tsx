@@ -354,7 +354,6 @@ export default function PricingTab({
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
-                    cursor: "help",
                   }}
                 >
                   {platform && <Image src={platform.iconWhite} alt="" width={12} height={12} />}
