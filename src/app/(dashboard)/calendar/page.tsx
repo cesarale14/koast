@@ -44,12 +44,16 @@ export default async function CalendarPage() {
 
   const propertyIds = properties.map((p) => p.id);
   const svc = createServiceClient();
-  // Three parallel queries. The `overrides` call returns only (property, date)
-  // tuples for rows where channel_code is NOT NULL — it feeds the golden
-  // hairline indicator on grid cells that have active per-channel rate
-  // overrides (Session 5a). Kept as a lightweight discovery query; the
-  // actual override rates load on demand when the sidebar opens.
-  const [bookingsRes, ratesRes, overridesRes] = await Promise.all([
+  // Session 5a.4: fetch ALL calendar_rates rows (both base where
+  // channel_code IS NULL and per-channel override rows) in one query.
+  // We then group by (property_id, date) to compute the grid's
+  // display_rate and the divergence flag per the policy:
+  //   - No overrides, or overrides all equal base  → display base, no divergence
+  //   - Overrides uniform but differ from base     → display the override, divergence ON
+  //   - Overrides disagree                         → display base, divergence ON
+  //   - No base + overrides present (edge)         → display first override, divergence per agreement
+  // The sidebar still fetches its own bundle via /api/calendar/rates.
+  const [bookingsRes, ratesRes] = await Promise.all([
     svc
       .from("bookings")
       .select(
@@ -62,17 +66,9 @@ export default async function CalendarPage() {
     svc
       .from("calendar_rates")
       .select(
-        "property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
+        "property_id, date, channel_code, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source"
       )
       .in("property_id", propertyIds)
-      .is("channel_code", null)
-      .gte("date", today)
-      .lte("date", end),
-    svc
-      .from("calendar_rates")
-      .select("property_id, date")
-      .in("property_id", propertyIds)
-      .not("channel_code", "is", null)
       .gte("date", today)
       .lte("date", end),
   ]);
@@ -89,23 +85,103 @@ export default async function CalendarPage() {
     status: string;
   }[];
 
-  const rates = (ratesRes.data ?? []) as {
+  type CalendarRateRow = {
     property_id: string;
     date: string;
+    channel_code: string | null;
     base_rate: number | null;
     suggested_rate: number | null;
     applied_rate: number | null;
     min_stay: number;
     is_available: boolean;
     rate_source: string;
-  }[];
+  };
 
-  const overrideRows = (overridesRes.data ?? []) as { property_id: string; date: string }[];
+  const allRows = (ratesRes.data ?? []) as CalendarRateRow[];
+
+  // Group by (property_id, date): one base row (channel_code=NULL)
+  // plus zero-or-more override rows keyed by channel_code.
+  const byKey = new Map<string, { base: CalendarRateRow | null; overrides: CalendarRateRow[] }>();
+  for (const r of allRows) {
+    const key = `${r.property_id}|${r.date}`;
+    let bucket = byKey.get(key);
+    if (!bucket) {
+      bucket = { base: null, overrides: [] };
+      byKey.set(key, bucket);
+    }
+    if (r.channel_code === null) bucket.base = r;
+    else bucket.overrides.push(r);
+  }
+
+  const rates: Array<{
+    property_id: string;
+    date: string;
+    base_rate: number | null;
+    suggested_rate: number | null;
+    applied_rate: number | null;
+    display_rate: number | null;
+    min_stay: number;
+    is_available: boolean;
+    rate_source: string;
+  }> = [];
   const overrideDatesByProperty: Record<string, string[]> = {};
-  for (const r of overrideRows) {
-    if (!overrideDatesByProperty[r.property_id]) overrideDatesByProperty[r.property_id] = [];
-    if (!overrideDatesByProperty[r.property_id].includes(r.date)) {
-      overrideDatesByProperty[r.property_id].push(r.date);
+
+  for (const bucket of Array.from(byKey.values())) {
+    const { base, overrides } = bucket;
+    // Choose a canonical "record" to carry the non-rate fields (min_stay,
+    // is_available, rate_source). Prefer the base row; fall back to the
+    // first override in the edge case where the base row doesn't exist
+    // yet (post-apply, pre-sync state).
+    const canonical: CalendarRateRow | null = base ?? overrides[0] ?? null;
+    if (!canonical) continue;
+
+    const baseApplied = base?.applied_rate ?? null;
+    const overrideApplied: number[] = overrides
+      .map((o: CalendarRateRow) => o.applied_rate)
+      .filter((v: number | null): v is number => v != null);
+    const allOverridesEqual =
+      overrideApplied.length > 0 && overrideApplied.every((v: number) => v === overrideApplied[0]);
+
+    let displayRate: number | null;
+    let hasDivergence: boolean;
+
+    if (overrides.length === 0) {
+      displayRate = baseApplied;
+      hasDivergence = false;
+    } else if (!base) {
+      displayRate = overrideApplied[0] ?? null;
+      hasDivergence = !allOverridesEqual;
+    } else if (allOverridesEqual) {
+      const unified = overrideApplied[0];
+      if (unified === baseApplied) {
+        displayRate = baseApplied;
+        hasDivergence = false;
+      } else {
+        displayRate = unified;
+        hasDivergence = true;
+      }
+    } else {
+      displayRate = baseApplied;
+      hasDivergence = true;
+    }
+
+    rates.push({
+      property_id: canonical.property_id,
+      date: canonical.date,
+      base_rate: base?.base_rate ?? null,
+      suggested_rate: base?.suggested_rate ?? null,
+      applied_rate: baseApplied,
+      display_rate: displayRate,
+      min_stay: canonical.min_stay,
+      is_available: canonical.is_available,
+      rate_source: canonical.rate_source,
+    });
+
+    if (hasDivergence) {
+      if (!overrideDatesByProperty[canonical.property_id]) {
+        overrideDatesByProperty[canonical.property_id] = [];
+      }
+      overrideDatesByProperty[canonical.property_id].push(canonical.date);
     }
   }
 

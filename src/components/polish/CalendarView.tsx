@@ -43,6 +43,14 @@ interface Rate {
   base_rate: number | null;
   suggested_rate: number | null;
   applied_rate: number | null;
+  // Session 5a.4: the grid-effective rate after the per-channel
+  // divergence policy in page.tsx. Equals applied_rate (base row)
+  // except when all override rows agree on a value different from
+  // base — then it carries the override. Falls back to
+  // applied_rate / suggested_rate / base_rate in the cell renderer
+  // when not provided (back-compat for callers that haven't been
+  // migrated yet).
+  display_rate?: number | null;
   min_stay: number;
   is_available: boolean;
   rate_source: string;
@@ -1204,7 +1212,10 @@ function DayCellContents({
   hasOverride: boolean;
 }) {
   const showRate = rate && rate.is_available !== false;
-  const rateValue = rate?.applied_rate ?? rate?.suggested_rate ?? rate?.base_rate ?? null;
+  // Grid shows display_rate (computed server-side with the 5a.4
+  // divergence policy) when provided; otherwise falls through to
+  // the original chain for back-compat.
+  const rateValue = rate?.display_rate ?? rate?.applied_rate ?? rate?.suggested_rate ?? rate?.base_rate ?? null;
   const closed = rate && rate.is_available === false;
   const renderRate = !isMobile && !booked;
   return (
