@@ -1302,19 +1302,15 @@ function WeekRow({
           // visible beyond the overlap.
           const tipPct = cellPct / 5; // 20% of a single cell in row-%
           const rightShiftPct = s.hasOverhang ? tipPct : 0;
-          // Month-boundary cut effect. A 22px linear-gradient mask
-          // softens the clipped edge so the bar looks like it flows
-          // into the adjacent month's block rather than being sliced.
-          // Applied at the wrapper level so KoastBookingBar's inner
-          // layout is unchanged.
-          let maskImage: string | undefined;
-          if (s.fadeLeft && s.fadeRight) {
-            maskImage = "linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%)";
-          } else if (s.fadeLeft) {
-            maskImage = "linear-gradient(to right, transparent 0, #000 22px, #000 100%)";
-          } else if (s.fadeRight) {
-            maskImage = "linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%)";
-          }
+          // Month-boundary cut effect. Instead of a gradient fade the
+          // clipped edge gets a small corner-curve via overflow-clip
+          // on the wrapper — keeps the pill mostly square but softens
+          // the cut so it doesn't look razor-sliced.
+          let cutRadius: string | undefined;
+          if (s.fadeLeft && s.fadeRight) cutRadius = "6px";
+          else if (s.fadeLeft) cutRadius = "6px 0 0 6px";
+          else if (s.fadeRight) cutRadius = "0 6px 6px 0";
+          const overflow = cutRadius ? "hidden" : "visible";
           // Every pill gets a small right-side gap so it doesn't butt
           // against the neighboring cell's left edge. For same-week
           // turnover overhangs the pill EXTENDS past this gap into
@@ -1332,9 +1328,8 @@ function WeekRow({
                 bottom: 6,
                 height: barHeight,
                 pointerEvents: "auto",
-                overflow: "visible",
-                maskImage,
-                WebkitMaskImage: maskImage,
+                overflow,
+                borderRadius: cutRadius,
               }}
             >
               <KoastBookingBar
