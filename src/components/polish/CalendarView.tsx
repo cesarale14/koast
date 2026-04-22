@@ -144,6 +144,14 @@ interface BarSegment {
   borderRadius: "both" | "left" | "right" | "none";
   hasOverhang: boolean;
   hasSeam: boolean;
+  /** Segment was clipped at a month boundary on the left side — the
+   * bar continues in the PREVIOUS month's block. Renderer applies a
+   * soft fade-in on the left edge. */
+  fadeLeft: boolean;
+  /** Segment was clipped at a month boundary on the right side — the
+   * bar continues in the NEXT month's block. Renderer applies a soft
+   * fade-out on the right edge. */
+  fadeRight: boolean;
 }
 
 function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[] {
@@ -151,6 +159,20 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
   if (weeks.length === 0) return segs;
   const firstDate = weeks[0].days[0].date;
   const lastDate = weeks[weeks.length - 1].days[6].date;
+
+  // Session 5b.4 — clip bar rendering to the in-month range so
+  // bookings that cross month boundaries don't bleed into the grey
+  // leading/trailing cells of adjacent months. Bars get a fade flag
+  // when their edge was cut at a boundary.
+  let monthFirstIdx = -1;
+  let monthLastIdx = -1;
+  const flatDays = weeks.flatMap((w) => w.days);
+  for (let i = 0; i < flatDays.length; i++) {
+    if (flatDays[i].inMonth) {
+      if (monthFirstIdx === -1) monthFirstIdx = i;
+      monthLastIdx = i;
+    }
+  }
 
   // Build the set of turnover dates — dates that have both a
   // check-out (from one booking) and a check-in (from a DIFFERENT
@@ -186,9 +208,17 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
     const endExclusive = b.check_out > lastDate
       ? new Date(parseISO(lastDate).getTime() + 86_400_000).toISOString().slice(0, 10)
       : b.check_out;
-    const startIdx = daysBetween(firstDate, start);
-    const endIdx = daysBetween(firstDate, endExclusive) - 1; // inclusive last night
+    const rawStartIdx = daysBetween(firstDate, start);
+    const rawEndIdx = daysBetween(firstDate, endExclusive) - 1; // inclusive last night
+    if (rawEndIdx < rawStartIdx) continue;
+
+    // Clip to in-month range. Any clipping implies the bar crosses a
+    // month boundary; the adjacent-month MonthBlock renders the rest.
+    const startIdx = monthFirstIdx >= 0 ? Math.max(rawStartIdx, monthFirstIdx) : rawStartIdx;
+    const endIdx = monthLastIdx >= 0 ? Math.min(rawEndIdx, monthLastIdx) : rawEndIdx;
     if (endIdx < startIdx) continue;
+    const clippedLeft = startIdx > rawStartIdx;
+    const clippedRight = endIdx < rawEndIdx;
 
     const checkInIsTurnover = turnoverDates.has(b.check_in) && b.check_in === start;
     const checkOutIsTurnover = turnoverDates.has(b.check_out) && b.check_out <= lastDate;
@@ -199,11 +229,22 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
       const colInWeek = cur % 7;
       const lastInWeek = Math.min(endIdx, (weekIdx + 1) * 7 - 1);
       const span = lastInWeek - cur + 1;
-      const startsHere = b.check_in >= firstDate && cur === startIdx;
-      const endsHere = b.check_out <= lastDate && lastInWeek === endIdx;
+      const startsHere = b.check_in >= firstDate && cur === startIdx && !clippedLeft;
+      const endsHere = b.check_out <= lastDate && lastInWeek === endIdx && !clippedRight;
 
       const borderRadius: BarSegment["borderRadius"] =
         startsHere && endsHere ? "both" : startsHere ? "left" : endsHere ? "right" : "none";
+
+      const isFirstSegment = cur === startIdx;
+      const isLastSegment = lastInWeek === endIdx;
+
+      // Overhang only makes visual sense when the check-out cell is
+      // in the SAME week as the segment's last night — the 20% tail
+      // extends into that cell to overlap with the incoming pill's
+      // seam. If the check-out lands in the next week (e.g. last
+      // night is a Saturday), the overhang would bleed past the row
+      // edge, which is the bug Cesar flagged on Apr 24→26.
+      const checkoutInSameWeek = (endIdx + 1) < (weekIdx + 1) * 7;
 
       segs.push({
         booking: b,
@@ -211,8 +252,10 @@ function computeBarSegments(bookings: Booking[], weeks: WeekGrid[]): BarSegment[
         startCol: colInWeek,
         span,
         borderRadius,
-        hasOverhang: endsHere && checkOutIsTurnover,
+        hasOverhang: endsHere && checkOutIsTurnover && checkoutInSameWeek,
         hasSeam: startsHere && checkInIsTurnover,
+        fadeLeft: clippedLeft && isFirstSegment,
+        fadeRight: clippedRight && isLastSegment,
       });
       cur = lastInWeek + 1;
     }
@@ -1202,6 +1245,20 @@ function WeekRow({
         }}
       >
         {week.days.map((d) => {
+          // Session 5b.4 — out-of-month cells render as empty space
+          // (no border, no content, no interaction). The grid layout
+          // still reserves the column so in-month cells land in their
+          // correct day-of-week position; the adjacent-month block
+          // renders those dates in its own grid.
+          if (!d.inMonth) {
+            return (
+              <div
+                key={d.date}
+                aria-hidden
+                style={{ minHeight: cellMinHeight, background: "transparent" }}
+              />
+            );
+          }
           const rate = rateByDate.get(d.date);
           const rec = recByDate.get(d.date);
           const selected = selectedDatesSet.has(d.date);
@@ -1216,15 +1273,10 @@ function WeekRow({
               style={{
                 minHeight: cellMinHeight,
                 padding: isMobile ? "4px 4px" : "10px 12px",
-                // Three states of visual emphasis:
-                //   - out-of-month cells: 0.35 (deeply faded)
-                //   - past in-month days: 0.5  (muted grey feel, still legible)
-                //   - today + future:     1.0  (full contrast)
-                // Past-day mute only affects the cell contents (date number,
-                // rate, recommendation dot). Booking bars are positioned in a
-                // separate layer above the grid, so they stay full-contrast
-                // even on historical dates.
-                opacity: !d.inMonth ? 0.35 : d.isPast ? 0.5 : 1,
+                // Two states of emphasis (past-day mute + today+future
+                // at full). Out-of-month cells are handled above and
+                // never reach this branch.
+                opacity: d.isPast ? 0.5 : 1,
               }}
             >
               <DayCellContents
@@ -1256,17 +1308,39 @@ function WeekRow({
           // visible beyond the overlap.
           const tipPct = cellPct / 5; // 20% of a single cell in row-%
           const rightShiftPct = s.hasOverhang ? tipPct : 0;
+          // Month-boundary cut effect. A 22px linear-gradient mask
+          // softens the clipped edge so the bar looks like it flows
+          // into the adjacent month's block rather than being sliced.
+          // Applied at the wrapper level so KoastBookingBar's inner
+          // layout is unchanged.
+          let maskImage: string | undefined;
+          if (s.fadeLeft && s.fadeRight) {
+            maskImage = "linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%)";
+          } else if (s.fadeLeft) {
+            maskImage = "linear-gradient(to right, transparent 0, #000 22px, #000 100%)";
+          } else if (s.fadeRight) {
+            maskImage = "linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%)";
+          }
+          // Every pill gets a small right-side gap so it doesn't butt
+          // against the neighboring cell's left edge. For same-week
+          // turnover overhangs the pill EXTENDS past this gap into
+          // the next cell, creating the intended slight overlap with
+          // the incoming pill's seam. Value is applied in px so it
+          // reads consistently regardless of cell width.
+          const PILL_RIGHT_GAP_PX = 4;
           return (
             <div
               key={`bar-${s.booking.id}-${s.weekIdx}-${s.startCol}`}
               style={{
                 position: "absolute",
                 left: `${leftPct}%`,
-                width: `${widthPct + rightShiftPct}%`,
+                width: `calc(${widthPct + rightShiftPct}% - ${PILL_RIGHT_GAP_PX}px)`,
                 bottom: 6,
                 height: barHeight,
                 pointerEvents: "auto",
                 overflow: "visible",
+                maskImage,
+                WebkitMaskImage: maskImage,
               }}
             >
               <KoastBookingBar
