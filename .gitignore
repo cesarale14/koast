@@ -36,3 +36,8 @@ yarn-error.log*
 next-env.d.ts
 repomix-output.xml
 *.swp
+
+# koast-development skill build artifacts (uploadable zip lives at
+# the repo root but isn't checked in — it's generated on demand).
+/.skill-build/
+/koast-development.zip
