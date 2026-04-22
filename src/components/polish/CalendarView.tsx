@@ -1244,21 +1244,14 @@ function WeekRow({
           gridTemplateColumns: `repeat(7, minmax(${cellMinWidth}px, 1fr))`,
         }}
       >
-        {week.days.map((d) => {
-          // Session 5b.4 — out-of-month cells render as empty space
-          // (no border, no content, no interaction). The grid layout
-          // still reserves the column so in-month cells land in their
-          // correct day-of-week position; the adjacent-month block
-          // renders those dates in its own grid.
-          if (!d.inMonth) {
-            return (
-              <div
-                key={d.date}
-                aria-hidden
-                style={{ minHeight: cellMinHeight, background: "transparent" }}
-              />
-            );
-          }
+        {week.days.map((d, colIdx) => {
+          // Session 5b.4 — out-of-month cells are fully skipped: no
+          // empty div, no layout space. In-month cells position
+          // themselves in the correct day-of-week column via
+          // gridColumnStart so the grid's 7-col geometry still aligns
+          // with the bar-overlay positioning math (left/width as %
+          // of 7 equal columns).
+          if (!d.inMonth) return null;
           const rate = rateByDate.get(d.date);
           const rec = recByDate.get(d.date);
           const selected = selectedDatesSet.has(d.date);
@@ -1271,10 +1264,11 @@ function WeekRow({
               onMouseEnterDrag={() => onCellMouseEnterDrag(d.date)}
               ariaLabel={`Select ${d.date}`}
               style={{
+                gridColumnStart: colIdx + 1,
                 minHeight: cellMinHeight,
                 padding: isMobile ? "4px 4px" : "10px 12px",
                 // Two states of emphasis (past-day mute + today+future
-                // at full). Out-of-month cells are handled above and
+                // at full). Out-of-month cells are skipped above and
                 // never reach this branch.
                 opacity: d.isPast ? 0.5 : 1,
               }}
