@@ -29,6 +29,19 @@ export async function POST(
     const review = ((reviews ?? []) as any[])[0];
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
+    if (action === "save_draft") {
+      // Session 6.1a: interim verb. Persist an edited/approved draft
+      // to response_draft without pushing to Channex. The real publish
+      // path (action='approve' below) is preserved but no UI button
+      // triggers it until 6.1b restores the "Approve & Publish" verb.
+      const finalText = body.response_text ?? review.response_draft;
+      if (!finalText) {
+        return NextResponse.json({ error: "No draft to save. Generate a draft first." }, { status: 400 });
+      }
+      await reviewTable.update({ response_draft: finalText }).eq("id", params.reviewId);
+      return NextResponse.json({ response_text: finalText, saved: true });
+    }
+
     if (action === "approve") {
       // Session 6 — "approve" is the actual SEND. Call Channex's
       // /reviews/:id/reply, and only mark the local row as sent when

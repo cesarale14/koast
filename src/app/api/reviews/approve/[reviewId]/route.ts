@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/pooled";
-import { bookings, guestReviews, reviewRules } from "@/lib/db/schema";
+import { guestReviews } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { calculatePublishTime } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 
 export async function POST(
@@ -33,47 +32,28 @@ export async function POST(
       .limit(1);
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
-    // Get booking checkout date for scheduling
-    const [bookingRow] = await db
-      .select({ checkOut: bookings.checkOut })
-      .from(bookings)
-      .where(eq(bookings.id, review.bookingId))
-      .limit(1);
-    const checkOut = bookingRow?.checkOut;
-
-    // Get review rules
-    const [ruleRow] = await db
-      .select({
-        publishDelayDays: reviewRules.publishDelayDays,
-        badReviewDelay: reviewRules.badReviewDelay,
-      })
-      .from(reviewRules)
-      .where(eq(reviewRules.propertyId, review.propertyId))
-      .limit(1);
-    const rule = ruleRow ?? { publishDelayDays: 3, badReviewDelay: true };
-
     const isBad = body.is_bad_review ?? review.isBadReview ?? false;
     const finalText = body.final_text ?? review.draftText;
     const starRating = body.star_rating ?? review.starRating;
 
-    const publishAt = checkOut
-      ? calculatePublishTime(checkOut, rule.publishDelayDays ?? 3, isBad, rule.badReviewDelay ?? true)
-      : new Date(Date.now() + 3 * 86400000);
-
+    // Session 6.1a: no scheduler exists. Saving a draft sets
+    // status='draft_generated' (or 'bad_review_held' for flagged
+    // reviews); no scheduled_publish_at is set. The "Approve & Publish"
+    // verb (which actually pushes to Channex via submitGuestReview)
+    // lands in 6.2 once the Channex client gains that method.
     await db
       .update(guestReviews)
       .set({
         finalText,
         starRating,
         isBadReview: isBad,
-        status: isBad ? "bad_review_held" : "scheduled",
-        scheduledPublishAt: publishAt,
+        status: isBad ? "bad_review_held" : "draft_generated",
       })
       .where(eq(guestReviews.id, params.reviewId));
 
     return NextResponse.json({
-      status: isBad ? "bad_review_held" : "scheduled",
-      scheduled_publish_at: publishAt.toISOString(),
+      status: isBad ? "bad_review_held" : "draft_generated",
+      saved: true,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

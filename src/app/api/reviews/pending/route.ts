@@ -83,6 +83,9 @@ export async function GET() {
     const pendingBookings = allBookings.filter((b) => !reviewedIds.has(b.id));
 
     // Reviews needing approval — FILTERED by user's properties
+    // Session 6.1a: added direction='outgoing' filter to stop incoming
+    // rows (status=pending after Channex sync) from leaking into the
+    // Outgoing/Drafts bucket.
     const drafts = await db
       .select({
         id: guestReviews.id,
@@ -92,12 +95,14 @@ export async function GET() {
         star_rating: guestReviews.starRating,
         status: guestReviews.status,
         is_bad_review: guestReviews.isBadReview,
+        guest_name: guestReviews.guestName,
         created_at: guestReviews.createdAt,
       })
       .from(guestReviews)
       .where(
         and(
           inArray(guestReviews.propertyId, userPropertyIds),
+          eq(guestReviews.direction, "outgoing"),
           inArray(guestReviews.status, ["pending", "draft_generated", "bad_review_held"])
         )
       )
@@ -109,6 +114,7 @@ export async function GET() {
         id: guestReviews.id,
         booking_id: guestReviews.bookingId,
         property_id: guestReviews.propertyId,
+        guest_name: guestReviews.guestName,
         incoming_text: guestReviews.incomingText,
         incoming_rating: guestReviews.incomingRating,
         incoming_date: guestReviews.incomingDate,
@@ -175,7 +181,7 @@ export async function GET() {
       const pr = d.property_id ? propLookup.get(d.property_id) : null;
       return {
         ...d,
-        guest_name: bk?.guest_name ?? "Airbnb Guest",
+        guest_name: d.guest_name ?? bk?.guest_name ?? null,
         check_in: bk?.check_in ?? null,
         check_out: bk?.check_out ?? null,
         platform: bk?.platform ?? "airbnb",

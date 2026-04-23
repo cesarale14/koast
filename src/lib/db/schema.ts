@@ -255,9 +255,12 @@ export const reviewRulesRelations = relations(reviewRules, ({ one }) => ({
 
 export const guestReviews = pgTable("guest_reviews", {
   id: uuid("id").primaryKey().defaultRandom(),
-  bookingId: uuid("booking_id").notNull().references(() => bookings.id).unique(),
+  // Nullable to match DB: incoming Channex reviews may not have a
+  // matching local booking via ota_reservation_id.
+  bookingId: uuid("booking_id").references(() => bookings.id),
   propertyId: uuid("property_id").notNull().references(() => properties.id),
   direction: text("direction"),
+  guestName: text("guest_name"),
   draftText: text("draft_text"),
   finalText: text("final_text"),
   starRating: integer("star_rating").default(5),

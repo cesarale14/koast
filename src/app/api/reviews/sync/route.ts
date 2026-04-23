@@ -135,7 +135,15 @@ export async function POST(request: NextRequest) {
 
         for (const rv of allReviews) {
           const localBookingId = rv.ota_reservation_id ? bookingByOtaRes.get(rv.ota_reservation_id) ?? null : null;
-          if (!localBookingId) record.skipped_no_match++;
+          if (!localBookingId) {
+            record.skipped_no_match++;
+            console.warn("[reviews/sync] booking_id unresolved", {
+              channex_review_id: rv.id,
+              ota_reservation_id: rv.ota_reservation_id,
+              property_id: prop.id,
+              ota: rv.ota,
+            });
+          }
 
           const publicText = rv.raw_content?.public_review ?? rv.content ?? null;
           const privateText = rv.raw_content?.private_feedback ?? null;
@@ -158,6 +166,7 @@ export async function POST(request: NextRequest) {
             booking_id: localBookingId,
             property_id: prop.id,
             direction: "incoming",
+            guest_name: rv.guest_name ?? null,
             incoming_text: publicText,
             private_feedback: privateText,
             incoming_rating: rating5,

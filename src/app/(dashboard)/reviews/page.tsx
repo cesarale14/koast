@@ -20,7 +20,8 @@ interface InlineDraft {
 
 export default function ReviewsPage() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"outgoing" | "incoming" | "settings">("outgoing");
+  const [tab, setTab] = useState<"outgoing" | "incoming" | "settings">("incoming");
+  const [expandedIncoming, setExpandedIncoming] = useState<Set<string>>(new Set());
   const [data, setData] = useState<AnyData>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -58,8 +59,18 @@ export default function ReviewsPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // Scenario 1: Generate review and show inline
-  const generateReview = async (bookingId: string) => {
-    setGenerating(bookingId);
+  // Session 6.1a: tracker param decouples the UI loading key from the
+  // booking id. Synced Channex reviews have booking_id=null, which
+  // collided with the initial `generating === null` state and left the
+  // button stuck on "Writing your review...". Callers that already have
+  // a stable row id (like a guest_reviews.id) should pass it as tracker.
+  const generateReview = async (bookingId: string, tracker?: string) => {
+    const key = tracker ?? bookingId;
+    if (!bookingId) {
+      toast("This review has no linked booking — generation unavailable", "error");
+      return;
+    }
+    setGenerating(key);
     try {
       const res = await fetch(`/api/reviews/generate/${bookingId}`, { method: "POST" });
       const d = await res.json();
@@ -110,14 +121,10 @@ export default function ReviewsPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
 
-      const publishDate = d.scheduled_publish_at
-        ? new Date(d.scheduled_publish_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-        : "soon";
-
       if (isBad) {
-        toast("Held for delayed publishing");
+        toast("Marked as bad review — held locally");
       } else {
-        toast(`Review scheduled for ${publishDate}. You can edit it until then.`);
+        toast("Draft saved");
       }
 
       // Clear inline drafts
@@ -154,14 +161,18 @@ export default function ReviewsPage() {
 
   const respondToReview = async (reviewId: string, hasDraft: boolean) => {
     try {
-      const action = hasDraft ? "approve" : "generate";
+      // Session 6.1a: interim verb. When a draft already exists the
+      // button saves it (no Channex push). "Approve & Publish" — which
+      // actually calls Channex's POST /reviews/:id/reply — returns in
+      // 6.1b once the two-verb model is restored.
+      const action = hasDraft ? "save_draft" : "generate";
       const res = await fetch(`/api/reviews/respond/${reviewId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast(hasDraft ? "Response approved & sent!" : "Draft generated — review before approving");
+      toast(hasDraft ? "Draft saved" : "Draft generated — review before saving");
       fetchData();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
@@ -325,7 +336,12 @@ export default function ReviewsPage() {
                             )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-coastal truncate">{r.property_name ?? "Property"}</p>
-                              <p className="text-xs text-tideline">{r.guest_name ?? "Airbnb Guest"} &middot; {checkInFmt}{checkOutFmt ? ` – ${checkOutFmt}` : ""}</p>
+                              <p className="text-xs text-tideline">
+                                {[
+                                  r.guest_name ?? "Airbnb Guest",
+                                  checkInFmt && (checkOutFmt ? `${checkInFmt} – ${checkOutFmt}` : checkInFmt),
+                                ].filter(Boolean).join(" · ")}
+                              </p>
                             </div>
                             <StarRating
                               rating={isEditing ? editDraftRating : (r.star_rating ?? 5)}
@@ -351,12 +367,12 @@ export default function ReviewsPage() {
                               <p className="text-sm mb-3" style={{ color: "var(--shell)" }}>Generate a personalized review for this guest</p>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => generateReview(r.booking_id)}
-                                  disabled={generating === r.booking_id}
+                                  onClick={() => generateReview(r.booking_id, r.id)}
+                                  disabled={generating === r.id}
                                   className="text-sm disabled:opacity-50 transition-colors"
                                   style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)", borderRadius: 10, padding: "9px 16px", fontWeight: 600 }}
                                 >
-                                  {generating === r.booking_id ? "Writing your review..." : "Generate AI Review"}
+                                  {generating === r.id ? "Writing your review..." : "Generate AI Review"}
                                 </button>
                               </div>
                             </div>
@@ -370,7 +386,7 @@ export default function ReviewsPage() {
                                   disabled={approvingId === r.id}
                                   className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
-                                  {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
+                                  {approvingId === r.id ? "Saving..." : "Save draft"}
                                 </button>
                                 <button
                                   onClick={() => setEditingDraftId(null)}
@@ -386,7 +402,7 @@ export default function ReviewsPage() {
                                   disabled={approvingId === r.id}
                                   className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
-                                  {approvingId === r.id ? "Scheduling..." : "Approve & Schedule"}
+                                  {approvingId === r.id ? "Saving..." : "Save draft"}
                                 </button>
                                 <button
                                   onClick={() => { setEditingDraftId(r.id); setEditDraftText(r.draft_text); setEditDraftRating(r.star_rating); }}
@@ -495,7 +511,7 @@ export default function ReviewsPage() {
                                   disabled={approvingId !== null}
                                   className="px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                                 >
-                                  {approvingId ? "Scheduling..." : "Approve & Schedule"}
+                                  {approvingId ? "Saving..." : "Save draft"}
                                 </button>
                                 <button
                                   onClick={() => dismissInlineDraft(b.id)}
@@ -560,7 +576,14 @@ export default function ReviewsPage() {
                   action={{ label: "View Properties", href: "/properties" }}
                 />
               ) : (
-                data.incoming_reviews.map((r: AnyData, cardIdx: number) => (
+                data.incoming_reviews.map((r: AnyData, cardIdx: number) => {
+                  const isExpanded = expandedIncoming.has(r.id);
+                  const fullText: string = r.incoming_text ?? "";
+                  const preview = fullText.length > 180 && !isExpanded
+                    ? fullText.slice(0, 180).trimEnd() + "…"
+                    : fullText;
+                  const displayName = r.guest_name ?? "Airbnb Guest";
+                  return (
                   <div
                     key={r.id}
                     style={{ animationDelay: `${cardIdx * 40}ms` }}
@@ -568,7 +591,8 @@ export default function ReviewsPage() {
                     (r.incoming_rating ?? 5) < 4 ? "border-danger/30" : "border-[var(--border)]"
                   }`}>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold text-coastal truncate">{displayName}</span>
                         <span className="text-sm font-bold font-mono" style={{ color: (r.incoming_rating ?? 5) < 4 ? "var(--coral-reef)" : "var(--golden)" }}>
                           {"★".repeat(Math.round(r.incoming_rating ?? 5))}
                         </span>
@@ -582,7 +606,26 @@ export default function ReviewsPage() {
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>needs response</span>
                       )}
                     </div>
-                    <p className="text-sm text-coastal mb-3">{r.incoming_text}</p>
+                    {fullText ? (
+                      <p className="text-sm text-coastal mb-3 whitespace-pre-wrap">
+                        {preview}
+                        {fullText.length > 180 && (
+                          <button
+                            onClick={() => {
+                              const next = new Set(expandedIncoming);
+                              if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                              setExpandedIncoming(next);
+                            }}
+                            className="ml-1 text-xs font-medium"
+                            style={{ color: "var(--golden)" }}
+                          >
+                            {isExpanded ? "Show less" : "Read more"}
+                          </button>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-sm mb-3" style={{ color: "var(--shell)" }}>No review text</p>
+                    )}
                     {r.response_draft && (
                       <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: "rgba(196,154,90,0.08)" }}>
                         <p className="text-[10px] font-medium mb-1" style={{ color: "var(--golden)" }}>AI RESPONSE DRAFT</p>
@@ -595,11 +638,12 @@ export default function ReviewsPage() {
                         className="px-4 py-2 text-xs font-semibold transition-colors hover:opacity-90"
                         style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
                       >
-                        {r.response_draft ? "Approve Response" : "Generate Draft Response"}
+                        {r.response_draft ? "Save draft" : "Generate AI draft"}
                       </button>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}
