@@ -3,6 +3,7 @@ import { db } from "@/lib/db/pooled";
 import { bookings, guestReviews, properties } from "@/lib/db/schema";
 import { and, eq, inArray, desc } from "drizzle-orm";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
+import { resolveDisplayGuestName } from "@/lib/guest-name";
 
 // Session 6.1b reshape: unified /reviews feed. Returns one list of
 // review "cards" across all the user's properties, plus a light
@@ -97,12 +98,19 @@ export async function GET() {
         const b = Date.UTC(+co.slice(0, 4), +co.slice(5, 7) - 1, +co.slice(8, 10));
         nights = Math.max(0, Math.round((b - a) / 86400000));
       }
+      const platform = bk?.platform ?? "airbnb";
+      const display_guest_name = resolveDisplayGuestName({
+        bookingGuestName: bk?.guest_name,
+        channexGuestName: r.guest_name,
+        platform,
+      });
       return {
         id: r.id,
         property_id: r.property_id,
         property_name: prop?.name ?? "Property",
         channex_review_id: r.channex_review_id,
         guest_name: r.guest_name ?? bk?.guest_name ?? null,
+        display_guest_name,
         incoming_text: r.incoming_text,
         incoming_rating: r.incoming_rating == null ? null : Number(r.incoming_rating),
         incoming_date: r.incoming_date ? r.incoming_date.toISOString() : null,
@@ -116,7 +124,7 @@ export async function GET() {
         // (Villa Jamaica is Airbnb-only today; BDC reviews will need an
         // explicit `ota` column on guest_reviews before they arrive — see
         // channex-expert known-quirks #5 on ID mismatches).
-        platform: bk?.platform ?? "airbnb",
+        platform,
         booking_check_in: ci,
         booking_check_out: co,
         booking_nights: nights,

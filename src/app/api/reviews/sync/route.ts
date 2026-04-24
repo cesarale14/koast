@@ -167,6 +167,11 @@ export async function POST(request: NextRequest) {
             property_id: prop.id,
             direction: "incoming",
             guest_name: rv.guest_name ?? null,
+            // Session 6.1c — stamp Channex's ota_reservation_id (HM-code
+            // for Airbnb, numeric string for BDC) so read paths can
+            // resolve a matching booking later without re-fetching from
+            // Channex. Idempotent on update.
+            ota_reservation_code: rv.ota_reservation_id ?? null,
             incoming_text: publicText,
             private_feedback: privateText,
             incoming_rating: rating5,

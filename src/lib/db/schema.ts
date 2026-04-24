@@ -281,6 +281,10 @@ export const guestReviews = pgTable("guest_reviews", {
   channexReviewId: text("channex_review_id"),
   privateFeedback: text("private_feedback"),
   subratings: jsonb("subratings"),
+  // Session 6.1c — Channex's ota_reservation_id stamped at sync time
+  // (Airbnb HM-code or BDC numeric). Used by read paths to resolve
+  // the matching booking without re-fetching from Channex.
+  otaReservationCode: text("ota_reservation_code"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_guest_reviews_property").on(t.propertyId),

@@ -74,8 +74,7 @@ export default function ReviewReplyPanel({ review, onClose, onUpdated }: ReviewR
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? `Failed (${res.status})`);
       const platformLabel = review.platform === "booking_com" ? "Booking.com" : "Airbnb";
-      const who = review.guest_name ?? "guest";
-      toast(`Reply posted to ${who} on ${platformLabel}`);
+      toast(`Reply posted to ${review.display_guest_name} on ${platformLabel}`);
       onUpdated();
       onClose();
     } catch (e) {

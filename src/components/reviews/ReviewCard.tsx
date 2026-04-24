@@ -12,6 +12,7 @@ export interface ReviewCardModel {
   property_name: string;
   channex_review_id: string | null;
   guest_name: string | null;
+  display_guest_name: string;
   incoming_text: string | null;
   incoming_rating: number | null;
   incoming_date: string | null;
@@ -112,8 +113,10 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
 
   const rating = review.incoming_rating;
   const isBad = review.is_bad_review || (rating != null && rating < 4);
-  const name = review.guest_name ?? (review.platform === "booking_com" ? "Booking.com guest" : "Airbnb Guest");
-  const isFallbackName = !review.guest_name;
+  const name = review.display_guest_name;
+  // Treat a name as "fallback / muted" when the API resolver had to
+  // synthesize a platform-tagged label rather than surface a real one.
+  const isFallbackName = !review.guest_name || review.guest_name === "Airbnb Guest";
 
   const PREVIEW_LEN = 200;
   const fullText = review.incoming_text ?? "";
