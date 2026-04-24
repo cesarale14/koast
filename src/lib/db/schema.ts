@@ -277,6 +277,10 @@ export const guestReviews = pgTable("guest_reviews", {
   publishedAt: timestamp("published_at", { withTimezone: true }),
   isBadReview: boolean("is_bad_review").default(false),
   aiContext: jsonb("ai_context"),
+  // Session 6 sync columns
+  channexReviewId: text("channex_review_id"),
+  privateFeedback: text("private_feedback"),
+  subratings: jsonb("subratings"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_guest_reviews_property").on(t.propertyId),
