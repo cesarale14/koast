@@ -37,7 +37,9 @@ next-env.d.ts
 repomix-output.xml
 *.swp
 
-# koast-development skill build artifacts (uploadable zip lives at
-# the repo root but isn't checked in — it's generated on demand).
+# Skill build artifacts (uploadable zips live at the repo root but
+# aren't checked in — they're generated on demand).
 /.skill-build/
 /koast-development.zip
+/channex-expert.zip
+/channex-expert/
