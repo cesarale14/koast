@@ -20,7 +20,7 @@ export default function ReviewsPage() {
   const [userProperties, setUserProperties] = useState<PropertyLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
-  const [activeFilters, setActiveFilters] = useState<Set<ReviewFilter>>(new Set(["all"]));
+  const [activeFilters, setActiveFilters] = useState<Set<ReviewFilter>>(new Set<ReviewFilter>(["all"]));
   const [sort, setSort] = useState<SortKey>("recent");
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -220,7 +220,7 @@ export default function ReviewsPage() {
             action={
               <button
                 type="button"
-                onClick={() => { setActiveFilters(new Set(["all"])); setChannelFilter("all"); }}
+                onClick={() => { setActiveFilters(new Set<ReviewFilter>(["all"])); setChannelFilter("all"); }}
                 className="px-4 py-2 text-[12px] font-semibold"
                 style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
               >
