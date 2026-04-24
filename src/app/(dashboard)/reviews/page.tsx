@@ -171,7 +171,8 @@ export default function ReviewsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      if (!res.ok) throw new Error("Failed");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? `Failed (${res.status})`);
       toast(hasDraft ? "Draft saved" : "Draft generated — review before saving");
       fetchData();
     } catch (e) {

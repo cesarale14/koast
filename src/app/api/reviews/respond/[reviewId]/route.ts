@@ -82,11 +82,18 @@ export async function POST(
     let responseText = body.response_text;
 
     if (!responseText) {
-      const { data: bookings } = await supabase
-        .from("bookings")
-        .select("guest_name, check_in, check_out, platform")
-        .eq("id", review.booking_id)
-        .limit(1);
+      // Booking lookup is best-effort: Channex-synced reviews often
+      // have booking_id=null (ota_reservation_id ⇄ platform_booking_id
+      // mismatch). When we can't resolve a booking we still generate
+      // using property + incoming_text + rating, with null guest_name
+      // and a zero-nights placeholder.
+      const { data: bookings } = review.booking_id
+        ? await supabase
+            .from("bookings")
+            .select("guest_name, check_in, check_out, platform")
+            .eq("id", review.booking_id)
+            .limit(1)
+        : { data: [] };
       const { data: props } = await supabase
         .from("properties")
         .select("name, city, bedrooms, bathrooms")
@@ -99,17 +106,34 @@ export async function POST(
         .limit(1);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const booking = ((bookings ?? []) as any[])[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const property = ((props ?? []) as any[])[0];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rule = ((rules ?? []) as any[])[0] ?? { tone: "warm", target_keywords: [] };
+      const today = new Date().toISOString().slice(0, 10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const booking = ((bookings ?? []) as any[])[0] ?? {
+        guest_name: null,
+        check_in: today,
+        check_out: today,
+        platform: "airbnb",
+      };
 
-      if (booking && property) {
+      if (!property) {
+        return NextResponse.json({ error: "Property not found for this review" }, { status: 404 });
+      }
+      if (!review.incoming_text) {
+        return NextResponse.json({ error: "Review has no text to respond to yet" }, { status: 400 });
+      }
+
+      try {
         const result = await generateReviewResponse(
-          review.incoming_text, review.incoming_rating, booking, property, rule
+          review.incoming_text, review.incoming_rating ?? 5, booking, property, rule
         );
         responseText = result.response_text;
+      } catch (gErr) {
+        const msg = gErr instanceof Error ? gErr.message : String(gErr);
+        console.error(`[reviews/respond] generation failed for ${params.reviewId}: ${msg}`);
+        return NextResponse.json({ error: `Generation failed: ${msg}` }, { status: 502 });
       }
     }
 
