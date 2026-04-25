@@ -48,6 +48,10 @@ interface ExistingRow {
   guest_review_channex_acked_at: string | null;
   guest_review_airbnb_confirmed_at: string | null;
   guest_review_payload: { public_review?: string } | null;
+  // RDX-DIAG-FIX — needed to gate the no-downgrade rule on response state.
+  response_sent: boolean | null;
+  response_final: string | null;
+  published_at: string | null;
 }
 
 async function syncOneProperty(
@@ -101,7 +105,7 @@ async function syncOneProperty(
     const channexIds = allReviews.map((r) => r.id);
     const { data: existingRows } = channexIds.length > 0
       ? await reviewTable
-          .select("id, channex_review_id, guest_review_submitted_at, guest_review_channex_acked_at, guest_review_airbnb_confirmed_at, guest_review_payload")
+          .select("id, channex_review_id, guest_review_submitted_at, guest_review_channex_acked_at, guest_review_airbnb_confirmed_at, guest_review_payload, response_sent, response_final, published_at")
           .in("channex_review_id", channexIds)
       : { data: [] };
     const existingArr = (existingRows ?? []) as ExistingRow[];
@@ -146,11 +150,12 @@ async function syncOneProperty(
         expired_at: rv.expired_at ?? null,
       };
       if (isNew) {
+        // Insert-only defaults. is_bad_review stays gated on isNew so
+        // host marks via /api/reviews/approve aren't clobbered (RDX-2
+        // Phase A: threshold <4 matches the UI's "below excellent"
+        // predicate). Initial status mirrors Channex's is_replied —
+        // RDX-DIAG-FIX adds the post-insert re-evaluation below.
         row.status = rv.is_replied ? "published" : "pending";
-        // Threshold normalized RDX-2 Phase A: <4 matches Airbnb's
-        // "below excellent" bucket and the UI predicate. Sync is
-        // canonical; render reads is_bad_review directly without
-        // re-derivation.
         row.is_bad_review = rating5 != null && rating5 < 4;
       }
 
@@ -163,6 +168,53 @@ async function syncOneProperty(
       }
       if (isNew) record.new++;
       else record.updated++;
+
+      // RDX-DIAG-FIX — re-evaluate response state on every iteration,
+      // not just isNew. Without this, a review whose is_replied flips
+      // to true after first sync (Airbnb-direct propagation, or any
+      // race) stays "Needs response" in Koast forever. No-downgrade
+      // rule: we only flip false→true. Koast-originated state
+      // (response_sent=true written by /api/reviews/respond/approve)
+      // is never touched, even if Channex hasn't propagated yet.
+      if (rv.is_replied === true) {
+        const existing = existingByChannexId.get(rv.id);
+        const channexReplyText = typeof rv.reply === "object" && rv.reply !== null
+          ? (rv.reply as Record<string, unknown>).reply
+          : null;
+        const replyText = typeof channexReplyText === "string" && channexReplyText.length > 0
+          ? channexReplyText
+          : null;
+
+        // For an existing row, only patch the fields that are stale.
+        // For a new row that just inserted as published-but-textless,
+        // backfill the text from Channex if available.
+        const patch: Record<string, unknown> = {};
+        if (!existing || existing.response_sent !== true) {
+          patch.response_sent = true;
+          patch.status = "published";
+          // published_at: Channex doesn't expose a dedicated reply
+          // timestamp; updated_at is the closest approximation
+          // available (Channex bumps it whenever the review entity
+          // changes, including on reply attachment). Acceptable
+          // imprecision — this stamp is informational, not load-bearing.
+          if (!existing?.published_at) {
+            patch.published_at = rv.updated_at ?? new Date().toISOString();
+          }
+        }
+        if (!existing?.response_final && replyText) {
+          patch.response_final = replyText;
+        }
+
+        if (Object.keys(patch).length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: updErr } = await (supabase.from("guest_reviews") as any)
+            .update(patch)
+            .eq("channex_review_id", rv.id);
+          if (updErr) {
+            console.warn(`[reviews/sync] response-state patch failed for ${rv.id}:`, updErr.message);
+          }
+        }
+      }
 
       // Session 6.2 — guest_review submission reconciliation.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
