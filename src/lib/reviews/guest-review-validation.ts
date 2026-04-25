@@ -7,7 +7,7 @@ import {
   GUEST_REVIEW_CATEGORIES,
   type GuestReviewCategory,
   type SubmitGuestReviewPayload,
-} from "@/lib/channex/client";
+} from "@/lib/channex/guest-review-types";
 
 export const GUEST_REVIEW_PUBLIC_MIN = 50;
 export const GUEST_REVIEW_PUBLIC_MAX = 1000;

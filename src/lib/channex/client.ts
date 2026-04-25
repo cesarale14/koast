@@ -48,40 +48,25 @@ type AnyResponse = any;
 
 // ==================== Guest Review (Session 6.2) ====================
 
-// Outgoing host-review-of-guest categories. Per the Channex docs payload
-// example (cleanliness / communication / respect_house_rules) — distinct
-// from the incoming review categories (clean / accuracy / checkin /
-// communication / location / value). Don't conflate.
-export type GuestReviewCategory =
-  | "cleanliness"
-  | "communication"
-  | "respect_house_rules";
+// Types + the GUEST_REVIEW_CATEGORIES runtime constant live in
+// ./guest-review-types so client components can import them without
+// pulling client.ts (which transitively touches node:crypto for
+// payload signing) into the browser bundle.
+export {
+  GUEST_REVIEW_CATEGORIES,
+} from "./guest-review-types";
+export type {
+  GuestReviewCategory,
+  GuestReviewRating,
+  GuestReviewScore,
+  SubmitGuestReviewPayload,
+  SubmitGuestReviewResult,
+} from "./guest-review-types";
 
-export const GUEST_REVIEW_CATEGORIES: GuestReviewCategory[] = [
-  "cleanliness",
-  "communication",
-  "respect_house_rules",
-];
-
-export type GuestReviewRating = 1 | 2 | 3 | 4 | 5;
-
-export interface GuestReviewScore {
-  category: GuestReviewCategory;
-  rating: GuestReviewRating;
-}
-
-export interface SubmitGuestReviewPayload {
-  scores: GuestReviewScore[];
-  public_review: string;
-  private_review?: string | null;
-  is_reviewee_recommended: boolean;
-  tags?: string[] | null;
-}
-
-export interface SubmitGuestReviewResult {
-  success: boolean;
-  channex_response: unknown;
-}
+import type {
+  SubmitGuestReviewPayload,
+  SubmitGuestReviewResult,
+} from "./guest-review-types";
 
 export class ChannexValidationError extends Error {
   details: unknown;

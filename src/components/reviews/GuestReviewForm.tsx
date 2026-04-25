@@ -7,7 +7,7 @@ import {
   GUEST_REVIEW_CATEGORIES,
   type GuestReviewCategory,
   type GuestReviewRating,
-} from "@/lib/channex/client";
+} from "@/lib/channex/guest-review-types";
 import {
   GUEST_REVIEW_PUBLIC_MIN,
   GUEST_REVIEW_PUBLIC_MAX,
