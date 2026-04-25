@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { X } from "lucide-react";
 
@@ -30,7 +31,12 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
   });
   const [saving, setSaving] = useState(false);
 
-  if (!open) return null;
+  // Same portal pattern as GuestReviewForm — escape ancestor stacking
+  // contexts that would otherwise clip position:fixed.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!open || !mounted) return null;
 
   const save = async () => {
     if (!propertyId) {
@@ -58,9 +64,9 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
     }
   };
 
-  return (
+  const node = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: "rgba(19,46,32,0.4)" }}
       onClick={onClose}
     >
@@ -184,4 +190,6 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
       </div>
     </div>
   );
+
+  return createPortal(node, document.body);
 }

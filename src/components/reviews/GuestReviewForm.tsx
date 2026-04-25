@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { X, Sparkles, AlertTriangle } from "lucide-react";
 import {
@@ -108,9 +109,16 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
   const summarySnippet = publicReview.trim().slice(0, 80) + (publicReview.trim().length > 80 ? "…" : "");
   const pubLen = publicReview.trim().length;
 
-  return (
+  // Portal-render to document.body so the modal escapes any ancestor
+  // that has `transform` / `filter` / `contain` set, which otherwise
+  // clips a position:fixed element to that ancestor's box.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  const node = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: "rgba(19,46,32,0.45)" }}
       onClick={tryClose}
     >
@@ -308,7 +316,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
       {/* Confirmation dialog */}
       {confirmOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4"
           style={{ background: "rgba(19,46,32,0.55)" }}
           onClick={() => !submitting && setConfirmOpen(false)}
         >
@@ -360,4 +368,6 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
       )}
     </div>
   );
+
+  return createPortal(node, document.body);
 }
