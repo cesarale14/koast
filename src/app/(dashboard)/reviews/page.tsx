@@ -10,7 +10,6 @@ import ReviewsFilterBar, {
   type SortKey,
 } from "@/components/reviews/ReviewsFilterBar";
 import ReviewsList, { ReviewsListSkeleton } from "@/components/reviews/ReviewsList";
-import ReviewListItem from "@/components/reviews/ReviewListItem";
 import ReviewSlideOver from "@/components/reviews/ReviewSlideOver";
 import ReviewsSettingsModal from "@/components/reviews/ReviewsSettingsModal";
 import { useToast } from "@/components/ui/Toast";
@@ -461,6 +460,3 @@ export default function ReviewsPage() {
   );
 }
 
-// ReviewListItem is imported and re-exported here so that any
-// orphan import paths (e.g. tests) can still resolve it from the page.
-export { ReviewListItem };
