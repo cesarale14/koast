@@ -285,6 +285,16 @@ export const guestReviews = pgTable("guest_reviews", {
   // (Airbnb HM-code or BDC numeric). Used by read paths to resolve
   // the matching booking without re-fetching from Channex.
   otaReservationCode: text("ota_reservation_code"),
+  // Session 6.2 — three-stage guest_review submission tracking.
+  // submitted_at: host clicked Submit. channex_acked_at: Channex 200.
+  // airbnb_confirmed_at: verified that Airbnb actually accepted (via
+  // subsequent sync match against reply.guest_review). The split
+  // exists because Channex validates shape only — see channex-expert
+  // known-quirks.md.
+  guestReviewSubmittedAt: timestamp("guest_review_submitted_at", { withTimezone: true }),
+  guestReviewChannexAckedAt: timestamp("guest_review_channex_acked_at", { withTimezone: true }),
+  guestReviewAirbnbConfirmedAt: timestamp("guest_review_airbnb_confirmed_at", { withTimezone: true }),
+  guestReviewPayload: jsonb("guest_review_payload"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_guest_reviews_property").on(t.propertyId),

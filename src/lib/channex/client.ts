@@ -46,6 +46,73 @@ const DEFAULT_BASE_URL = "https://app.channex.io/api/v1";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyResponse = any;
 
+// ==================== Guest Review (Session 6.2) ====================
+
+// Outgoing host-review-of-guest categories. Per the Channex docs payload
+// example (cleanliness / communication / respect_house_rules) — distinct
+// from the incoming review categories (clean / accuracy / checkin /
+// communication / location / value). Don't conflate.
+export type GuestReviewCategory =
+  | "cleanliness"
+  | "communication"
+  | "respect_house_rules";
+
+export const GUEST_REVIEW_CATEGORIES: GuestReviewCategory[] = [
+  "cleanliness",
+  "communication",
+  "respect_house_rules",
+];
+
+export type GuestReviewRating = 1 | 2 | 3 | 4 | 5;
+
+export interface GuestReviewScore {
+  category: GuestReviewCategory;
+  rating: GuestReviewRating;
+}
+
+export interface SubmitGuestReviewPayload {
+  scores: GuestReviewScore[];
+  public_review: string;
+  private_review?: string | null;
+  is_reviewee_recommended: boolean;
+  tags?: string[] | null;
+}
+
+export interface SubmitGuestReviewResult {
+  success: boolean;
+  channex_response: unknown;
+}
+
+export class ChannexValidationError extends Error {
+  details: unknown;
+  constructor(message: string, details: unknown) {
+    super(message);
+    this.name = "ChannexValidationError";
+    this.details = details;
+  }
+}
+
+export class ChannexNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChannexNotFoundError";
+  }
+}
+
+export class ChannexServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChannexServerError";
+  }
+}
+
+export class ChannexUnexpectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChannexUnexpectedError";
+  }
+}
+
 class ChannexClient {
   private baseUrl: string;
   private apiKey: string;
@@ -708,6 +775,54 @@ class ChannexClient {
       method: "POST",
       body: JSON.stringify({ reply: { reply: response } }),
     });
+  }
+
+  /**
+   * POST /api/v1/reviews/:review_id/guest_review — Airbnb only.
+   *
+   * Body shape (from doc + dry probe 2026-04-24):
+   *   { review: { scores: [{category, rating}], public_review,
+   *               private_review?, is_reviewee_recommended, tags? } }
+   *
+   * CRITICAL: Channex validates payload SHAPE only. A 200 response does
+   * NOT mean Airbnb accepted the submission — Airbnb's downstream
+   * validation will silently reject malformed categories or out-of-range
+   * ratings. Always validate client-side against the canonical Airbnb
+   * rules before calling this. See channex-expert known-quirks.md.
+   */
+  async submitGuestReview(
+    reviewId: string,
+    payload: SubmitGuestReviewPayload,
+  ): Promise<SubmitGuestReviewResult> {
+    const body = JSON.stringify({ review: payload });
+    const url = `${this.baseUrl}/reviews/${reviewId}/guest_review`;
+    console.log(`[Channex] POST ${url}`);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "user-api-key": this.apiKey,
+        "accept": "application/json",
+        "content-type": "application/json",
+      },
+      body,
+    });
+    const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = text ? JSON.parse(text) : null; } catch { /* keep raw */ }
+
+    if (res.status === 200) {
+      return { success: true, channex_response: parsed };
+    }
+    if (res.status === 422) {
+      throw new ChannexValidationError("Channex rejected guest_review payload", parsed);
+    }
+    if (res.status === 404) {
+      throw new ChannexNotFoundError(`Channex review ${reviewId} not found`);
+    }
+    if (res.status >= 500) {
+      throw new ChannexServerError(`Channex ${res.status}: ${text}`);
+    }
+    throw new ChannexUnexpectedError(`Channex returned ${res.status}: ${text}`);
   }
 
   // ==================== Certification Helpers ====================

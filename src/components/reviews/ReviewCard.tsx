@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import PlatformLogo from "@/components/ui/PlatformLogo";
-import { Lock, AlertTriangle, MoreVertical } from "lucide-react";
+import { Lock, AlertTriangle, MoreVertical, CheckCircle2 } from "lucide-react";
 import ReviewReplyPanel from "./ReviewReplyPanel";
+import GuestReviewForm from "./GuestReviewForm";
 
 export interface ReviewCardModel {
   id: string;
@@ -13,6 +14,9 @@ export interface ReviewCardModel {
   channex_review_id: string | null;
   guest_name: string | null;
   display_guest_name: string;
+  guest_review_submitted_at: string | null;
+  guest_review_channex_acked_at: string | null;
+  guest_review_airbnb_confirmed_at: string | null;
   incoming_text: string | null;
   incoming_rating: number | null;
   incoming_date: string | null;
@@ -108,6 +112,7 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [guestReviewOpen, setGuestReviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [markingBad, setMarkingBad] = useState(false);
 
@@ -256,20 +261,52 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
             Reply to guest
           </button>
           {review.platform === "airbnb" && (
-            <button
-              type="button"
-              disabled
-              title="Coming in next release"
-              className="px-4 py-2 text-[12px] font-medium cursor-not-allowed"
-              style={{
-                background: "#fff",
-                border: "1px solid var(--dry-sand)",
-                color: "var(--shell)",
-                borderRadius: 10,
-              }}
-            >
-              Review this guest
-            </button>
+            (() => {
+              if (review.guest_review_airbnb_confirmed_at) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold"
+                    style={{ background: "rgba(26,122,90,0.1)", color: "var(--lagoon)", borderRadius: 10 }}
+                  >
+                    <CheckCircle2 size={12} /> Guest reviewed
+                  </span>
+                );
+              }
+              if (review.guest_review_submitted_at) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold"
+                    title="Submitted to Channex. Awaiting Airbnb confirmation."
+                    style={{ background: "rgba(212,150,11,0.1)", color: "var(--amber-tide)", borderRadius: 10 }}
+                  >
+                    Submitted, pending
+                  </span>
+                );
+              }
+              if (!review.channex_review_id) {
+                return (
+                  <button
+                    type="button"
+                    disabled
+                    title="Cannot submit — review predates Channex sync"
+                    className="px-4 py-2 text-[12px] font-medium cursor-not-allowed"
+                    style={{ background: "#fff", border: "1px solid var(--dry-sand)", color: "var(--shell)", borderRadius: 10 }}
+                  >
+                    Review this guest
+                  </button>
+                );
+              }
+              return (
+                <button
+                  type="button"
+                  onClick={() => setGuestReviewOpen(true)}
+                  className="px-4 py-2 text-[12px] font-semibold transition-colors"
+                  style={{ background: "#fff", border: "1px solid var(--coastal)", color: "var(--coastal)", borderRadius: 10 }}
+                >
+                  Review this guest
+                </button>
+              );
+            })()
           )}
           <div className="relative ml-auto">
             <button
@@ -312,6 +349,14 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
 
       {replyOpen && (
         <ReviewReplyPanel review={review} onClose={() => setReplyOpen(false)} onUpdated={onRefresh} />
+      )}
+
+      {guestReviewOpen && (
+        <GuestReviewForm
+          review={review}
+          onClose={() => setGuestReviewOpen(false)}
+          onSubmitted={onRefresh}
+        />
       )}
     </div>
   );

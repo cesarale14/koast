@@ -127,10 +127,22 @@ export async function POST(request: NextRequest) {
         // cleanly).
         const channexIds = allReviews.map((r) => r.id);
         const { data: existingRows } = channexIds.length > 0
-          ? await reviewTable.select("channex_review_id").in("channex_review_id", channexIds)
+          ? await reviewTable
+              .select("id, channex_review_id, guest_review_submitted_at, guest_review_channex_acked_at, guest_review_airbnb_confirmed_at, guest_review_payload")
+              .in("channex_review_id", channexIds)
           : { data: [] };
-        const existingSet = new Set<string>(
-          ((existingRows ?? []) as Array<{ channex_review_id: string }>).map((r) => r.channex_review_id)
+        type ExistingRow = {
+          id: string;
+          channex_review_id: string;
+          guest_review_submitted_at: string | null;
+          guest_review_channex_acked_at: string | null;
+          guest_review_airbnb_confirmed_at: string | null;
+          guest_review_payload: { public_review?: string } | null;
+        };
+        const existingArr = (existingRows ?? []) as ExistingRow[];
+        const existingSet = new Set<string>(existingArr.map((r) => r.channex_review_id));
+        const existingByChannexId = new Map<string, ExistingRow>(
+          existingArr.map((r) => [r.channex_review_id, r])
         );
 
         for (const rv of allReviews) {
@@ -195,6 +207,59 @@ export async function POST(request: NextRequest) {
           }
           if (isNew) record.new++;
           else record.updated++;
+
+          // Session 6.2 — guest_review submission reconciliation. Channex's
+          // /reviews entity exposes reply.guest_review when host has
+          // submitted (whether via Koast or via Airbnb dashboard
+          // directly). Use this to (a) stamp airbnb_confirmed_at on rows
+          // we submitted and Airbnb has now accepted, (b) detect host
+          // submitted-via-dashboard cases.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const channexGuestReview: any = (rv.reply as Record<string, unknown> | null | undefined)?.guest_review ?? null;
+          const existingMeta = existingByChannexId.get(rv.id);
+
+          if (channexGuestReview && existingMeta) {
+            const localPub = existingMeta.guest_review_payload?.public_review ?? null;
+            const channexPub = typeof channexGuestReview.public_review === "string" ? channexGuestReview.public_review : null;
+            const matches = localPub != null && channexPub != null && localPub === channexPub;
+
+            if (existingMeta.guest_review_submitted_at && !existingMeta.guest_review_airbnb_confirmed_at) {
+              // We submitted; Channex now reflects a guest_review. Confirm
+              // only when the public_review text matches what we stored.
+              if (matches) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase.from("guest_reviews") as any)
+                  .update({ guest_review_airbnb_confirmed_at: new Date().toISOString() })
+                  .eq("id", existingMeta.id);
+              } else {
+                // Mismatch: probe-contamination shape, or host's local
+                // payload differs from what Channex received. Warn but
+                // do not stamp.
+                const ageMs = Date.now() - new Date(existingMeta.guest_review_submitted_at).getTime();
+                if (ageMs > 6 * 3600 * 1000) {
+                  console.warn(
+                    `[reviews/sync] guest_review unconfirmed >6h: review=${rv.id} (likely probe-contamination — Channex stored payload but Airbnb may have rejected, or local payload mismatch)`,
+                  );
+                }
+              }
+            } else if (!existingMeta.guest_review_submitted_at) {
+              // Host submitted via Airbnb dashboard directly — Koast row
+              // has no submission stamps but Channex shows guest_review
+              // populated. Stamp all three with the channex
+              // last-updated time (best-effort) and store Channex's
+              // payload.
+              const stampAt = rv.updated_at ?? new Date().toISOString();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase.from("guest_reviews") as any)
+                .update({
+                  guest_review_submitted_at: stampAt,
+                  guest_review_channex_acked_at: stampAt,
+                  guest_review_airbnb_confirmed_at: stampAt,
+                  guest_review_payload: channexGuestReview,
+                })
+                .eq("id", existingMeta.id);
+            }
+          }
         }
 
         totalNew += record.new;

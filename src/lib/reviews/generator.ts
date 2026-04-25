@@ -129,6 +129,53 @@ Return ONLY the response text.`,
   return { response_text: responseText };
 }
 
+// Session 6.2 — generate a host's review of a guest, conditioned on
+// the guest's incoming review of the property (vibes from rating +
+// optional private feedback). Distinct from the legacy
+// generateGuestReview path which generated from booking context only.
+export async function generateGuestReviewFromIncoming(input: {
+  incoming_text: string | null;
+  incoming_rating: number | null;
+  private_feedback: string | null;
+  guest_name: string | null;
+  property_name: string;
+  nights: number | null;
+}): Promise<{ public_review_draft: string }> {
+  const client = getClient();
+  const guest = input.guest_name?.split(" ")[0] ?? "the guest";
+  const stayDesc = input.nights ? `${input.nights}-night stay` : "stay";
+  const ratingTone = (input.incoming_rating ?? 5) >= 4 ? "positive" : "neutral-to-critical";
+  const flagged = input.private_feedback && input.private_feedback.trim().length > 0;
+
+  const system = `Write a host's review of a guest for Airbnb. Tone: ${ratingTone}. Length: 100-300 characters. Honest, not performatively warm. Never fabricate specifics.
+
+Context:
+- Guest: ${guest}
+- Property: ${input.property_name}
+- Stay: ${stayDesc}
+- Guest left ${input.incoming_rating ?? "?"}/5 of the property
+${input.incoming_text ? `- Guest's public review: "${input.incoming_text}"` : ""}
+${flagged ? `- Private feedback flagged issues — keep tone measured.` : ""}
+
+Bias rules:
+- 5-star incoming with no flagged issues: warm, brief, mentions communication or rule-following.
+- 4-star: positive but light, no over-claim.
+- 3 or below: neutral, factual ("good communication" / "respectful of the space"); do not invent positive details.
+- If private feedback flagged issues: acknowledge guest demeanor without praising — e.g. "communicated clearly" not "delightful guest".
+
+Return ONLY the review text. No preamble, no quotes around it.`;
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content: "Write the guest review." }],
+  });
+
+  const text = response.content.find((b) => b.type === "text")?.text?.trim() ?? "";
+  return { public_review_draft: text };
+}
+
 export function calculatePublishTime(
   checkOutDate: string,
   delayDays: number,

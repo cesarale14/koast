@@ -59,6 +59,9 @@ export async function GET() {
         response_sent: guestReviews.responseSent,
         status: guestReviews.status,
         is_bad_review: guestReviews.isBadReview,
+        guest_review_submitted_at: guestReviews.guestReviewSubmittedAt,
+        guest_review_channex_acked_at: guestReviews.guestReviewChannexAckedAt,
+        guest_review_airbnb_confirmed_at: guestReviews.guestReviewAirbnbConfirmedAt,
       })
       .from(guestReviews)
       .where(
@@ -111,6 +114,9 @@ export async function GET() {
         channex_review_id: r.channex_review_id,
         guest_name: r.guest_name ?? bk?.guest_name ?? null,
         display_guest_name,
+        guest_review_submitted_at: r.guest_review_submitted_at ? r.guest_review_submitted_at.toISOString() : null,
+        guest_review_channex_acked_at: r.guest_review_channex_acked_at ? r.guest_review_channex_acked_at.toISOString() : null,
+        guest_review_airbnb_confirmed_at: r.guest_review_airbnb_confirmed_at ? r.guest_review_airbnb_confirmed_at.toISOString() : null,
         incoming_text: r.incoming_text,
         incoming_rating: r.incoming_rating == null ? null : Number(r.incoming_rating),
         incoming_date: r.incoming_date ? r.incoming_date.toISOString() : null,
