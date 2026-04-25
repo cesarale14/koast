@@ -1,18 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MailX, Plug, Settings, CheckCircle2 } from "lucide-react";
+import { MailX, Plug, RefreshCw, Settings, CheckCircle2 } from "lucide-react";
 import KoastEmptyState from "@/components/polish/KoastEmptyState";
 import ReviewCard, { type ReviewCardModel } from "@/components/reviews/ReviewCard";
 import ReviewFilterChips, { type ReviewFilter } from "@/components/reviews/ReviewFilterChips";
 import ReviewSkeletonCard from "@/components/reviews/ReviewSkeletonCard";
 import ReviewsSettingsModal from "@/components/reviews/ReviewsSettingsModal";
+import { useToast } from "@/components/ui/Toast";
 
 type SortKey = "recent" | "lowest_rating" | "needs_response";
 
 interface PropertyLite {
   id: string;
   name: string;
+  reviews_last_synced_at: string | null;
+}
+
+const REFRESH_COOLDOWN_MS = 60_000;
+
+function formatRelativeAgo(iso: string | null): string {
+  if (!iso) return "Never synced";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  return `${d}d ago`;
 }
 
 export default function ReviewsPage() {
@@ -25,8 +43,20 @@ export default function ReviewsPage() {
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const { toast } = useToast();
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Re-render the relative "ago" label every 30s and on focus.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30_000);
+    const onFocus = () => setNowTick(Date.now());
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -43,6 +73,55 @@ export default function ReviewsPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing || Date.now() < cooldownUntil) return;
+    setRefreshing(true);
+    try {
+      const body = propertyFilter === "all" ? {} : { property_id: propertyFilter };
+      const res = await fetch("/api/reviews/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.error || "Refresh failed");
+      const newCount = Number(d.reviews_new ?? 0);
+      const updatedCount = Number(d.reviews_updated ?? 0);
+      toast(
+        newCount + updatedCount === 0
+          ? "Reviews up to date"
+          : `Synced — ${newCount} new, ${updatedCount} updated`,
+      );
+      setCooldownUntil(Date.now() + REFRESH_COOLDOWN_MS);
+      await fetchData();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Refresh failed", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, cooldownUntil, propertyFilter, toast, fetchData]);
+
+  // Pick the timestamp shown next to the button. On "all", use the
+  // OLDEST per-property stamp (worst case across the portfolio); on a
+  // single property, use that property's stamp. Null when nothing has
+  // ever synced for the relevant scope.
+  const lastSyncedIso = useMemo<string | null>(() => {
+    if (userProperties.length === 0) return null;
+    const scope = propertyFilter === "all"
+      ? userProperties
+      : userProperties.filter((p) => p.id === propertyFilter);
+    if (scope.length === 0) return null;
+    const stamps = scope.map((p) => p.reviews_last_synced_at);
+    if (stamps.some((s) => s == null)) return null; // never synced for at least one
+    let oldest = stamps[0]!;
+    for (const s of stamps) if (s! < oldest) oldest = s!;
+    return oldest;
+  }, [userProperties, propertyFilter]);
+
+  const cooldownActive = nowTick < cooldownUntil;
+  const refreshDisabled = refreshing || cooldownActive;
+  const refreshTitle = lastSyncedIso ? new Date(lastSyncedIso).toLocaleString() : "Never synced";
 
   // Filter reviews by property selector first
   const propertyScoped = useMemo(() => {
@@ -130,6 +209,30 @@ export default function ReviewsPage() {
               ))}
             </select>
           )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshDisabled}
+              title={refreshTitle}
+              className="px-3 py-2 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-shore"
+              style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
+            >
+              <RefreshCw
+                size={14}
+                className={refreshing ? "animate-spin" : ""}
+                style={{ color: "var(--coastal)" }}
+              />
+              {refreshing ? "Refreshing…" : "Refresh now"}
+            </button>
+            <span
+              className="text-[12px]"
+              style={{ color: "var(--tideline)" }}
+              title={refreshTitle}
+            >
+              {`Last synced ${formatRelativeAgo(lastSyncedIso)}`}
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}

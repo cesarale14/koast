@@ -35,6 +35,7 @@ export const properties = pgTable("properties", {
   coverPhotoUrl: text("cover_photo_url"),
   channexPropertyId: text("channex_property_id"),
   defaultCleanerId: uuid("default_cleaner_id"),
+  reviewsLastSyncedAt: timestamp("reviews_last_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (t) => [

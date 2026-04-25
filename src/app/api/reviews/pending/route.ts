@@ -34,7 +34,11 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const userProperties = await db
-      .select({ id: properties.id, name: properties.name })
+      .select({
+        id: properties.id,
+        name: properties.name,
+        reviews_last_synced_at: properties.reviewsLastSyncedAt,
+      })
       .from(properties)
       .where(eq(properties.userId, user.id));
 
@@ -199,7 +203,13 @@ export async function GET() {
 
     return NextResponse.json({
       reviews,
-      properties: userProperties.map((p) => ({ id: p.id, name: p.name })),
+      properties: userProperties.map((p) => ({
+        id: p.id,
+        name: p.name,
+        reviews_last_synced_at: p.reviews_last_synced_at
+          ? p.reviews_last_synced_at.toISOString()
+          : null,
+      })),
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
