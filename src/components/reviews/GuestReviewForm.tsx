@@ -14,7 +14,7 @@ import {
   GUEST_REVIEW_PUBLIC_MAX,
   GUEST_REVIEW_PRIVATE_MAX,
 } from "@/lib/reviews/guest-review-validation";
-import type { ReviewCardModel } from "./ReviewCard";
+import type { ReviewCardModel } from "@/lib/reviews/types";
 
 const CATEGORY_LABELS: Record<GuestReviewCategory, string> = {
   cleanliness: "Cleanliness",

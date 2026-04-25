@@ -147,7 +147,11 @@ async function syncOneProperty(
       };
       if (isNew) {
         row.status = rv.is_replied ? "published" : "pending";
-        row.is_bad_review = rating5 != null && rating5 < 3;
+        // Threshold normalized RDX-2 Phase A: <4 matches Airbnb's
+        // "below excellent" bucket and the UI predicate. Sync is
+        // canonical; render reads is_bad_review directly without
+        // re-derivation.
+        row.is_bad_review = rating5 != null && rating5 < 4;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
