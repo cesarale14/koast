@@ -752,33 +752,6 @@ class ChannexClient {
   }
 
   /**
-   * GET /api/v1/bookings — list bookings for a property.
-   *
-   * Channex returns honest meta.total here (verified probe 2026-04-25:
-   * total=9, page 2 returns 0). NOT subject to the shape-only-cap
-   * issue that bites /reviews. So pagination via page[number] is
-   * reliable. KNOWN LIMITATION: only recent + future bookings are
-   * exposed — historical post-checkout bookings age out of the
-   * window. See channex-expert known-quirks #20.
-   */
-  async getBookings(
-    propertyId: string,
-    options: { limit?: number; page?: number } = {},
-  ): Promise<{ data: Array<{ id: string; attributes: Record<string, unknown> }>; total: number }> {
-    const limit = options.limit ?? 100;
-    const page = options.page ?? 1;
-    const url = `/bookings?filter[property_id]=${propertyId}&pagination[limit]=${limit}&pagination[page]=${page}`;
-    const res = await this.request<{
-      data?: Array<{ id: string; attributes: Record<string, unknown> }>;
-      meta?: { total?: number };
-    }>(url);
-    return {
-      data: res.data ?? [],
-      total: res.meta?.total ?? (res.data?.length ?? 0),
-    };
-  }
-
-  /**
    * POST /api/v1/reviews/:review_id/reply
    * Body: { reply: { reply: "<text>" } }
    */
