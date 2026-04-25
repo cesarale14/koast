@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MailX, Plug, RefreshCw, Settings, CheckCircle2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MailX, Plug, Plus, RefreshCw, Settings, CheckCircle2, X } from "lucide-react";
 import KoastEmptyState from "@/components/polish/KoastEmptyState";
 import ReviewCard, { type ReviewCardModel } from "@/components/reviews/ReviewCard";
 import ReviewFilterChips, { type ReviewFilter } from "@/components/reviews/ReviewFilterChips";
@@ -14,10 +15,12 @@ type SortKey = "recent" | "lowest_rating" | "needs_response";
 interface PropertyLite {
   id: string;
   name: string;
+  channex_property_id: string | null;
   reviews_last_synced_at: string | null;
 }
 
 const REFRESH_COOLDOWN_MS = 60_000;
+const JUST_CONNECTED_BANNER_TTL_MS = 5 * 60 * 1000;
 
 function formatRelativeAgo(iso: string | null): string {
   if (!iso) return "Never synced";
@@ -47,6 +50,20 @@ export default function ReviewsPage() {
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [bannerVisible, setBannerVisible] = useState(false);
+  const [bannerOpenedAt, setBannerOpenedAt] = useState<number | null>(null);
+
+  // Detect the just-connected banner trigger and strip the query param
+  // so a refresh doesn't re-show it.
+  useEffect(() => {
+    if (searchParams.get("just_connected") === "1") {
+      setBannerVisible(true);
+      setBannerOpenedAt(Date.now());
+      router.replace("/reviews");
+    }
+  }, [searchParams, router]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -122,6 +139,29 @@ export default function ReviewsPage() {
   const cooldownActive = nowTick < cooldownUntil;
   const refreshDisabled = refreshing || cooldownActive;
   const refreshTitle = lastSyncedIso ? new Date(lastSyncedIso).toLocaleString() : "Never synced";
+  const lastSyncedLabel = lastSyncedIso
+    ? `Last synced ${formatRelativeAgo(lastSyncedIso)}`
+    : "Never synced";
+
+  const hasAnyChannexProperty = useMemo(
+    () => userProperties.some((p) => !!p.channex_property_id),
+    [userProperties],
+  );
+
+  // Banner auto-fades when the first review-bearing refetch settles
+  // OR after the 5-min TTL elapses, whichever comes first.
+  useEffect(() => {
+    if (!bannerVisible) return;
+    if (reviews.length > 0) {
+      setBannerVisible(false);
+      return;
+    }
+    if (bannerOpenedAt == null) return;
+    const elapsed = nowTick - bannerOpenedAt;
+    if (elapsed > JUST_CONNECTED_BANNER_TTL_MS) {
+      setBannerVisible(false);
+    }
+  }, [bannerVisible, bannerOpenedAt, reviews.length, nowTick]);
 
   // Filter reviews by property selector first
   const propertyScoped = useMemo(() => {
@@ -209,30 +249,32 @@ export default function ReviewsPage() {
               ))}
             </select>
           )}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={refreshDisabled}
-              title={refreshTitle}
-              className="px-3 py-2 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-shore"
-              style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
-            >
-              <RefreshCw
-                size={14}
-                className={refreshing ? "animate-spin" : ""}
-                style={{ color: "var(--coastal)" }}
-              />
-              {refreshing ? "Refreshing…" : "Refresh now"}
-            </button>
-            <span
-              className="text-[12px]"
-              style={{ color: "var(--tideline)" }}
-              title={refreshTitle}
-            >
-              {`Last synced ${formatRelativeAgo(lastSyncedIso)}`}
-            </span>
-          </div>
+          {hasAnyChannexProperty && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={refreshDisabled}
+                title={refreshTitle}
+                className="px-3 py-2 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-shore"
+                style={{ color: "var(--coastal)", border: "1px solid var(--dry-sand)" }}
+              >
+                <RefreshCw
+                  size={14}
+                  className={refreshing ? "animate-spin" : ""}
+                  style={{ color: "var(--coastal)" }}
+                />
+                {refreshing ? "Refreshing…" : "Refresh now"}
+              </button>
+              <span
+                className="text-[12px]"
+                style={{ color: "var(--tideline)" }}
+                title={refreshTitle}
+              >
+                {lastSyncedLabel}
+              </span>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -244,6 +286,31 @@ export default function ReviewsPage() {
           </button>
         </div>
       </div>
+
+      {bannerVisible && (
+        <div
+          className="mb-4 px-4 py-3 flex items-start gap-3"
+          style={{
+            background: "rgba(26,122,90,0.08)",
+            border: "1px solid rgba(26,122,90,0.2)",
+            borderRadius: 12,
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: "var(--lagoon)", marginTop: 2 }} />
+          <div className="flex-1 text-[13px]" style={{ color: "var(--lagoon)" }}>
+            Channex connected. Pulling your first reviews — this can take a few minutes.
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerVisible(false)}
+            aria-label="Dismiss"
+            className="p-1 rounded hover:bg-white/40"
+            style={{ color: "var(--lagoon)" }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Filter + sort row */}
       {hasAnyReviews && !loading && (
@@ -287,12 +354,32 @@ export default function ReviewsPage() {
           style={{ borderRadius: 16, border: "1px solid var(--dry-sand)" }}
         >
           <KoastEmptyState
+            icon={<Plus size={28} />}
+            title="Add a property to see reviews"
+            body="Reviews from Airbnb and Booking.com appear here once you add a property and connect a channel."
+            action={
+              <a
+                href="/properties/new?from=reviews"
+                className="px-4 py-2 text-[12px] font-semibold"
+                style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
+              >
+                Add a property
+              </a>
+            }
+          />
+        </div>
+      ) : !hasAnyChannexProperty ? (
+        <div
+          className="bg-white"
+          style={{ borderRadius: 16, border: "1px solid var(--dry-sand)" }}
+        >
+          <KoastEmptyState
             icon={<Plug size={28} />}
             title="Connect a channel to see reviews"
             body="Reviews from Airbnb and Booking.com appear here once you connect a channel to your property."
             action={
               <a
-                href="/channels/connect"
+                href="/properties/new?from=reviews"
                 className="px-4 py-2 text-[12px] font-semibold"
                 style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
               >

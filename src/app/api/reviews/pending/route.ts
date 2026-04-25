@@ -37,6 +37,7 @@ export async function GET() {
       .select({
         id: properties.id,
         name: properties.name,
+        channex_property_id: properties.channexPropertyId,
         reviews_last_synced_at: properties.reviewsLastSyncedAt,
       })
       .from(properties)
@@ -206,6 +207,7 @@ export async function GET() {
       properties: userProperties.map((p) => ({
         id: p.id,
         name: p.name,
+        channex_property_id: p.channex_property_id,
         reviews_last_synced_at: p.reviews_last_synced_at
           ? p.reviews_last_synced_at.toISOString()
           : null,

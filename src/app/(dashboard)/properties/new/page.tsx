@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -68,6 +68,8 @@ const steps = ["Property Details", "Platform Listings", "Base Pricing", "Review 
 
 export default function AddPropertyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromReviews = searchParams.get("from") === "reviews";
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -205,7 +207,7 @@ export default function AddPropertyPage() {
       }
 
       toast("Property created successfully!");
-      router.push(`/properties/${propertyId}`);
+      router.push(fromReviews ? "/reviews?just_connected=1" : `/properties/${propertyId}`);
     } catch (err) {
       console.error(err);
       toast("Failed to create property. Please try again.", "error");

@@ -10,6 +10,11 @@ interface BookingComConnectProps {
   propertyName: string;
   onClose: () => void;
   onConnected: () => void;
+  // Session 6.7 — when set, the parent (e.g. PropertyDetail reached
+  // via the /reviews "Connect a channel" CTA) wants the user routed
+  // somewhere specific after a successful activation. Done button
+  // navigates here instead of firing onConnected().
+  redirectTo?: string;
 }
 
 const PROGRESS_STEPS = [
@@ -20,7 +25,7 @@ const PROGRESS_STEPS = [
   "Activating channel",
 ];
 
-export default function BookingComConnect({ propertyId, propertyName, onClose, onConnected }: BookingComConnectProps) {
+export default function BookingComConnect({ propertyId, propertyName, onClose, onConnected, redirectTo }: BookingComConnectProps) {
   const [step, setStep] = useState<Step>("form");
   const [hotelId, setHotelId] = useState("");
   const [channelId, setChannelId] = useState("");
@@ -492,7 +497,13 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                 )}
 
                 <button
-                  onClick={() => { onConnected(); onClose(); }}
+                  onClick={() => {
+                    onConnected();
+                    onClose();
+                    if (redirectTo && typeof window !== "undefined") {
+                      window.location.href = redirectTo;
+                    }
+                  }}
                   className="w-full py-2.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] transition-colors"
                 >
                   Done

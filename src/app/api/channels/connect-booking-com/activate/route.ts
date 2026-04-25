@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
+import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
 import {
   buildSafeBdcRestrictions,
   toChannexRestrictionValues,
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Verify property
     const { data: property } = await supabase
       .from("properties")
-      .select("id, channex_property_id")
+      .select("id, name, channex_property_id")
       .eq("id", propertyId)
       .eq("user_id", user.id)
       .single();
@@ -279,6 +280,13 @@ export async function POST(request: NextRequest) {
         console.error("[connect-bdc/activate] Background probe crashed:", err instanceof Error ? err.message : err);
       });
     }
+
+    // Session 6.7 — non-blocking on-connect reviews sync.
+    void syncReviewsForOneProperty({
+      id: propertyId,
+      name: property.name ?? "Property",
+      channex_property_id: channexPropertyId,
+    });
 
     return NextResponse.json({
       success: true,

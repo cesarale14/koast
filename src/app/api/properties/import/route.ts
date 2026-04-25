@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
 
 /**
  * POST /api/properties/import
@@ -340,6 +341,14 @@ export async function POST(request: NextRequest) {
         .neq("status", "cancelled");
       bookingCount = count ?? 0;
     }
+
+    // Session 6.7 — non-blocking on-connect reviews sync. Same helper
+    // the manual Refresh button calls. Errors logged, never fatal.
+    void syncReviewsForOneProperty({
+      id: propertyId,
+      name: propertyName,
+      channex_property_id,
+    });
 
     // 8. Return result
     return NextResponse.json({
