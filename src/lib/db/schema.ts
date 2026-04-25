@@ -307,6 +307,10 @@ export const guestReviews = pgTable("guest_reviews", {
   guestReviewChannexAckedAt: timestamp("guest_review_channex_acked_at", { withTimezone: true }),
   guestReviewAirbnbConfirmedAt: timestamp("guest_review_airbnb_confirmed_at", { withTimezone: true }),
   guestReviewPayload: jsonb("guest_review_payload"),
+  // Session 6.5 — Channex's two-sided-review submission deadline. NULL
+  // when not yet synced. Consumers derive is_expired at read time
+  // against now() rather than caching a stale boolean.
+  expiredAt: timestamp("expired_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_guest_reviews_property").on(t.propertyId),

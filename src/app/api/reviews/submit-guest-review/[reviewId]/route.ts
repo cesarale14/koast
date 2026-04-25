@@ -158,6 +158,29 @@ export async function POST(
       channex_response: channexResponse,
     });
   } catch (err) {
+    // Session 6.5 — outer-catch rollback. The inner try/catch around
+    // the Channex call covers classified ChannexError types, but any
+    // unhandled exception between the submitted_at stamp and the typed
+    // catches (e.g. createServiceClient throw, lock re-read failure,
+    // unforeseen runtime error) bypasses the inner rollback and would
+    // leave guest_review_submitted_at set with channex_acked_at null —
+    // see the orphan on review 321d7369. Roll back any submission stamp
+    // that has not yet been Channex-acknowledged. Conditional on
+    // channex_acked_at IS NULL so a post-ack throw can't undo a real
+    // submission.
+    try {
+      const supabase = createServiceClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from("guest_reviews") as any)
+        .update({ guest_review_submitted_at: null, guest_review_payload: null })
+        .eq("id", params.reviewId)
+        .is("guest_review_channex_acked_at", null);
+    } catch (rollbackErr) {
+      console.error(
+        `[reviews/submit-guest-review] rollback failed for ${params.reviewId}:`,
+        rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+      );
+    }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

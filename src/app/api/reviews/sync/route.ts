@@ -189,6 +189,11 @@ export async function POST(request: NextRequest) {
             incoming_rating: rating5,
             incoming_date: incomingAt,
             subratings,
+            // Session 6.5 — store Channex's two-sided-review deadline so
+            // the UI can replace "Review this guest" with "Review time
+            // expired" once the window closes. is_expired is derived at
+            // read time from expired_at <= now().
+            expired_at: rv.expired_at ?? null,
           };
           // Initial-insert-only defaults: set status and is_bad_review
           // based on Channex state. Don't stomp on local workflow state

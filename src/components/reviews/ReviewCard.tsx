@@ -18,6 +18,11 @@ export interface ReviewCardModel {
   guest_review_submitted_at: string | null;
   guest_review_channex_acked_at: string | null;
   guest_review_airbnb_confirmed_at: string | null;
+  // Session 6.5 — Channex's submission window deadline. is_expired is
+  // server-derived from expired_at <= now(); the client trusts it
+  // rather than recomputing to avoid clock-skew drift.
+  expired_at: string | null;
+  is_expired: boolean;
   incoming_text: string | null;
   incoming_rating: number | null;
   incoming_date: string | null;
@@ -350,6 +355,16 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
                     style={{ background: "rgba(212,150,11,0.1)", color: "var(--amber-tide)", borderRadius: 10 }}
                   >
                     Submitted, pending
+                  </span>
+                );
+              }
+              if (review.is_expired) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium"
+                    style={{ background: "var(--shore)", color: "var(--tideline)", borderRadius: 10 }}
+                  >
+                    Review time expired
                   </span>
                 );
               }

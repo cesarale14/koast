@@ -64,6 +64,7 @@ export async function GET() {
         guest_review_submitted_at: guestReviews.guestReviewSubmittedAt,
         guest_review_channex_acked_at: guestReviews.guestReviewChannexAckedAt,
         guest_review_airbnb_confirmed_at: guestReviews.guestReviewAirbnbConfirmedAt,
+        expired_at: guestReviews.expiredAt,
       })
       .from(guestReviews)
       .where(
@@ -129,6 +130,7 @@ export async function GET() {
     }
     const propertyLookup = new Map(userProperties.map((p) => [p.id, p]));
 
+    const nowMs = Date.now();
     const reviews = rows.map((r) => {
       const bk =
         (r.ota_reservation_code ? bookingsByOtaCode.get(r.ota_reservation_code) : null) ??
@@ -161,6 +163,8 @@ export async function GET() {
         guest_review_submitted_at: r.guest_review_submitted_at ? r.guest_review_submitted_at.toISOString() : null,
         guest_review_channex_acked_at: r.guest_review_channex_acked_at ? r.guest_review_channex_acked_at.toISOString() : null,
         guest_review_airbnb_confirmed_at: r.guest_review_airbnb_confirmed_at ? r.guest_review_airbnb_confirmed_at.toISOString() : null,
+        expired_at: r.expired_at ? r.expired_at.toISOString() : null,
+        is_expired: r.expired_at ? r.expired_at.getTime() <= nowMs : false,
         incoming_text: r.incoming_text,
         incoming_rating: r.incoming_rating == null ? null : Number(r.incoming_rating),
         incoming_date: r.incoming_date ? r.incoming_date.toISOString() : null,
