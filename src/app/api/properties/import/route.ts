@@ -348,6 +348,11 @@ export async function POST(request: NextRequest) {
       id: propertyId,
       name: propertyName,
       channex_property_id,
+    }).catch((err) => {
+      console.error(
+        `[properties/import] on-connect review sync rejected for ${propertyId}:`,
+        err instanceof Error ? err.message : err,
+      );
     });
 
     // 8. Return result

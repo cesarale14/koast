@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 
@@ -31,6 +31,8 @@ interface ImportResult {
 
 export default function ImportPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromReviews = searchParams.get("from") === "reviews";
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -264,10 +266,12 @@ export default function ImportPage() {
             </div>
 
             <button
-              onClick={() => router.push("/properties")}
+              onClick={() =>
+                router.push(fromReviews ? "/reviews?just_connected=1" : "/properties")
+              }
               className="w-full px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
             >
-              Go to Properties
+              {fromReviews ? "Go to Reviews" : "Go to Properties"}
             </button>
           </div>
         )}

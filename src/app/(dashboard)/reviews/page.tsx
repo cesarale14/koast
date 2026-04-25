@@ -359,7 +359,7 @@ export default function ReviewsPage() {
             body="Reviews from Airbnb and Booking.com appear here once you add a property and connect a channel."
             action={
               <a
-                href="/properties/new?from=reviews"
+                href="/properties/import?from=reviews"
                 className="px-4 py-2 text-[12px] font-semibold"
                 style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
               >
@@ -379,7 +379,7 @@ export default function ReviewsPage() {
             body="Reviews from Airbnb and Booking.com appear here once you connect a channel to your property."
             action={
               <a
-                href="/properties/new?from=reviews"
+                href="/properties/import?from=reviews"
                 className="px-4 py-2 text-[12px] font-semibold"
                 style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
               >

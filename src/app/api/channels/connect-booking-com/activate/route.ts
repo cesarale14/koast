@@ -286,6 +286,11 @@ export async function POST(request: NextRequest) {
       id: propertyId,
       name: property.name ?? "Property",
       channex_property_id: channexPropertyId,
+    }).catch((err) => {
+      console.error(
+        `[connect-bdc/activate] on-connect review sync rejected for ${propertyId}:`,
+        err instanceof Error ? err.message : err,
+      );
     });
 
     return NextResponse.json({

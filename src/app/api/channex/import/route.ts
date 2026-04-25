@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServerClient } from "@supabase/ssr";
 import { createChannexClient } from "@/lib/channex/client";
 import { acquireLock, releaseLock } from "@/lib/concurrency/locks";
+import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
 
 /**
  * Normalize a property name for strict matching.
@@ -502,6 +503,22 @@ export async function POST(request: NextRequest) {
           bookings_failed: bookingsFailed,
           booking_errors: bookingErrors.slice(0, 10),
           rates: ratesImported,
+        });
+
+        // Session 6.7-POST — non-blocking on-connect reviews sync. Same
+        // pattern as /api/properties/import. Fire-and-forget so the
+        // bulk import response returns immediately; helper swallows
+        // its own errors but we add an outer .catch in case the
+        // promise itself rejects (e.g. import-time module errors).
+        void syncReviewsForOneProperty({
+          id: propertyId,
+          name: attrs.title,
+          channex_property_id: channexId,
+        }).catch((err) => {
+          console.error(
+            `[channex/import] on-connect review sync rejected for ${propertyId}:`,
+            err instanceof Error ? err.message : err,
+          );
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
