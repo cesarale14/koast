@@ -164,7 +164,18 @@ export async function GET() {
         guest_review_channex_acked_at: r.guest_review_channex_acked_at ? r.guest_review_channex_acked_at.toISOString() : null,
         guest_review_airbnb_confirmed_at: r.guest_review_airbnb_confirmed_at ? r.guest_review_airbnb_confirmed_at.toISOString() : null,
         expired_at: r.expired_at ? r.expired_at.toISOString() : null,
-        is_expired: r.expired_at ? r.expired_at.getTime() <= nowMs : false,
+        // Session 6.5 follow-up — when Channex's /reviews listing
+        // purges old reviews their expired_at column stays NULL on
+        // our side forever (probe-validated 2026-04-25: review
+        // 91c80897 ~67d old not returned by /reviews?filter or
+        // direct GET). Fall back to incoming_date + 14d so those
+        // rows still gate to "Review time expired" instead of
+        // showing an active button. Channex remains authoritative
+        // when present; the fallback only fires when expired_at
+        // is missing.
+        is_expired: r.expired_at
+          ? r.expired_at.getTime() <= nowMs
+          : (r.incoming_date ? r.incoming_date.getTime() + 14 * 86400000 <= nowMs : false),
         incoming_text: r.incoming_text,
         incoming_rating: r.incoming_rating == null ? null : Number(r.incoming_rating),
         incoming_date: r.incoming_date ? r.incoming_date.toISOString() : null,
