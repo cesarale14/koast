@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import PlatformLogo from "@/components/ui/PlatformLogo";
-import { Lock, AlertTriangle, MoreVertical, CheckCircle2 } from "lucide-react";
+import { Lock, AlertTriangle, MoreVertical, CheckCircle2, Pencil } from "lucide-react";
 import ReviewReplyPanel from "./ReviewReplyPanel";
 import GuestReviewForm from "./GuestReviewForm";
 
@@ -13,6 +13,7 @@ export interface ReviewCardModel {
   property_name: string;
   channex_review_id: string | null;
   guest_name: string | null;
+  guest_name_override: string | null;
   display_guest_name: string;
   guest_review_submitted_at: string | null;
   guest_review_channex_acked_at: string | null;
@@ -115,13 +116,39 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
   const [guestReviewOpen, setGuestReviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [markingBad, setMarkingBad] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(review.guest_name_override ?? "");
+  const [optimisticName, setOptimisticName] = useState<string | null>(null);
 
   const rating = review.incoming_rating;
   const isBad = review.is_bad_review || (rating != null && rating < 4);
-  const name = review.display_guest_name;
-  // Treat a name as "fallback / muted" when the API resolver had to
+  const name = optimisticName ?? review.display_guest_name;
+  // Treat a name as "fallback / muted" when the resolver had to
   // synthesize a platform-tagged label rather than surface a real one.
-  const isFallbackName = !review.guest_name || review.guest_name === "Airbnb Guest";
+  // An override always counts as a real name.
+  const isFallbackName =
+    !review.guest_name_override &&
+    optimisticName == null &&
+    (!review.guest_name || review.guest_name === "Airbnb Guest");
+
+  const saveName = async (raw: string) => {
+    const next = raw.trim();
+    setEditingName(false);
+    setOptimisticName(next === "" ? null : next);
+    try {
+      const res = await fetch(`/api/reviews/${review.id}/guest-name`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? `Failed (${res.status})`);
+      onRefresh();
+    } catch (e) {
+      setOptimisticName(null);
+      toast(e instanceof Error ? e.message : "Failed to save name", "error");
+    }
+  };
 
   const PREVIEW_LEN = 200;
   const fullText = review.incoming_text ?? "";
@@ -164,7 +191,7 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
 
   return (
     <div
-      className={`bg-white p-5 relative ${mounted ? "animate-cardReveal" : "opacity-0"}`}
+      className={`group bg-white p-5 relative ${mounted ? "animate-cardReveal" : "opacity-0"}`}
       style={{
         borderRadius: 16,
         boxShadow: "var(--shadow-card)",
@@ -178,12 +205,55 @@ export default function ReviewCard({ review, animationDelayMs = 0, mounted, onRe
         <Avatar name={review.guest_name} isBad={isBad} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-[14px] font-semibold truncate"
-              style={{ color: isFallbackName ? "var(--tideline)" : "var(--coastal)" }}
-            >
-              {name}
-            </span>
+            {editingName ? (
+              <input
+                type="text"
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={() => saveName(nameDraft)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveName(nameDraft);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setNameDraft(review.guest_name_override ?? "");
+                    setEditingName(false);
+                  }
+                }}
+                placeholder="Guest name…"
+                maxLength={200}
+                className="px-2 py-0.5 text-[14px] font-semibold rounded"
+                style={{
+                  border: "1px solid var(--dry-sand)",
+                  color: "var(--coastal)",
+                  outline: "none",
+                  width: "min(220px, 60%)",
+                }}
+              />
+            ) : (
+              <span
+                className="text-[14px] font-semibold truncate"
+                style={{ color: isFallbackName ? "var(--tideline)" : "var(--coastal)" }}
+              >
+                {name}
+              </span>
+            )}
+            {!review.response_sent && !editingName && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNameDraft(review.guest_name_override ?? "");
+                  setEditingName(true);
+                }}
+                aria-label="Edit guest name"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-shore"
+                style={{ color: "var(--tideline)" }}
+              >
+                <Pencil size={12} />
+              </button>
+            )}
             <PlatformLogo platform={review.platform} size="sm" />
           </div>
           <div className="text-[12px] flex items-center gap-2" style={{ color: "var(--tideline)" }}>

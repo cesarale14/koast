@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChannexClient } from "@/lib/channex/client";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  upsertBookingFromChannexRevision,
+  platformFromChannex,
+  type ChannexBookingAttrs,
+} from "@/lib/bookings/upsert-from-channex";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
@@ -209,106 +214,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "ok", action: "skipped_self", booking_id: bookingId });
     }
 
-    // Parse guest and platform
+    // Session 6.3 — shared upsert. Same field mapping as the polling
+    // worker, single source of truth for the booking-record shape.
     const guestName = ba.customer
-      ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ")
+      ? [ba.customer.name, ba.customer.surname].filter(Boolean).join(" ") || null
       : null;
-
-    // Prefer unique_id prefix (BDC-/ABB-/VRBO-) — it's Channex's canonical
-    // per-channel source tag — then fall back to ota_name.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const uniqueId = String(((ba as any).unique_id ?? ba.ota_reservation_code ?? "")).toUpperCase();
-    let platform = "direct";
-    if (uniqueId.startsWith("BDC-")) platform = "booking_com";
-    else if (uniqueId.startsWith("ABB-")) platform = "airbnb";
-    else if (uniqueId.startsWith("VRBO-") || uniqueId.startsWith("HA-")) platform = "vrbo";
-    else {
-      const otaLower = (ba.ota_name ?? "").toLowerCase();
-      if (otaLower.includes("airbnb")) platform = "airbnb";
-      else if (otaLower.includes("vrbo") || otaLower.includes("homeaway")) platform = "vrbo";
-      else if (otaLower.includes("booking")) platform = "booking_com";
-    }
-    console.log(`[webhook] Detected platform=${platform} (unique_id=${uniqueId || "—"}, ota_name=${ba.ota_name ?? "—"})`);
-
-    // Determine action from event type AND booking status
-    let action: "created" | "modified" | "cancelled";
-    let bookingStatus: string;
-
-    if (ba.status === "cancelled" || event.includes("cancellation") || event.includes("cancelled")) {
-      action = "cancelled";
-      bookingStatus = "cancelled";
-    } else if (event.includes("modification") || event.includes("modified") || ba.status === "modified") {
-      action = "modified";
-      bookingStatus = "confirmed";
-    } else {
-      action = "created";
-      bookingStatus = "confirmed";
-    }
-
-    console.log(`[webhook] Action: ${action}, DB status: ${bookingStatus}`);
-
-    // Check for existing booking in our DB
-    const { data: existingData } = await supabase
-      .from("bookings")
-      .select("id, check_in, check_out")
-      .eq("channex_booking_id", bookingId)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existingBooking = ((existingData ?? []) as any[])[0];
-    const oldCheckIn = existingBooking?.check_in;
-    const oldCheckOut = existingBooking?.check_out;
-
-    // Build booking record
-    const bookingRecord = {
-      property_id: propertyId,
-      platform,
-      channex_booking_id: bookingId,
-      guest_name: guestName,
-      guest_email: ba.customer?.mail || null,
-      guest_phone: ba.customer?.phone || null,
-      check_in: ba.arrival_date,
-      check_out: ba.departure_date,
-      total_price: ba.amount ? parseFloat(ba.amount) : null,
-      currency: ba.currency || "USD",
-      status: bookingStatus,
-      platform_booking_id: ba.ota_reservation_code || null,
-      notes: ba.notes || null,
-      updated_at: new Date().toISOString(),
-    };
-
-    // Upsert booking
-    if (existingBooking) {
-      await supabase.from("bookings").update(bookingRecord).eq("id", existingBooking.id);
-      console.log(`[webhook] Updated existing booking ${bookingId} (action: ${action})`);
-    } else if (bookingStatus !== "cancelled") {
-      // Dedup scope: only same-platform exact-date matches are
-      // duplicates. Different platforms at overlapping dates are
-      // cross-platform overbookings (e.g. Airbnb guest X and
-      // Booking.com guest Y on the same night) and must be left alone
-      // so /api/bookings/conflicts can surface them.
-      const { data: exact } = await supabase
-        .from("bookings")
-        .select("id")
-        .eq("property_id", propertyId)
-        .eq("platform", platform)
-        .eq("check_in", ba.arrival_date)
-        .eq("check_out", ba.departure_date)
-        .is("channex_booking_id", null)
-        .eq("status", "confirmed")
-        .limit(1);
+    const platform = platformFromChannex(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const exactRow = ((exact ?? []) as any[])[0];
-      if (exactRow) {
-        await supabase.from("bookings").update(bookingRecord).eq("id", exactRow.id);
-        console.log(`[webhook] Promoted iCal placeholder ${exactRow.id} with Channex data for ${bookingId}`);
-      } else {
-        const { error: insertErr } = await supabase.from("bookings").insert(bookingRecord);
-        if (insertErr) console.error(`[webhook] Insert error:`, insertErr);
-        else console.log(`[webhook] Inserted new booking ${bookingId}`);
-      }
-    } else {
-      console.log(`[webhook] Skipping insert for cancelled booking ${bookingId} (no existing row)`);
-    }
+      ((ba as any).unique_id ?? ba.ota_reservation_code) as string | null,
+      ba.ota_name ?? null,
+    );
+    const isCancelEvent = event.includes("cancellation") || event.includes("cancelled");
+    const upsert = await upsertBookingFromChannexRevision({
+      supabase,
+      propertyId,
+      channexBookingId: bookingId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      attrs: ba as unknown as ChannexBookingAttrs,
+      forceCancelled: isCancelEvent,
+    });
+    const action: "created" | "modified" | "cancelled" =
+      upsert.action === "promoted_ical" ? "created" : upsert.action;
+    const bookingStatus = action === "cancelled" ? "cancelled" : "confirmed";
+    const oldCheckIn = upsert.oldCheckIn;
+    const oldCheckOut = upsert.oldCheckOut;
+    console.log(`[webhook] Detected platform=${platform}, action=${upsert.action}, status=${bookingStatus}`);
 
     // PR C — Outcome capture for pricing_performance. On booking_new only,
     // walk every date in the booking's stay and backfill any matching

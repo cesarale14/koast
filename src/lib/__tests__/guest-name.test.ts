@@ -1,6 +1,28 @@
 import { resolveDisplayGuestName } from "@/lib/guest-name";
 
 describe("resolveDisplayGuestName", () => {
+  test("override wins over every other source", () => {
+    expect(
+      resolveDisplayGuestName({
+        overrideName: "Sarah",
+        bookingGuestName: "Hiria Puha",
+        channexGuestName: "Channex Name",
+        platform: "airbnb",
+      }),
+    ).toBe("Sarah");
+  });
+
+  test("override of whitespace-only is treated as absent", () => {
+    expect(
+      resolveDisplayGuestName({
+        overrideName: "   ",
+        bookingGuestName: "Hiria Puha",
+        channexGuestName: null,
+        platform: "booking_com",
+      }),
+    ).toBe("Hiria Puha");
+  });
+
   test("returns the booking guest_name when it's a real name", () => {
     expect(
       resolveDisplayGuestName({

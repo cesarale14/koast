@@ -49,7 +49,9 @@ export async function GET() {
         property_id: guestReviews.propertyId,
         booking_id: guestReviews.bookingId,
         channex_review_id: guestReviews.channexReviewId,
+        ota_reservation_code: guestReviews.otaReservationCode,
         guest_name: guestReviews.guestName,
+        guest_name_override: guestReviews.guestNameOverride,
         incoming_text: guestReviews.incomingText,
         incoming_rating: guestReviews.incomingRating,
         incoming_date: guestReviews.incomingDate,
@@ -72,26 +74,66 @@ export async function GET() {
       )
       .orderBy(desc(guestReviews.incomingDate));
 
-    // Enrich with linked booking context (when resolvable)
+    // Session 6.3 — primary join is ota_reservation_code (set by sync
+    // path 6.1c). Falls back to booking_id FK lookup for any rows that
+    // had a direct linkage at sync time. Net: review.guest_name surfaces
+    // whenever we can resolve the booking via either path.
     const bookingIds = rows.map((r) => r.booking_id).filter(Boolean) as string[];
-    const bookingRows = bookingIds.length > 0
-      ? await db
-          .select({
-            id: bookings.id,
-            check_in: bookings.checkIn,
-            check_out: bookings.checkOut,
-            platform: bookings.platform,
-            platform_booking_id: bookings.platformBookingId,
-            guest_name: bookings.guestName,
-          })
-          .from(bookings)
-          .where(inArray(bookings.id, bookingIds))
-      : [];
-    const bookingLookup = new Map(bookingRows.map((b) => [b.id, b]));
+    const otaCodes = rows
+      .map((r) => r.ota_reservation_code)
+      .filter((c): c is string => !!c);
+    type BookingLite = {
+      id: string;
+      check_in: string | null;
+      check_out: string | null;
+      platform: string | null;
+      platform_booking_id: string | null;
+      ota_reservation_code: string | null;
+      guest_name: string | null;
+    };
+    const bookingsByOtaCode = new Map<string, BookingLite>();
+    const bookingsById = new Map<string, BookingLite>();
+
+    if (otaCodes.length > 0) {
+      const byCode = await db
+        .select({
+          id: bookings.id,
+          check_in: bookings.checkIn,
+          check_out: bookings.checkOut,
+          platform: bookings.platform,
+          platform_booking_id: bookings.platformBookingId,
+          ota_reservation_code: bookings.otaReservationCode,
+          guest_name: bookings.guestName,
+        })
+        .from(bookings)
+        .where(inArray(bookings.otaReservationCode, otaCodes));
+      for (const b of byCode) {
+        if (b.ota_reservation_code) bookingsByOtaCode.set(b.ota_reservation_code, b);
+        bookingsById.set(b.id, b);
+      }
+    }
+    if (bookingIds.length > 0) {
+      const byId = await db
+        .select({
+          id: bookings.id,
+          check_in: bookings.checkIn,
+          check_out: bookings.checkOut,
+          platform: bookings.platform,
+          platform_booking_id: bookings.platformBookingId,
+          ota_reservation_code: bookings.otaReservationCode,
+          guest_name: bookings.guestName,
+        })
+        .from(bookings)
+        .where(inArray(bookings.id, bookingIds));
+      for (const b of byId) bookingsById.set(b.id, b);
+    }
     const propertyLookup = new Map(userProperties.map((p) => [p.id, p]));
 
     const reviews = rows.map((r) => {
-      const bk = r.booking_id ? bookingLookup.get(r.booking_id) : null;
+      const bk =
+        (r.ota_reservation_code ? bookingsByOtaCode.get(r.ota_reservation_code) : null) ??
+        (r.booking_id ? bookingsById.get(r.booking_id) : null) ??
+        null;
       const prop = propertyLookup.get(r.property_id);
       const ci = bk?.check_in ?? null;
       const co = bk?.check_out ?? null;
@@ -103,6 +145,7 @@ export async function GET() {
       }
       const platform = bk?.platform ?? "airbnb";
       const display_guest_name = resolveDisplayGuestName({
+        overrideName: r.guest_name_override,
         bookingGuestName: bk?.guest_name,
         channexGuestName: r.guest_name,
         platform,
@@ -113,6 +156,7 @@ export async function GET() {
         property_name: prop?.name ?? "Property",
         channex_review_id: r.channex_review_id,
         guest_name: r.guest_name ?? bk?.guest_name ?? null,
+        guest_name_override: r.guest_name_override,
         display_guest_name,
         guest_review_submitted_at: r.guest_review_submitted_at ? r.guest_review_submitted_at.toISOString() : null,
         guest_review_channex_acked_at: r.guest_review_channex_acked_at ? r.guest_review_channex_acked_at.toISOString() : null,

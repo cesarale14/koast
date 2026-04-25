@@ -22,6 +22,11 @@
 const ICAL_AIRBNB_SENTINEL = "Airbnb Guest";
 
 export interface ResolveDisplayGuestNameInput {
+  // Session 6.3 — host's manual override. Wins over every other
+  // source. Set via the inline-edit pencil on review cards. Used to
+  // recover names for historical reviews whose booking has aged out
+  // of Channex's /bookings window (channex-expert known-quirks #20).
+  overrideName?: string | null | undefined;
   bookingGuestName: string | null | undefined;
   channexGuestName: string | null | undefined;
   platform: string | null | undefined;
@@ -44,11 +49,14 @@ function platformFallback(platform: string | null | undefined): string {
 }
 
 export function resolveDisplayGuestName({
+  overrideName,
   bookingGuestName,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   channexGuestName,
   platform,
 }: ResolveDisplayGuestNameInput): string {
+  const ov = (overrideName ?? "").trim();
+  if (ov) return ov;
   const bk = (bookingGuestName ?? "").trim();
   if (bk && bk !== ICAL_AIRBNB_SENTINEL) return bk;
   return platformFallback(platform);

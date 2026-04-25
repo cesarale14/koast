@@ -83,6 +83,14 @@ export const bookings = pgTable("bookings", {
   platform: text("platform").notNull(),
   platformBookingId: text("platform_booking_id"),
   channexBookingId: text("channex_booking_id"),
+  // Session 6.3 — Channex-feed-sourced columns. Populated by the
+  // webhook handler + booking_sync.py polling path. Reviews join on
+  // ota_reservation_code (HM-code for Airbnb, numeric for BDC).
+  otaReservationCode: text("ota_reservation_code"),
+  guestFirstName: text("guest_first_name"),
+  guestLastName: text("guest_last_name"),
+  revisionNumber: integer("revision_number"),
+  source: text("source").default("ical"),
   guestName: text("guest_name"),
   guestEmail: text("guest_email"),
   guestPhone: text("guest_phone"),
@@ -285,6 +293,10 @@ export const guestReviews = pgTable("guest_reviews", {
   // (Airbnb HM-code or BDC numeric). Used by read paths to resolve
   // the matching booking without re-fetching from Channex.
   otaReservationCode: text("ota_reservation_code"),
+  // Session 6.3 — manual override for historical reviews whose
+  // booking has aged out of Channex's /bookings window. Resolver
+  // precedence: override > booking > review > platform fallback.
+  guestNameOverride: text("guest_name_override"),
   // Session 6.2 — three-stage guest_review submission tracking.
   // submitted_at: host clicked Submit. channex_acked_at: Channex 200.
   // airbnb_confirmed_at: verified that Airbnb actually accepted (via
