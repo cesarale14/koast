@@ -1,26 +1,33 @@
 "use client";
 
-// MSG-S1 Phase F — UnifiedInbox rewired to server-grouped threads.
+// MSG-S2 — UnifiedInbox with active composer + optimistic send + retry +
+// mark-read on thread open + Airbnb content-filter preview warning.
 //
-// The old in-memory grouping (msgs → conversations) is gone — threads
-// arrive pre-grouped from /messages page server query. Messages within
-// a thread are fetched lazily from /api/messages/threads/[id] when the
-// host opens it.
-//
-// Composer is disabled in slice 1 (no outbound send capability — that
-// arrives in slice 2). The send button shows a "Coming soon" tooltip
-// and the textarea is read-only. The Koast-AI "K" button stays
-// disabled (slice 3 wires the AI draft path).
+// Slice 1 served threads + messages read-only with the composer
+// disabled. Slice 2 turns send on:
+//   * Composer wired to POST /api/messages/threads/[id]/send.
+//   * Optimistic UI: clientId-tagged temp message inserted immediately
+//     with status='sending', flips to 'sent' on success or 'failed'
+//     with retry button on error.
+//   * Mark-read: opening a thread fires POST /api/messages/threads/[id]/mark-read
+//     and zeroes the local unread badge in the same React render.
+//   * Content-filter preview: Airbnb-channel composer surfaces a
+//     non-blocking warning when the body contains a phone number,
+//     email, or URL (Airbnb's anti-disintermediation auto-filters).
+//   * Closed BDC threads: composer renders normally; failures surface
+//     via the optimistic-failed state. No special pre-send gate.
 //
 // thread_kind badges (per MESSAGING_DESIGN §F.4):
 //   - 'inquiry' → neutral badge "Inquiry"
-//   - 'reservation_request' → orange badge "Reservation request"
+//   - 'reservation_request' → amber badge "Reservation request"
 //   - 'message' → no badge (default)
+//
+// The Koast-AI "K" button stays disabled (slice 3 wires AI drafts).
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Send, Phone, MoreHorizontal, MessageCircle, User } from "lucide-react";
+import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle } from "lucide-react";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
 
 // ============ Types ============
@@ -63,6 +70,8 @@ interface MessageRow {
   read_at: string | null;
   channex_inserted_at: string | null;
   created_at: string;
+  // Optimistic-UI state — only set on temp rows. Slice 2.
+  __optimistic?: { status: "sending" | "sent" | "failed"; clientId: string; error?: string };
 }
 
 interface PropertyInfo {
@@ -150,12 +159,20 @@ function timeOfDay(dateStr: string): string {
 
 // ============ Main ============
 
-export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps) {
+export default function UnifiedInbox({ threads: initialThreads, properties }: UnifiedInboxProps) {
+  const [threads, setThreads] = useState<ThreadRow[]>(initialThreads);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [activeMessages, setActiveMessages] = useState<MessageRow[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  // Per-thread composer state — keyed by thread.id. Stays mounted
+  // when the host switches conversations so half-typed drafts survive.
+  const [composers, setComposers] = useState<Record<string, string>>({});
+  // True while a send is in flight for the current thread — disables the
+  // send button to prevent double-submit (paired with the route-level
+  // in-flight dedup).
+  const [sending, setSending] = useState(false);
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [mounted, setMounted] = useState(false);
@@ -167,10 +184,9 @@ export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps)
     let result = threads;
     if (filter === "unread") result = result.filter((t) => (t.unread_count ?? 0) > 0);
     if (filter === "needs_reply") {
-      // Slice-1 heuristic: thread is "needs reply" when last activity
-      // happened and unread count > 0 (mirrors the reviews "needs
-      // response" semantics). Tightens further in slice 2 once the
-      // outbound send path lands.
+      // Slice-2 heuristic: a thread "needs reply" when the last activity
+      // was inbound (unread > 0). Tighter rule once outbound mark-read
+      // semantics evolve.
       result = result.filter((t) => (t.unread_count ?? 0) > 0);
     }
     if (search) {
@@ -189,7 +205,7 @@ export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps)
     [threads, activeId],
   );
 
-  // Fetch messages on activeId change
+  // Fetch messages on activeId change AND fire mark-read.
   useEffect(() => {
     if (!activeId) { setActiveMessages([]); return; }
     let cancelled = false;
@@ -203,6 +219,15 @@ export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps)
       })
       .catch(() => { if (!cancelled) setActiveMessages([]); })
       .finally(() => { if (!cancelled) setLoadingMessages(false); });
+
+    // Mark-read: optimistic local update first, then fire-and-forget POST.
+    setThreads((prev) => prev.map((t) => t.id === activeId ? { ...t, unread_count: 0 } : t));
+    fetch(`/api/messages/threads/${activeId}/mark-read`, { method: "POST" }).catch((err) => {
+      // Local state stays optimistic; the next sync reconciles. Per
+      // MESSAGING_DESIGN §6.2 + slice-2 brief D.3 edge case.
+      console.warn("[UnifiedInbox] mark-read failed (non-fatal):", err);
+    });
+
     return () => { cancelled = true; };
   }, [activeId]);
 
@@ -214,6 +239,100 @@ export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps)
   }, [activeId, activeMessages.length]);
 
   const activeProperty = activeThread ? propMap.get(activeThread.property_id) : null;
+  const activeComposer = activeId ? (composers[activeId] ?? "") : "";
+
+  const setActiveComposer = useCallback((value: string) => {
+    if (!activeId) return;
+    setComposers((prev) => ({ ...prev, [activeId]: value }));
+  }, [activeId]);
+
+  // Send: optimistic insert → POST → resolve / fail / retry.
+  const sendMessage = useCallback(async (bodyOverride?: string, retryOf?: string) => {
+    if (!activeThread) return;
+    const body = (bodyOverride ?? activeComposer).trim();
+    if (!body) return;
+    if (sending && !retryOf) return; // gate spam-clicks
+
+    setSending(true);
+    const clientId = retryOf ?? `tmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Optimistic temp message — appears immediately in the thread.
+    if (!retryOf) {
+      const tempMsg: MessageRow = {
+        id: clientId,
+        thread_id: activeThread.id,
+        channex_message_id: null,
+        direction: "outbound",
+        sender: "property",
+        sender_name: "Host",
+        content: body,
+        attachments: [],
+        read_at: null,
+        channex_inserted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        __optimistic: { status: "sending", clientId },
+      };
+      setActiveMessages((prev) => [...prev, tempMsg]);
+      setComposers((prev) => ({ ...prev, [activeThread.id]: "" }));
+    } else {
+      // Retry — flip the existing failed row back to sending.
+      setActiveMessages((prev) => prev.map((m) =>
+        m.__optimistic?.clientId === retryOf
+          ? { ...m, __optimistic: { status: "sending", clientId } }
+          : m,
+      ));
+    }
+
+    try {
+      const res = await fetch(`/api/messages/threads/${activeThread.id}/send`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errText = data?.channex_body
+          ? extractChannexError(data.channex_body) ?? data?.error ?? "Send failed"
+          : data?.error ?? `Send failed (${res.status})`;
+        setActiveMessages((prev) => prev.map((m) =>
+          m.__optimistic?.clientId === clientId
+            ? { ...m, __optimistic: { status: "failed", clientId, error: errText } }
+            : m,
+        ));
+        return;
+      }
+
+      // Success — replace the temp row with the real one returned
+      // from the route. The webhook echo a few seconds later is a
+      // no-op upsert (channex_message_id matches).
+      const real = data.message as MessageRow;
+      setActiveMessages((prev) => prev.map((m) =>
+        m.__optimistic?.clientId === clientId
+          ? { ...real, __optimistic: { status: "sent", clientId } }
+          : m,
+      ));
+      // Bump the thread's last-activity in the inbox list.
+      setThreads((prev) => prev.map((t) =>
+        t.id === activeThread.id
+          ? { ...t, last_message_received_at: real.channex_inserted_at, last_message_preview: body.slice(0, 200), message_count: (t.message_count ?? 0) + 1 }
+          : t,
+      ));
+    } catch (err) {
+      const errText = err instanceof Error ? err.message : "Network error";
+      setActiveMessages((prev) => prev.map((m) =>
+        m.__optimistic?.clientId === clientId
+          ? { ...m, __optimistic: { status: "failed", clientId, error: errText } }
+          : m,
+      ));
+    } finally {
+      setSending(false);
+    }
+  }, [activeThread, activeComposer, sending]);
+
+  const retrySend = useCallback((failedMsg: MessageRow) => {
+    if (!failedMsg.__optimistic) return;
+    void sendMessage(failedMsg.content, failedMsg.__optimistic.clientId);
+  }, [sendMessage]);
 
   return (
     <div className="flex h-full bg-white" style={{ borderTop: "1px solid var(--dry-sand)" }}>
@@ -239,11 +358,47 @@ export default function UnifiedInbox({ threads, properties }: UnifiedInboxProps)
         loading={loadingMessages}
         threadScrollRef={threadScrollRef}
         mounted={mounted}
+        composer={activeComposer}
+        setComposer={setActiveComposer}
+        onSend={() => void sendMessage()}
+        onRetry={retrySend}
+        sending={sending}
       />
 
       <GuestContextPanel thread={activeThread} property={activeProperty ?? null} mounted={mounted} />
     </div>
   );
+}
+
+// ============ Helpers (Phase C content filter + error parse) ============
+
+const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/;
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+const URL_RE = /\b(?:https?:\/\/|www\.|[\w-]+\.(?:com|net|org|io|co|app|me|us|uk))\b/i;
+
+function detectFilteredContent(body: string): { phone: boolean; email: boolean; url: boolean; any: boolean } {
+  const phone = PHONE_RE.test(body);
+  const email = EMAIL_RE.test(body);
+  const url = URL_RE.test(body);
+  return { phone, email, url, any: phone || email || url };
+}
+
+function extractChannexError(channexBody: unknown): string | null {
+  if (!channexBody) return null;
+  if (typeof channexBody === "string") return channexBody.slice(0, 200);
+  if (typeof channexBody === "object") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj = channexBody as any;
+    if (obj.errors) {
+      if (Array.isArray(obj.errors)) {
+        return obj.errors.map((e: unknown) => typeof e === "string" ? e : JSON.stringify(e)).join("; ").slice(0, 200);
+      }
+      return JSON.stringify(obj.errors).slice(0, 200);
+    }
+    if (obj.error) return String(obj.error).slice(0, 200);
+    if (obj.message) return String(obj.message).slice(0, 200);
+  }
+  return null;
 }
 
 // ============ Left: Conversation list ============
@@ -414,12 +569,18 @@ function ConversationItem({ t, active, index, onSelect }: {
 
 function ThreadColumn({
   thread, messages, loading, threadScrollRef, mounted,
+  composer, setComposer, onSend, onRetry, sending,
 }: {
   thread: ThreadRow | null;
   messages: MessageRow[];
   loading: boolean;
   threadScrollRef: React.RefObject<HTMLDivElement>;
   mounted: boolean;
+  composer: string;
+  setComposer: (v: string) => void;
+  onSend: () => void;
+  onRetry: (msg: MessageRow) => void;
+  sending: boolean;
 }) {
   const messagesByDay = useMemo(() => {
     const groups: { label: string; messages: MessageRow[] }[] = [];
@@ -491,7 +652,7 @@ function ThreadColumn({
               <DateDivider label={group.label} />
               <div className="mt-3 space-y-3">
                 {group.messages.map((msg) => (
-                  <MessageBubble key={msg.id} msg={msg} platform={platform} />
+                  <MessageBubble key={msg.__optimistic?.clientId ?? msg.id} msg={msg} platform={platform} onRetry={onRetry} />
                 ))}
               </div>
             </div>
@@ -499,7 +660,10 @@ function ThreadColumn({
         )}
       </div>
 
-      {/* Compose bar — DISABLED in slice 1. Outbound send arrives in slice 2. */}
+      {/* Content filter warning (Airbnb only — anti-disintermediation) */}
+      <ContentFilterWarning composer={composer} platform={thread.platform} />
+
+      {/* Compose bar — slice 2. Optimistic UI; failures surface inline on the bubble (see MessageBubble). */}
       <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid var(--dry-sand)" }}>
         <div className="px-4 py-3 flex items-end gap-2">
           <button type="button" disabled
@@ -511,31 +675,80 @@ function ThreadColumn({
               opacity: 0.45, cursor: "not-allowed",
               boxShadow: "0 2px 8px rgba(196,154,90,0.25)",
             }}
-            title="Koast AI — coming soon"
+            title="Koast AI — coming in slice 3"
           >
             K
           </button>
           <textarea
-            readOnly placeholder="Read-only in slice 1 — sending arrives soon."
+            value={composer}
+            onChange={(e) => setComposer(e.target.value)}
+            placeholder="Type a message…"
             rows={1}
-            className="flex-1 outline-none resize-none cursor-not-allowed"
+            className="flex-1 outline-none transition-all resize-none"
             style={{
               padding: "11px 14px", border: "1.5px solid var(--dry-sand)", borderRadius: 12,
-              fontSize: 13, fontWeight: 500, color: "var(--tideline)",
-              backgroundColor: "rgba(237,231,219,0.4)",
-              minHeight: 44, fontFamily: "inherit",
+              fontSize: 13, fontWeight: 500, color: "var(--coastal)",
+              backgroundColor: "rgba(255,255,255,0.7)",
+              minHeight: 44, maxHeight: 160, fontFamily: "inherit",
             }}
-            title="Coming soon"
+            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--golden)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dry-sand)"; e.currentTarget.style.boxShadow = ""; }}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = Math.min(160, el.scrollHeight) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setComposer("");
+                return;
+              }
+              const sendCombo = e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey);
+              if (sendCombo) {
+                e.preventDefault();
+                onSend();
+              }
+            }}
           />
-          <button type="button" disabled
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!composer.trim() || sending}
             className="flex items-center justify-center flex-shrink-0 self-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "var(--coastal)", color: "var(--shore)" }}
-            title="Coming soon"
+            title={sending ? "Sending…" : "Send"}
           >
             <Send size={15} strokeWidth={2} />
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ContentFilterWarning({ composer, platform }: { composer: string; platform: string }) {
+  if (platform !== "airbnb") return null;
+  const detection = detectFilteredContent(composer);
+  if (!detection.any) return null;
+  const matched = [
+    detection.phone && "phone numbers",
+    detection.email && "emails",
+    detection.url && "external links",
+  ].filter(Boolean).join(", ");
+  return (
+    <div
+      className="flex-shrink-0 px-4 py-2 flex items-start gap-2"
+      style={{
+        backgroundColor: "rgba(212,150,11,0.08)",
+        borderTop: "1px solid rgba(212,150,11,0.18)",
+        color: "var(--amber-tide)",
+      }}
+    >
+      <AlertTriangle size={13} strokeWidth={2} style={{ marginTop: 2, flexShrink: 0 }} />
+      <p className="text-[12px] leading-[1.4]">
+        Airbnb may filter {matched} from this message. Send anyway if needed.
+      </p>
     </div>
   );
 }
@@ -550,13 +763,19 @@ function DateDivider({ label }: { label: string }) {
   );
 }
 
-function MessageBubble({ msg, platform }: {
+function MessageBubble({ msg, platform, onRetry }: {
   msg: MessageRow;
   platform: { name: string; color: string; colorLight: string; icon: string } | null;
+  onRetry: (msg: MessageRow) => void;
 }) {
   const isInbound = msg.direction === "inbound";
   const attribution = isInbound && platform ? `via ${platform.name}` : null;
   const ts = msg.channex_inserted_at ?? msg.created_at;
+  const status = msg.__optimistic?.status;
+  // Visual: muted bubble while sending, coral border + retry on failed.
+  const bubbleOpacity = status === "sending" ? 0.55 : 1;
+  const bubbleBorder = status === "failed" ? "1.5px solid var(--coral-reef)" : "none";
+
   return (
     <div className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
       <div className="max-w-[70%] flex flex-col" style={{ alignItems: isInbound ? "flex-start" : "flex-end" }}>
@@ -567,15 +786,45 @@ function MessageBubble({ msg, platform }: {
             color: isInbound ? "var(--coastal)" : "var(--shore)",
             boxShadow: isInbound ? "var(--shadow-card)" : "none",
             fontSize: 13, lineHeight: 1.45,
+            opacity: bubbleOpacity,
+            border: bubbleBorder,
+            transition: "opacity 0.2s ease-out",
           }}
         >
           <p className="whitespace-pre-wrap">{msg.content}</p>
         </div>
-        <div className="text-[10px] mt-1 flex items-center gap-1.5" style={{ color: "var(--tideline)" }}>
+        <div className="text-[10px] mt-1 flex items-center gap-1.5 flex-wrap justify-end" style={{ color: "var(--tideline)" }}>
           <span>{timeOfDay(ts)}</span>
           {attribution && <span>· {attribution}</span>}
-          {!isInbound && <span>· Sent</span>}
+          {!isInbound && status === "sending" && <span>· Sending…</span>}
+          {!isInbound && (status === "sent" || !status) && <span>· Sent</span>}
+          {!isInbound && status === "failed" && (
+            <>
+              <span style={{ color: "var(--coral-reef)" }}>· Failed</span>
+              <button
+                type="button"
+                onClick={() => onRetry(msg)}
+                className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-md transition-colors"
+                style={{
+                  backgroundColor: "rgba(196,64,64,0.08)",
+                  color: "var(--coral-reef)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  border: "1px solid rgba(196,64,64,0.2)",
+                }}
+                title={msg.__optimistic?.error ?? "Retry"}
+              >
+                <RotateCcw size={9} strokeWidth={2} />
+                Retry
+              </button>
+            </>
+          )}
         </div>
+        {!isInbound && status === "failed" && msg.__optimistic?.error && (
+          <p className="text-[10px] mt-1 max-w-[280px] text-right" style={{ color: "var(--coral-reef)" }}>
+            {msg.__optimistic.error}
+          </p>
+        )}
       </div>
     </div>
   );

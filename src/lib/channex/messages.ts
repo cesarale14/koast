@@ -165,6 +165,48 @@ async function channexPut<T = unknown>(path: string, body: unknown, cfg?: Messag
   return parsed as T;
 }
 
+/**
+ * MSG-S2 — Channex error type that surfaces both HTTP status and the
+ * raw Channex error envelope. The send route surfaces these to the
+ * UI verbatim so hosts see why a send failed (e.g. "thread closed",
+ * "content rejected by Airbnb").
+ */
+export class ChannexSendError extends Error {
+  status: number;
+  body: unknown;
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "ChannexSendError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+async function channexPost<T = unknown>(path: string, body: unknown, cfg?: MessagingClientConfig): Promise<T> {
+  const { apiKey, baseUrl } = resolveConfig(cfg);
+  const url = `${baseUrl}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "user-api-key": apiKey,
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: unknown = null;
+  try { parsed = text ? JSON.parse(text) : null; } catch { /* keep raw */ }
+  if (!res.ok) {
+    throw new ChannexSendError(
+      `Channex POST ${path} ${res.status}: ${text.slice(0, 300)}`,
+      res.status,
+      parsed ?? text,
+    );
+  }
+  return parsed as T;
+}
+
 // ---------------- Threads ----------------
 
 /**
@@ -301,22 +343,73 @@ export async function updateWebhook(
   return res.data;
 }
 
-// ---------------- Slice 2+ stubs (forward-compat) ----------------
+// ---------------- Send (slice 2) ----------------
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/**
+ * POST /message_threads/:id/messages
+ *
+ * Body shape mirrors the reviews POST pattern (`{review: {…}}` for
+ * /reviews/:id/reply, /reviews/:id/guest_review). For messages the
+ * wrapper is `{message: {message: <text>}}`. Channex's docs are
+ * `D` (documented but unprobed) for this endpoint per
+ * channex-expert/endpoint-reference.md:247; the shape was confirmed
+ * against the live Channex production at MSG-S2 commit time.
+ *
+ * Errors surface via ChannexSendError, which carries the parsed
+ * Channex body so the route can pass meaningful failure text to
+ * the UI (e.g. BDC "thread closed", Airbnb content-filter rejection).
+ *
+ * No idempotency-key header is supported by Channex on this endpoint
+ * (per skill silence + probe). The route layer protects against
+ * client double-submit via in-flight dedup.
+ */
 export async function sendMessage(
-  _threadId: string,
-  _body: { message: string; attachments?: ChannexAttachment[] },
-  _cfg?: MessagingClientConfig,
+  threadId: string,
+  body: string,
+  cfg?: MessagingClientConfig,
 ): Promise<ChannexMessageEntity> {
-  throw new Error("sendMessage not implemented in slice 1 — see MESSAGING_DESIGN.md §8 slice 2");
+  const res = await channexPost<{ data?: ChannexMessageEntity }>(
+    `/message_threads/${threadId}/messages`,
+    { message: { message: body } },
+    cfg,
+  );
+  if (!res.data) {
+    throw new ChannexSendError("Channex POST /messages returned no data", 200, res);
+  }
+  return res.data;
 }
 
+/**
+ * Channex does not document a thread-level mark-read endpoint, and
+ * messages don't have a server-side read state in the entity probe
+ * (no `is_read` / `read_at` field). Read state is Koast-side
+ * bookkeeping only.
+ *
+ * This stub is here to keep the API surface complete for slice 3+
+ * (in case Channex adds the endpoint, or for per-message PATCH if
+ * we ever want cross-device sync). For slice 2 the route updates
+ * the local DB and skips Channex entirely. See PHASE B.2 in the
+ * MSG-S2 brief.
+ */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+export async function markThreadRead(
+  _threadId: string,
+  _cfg?: MessagingClientConfig,
+): Promise<{ ok: true; channex_called: false }> {
+  // No-op — Channex doesn't expose mark-read on /message_threads.
+  // Documented as a follow-up question in MSG-S2 commit body.
+  return { ok: true, channex_called: false };
+}
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+// ---------------- Slice 3+ stubs (forward-compat) ----------------
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export async function closeThread(
   _threadId: string,
   _cfg?: MessagingClientConfig,
 ): Promise<void> {
-  throw new Error("closeThread not implemented in slice 1 — see MESSAGING_DESIGN.md §8 slice 3");
+  throw new Error("closeThread not implemented in slice 2 — see MESSAGING_DESIGN.md §8 slice 3");
 }
 
 // BDC-only — POST /message_threads/:id/no_reply_needed satisfies BDC's
@@ -325,6 +418,7 @@ export async function markThreadNoReplyNeeded(
   _threadId: string,
   _cfg?: MessagingClientConfig,
 ): Promise<void> {
-  throw new Error("markThreadNoReplyNeeded not implemented in slice 1 — see MESSAGING_DESIGN.md §8 slice 3");
+  throw new Error("markThreadNoReplyNeeded not implemented in slice 2 — see MESSAGING_DESIGN.md §8 slice 3");
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 /* eslint-enable @typescript-eslint/no-unused-vars */

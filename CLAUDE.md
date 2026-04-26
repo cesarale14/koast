@@ -133,7 +133,7 @@ PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden
 
 **Co-located parcel:** both properties share `4105 N Jamaica St, Tampa, FL 33614`. Cozy Loft is a 1BR back unit of the Villa Jamaica main house — same physical parcel, different rentable units. Multi-unit modeling (`parent_property_id`, shared amenities/photos/location) is deferred — see Known Data Quality Issues.
 
-**Airbnb OAuth:** currently disconnected from Channex. Reconnect when PMS is ready for production.
+**Airbnb OAuth:** connected (verified MSG-S2-PRE 2026-04-26: `settings.token_invalid=false`, fresh access+refresh tokens, channel `updated_at` recent). Channex pushes `disconnected_channel` webhook events on token failure; the messaging surface logs them but the dedicated `channel_health` table + reconnect banners are still planned (not yet built — see "Channel health monitoring" below). Re-verify via `GET /channels?filter[property_id]=…` if a host reports send failures.
 
 ---
 
@@ -376,7 +376,7 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - **Dashboard greeting** — may still show auth username instead of display name on some paths.
 - **Channel health monitoring** — no `channel_health` table, no 5-minute worker, no disconnect alert banners.
 - **Auto-apply pricing** — toggle dimmed ("Coming soon"). Unlock after ≥14 days of validation data.
-- **Airbnb OAuth** — disconnected from Channex; reconnect when ready.
+- **Airbnb OAuth** — connected as of 2026-04-22 (re-verified MSG-S2-PRE 2026-04-26). See the "Active Properties" Airbnb OAuth note above for the canonical state.
 - **Google OAuth** — button on login, needs Supabase Google-provider config.
 
 ---
@@ -491,7 +491,7 @@ What Koast has that competitors don't.
 - Commission Koast logo.
 - Channel health monitoring worker + `channel_health` table + disconnect banners.
 - Onboarding polish: signup → connect → first property in 3 minutes.
-- Reconnect Airbnb OAuth (Villa Jamaica + Cozy Loft).
+- ~~Reconnect Airbnb OAuth (Villa Jamaica + Cozy Loft).~~ Done 2026-04-22 (re-verified MSG-S2-PRE).
 - First `brand-*` → Koast-token migration sweep (start with the 17 files touching `bg-brand-500`).
 
 ### Phase 2 — Intelligence layer (4 weeks)
