@@ -13,7 +13,6 @@ import {
   listThreads,
   listMessages,
   channelCodeFromProvider,
-  deriveBookingLinkFromThread,
   type MessageThreadEntity,
   type ChannexMessageEntity,
 } from "@/lib/channex/messages";
@@ -65,9 +64,9 @@ export async function syncMessagesForOneProperty(
   const { data: existingThreads } = await (supabase.from("message_threads") as any)
     .select("id, channex_thread_id")
     .in("channex_thread_id", incomingIds.length > 0 ? incomingIds : ["__none__"]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingThreadRows = (existingThreads ?? []) as Array<{ id: string; channex_thread_id: string }>;
   const existingThreadByChannexId = new Map<string, string>(
-    ((existingThreads as any[] | null) ?? []).map((r) => [r.channex_thread_id, r.id]),
+    existingThreadRows.map((r) => [r.channex_thread_id, r.id]),
   );
 
   for (const thread of threads) {

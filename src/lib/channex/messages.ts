@@ -303,6 +303,7 @@ export async function updateWebhook(
 
 // ---------------- Slice 2+ stubs (forward-compat) ----------------
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export async function sendMessage(
   _threadId: string,
   _body: { message: string; attachments?: ChannexAttachment[] },
@@ -326,3 +327,4 @@ export async function markThreadNoReplyNeeded(
 ): Promise<void> {
   throw new Error("markThreadNoReplyNeeded not implemented in slice 1 — see MESSAGING_DESIGN.md §8 slice 3");
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
