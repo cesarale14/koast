@@ -109,6 +109,14 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_bookings_property_checkin").on(t.propertyId, t.checkIn),
+  // PG-PARTIAL-FIX (2026-04-26): the live constraint is named
+  // bookings_channex_booking_id_key (full UNIQUE, no WHERE),
+  // replacing the original partial idx_bookings_channex_booking_id
+  // from migration 002. Drizzle's uniqueIndex() without .where()
+  // generates a non-partial index, so this declaration matches the
+  // current DB shape — same name preserved for continuity. See
+  // koast-development/conventions.md "Database conventions —
+  // partial indexes" for why partial UNIQUE breaks PostgREST upserts.
   uniqueIndex("idx_bookings_channex_booking_id").on(t.channexBookingId),
 ]);
 
