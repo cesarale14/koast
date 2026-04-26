@@ -20,9 +20,20 @@ const DEFAULT_BASE_URL = "https://app.channex.io/api/v1";
 
 export type ChannelCode = "abb" | "bdc" | "unknown";
 
+export interface LastMessageObject {
+  message?: string | null;
+  sender?: string | null;
+  inserted_at?: string | null;
+  attachments?: unknown[] | null;
+}
+
 export interface MessageThreadAttrs {
   title: string | null;
-  last_message: string | null;
+  // Channex returns this as an OBJECT (not a string) — keys mirror
+  // the per-message entity. Probe-confirmed 2026-04-26 across both
+  // AirBNB + BookingCom threads. Always extract `.message` for the
+  // text preview before persisting.
+  last_message: LastMessageObject | string | null;
   last_message_received_at: string;
   inserted_at: string;
   updated_at: string;
@@ -31,6 +42,14 @@ export interface MessageThreadAttrs {
   provider: string;                                 // 'AirBNB' | 'BookingCom' | …
   ota_message_thread_id: string | null;
   meta?: Record<string, unknown> | null;
+}
+
+// Normalize Channex's last_message (object or legacy string) to the
+// plain text preview Koast persists in message_threads.last_message_preview.
+export function lastMessagePreview(lm: LastMessageObject | string | null | undefined): string | null {
+  if (!lm) return null;
+  if (typeof lm === "string") return lm;
+  return lm.message ?? null;
 }
 
 export interface MessageThreadRels {

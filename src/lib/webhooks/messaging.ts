@@ -18,6 +18,7 @@ import {
   fetchThread,
   channelCodeFromProvider,
   deriveBookingLinkFromThread,
+  lastMessagePreview,
   type MessageThreadEntity,
 } from "@/lib/channex/messages";
 
@@ -262,7 +263,7 @@ export function buildThreadRowFromChannex(
     channel_code: channelCodeFromProvider(a.provider),
     provider_raw: a.provider,
     title: a.title,
-    last_message_preview: a.last_message,
+    last_message_preview: lastMessagePreview(a.last_message),
     last_message_received_at: a.last_message_received_at,
     message_count: a.message_count ?? 0,
     is_closed: !!a.is_closed,
@@ -358,7 +359,7 @@ async function refreshThreadFromChannex(supabase: SupaAny, localThreadId: string
   await (supabase.from("message_threads") as any)
     .update({
       title: a.title,
-      last_message_preview: a.last_message,
+      last_message_preview: lastMessagePreview(a.last_message),
       last_message_received_at: a.last_message_received_at,
       message_count: a.message_count ?? 0,
       is_closed: !!a.is_closed,
