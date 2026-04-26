@@ -866,7 +866,7 @@ function FieldNumeric({
         style={{
           display: "flex",
           alignItems: "center",
-          border: error ? "1px solid var(--coral-reef)" : "1px solid #E5E2DC",
+          border: error ? "1px solid var(--coral-reef)" : "1px solid var(--hairline)",
           borderRadius: 10,
           padding: "0 12px",
           height: 38,
@@ -1349,7 +1349,7 @@ function AccuracyChart({ performance }: { performance: PerformanceSummary | null
         ctx.lineTo(pad.l + W, yy);
         ctx.stroke();
       }
-      drawLine(suggested, "var(--coastal)".includes("var") ? "#17392A" : "var(--coastal)", p);
+      drawLine(suggested, "#17392A", p);
       drawLine(applied, "#C49A5A", p);
       drawLine(actual, "#1A7A5A", p);
       if (p < 1) rafId = requestAnimationFrame(frame);

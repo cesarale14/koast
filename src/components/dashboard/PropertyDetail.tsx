@@ -8,17 +8,20 @@ import {
   Home,
   Settings,
   X,
-  Minus,
-  Plus,
   AlertTriangle,
-  Check,
-  Sparkles,
   ArrowLeft,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import PolishCalendarView from "@/components/polish/CalendarView";
 import PolishPricingTab from "@/components/polish/PricingTab";
+import KoastSegmentedControl from "@/components/polish/KoastSegmentedControl";
+import KoastCard from "@/components/polish/KoastCard";
+import KoastChip from "@/components/polish/KoastChip";
+import KoastButton from "@/components/polish/KoastButton";
+import StatusDot from "@/components/polish/StatusDot";
+import KoastEmptyState from "@/components/polish/KoastEmptyState";
+import { Field, TextInput, Stepper } from "@/components/ui/FormControls";
 import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 import BookingComConnect from "./BookingComConnect";
 import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
@@ -198,13 +201,6 @@ export default function PropertyDetail({
 
   return (
     <div className="pb-12">
-      <style jsx global>{`
-        @keyframes koast-fade-up-pd { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes koast-hero-in { from { opacity: 0; } to { opacity: 1; } }
-        .pd-anim { opacity: 0; animation: koast-fade-up-pd 0.55s ease-out forwards; }
-        .pd-hero { opacity: 0; animation: koast-hero-in 0.6s ease-out 200ms forwards; }
-      `}</style>
-
       <HeroSection
         property={property}
         connectedPlatforms={connectedPlatforms}
@@ -407,26 +403,9 @@ function HeroSection({
           );
         })}
         {!bdcConnected && (
-          <button
-            type="button"
-            onClick={onConnectBdc}
-            className="text-[11px] font-semibold transition-colors"
-            style={{
-              padding: "7px 12px",
-              borderRadius: 8,
-              backgroundColor: "var(--coastal)",
-              color: "var(--shore)",
-              border: "1px solid rgba(255,255,255,0.1)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--mangrove)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--coastal)";
-            }}
-          >
+          <KoastButton variant="primary" size="sm" onClick={onConnectBdc}>
             Connect listing
-          </button>
+          </KoastButton>
         )}
       </div>
     </div>
@@ -435,6 +414,12 @@ function HeroSection({
 
 // ============ Tab bar ============
 
+const TAB_OPTIONS = [
+  { value: "Overview", label: "Overview" },
+  { value: "Calendar", label: "Calendar" },
+  { value: "Pricing", label: "Pricing" },
+];
+
 function TabBar({
   tab,
   onChange,
@@ -442,7 +427,6 @@ function TabBar({
   tab: "Overview" | "Calendar" | "Pricing";
   onChange: (t: "Overview" | "Calendar" | "Pricing") => void;
 }) {
-  const tabs: ("Overview" | "Calendar" | "Pricing")[] = ["Overview", "Calendar", "Pricing"];
   return (
     <div
       className="pd-anim"
@@ -453,56 +437,12 @@ function TabBar({
         animationDelay: "200ms",
       }}
     >
-      <div
-        role="tablist"
-        style={{
-          display: "inline-flex",
-          gap: 4,
-          padding: 4,
-          borderRadius: 999,
-          background: "#F5F1E8",
-        }}
-      >
-      {tabs.map((t) => {
-        const active = tab === t;
-        return (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={active}
-            type="button"
-            onClick={() => onChange(t)}
-            style={{
-              padding: "8px 18px",
-              borderRadius: 999,
-              border: "none",
-              background: active ? "#fff" : "transparent",
-              color: active ? "var(--coastal)" : "var(--tideline)",
-              fontSize: 13,
-              fontWeight: active ? 600 : 500,
-              letterSpacing: "-0.005em",
-              cursor: "pointer",
-              boxShadow: active ? "0 1px 3px rgba(19,46,32,0.08)" : "none",
-              transition: "background-color 160ms cubic-bezier(0.4,0,0.2,1), color 160ms cubic-bezier(0.4,0,0.2,1), box-shadow 160ms cubic-bezier(0.4,0,0.2,1)",
-            }}
-            onMouseEnter={(e) => {
-              if (!active) {
-                e.currentTarget.style.background = "rgba(23,57,42,0.04)";
-                e.currentTarget.style.color = "var(--coastal)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!active) {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "var(--tideline)";
-              }
-            }}
-          >
-            {t}
-          </button>
-        );
-      })}
-      </div>
+      <KoastSegmentedControl
+        options={TAB_OPTIONS}
+        value={tab}
+        onChange={(v) => onChange(v as "Overview" | "Calendar" | "Pricing")}
+        ariaLabel="Property views"
+      />
     </div>
   );
 }
@@ -561,16 +501,14 @@ function StatusBanner({
   const isTurnover = !!cleaningToday;
   const isOccupied = !!currentBooking && !isTurnover;
 
-  let tone: "lagoon" | "golden" | "amber-tide" = "golden";
+  let tone: "ok" | "warn" | "muted" = "muted";
   let title = "Vacant";
   let subtitle: string | null = null;
-  let icon: React.ReactNode = null;
   let guestName: string | null = null;
   let platformKey: PlatformKey | null = null;
 
   if (isTurnover && cleaningToday) {
-    tone = "amber-tide";
-    icon = <Sparkles size={18} strokeWidth={2} />;
+    tone = "warn";
     const statusLabel =
       cleaningToday.status === "completed"
         ? "Completed"
@@ -584,8 +522,7 @@ function StatusBanner({
       : "Turnover today — no cleaner assigned";
     subtitle = `Status: ${statusLabel}`;
   } else if (isOccupied && currentBooking) {
-    tone = "lagoon";
-    icon = <Check size={18} strokeWidth={2.5} />;
+    tone = "ok";
     guestName = currentBooking.guest_name ?? "Guest";
     platformKey = platformKeyFrom(currentBooking.platform);
     const days = Math.max(
@@ -603,8 +540,7 @@ function StatusBanner({
     title = `${firstNameLastInitial(guestName)} is checked in`;
     subtitle = `${shortDate(currentBooking.check_in)} – ${shortDate(currentBooking.check_out)} · checkout in ${days} day${days === 1 ? "" : "s"}`;
   } else if (nextBooking) {
-    tone = "golden";
-    icon = <AlertTriangle size={18} strokeWidth={2} />;
+    tone = "muted";
     const days = Math.max(
       0,
       Math.round(
@@ -622,61 +558,42 @@ function StatusBanner({
     title = `Vacant — next check-in ${shortDate(nextBooking.check_in)}`;
     subtitle = `${firstNameLastInitial(guestName)} · ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}`;
   } else {
+    tone = "muted";
     title = "Vacant";
     subtitle = "No upcoming bookings";
   }
 
-  const toneColor = `var(--${tone})`;
-
   return (
-    <div
-      className="pd-anim flex items-center gap-4 p-4 rounded-[14px]"
-      style={{
-        backgroundColor: "#fff",
-        borderLeft: `4px solid ${toneColor}`,
-        boxShadow: "var(--shadow-card)",
-        animationDelay: "400ms",
-      }}
+    <KoastCard
+      variant="elevated"
+      className="pd-anim"
+      style={{ animationDelay: "400ms", display: "flex", alignItems: "center", gap: 16 }}
     >
-      <div
-        className="flex items-center justify-center flex-shrink-0"
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          backgroundColor:
-            tone === "lagoon"
-              ? "rgba(26,122,90,0.12)"
-              : tone === "amber-tide"
-              ? "rgba(212,150,11,0.12)"
-              : "rgba(196,154,90,0.12)",
-          color: toneColor,
-        }}
-      >
-        {icon}
-      </div>
+      <StatusDot tone={tone} size={10} halo />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[14px] font-bold" style={{ color: "var(--coastal)" }}>
             {title}
           </span>
           {platformKey && (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 rounded text-[10px] font-semibold"
+            <KoastChip
+              variant="neutral"
+              iconLeft={
+                <Image
+                  src={PLATFORMS[platformKey].icon}
+                  alt={PLATFORMS[platformKey].name}
+                  width={12}
+                  height={12}
+                />
+              }
               style={{
-                height: 18,
-                backgroundColor: PLATFORMS[platformKey].colorLight,
                 color: PLATFORMS[platformKey].color,
+                background: PLATFORMS[platformKey].colorLight,
+                border: "none",
               }}
             >
-              <Image
-                src={PLATFORMS[platformKey].icon}
-                alt={PLATFORMS[platformKey].name}
-                width={10}
-                height={10}
-              />
               {PLATFORMS[platformKey].name}
-            </span>
+            </KoastChip>
           )}
         </div>
         {subtitle && (
@@ -685,7 +602,7 @@ function StatusBanner({
           </div>
         )}
       </div>
-    </div>
+    </KoastCard>
   );
 }
 
@@ -776,9 +693,10 @@ function UpcomingBookings({ bookings }: { bookings: Booking[] }) {
         style={{ boxShadow: "var(--shadow-card)" }}
       >
         {bookings.length === 0 ? (
-          <div className="p-8 text-center text-[13px]" style={{ color: "var(--tideline)" }}>
-            No upcoming bookings yet.
-          </div>
+          <KoastEmptyState
+            title="No upcoming bookings"
+            body="When guests book this property, their stays will show up here."
+          />
         ) : (
           bookings.map((b, i) => {
             const platformKey = platformKeyFrom(b.platform);
@@ -876,9 +794,10 @@ function ChannelPerformance({
         style={{ boxShadow: "var(--shadow-card)" }}
       >
         {entries.length === 0 ? (
-          <div className="text-[13px]" style={{ color: "var(--tideline)" }}>
-            No channel revenue yet. Connect a channel to start syncing bookings.
-          </div>
+          <KoastEmptyState
+            title="No channel revenue yet"
+            body="Connect a channel to start syncing bookings."
+          />
         ) : (
           <div className="space-y-4">
             {entries.map((entry) => {
@@ -1310,106 +1229,3 @@ function PropertySettingsModal({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label
-        className="block text-[10px] font-bold tracking-[0.06em] uppercase mb-1.5"
-        style={{ color: "var(--tideline)" }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function TextInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full outline-none transition-all"
-      style={{
-        padding: "9px 12px",
-        border: "1.5px solid var(--dry-sand)",
-        borderRadius: 10,
-        fontSize: 14,
-        fontWeight: 500,
-        color: "var(--coastal)",
-        backgroundColor: "rgba(255,255,255,0.7)",
-      }}
-      onFocus={(e) => {
-        e.currentTarget.style.borderColor = "var(--golden)";
-        e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)";
-      }}
-      onBlur={(e) => {
-        e.currentTarget.style.borderColor = "var(--dry-sand)";
-        e.currentTarget.style.boxShadow = "";
-      }}
-    />
-  );
-}
-
-function Stepper({
-  value,
-  onChange,
-  min = 0,
-  step = 1,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  min?: number;
-  step?: number;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(min, value - step))}
-        className="flex items-center justify-center transition-colors"
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 7,
-          border: "1px solid var(--dry-sand)",
-          backgroundColor: "#fff",
-          color: "var(--coastal)",
-        }}
-      >
-        <Minus size={14} />
-      </button>
-      <div
-        className="flex-1 text-center text-[14px] font-bold tabular-nums"
-        style={{ color: "var(--coastal)" }}
-      >
-        {value}
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(value + step)}
-        className="flex items-center justify-center transition-colors"
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 7,
-          border: "1px solid var(--dry-sand)",
-          backgroundColor: "#fff",
-          color: "var(--coastal)",
-        }}
-      >
-        <Plus size={14} />
-      </button>
-    </div>
-  );
-}

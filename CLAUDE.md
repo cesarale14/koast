@@ -38,7 +38,8 @@ A multi-session polish pass rebuilt the core UI surfaces. Every session is its o
 **Shipped sessions:**
 - **1**: Calendar rebuild + 9 shared primitives under `src/components/polish/` (ac2674c)
 - **1.5**: Booking bar alpha colors + rate delta semantics (e48d9d8 → 7a0345f)
-- **2 / 2.5 / 2.6 / 2.7 / 2.8**: PropertyDetail + Pricing tab rebuild, 1760px container, hero image pipeline, tab strip → segmented pill with URL `?tab=` (45911dd → 4d4ce0a)
+- **2 / 2.5 / 2.6 / 2.7 / 2.8**: PropertyDetail + Pricing tab rebuild, 1760px container, hero image pipeline, tab strip restyled to segmented pill (visual only — primitive adoption deferred to PD-V1) with URL `?tab=` (45911dd → 4d4ce0a)
+- **PD-V1**: PropertyDetail visual primitive migration — TabBar → KoastSegmentedControl, StatusBanner → KoastCard+StatusDot+KoastChip, two empty states → KoastEmptyState, Connect-listing button → KoastButton, Field/TextInput/Stepper extracted to `src/components/ui/FormControls.tsx`, entrance keyframes moved to globals.css, new `--shore-soft` and `--hairline` tokens, dead-code ternary in PricingTab AccuracyChart removed
 - **3 / 3.5 / 3.6 / 3.7 / 3.8 / 3.9**: Dashboard rebuild to "Quiet" design direction with Fraunces greeting + HandwrittenGreeting animation + mobile responsive (3148768 → 5d4f5f0)
 - **4 / 4.5**: Top bar command palette + PlatformPills on property cards (3791e1a → c00d6f7)
 - **5.5**: Unified platform tiles across Dashboard + Properties (0766720)

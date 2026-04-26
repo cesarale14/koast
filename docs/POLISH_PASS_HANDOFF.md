@@ -55,6 +55,7 @@ Every session is a separate commit on `main`. The arc:
 | — | `b44410f` | **Pre-Session-5a hardening**: `/api/pricing/apply` now multi-channel + writes `calendar_rates` + backfill SQL |
 | 5a | `8b5e93d` | Calendar Month Grid rebuild — two-tab sidebar (Pricing / Availability), `/api/calendar/rates` + `/api/calendar/rates/apply` endpoints, six new components under `src/components/polish/calendar/`, hairline indicator on override dates |
 | 5a handoff | `10950d1` | `docs/SESSION_5a_HANDOFF.md` |
+| PD-V1 | (this commit) | PropertyDetail visual primitive migration: TabBar adopted KoastSegmentedControl (2.8 had only restyled the hand-rolled version, never adopted the primitive — doc drift corrected), StatusBanner → KoastCard + StatusDot (tones ok/warn/muted; nextBooking shifts golden→muted per Quiet direction) + KoastChip platform pill, UpcomingBookings + ChannelPerformance empty states → KoastEmptyState, hero Connect-listing button → KoastButton, Field/TextInput/Stepper extracted to `src/components/ui/FormControls.tsx`, entrance keyframes (`koast-fade-up-pd`, `koast-hero-in`) moved to globals.css, two new tokens `--shore-soft #f5f1e8` + `--hairline #e5e2dc`, PricingTab AccuracyChart dead-code ternary collapsed to `"#17392A"` literal, PricingTab rules-editor input border → `var(--hairline)` |
 
 ---
 
