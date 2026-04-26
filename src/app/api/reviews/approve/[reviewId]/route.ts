@@ -4,6 +4,11 @@ import { guestReviews } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 
+// RDX-4 — host's mark-as-bad action lands here. Writes
+// is_flagged_by_host (the host-asserted flag); is_low_rating is
+// owned by sync and never touched by this route. is_bad_review is
+// also kept in lockstep for one release cycle so legacy reads keep
+// working until tech-debt cleanup drops the column.
 export async function POST(
   request: NextRequest,
   { params }: { params: { reviewId: string } }
@@ -17,43 +22,38 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
 
-    // Fetch review
     const [review] = await db
       .select({
         id: guestReviews.id,
-        bookingId: guestReviews.bookingId,
-        propertyId: guestReviews.propertyId,
         draftText: guestReviews.draftText,
         starRating: guestReviews.starRating,
-        isBadReview: guestReviews.isBadReview,
+        isFlaggedByHost: guestReviews.isFlaggedByHost,
       })
       .from(guestReviews)
       .where(eq(guestReviews.id, params.reviewId))
       .limit(1);
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
-    const isBad = body.is_bad_review ?? review.isBadReview ?? false;
+    // Accept legacy `is_bad_review` payload key for backwards-compat
+    // with any external caller; new clients send `is_flagged_by_host`.
+    const flagged = (body.is_flagged_by_host ?? body.is_bad_review ?? review.isFlaggedByHost ?? false) as boolean;
     const finalText = body.final_text ?? review.draftText;
     const starRating = body.star_rating ?? review.starRating;
 
-    // Session 6.1a: no scheduler exists. Saving a draft sets
-    // status='draft_generated' (or 'bad_review_held' for flagged
-    // reviews); no scheduled_publish_at is set. The "Approve & Publish"
-    // verb (which actually pushes to Channex via submitGuestReview)
-    // lands in 6.2 once the Channex client gains that method.
     await db
       .update(guestReviews)
       .set({
         finalText,
         starRating,
-        isBadReview: isBad,
-        status: isBad ? "bad_review_held" : "draft_generated",
+        isFlaggedByHost: flagged,
+        // Keep legacy column in sync until removed.
+        isBadReview: flagged,
       })
       .where(eq(guestReviews.id, params.reviewId));
 
     return NextResponse.json({
-      status: isBad ? "bad_review_held" : "draft_generated",
       saved: true,
+      is_flagged_by_host: flagged,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

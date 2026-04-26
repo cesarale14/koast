@@ -187,22 +187,25 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
     }
   }, [review.id, composer, toast, onRefresh]);
 
+  // RDX-4 — host toggle owns is_flagged_by_host only. is_low_rating is
+  // sync-derived from rating; the menu doesn't disclaim or override it.
   const toggleBad = useCallback(async () => {
     setMenuOpen(false);
+    const next = !review.is_flagged_by_host;
     try {
       const res = await fetch(`/api/reviews/approve/${review.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_bad_review: !review.is_bad_review }),
+        body: JSON.stringify({ is_flagged_by_host: next }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error ?? `Failed (${res.status})`);
-      toast(review.is_bad_review ? "Removed bad-review flag" : "Marked as bad review");
+      toast(next ? "Marked as bad review" : "Removed bad-review flag");
       onRefresh();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
     }
-  }, [review.id, review.is_bad_review, toast, onRefresh]);
+  }, [review.id, review.is_flagged_by_host, toast, onRefresh]);
 
   const copyText = useCallback(async () => {
     setMenuOpen(false);
@@ -350,7 +353,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                     className="block w-full text-left px-3 py-2 text-[12px] hover:bg-shore"
                     style={{ color: "var(--coastal)" }}
                   >
-                    {review.is_bad_review ? "Unmark as bad review" : "Mark as bad review"}
+                    {review.is_flagged_by_host ? "Unmark as bad review" : "Mark as bad review"}
                   </button>
                   <button
                     type="button"
@@ -444,7 +447,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                 {review.incoming_rating != null ? review.incoming_rating.toFixed(1) : "—"}
               </span>
             </div>
-            {review.is_bad_review && (
+            {(review.is_low_rating || review.is_flagged_by_host) && (
               <span
                 className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5"
                 style={{ borderRadius: 999, background: "rgba(196,64,64,0.08)", color: "var(--coral-reef)" }}

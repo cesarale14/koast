@@ -285,6 +285,10 @@ export const guestReviews = pgTable("guest_reviews", {
   scheduledPublishAt: timestamp("scheduled_publish_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   isBadReview: boolean("is_bad_review").default(false),
+  // RDX-4 decomposed source-of-truth columns. is_bad_review stays
+  // for one release cycle; remove in tech-debt cleanup.
+  isLowRating: boolean("is_low_rating").default(false).notNull(),
+  isFlaggedByHost: boolean("is_flagged_by_host").default(false).notNull(),
   aiContext: jsonb("ai_context"),
   // Session 6 sync columns
   channexReviewId: text("channex_review_id"),

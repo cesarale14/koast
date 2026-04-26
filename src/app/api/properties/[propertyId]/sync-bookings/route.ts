@@ -107,6 +107,12 @@ export async function POST(
             status:
               attrs.status === "cancelled" ? "cancelled" : "confirmed",
             platform_booking_id: attrs.ota_reservation_code || null,
+            // RDX-3 — populate the dedicated column so reviews-sync can
+            // join via ota_reservation_code rather than the legacy
+            // platform_booking_id key (which is iCal email-UID for
+            // iCal-sourced rows and HM-code for Channex-sourced —
+            // unjoinable without disambiguation).
+            ota_reservation_code: attrs.ota_reservation_code || null,
             notes: attrs.notes || null,
           };
 

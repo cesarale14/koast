@@ -30,7 +30,7 @@ export async function GET(
     // All reviews for this property
     const { data: reviews } = await supabase
       .from("guest_reviews")
-      .select("star_rating, incoming_rating, incoming_text, response_sent, direction, status, published_at, incoming_date, created_at")
+      .select("star_rating, incoming_rating, incoming_text, response_sent, direction, status, published_at, incoming_date, created_at, expired_at")
       .eq("property_id", params.propertyId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allReviews = (reviews ?? []) as any[];
@@ -38,13 +38,23 @@ export async function GET(
     const incoming = allReviews.filter((r) => r.direction === "incoming");
     const outgoing = allReviews.filter((r) => r.direction === "outgoing");
 
+    // RDX-6 — Closed bucket (expired-unreplied without published reply)
+    // is excluded from response-rate denominator. The host couldn't have
+    // replied; counting them would unfairly suppress the metric.
+    const nowMs = Date.now();
+    const isClosed = (r: { response_sent?: boolean; status?: string; expired_at?: string | null }) => {
+      const expired = r.expired_at ? new Date(r.expired_at).getTime() <= nowMs : false;
+      return expired && r.response_sent === false && r.status !== "published";
+    };
+    const incomingActive = incoming.filter((r) => !isClosed(r));
+
     // Stats
     const avgIncomingRating = incoming.length > 0
       ? Math.round(incoming.reduce((s, r) => s + (r.incoming_rating ?? 0), 0) / incoming.length * 10) / 10
       : 0;
 
-    const responseRate = incoming.length > 0
-      ? Math.round(incoming.filter((r) => r.response_sent).length / incoming.length * 100)
+    const responseRate = incomingActive.length > 0
+      ? Math.round(incomingActive.filter((r) => r.response_sent).length / incomingActive.length * 100)
       : 0;
 
     const publishedCount = outgoing.filter((r) => r.status === "published").length;

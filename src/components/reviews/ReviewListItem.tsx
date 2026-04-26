@@ -1,6 +1,8 @@
 "use client";
 
-import { Lock, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Lock, AlertTriangle, Home } from "lucide-react";
 import PlatformLogo from "@/components/ui/PlatformLogo";
 import type { ReviewListEntry } from "@/lib/reviews/types";
 
@@ -9,7 +11,8 @@ const STAYCOMMAND_SUFFIX = / - StayCommand$/i;
 const KOAST_SUFFIX = / - Koast$/i;
 
 // Render-time cleanup until a settings UI lets hosts override
-// properties.name (RDX-4 in REVIEWS_DATA_TRUTH §6).
+// properties.name. Phase E backfilled the DB but this stays as
+// belt-and-suspenders for any rows that slip through pre-strip.
 function cleanPropertyName(name: string): string {
   return (name ?? "").replace(STAYCOMMAND_SUFFIX, "").replace(KOAST_SUFFIX, "").trim();
 }
@@ -75,6 +78,62 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
   );
 }
 
+const AVATAR_SIZE = 44;
+
+function PropertyAvatar({
+  photoUrl,
+  propertyId,
+  alt,
+}: {
+  photoUrl: string | null;
+  propertyId: string;
+  alt: string;
+}) {
+  const router = useRouter();
+  const [imgError, setImgError] = useState(false);
+  const showFallback = !photoUrl || imgError;
+  return (
+    <button
+      type="button"
+      // Stop propagation so the row click (which opens the slide-over)
+      // doesn't also fire when the host taps the avatar to navigate.
+      onClick={(e) => {
+        e.stopPropagation();
+        router.push(`/properties/${propertyId}`);
+      }}
+      aria-label={`Open ${alt}`}
+      className="flex-shrink-0 mt-0.5 transition-transform hover:scale-105"
+      style={{
+        width: AVATAR_SIZE,
+        height: AVATAR_SIZE,
+        borderRadius: 12,
+        overflow: "hidden",
+        border: "1px solid var(--dry-sand)",
+        cursor: "pointer",
+        background: "var(--shore)",
+      }}
+    >
+      {showFallback ? (
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{ color: "var(--tideline)" }}
+        >
+          <Home size={20} />
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photoUrl!}
+          alt={alt}
+          loading="lazy"
+          onError={() => setImgError(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+    </button>
+  );
+}
+
 interface ReviewListItemProps {
   review: ReviewListEntry;
   showProperty: boolean;
@@ -93,14 +152,24 @@ export default function ReviewListItem({
   const text = review.incoming_text ?? "";
   const truncated = text.length > PREVIEW_LEN;
   const preview = truncated ? text.slice(0, PREVIEW_LEN).trimEnd() + "…" : text;
-  const isBad = review.is_bad_review;
+  const isBad = review.is_low_rating || review.is_flagged_by_host;
   const propertyLabel = cleanPropertyName(review.property_name);
 
+  const onRowClick = () => onOpen(review.id);
+  const onRowKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen(review.id);
+    }
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(review.id)}
-      className={`group w-full text-left bg-white px-4 py-3 flex items-start gap-3 transition-colors hover:bg-shore ${mounted ? "animate-cardReveal" : "opacity-0"}`}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onRowClick}
+      onKeyDown={onRowKey}
+      className={`group bg-white px-4 py-3 flex items-start gap-3 transition-colors hover:bg-shore cursor-pointer ${mounted ? "animate-cardReveal" : "opacity-0"}`}
       style={{
         borderRadius: 14,
         boxShadow: "var(--shadow-card)",
@@ -109,23 +178,28 @@ export default function ReviewListItem({
         animationDelay: `${animationDelayMs}ms`,
       }}
     >
-      {/* Channel badge */}
-      <div className="flex-shrink-0 mt-0.5">
-        <PlatformLogo platform={review.platform} size="sm" />
-      </div>
+      {/* RDX-5 — avatar = property photo. Click navigates to /properties/[id]. */}
+      <PropertyAvatar
+        photoUrl={review.property_cover_photo_url}
+        propertyId={review.property_id}
+        alt={propertyLabel || "Property"}
+      />
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        {/* Row 1: name · property (when 'all') · date */}
+        {/* Row 1: channel logo + property name (when 'all') OR guest name + date */}
         <div className="flex items-center gap-2 text-[12px] mb-0.5" style={{ color: "var(--tideline)" }}>
-          <span className="font-semibold truncate" style={{ color: "var(--coastal)", maxWidth: "60%" }}>
-            {review.display_guest_name}
+          <span className="inline-flex items-center" style={{ flexShrink: 0 }}>
+            <PlatformLogo platform={review.platform} size="sm" />
           </span>
-          {showProperty && propertyLabel && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="truncate">{propertyLabel}</span>
-            </>
+          {showProperty && propertyLabel ? (
+            <span className="font-semibold truncate" style={{ color: "var(--coastal)" }}>
+              {propertyLabel}
+            </span>
+          ) : (
+            <span className="font-semibold truncate" style={{ color: "var(--coastal)", maxWidth: "60%" }}>
+              {review.display_guest_name}
+            </span>
           )}
           {review.incoming_date && (
             <>
@@ -134,6 +208,13 @@ export default function ReviewListItem({
             </>
           )}
         </div>
+
+        {/* Row 1b: guest name when 'all' (otherwise rendered above) */}
+        {showProperty && propertyLabel && (
+          <div className="text-[11px] mb-1" style={{ color: "var(--tideline)" }}>
+            {review.display_guest_name}
+          </div>
+        )}
 
         {/* Row 2: text preview */}
         {preview ? (
@@ -173,6 +254,6 @@ export default function ReviewListItem({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

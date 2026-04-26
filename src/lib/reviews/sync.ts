@@ -90,14 +90,23 @@ async function syncOneProperty(
       if (page > 50) break;
     }
 
+    // RDX-3 — primary join key is bookings.ota_reservation_code (HM-code for
+    // Airbnb, numeric for BDC). platform_booking_id stays as the fallback
+    // path during the transition window (TECH-DEBT: drop after 2026-07-26
+    // when all in-flight bookings have been re-synced through the helpers
+    // that now populate ota_reservation_code).
     const { data: bookingRows } = await supabase
       .from("bookings")
-      .select("id, platform_booking_id")
-      .eq("property_id", prop.id)
-      .not("platform_booking_id", "is", null);
+      .select("id, ota_reservation_code, platform_booking_id")
+      .eq("property_id", prop.id);
     const bookingByOtaRes = new Map<string, string>();
-    for (const b of (bookingRows ?? []) as Array<{ id: string; platform_booking_id: string | null }>) {
-      if (b.platform_booking_id) bookingByOtaRes.set(b.platform_booking_id, b.id);
+    for (const b of (bookingRows ?? []) as Array<{ id: string; ota_reservation_code: string | null; platform_booking_id: string | null }>) {
+      if (b.ota_reservation_code) bookingByOtaRes.set(b.ota_reservation_code, b.id);
+      // Fallback only for keys not already claimed by ota_reservation_code,
+      // so the canonical column always wins.
+      if (b.platform_booking_id && !bookingByOtaRes.has(b.platform_booking_id)) {
+        bookingByOtaRes.set(b.platform_booking_id, b.id);
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,14 +158,12 @@ async function syncOneProperty(
         subratings,
         expired_at: rv.expired_at ?? null,
       };
+      // RDX-4 — algorithmic low-rating flag, written every iteration.
+      // is_bad_review (legacy) is no longer touched by sync; host-mark
+      // semantics live on is_flagged_by_host now.
+      row.is_low_rating = rating5 != null && rating5 < 4;
       if (isNew) {
-        // Insert-only defaults. is_bad_review stays gated on isNew so
-        // host marks via /api/reviews/approve aren't clobbered (RDX-2
-        // Phase A: threshold <4 matches the UI's "below excellent"
-        // predicate). Initial status mirrors Channex's is_replied —
-        // RDX-DIAG-FIX adds the post-insert re-evaluation below.
         row.status = rv.is_replied ? "published" : "pending";
-        row.is_bad_review = rating5 != null && rating5 < 4;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

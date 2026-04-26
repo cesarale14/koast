@@ -39,6 +39,7 @@ export async function GET() {
         name: properties.name,
         channex_property_id: properties.channexPropertyId,
         reviews_last_synced_at: properties.reviewsLastSyncedAt,
+        cover_photo_url: properties.coverPhotoUrl,
       })
       .from(properties)
       .where(eq(properties.userId, user.id));
@@ -66,6 +67,8 @@ export async function GET() {
         response_sent: guestReviews.responseSent,
         status: guestReviews.status,
         is_bad_review: guestReviews.isBadReview,
+        is_low_rating: guestReviews.isLowRating,
+        is_flagged_by_host: guestReviews.isFlaggedByHost,
         guest_review_submitted_at: guestReviews.guestReviewSubmittedAt,
         guest_review_channex_acked_at: guestReviews.guestReviewChannexAckedAt,
         guest_review_airbnb_confirmed_at: guestReviews.guestReviewAirbnbConfirmedAt,
@@ -161,6 +164,7 @@ export async function GET() {
         id: r.id,
         property_id: r.property_id,
         property_name: prop?.name ?? "Property",
+        property_cover_photo_url: prop?.cover_photo_url ?? null,
         channex_review_id: r.channex_review_id,
         guest_name: r.guest_name ?? bk?.guest_name ?? null,
         guest_name_override: r.guest_name_override,
@@ -190,6 +194,8 @@ export async function GET() {
         response_sent: r.response_sent ?? false,
         status: r.status,
         is_bad_review: r.is_bad_review ?? false,
+        is_low_rating: r.is_low_rating ?? false,
+        is_flagged_by_host: r.is_flagged_by_host ?? false,
         // Per-review channel: linked booking wins; else default airbnb
         // (Villa Jamaica is Airbnb-only today; BDC reviews will need an
         // explicit `ota` column on guest_reviews before they arrive — see

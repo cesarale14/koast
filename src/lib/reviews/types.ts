@@ -5,6 +5,9 @@ export interface ReviewListEntry {
   id: string;
   property_id: string;
   property_name: string;
+  // RDX-5 — property photo for the avatar slot. Nullable; render
+  // falls back to a generic house icon when absent.
+  property_cover_photo_url: string | null;
   channex_review_id: string | null;
   guest_name: string | null;
   guest_name_override: string | null;
@@ -24,6 +27,9 @@ export interface ReviewListEntry {
   response_sent: boolean;
   status: string | null;
   is_bad_review: boolean;
+  // RDX-4 decomposed flags. UI predicate: is_low_rating || is_flagged_by_host.
+  is_low_rating: boolean;
+  is_flagged_by_host: boolean;
   platform: string;
   booking_check_in: string | null;
   booking_check_out: string | null;

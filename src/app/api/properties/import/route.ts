@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
     if (!propertyName) {
       propertyName = `Airbnb Listing ${listing_id}`;
     }
+    // RDX-FINAL Phase E — strip the legacy " - StayCommand" / " - Koast"
+    // suffix at import time. Idempotent.
+    propertyName = propertyName.replace(/ - (StayCommand|Koast)$/i, "").trim();
 
     // 3. Create or update StayCommand property
     const { data: existingProps } = await supabase

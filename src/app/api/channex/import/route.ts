@@ -6,6 +6,16 @@ import { acquireLock, releaseLock } from "@/lib/concurrency/locks";
 import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
 
 /**
+ * RDX-FINAL Phase E — strip the legacy " - StayCommand" / " - Koast"
+ * suffix at import time so future imports don't reintroduce the
+ * cosmetic noise the host has to read past on every review card.
+ * Idempotent for already-clean titles.
+ */
+function stripBrandSuffix(name: string | null | undefined): string {
+  return (name ?? "").replace(/ - (StayCommand|Koast)$/i, "").trim();
+}
+
+/**
  * Normalize a property name for strict matching.
  * Strips common location suffixes so "Pool House - Tampa" and
  * "Pool House in Miami" both normalize to "pool house", without
@@ -123,7 +133,7 @@ export async function POST(request: NextRequest) {
         // 2. Insert property into Supabase
         const propInsert = {
           user_id: userId,
-          name: attrs.title,
+          name: stripBrandSuffix(attrs.title),
           address: attrs.address || null,
           city: attrs.city || null,
           state: attrs.state || null,
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
             // the user to pick which one to link manually.
             results.push({
               channex_id: channexId,
-              name: attrs.title,
+              name: stripBrandSuffix(attrs.title),
               status: "unmatched",
               reason: "multiple_candidates",
               candidates: exactMatches.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })),
@@ -494,7 +504,7 @@ export async function POST(request: NextRequest) {
         results.push({
           channex_id: channexId,
           property_id: propertyId,
-          name: attrs.title,
+          name: stripBrandSuffix(attrs.title),
           // If any bookings failed to import, flag the result as partial so
           // the UI can warn the user instead of reporting a clean success.
           status: bookingsFailed > 0 ? "imported_with_errors" : "imported",
@@ -512,7 +522,7 @@ export async function POST(request: NextRequest) {
         // promise itself rejects (e.g. import-time module errors).
         void syncReviewsForOneProperty({
           id: propertyId,
-          name: attrs.title,
+          name: stripBrandSuffix(attrs.title),
           channex_property_id: channexId,
         }).catch((err) => {
           console.error(

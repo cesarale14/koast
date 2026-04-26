@@ -1,6 +1,6 @@
 "use client";
 
-export type ReviewFilter = "all" | "needs_response" | "responded" | "bad" | "private";
+export type ReviewFilter = "all" | "needs_response" | "responded" | "bad" | "private" | "closed";
 export type SortKey = "recent" | "oldest" | "lowest_rating" | "highest_rating" | "needs_response";
 
 interface ReviewsFilterBarProps {
@@ -14,25 +14,34 @@ interface ReviewsFilterBarProps {
   onChangeChannel: (c: string) => void;
 }
 
-const CHIPS: Array<{ key: ReviewFilter; label: string }> = [
+// RDX-6 — "Closed" bucket holds expired-unreplied reviews. Default
+// 'All' view excludes these so they don't drag down "Needs response"
+// (the response window is over, action isn't possible). Click the
+// Closed chip to surface them as muted history.
+const CHIPS: Array<{ key: ReviewFilter; label: string; muted?: boolean }> = [
   { key: "all", label: "All" },
   { key: "needs_response", label: "Needs response" },
   { key: "responded", label: "Responded" },
   { key: "bad", label: "Bad reviews" },
   { key: "private", label: "Private feedback" },
+  { key: "closed", label: "Closed", muted: true },
 ];
 
 function Chip({
   label,
   count,
   active,
+  muted,
   onClick,
 }: {
   label: string;
   count: number;
   active: boolean;
+  muted?: boolean;
   onClick: () => void;
 }) {
+  const activeBg = muted ? "var(--tideline)" : "var(--coastal)";
+  const idleColor = muted ? "var(--tideline)" : "var(--coastal)";
   return (
     <button
       type="button"
@@ -40,9 +49,9 @@ function Chip({
       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold transition-colors"
       style={{
         borderRadius: 999,
-        border: `1px solid ${active ? "var(--coastal)" : "var(--dry-sand)"}`,
-        background: active ? "var(--coastal)" : "#fff",
-        color: active ? "var(--shore)" : "var(--coastal)",
+        border: `1px solid ${active ? activeBg : "var(--dry-sand)"}`,
+        background: active ? activeBg : "#fff",
+        color: active ? "var(--shore)" : idleColor,
       }}
     >
       <span>{label}</span>
@@ -93,6 +102,7 @@ export default function ReviewsFilterBar({
             label={c.label}
             count={counts[c.key] ?? 0}
             active={active.has(c.key)}
+            muted={c.muted}
             onClick={() => toggle(c.key)}
           />
         ))}

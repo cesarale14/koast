@@ -14,6 +14,7 @@ import ReviewSlideOver from "@/components/reviews/ReviewSlideOver";
 import ReviewsSettingsModal from "@/components/reviews/ReviewsSettingsModal";
 import { useToast } from "@/components/ui/Toast";
 import type { ReviewListEntry } from "@/lib/reviews/types";
+type ReviewRow = ReviewListEntry;
 
 interface PropertyLite {
   id: string;
@@ -149,16 +150,31 @@ export default function ReviewsPage() {
     return Array.from(s);
   }, [propertyScoped]);
 
+  // RDX-6 — Closed bucket: expired-unreplied reviews where the
+  // response window has lapsed and no response was published. These
+  // are filtered OUT of the default "All" view (response isn't
+  // possible) and surface only when the Closed chip is active.
+  // status='published' protects rare edge case: a Koast-originated
+  // reply on a now-aged review must NOT be hidden as "closed".
+  const isClosed = (r: ReviewRow): boolean =>
+    r.is_expired === true && r.response_sent === false && r.status !== "published";
+
   const visible = useMemo(() => {
     let list = propertyScoped;
     if (channelFilter !== "all") list = list.filter((r) => r.platform === channelFilter);
-    if (!activeFilters.has("all")) {
+    const showClosedOnly = activeFilters.has("closed");
+    if (showClosedOnly) {
+      list = list.filter(isClosed);
+    } else {
+      // Hide the Closed bucket from every other view including 'All'.
+      // 'All' now means "all active", not "all reviews ever".
+      list = list.filter((r) => !isClosed(r));
+    }
+    if (!activeFilters.has("all") && !showClosedOnly) {
       list = list.filter((r) => {
         if (activeFilters.has("needs_response") && r.response_sent) return false;
         if (activeFilters.has("responded") && !r.response_sent) return false;
-        // Bad-review predicate now reads the column directly. Sync is
-        // canonical (rating < 4 written at insert time per RDX-2 Phase A).
-        if (activeFilters.has("bad") && !r.is_bad_review) return false;
+        if (activeFilters.has("bad") && !(r.is_low_rating || r.is_flagged_by_host)) return false;
         if (activeFilters.has("private") && !r.private_feedback) return false;
         return true;
       });
@@ -188,12 +204,20 @@ export default function ReviewsPage() {
     const scope = channelFilter === "all"
       ? propertyScoped
       : propertyScoped.filter((r) => r.platform === channelFilter);
+    // 'All' and 'Needs response' counts EXCLUDE the Closed bucket
+    // (expired-unreplied) — see isClosed comment in `visible`. Other
+    // chip counts compute over the full scope; their predicates already
+    // gate appropriately (e.g. 'Responded' won't include closed since
+    // closed are unreplied by definition).
+    const active = scope.filter((r) => !isClosed(r));
+    const closed = scope.filter(isClosed);
     return {
-      all: scope.length,
-      needs_response: scope.filter((r) => !r.response_sent).length,
+      all: active.length,
+      needs_response: active.filter((r) => !r.response_sent).length,
       responded: scope.filter((r) => r.response_sent).length,
-      bad: scope.filter((r) => r.is_bad_review).length,
+      bad: scope.filter((r) => r.is_low_rating || r.is_flagged_by_host).length,
       private: scope.filter((r) => !!r.private_feedback).length,
+      closed: closed.length,
     };
   }, [propertyScoped, channelFilter]);
 
