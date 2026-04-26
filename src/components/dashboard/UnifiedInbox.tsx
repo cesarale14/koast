@@ -27,7 +27,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle } from "lucide-react";
+import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle, ChevronLeft } from "lucide-react";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
 
 // ============ Types ============
@@ -363,6 +363,7 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
         onSend={() => void sendMessage()}
         onRetry={retrySend}
         sending={sending}
+        onBack={() => setActiveId(null)}
       />
 
       <GuestContextPanel thread={activeThread} property={activeProperty ?? null} mounted={mounted} />
@@ -418,10 +419,14 @@ function ConversationList({
     { key: "ai_drafted", label: "AI Drafted", disabled: true },
   ];
 
+  // Mobile: full-width when no thread active; hidden when one is open
+  // (the ThreadColumn takes the full screen instead). Desktop (md+):
+  // always visible at 340px.
+  const mobileVisibility = activeId ? "hidden md:flex" : "flex";
   return (
     <aside
-      className={`flex-shrink-0 flex flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
-      style={{ width: 340, borderRight: "1px solid var(--dry-sand)", animationDelay: "0ms" }}
+      className={`flex-shrink-0 flex-col w-full md:w-[340px] ${mobileVisibility} ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ borderRight: "1px solid var(--dry-sand)", animationDelay: "0ms" }}
     >
       <div className="p-4 pb-3">
         <div className="relative">
@@ -569,7 +574,7 @@ function ConversationItem({ t, active, index, onSelect }: {
 
 function ThreadColumn({
   thread, messages, loading, threadScrollRef, mounted,
-  composer, setComposer, onSend, onRetry, sending,
+  composer, setComposer, onSend, onRetry, sending, onBack,
 }: {
   thread: ThreadRow | null;
   messages: MessageRow[];
@@ -581,6 +586,7 @@ function ThreadColumn({
   onSend: () => void;
   onRetry: (msg: MessageRow) => void;
   sending: boolean;
+  onBack: () => void;
 }) {
   const messagesByDay = useMemo(() => {
     const groups: { label: string; messages: MessageRow[] }[] = [];
@@ -594,16 +600,37 @@ function ThreadColumn({
     return groups;
   }, [messages]);
 
-  if (!thread) return <EmptyThreadState />;
+  // Mobile: hidden when no thread selected (ConversationList takes
+  // full screen); full-width and active when one is open.
+  // Desktop: flex-1 fills the middle column always; renders
+  // EmptyThreadState when nothing is selected.
+  if (!thread) {
+    return (
+      <div className="hidden md:flex flex-1 min-w-0">
+        <EmptyThreadState />
+      </div>
+    );
+  }
 
   const platformKey = platformKeyFrom(thread.platform);
   const platform = platformKey ? PLATFORMS[platformKey] : null;
 
   return (
-    <div className={`flex-1 min-w-0 flex flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`} style={{ animationDelay: "150ms" }}>
+    <div className={`flex flex-1 min-w-0 flex-col ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`} style={{ animationDelay: "150ms" }}>
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between bg-white" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
-        <div className="min-w-0">
+      <div className="flex-shrink-0 px-4 md:px-6 py-4 flex items-center justify-between bg-white" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
+        <div className="min-w-0 flex items-center gap-2">
+          {/* Mobile-only back button — returns to the conversation list */}
+          <button
+            type="button"
+            onClick={onBack}
+            className="md:hidden flex items-center justify-center flex-shrink-0 rounded-lg transition-colors"
+            style={{ width: 34, height: 34, color: "var(--coastal)", backgroundColor: "rgba(196,154,90,0.08)" }}
+            aria-label="Back to inbox"
+          >
+            <ChevronLeft size={18} strokeWidth={2.25} />
+          </button>
+          <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[16px] font-bold truncate" style={{ color: "var(--coastal)" }}>
               {thread.guest_display_name}
@@ -621,8 +648,10 @@ function ThreadColumn({
           <div className="text-[13px] mt-0.5" style={{ color: "var(--tideline)" }}>
             {thread.property_name}
           </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Phone + more buttons hidden on mobile (the back button takes priority); shown on md+ */}
+        <div className="hidden md:flex items-center gap-1 flex-shrink-0">
           <button type="button" disabled
             className="flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ width: 34, height: 34, color: "var(--tideline)", border: "1px solid var(--dry-sand)", backgroundColor: "#fff" }}
@@ -852,8 +881,10 @@ function GuestContextPanel({ thread, property, mounted }: {
 
   return (
     <aside
-      className={`flex-shrink-0 flex flex-col bg-white overflow-y-auto ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
-      style={{ width: 300, borderLeft: "1px solid var(--dry-sand)", animationDelay: "300ms" }}
+      // Hidden on mobile entirely (the inbox is a two-column experience
+      // there: list ↔ thread, no context panel). Shown at 300px on md+.
+      className={`flex-shrink-0 hidden md:flex flex-col bg-white overflow-y-auto md:w-[300px] ${mounted ? "animate-fadeSlideIn" : "opacity-0"}`}
+      style={{ borderLeft: "1px solid var(--dry-sand)", animationDelay: "300ms" }}
     >
       <div className="p-5" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
         <SectionLabel label="Guest info" />
