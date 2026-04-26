@@ -6,6 +6,11 @@ import {
   platformFromChannex,
   type ChannexBookingAttrs,
 } from "@/lib/bookings/upsert-from-channex";
+import {
+  MESSAGING_EVENTS,
+  handleMessagingEvent,
+  type MessageWebhookEnvelope,
+} from "@/lib/webhooks/messaging";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
@@ -60,6 +65,33 @@ export async function POST(request: NextRequest) {
     "booking_unmapped_new", "booking_unmapped_modified", "booking_unmapped_cancelled",
     "ota_booking_created", "ota_booking_modified", "ota_booking_cancelled",
   ];
+
+  // MSG-S1 Phase C — messaging events dispatch to their own handler.
+  // Per-event try/catch so a single bad event can't 500 the request
+  // (Channex retries on 500 → cascade). Always 200-ack.
+  if (MESSAGING_EVENTS.has(event)) {
+    let result: { action_taken: string; thread_id?: string; message_id?: string } = {
+      action_taken: "messaging_error",
+    };
+    let errMessage: string | null = null;
+    try {
+      result = await handleMessagingEvent(rawPayload as MessageWebhookEnvelope, supabase);
+    } catch (err) {
+      errMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[webhook/messaging] handler error event=${event}:`, errMessage);
+    }
+    try {
+      await supabase.from("channex_webhook_log").insert({
+        event_type: event,
+        channex_property_id: channexPropertyId,
+        payload: rawPayload as Record<string, unknown>,
+        action_taken: result.action_taken,
+        ack_sent: false,
+        ack_response: errMessage,
+      });
+    } catch { /* non-critical */ }
+    return NextResponse.json({ status: "ok", action: result.action_taken, error: errMessage });
+  }
 
   if (!bookingEvents.includes(event)) {
     console.log(`[webhook] Event "${event}" not a booking event, logging and returning 200`);

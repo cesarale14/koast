@@ -36,6 +36,7 @@ export const properties = pgTable("properties", {
   channexPropertyId: text("channex_property_id"),
   defaultCleanerId: uuid("default_cleaner_id"),
   reviewsLastSyncedAt: timestamp("reviews_last_synced_at", { withTimezone: true }),
+  messagesLastSyncedAt: timestamp("messages_last_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
@@ -50,6 +51,7 @@ export const propertiesRelations = relations(properties, ({ many }) => ({
   marketComps: many(marketComps),
   marketSnapshots: many(marketSnapshots),
   messages: many(messages),
+  messageThreads: many(messageThreads),
   cleaningTasks: many(cleaningTasks),
   localEvents: many(localEvents),
   guestReviews: many(guestReviews),
@@ -192,25 +194,80 @@ export const marketSnapshotsRelations = relations(marketSnapshots, ({ one }) => 
 
 // ==================== Messages ====================
 
+// MSG-S1 — message_threads is the parent, messages is the leaf.
+// Channel-asymmetric booking link: BDC threads carry channex_booking_id;
+// AirBNB threads only carry ota_message_thread_id and resolve via the
+// RDX-3 join key. See docs/MESSAGING_DESIGN.md §3.
+export const messageThreads = pgTable("message_threads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  propertyId: uuid("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  channexThreadId: text("channex_thread_id").notNull(),
+  channexChannelId: text("channex_channel_id"),
+  channexBookingId: text("channex_booking_id"),
+  otaMessageThreadId: text("ota_message_thread_id"),
+  channelCode: text("channel_code").notNull(),               // 'abb' | 'bdc'
+  providerRaw: text("provider_raw").notNull(),               // 'AirBNB' | 'BookingCom'
+  title: text("title"),
+  lastMessagePreview: text("last_message_preview"),
+  lastMessageReceivedAt: timestamp("last_message_received_at", { withTimezone: true }),
+  messageCount: integer("message_count").notNull().default(0),
+  unreadCount: integer("unread_count").notNull().default(0),
+  isClosed: boolean("is_closed").notNull().default(false),
+  status: text("status").notNull().default("active"),        // active | archived | no_reply_needed
+  threadKind: text("thread_kind").notNull().default("message"), // message | inquiry | reservation_request
+  meta: jsonb("meta"),
+  channexInsertedAt: timestamp("channex_inserted_at", { withTimezone: true }),
+  channexUpdatedAt: timestamp("channex_updated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_message_threads_channex_id").on(t.channexThreadId),
+  index("idx_message_threads_property_last").on(t.propertyId, t.lastMessageReceivedAt),
+  index("idx_message_threads_booking").on(t.bookingId),
+]);
+
+export const messageThreadsRelations = relations(messageThreads, ({ one, many }) => ({
+  property: one(properties, { fields: [messageThreads.propertyId], references: [properties.id] }),
+  booking: one(bookings, { fields: [messageThreads.bookingId], references: [bookings.id] }),
+  messages: many(messages),
+}));
+
 export const messages = pgTable("messages", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookingId: uuid("booking_id").references(() => bookings.id),
   propertyId: uuid("property_id").notNull().references(() => properties.id),
+  threadId: uuid("thread_id").references(() => messageThreads.id, { onDelete: "cascade" }),
+  channexMessageId: text("channex_message_id"),
+  otaMessageId: text("ota_message_id"),
   platform: text("platform").notNull(),
   direction: text("direction"),
+  sender: text("sender"),                                    // raw 'guest' | 'property' | 'system'
   senderName: text("sender_name"),
   content: text("content").notNull(),
+  attachments: jsonb("attachments").notNull().default([]),
+  channexMeta: jsonb("channex_meta"),
   aiDraft: text("ai_draft"),
   aiDraftStatus: text("ai_draft_status").default("none"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  channexInsertedAt: timestamp("channex_inserted_at", { withTimezone: true }),
+  channexUpdatedAt: timestamp("channex_updated_at", { withTimezone: true }),
+  // Slice 2 — outbound three-stage write columns. NULL until used.
+  hostSendSubmittedAt: timestamp("host_send_submitted_at", { withTimezone: true }),
+  hostSendChannexAckedAt: timestamp("host_send_channex_acked_at", { withTimezone: true }),
+  hostSendOtaConfirmedAt: timestamp("host_send_ota_confirmed_at", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_messages_property_created").on(t.propertyId, t.createdAt),
+  index("idx_messages_thread_inserted").on(t.threadId, t.channexInsertedAt),
+  uniqueIndex("idx_messages_channex_id").on(t.channexMessageId),
 ]);
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   property: one(properties, { fields: [messages.propertyId], references: [properties.id] }),
   booking: one(bookings, { fields: [messages.bookingId], references: [bookings.id] }),
+  thread: one(messageThreads, { fields: [messages.threadId], references: [messageThreads.id] }),
 }));
 
 // ==================== Cleaning Tasks ====================
