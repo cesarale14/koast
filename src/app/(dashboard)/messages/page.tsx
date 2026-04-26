@@ -110,7 +110,11 @@ export default async function MessagesPage() {
       property_cover_photo_url: p?.cover_photo_url ?? null,
       property_city: p?.city ?? null,
       booking_id: t.booking_id,
-      guest_display_name: b?.guest_name ?? "Guest",
+      // AirBNB threads have no booking link (channel-asymmetric per
+      // MESSAGING_DESIGN §3), so b is null. Channex's thread.title is
+      // the guest's first name on AirBNB; fall back to it before the
+      // generic "Guest" label.
+      guest_display_name: b?.guest_name ?? (t.title?.trim() || null) ?? "Guest",
       check_in: b?.check_in ?? null,
       check_out: b?.check_out ?? null,
       total_price: b?.total_price ?? null,

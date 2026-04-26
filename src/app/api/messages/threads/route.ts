@@ -70,7 +70,13 @@ export async function GET(_request: NextRequest) {
         property_name: p?.name ?? null,
         property_cover_photo_url: p?.cover_photo_url ?? null,
         property_city: p?.city ?? null,
-        guest_display_name: b?.guest_name ?? "Guest",
+        // AirBNB threads carry no relationships.booking from Channel
+        // (channel-asymmetric per MESSAGING_DESIGN §3), so b is usually
+        // null. Fall back to thread.title — Channex populates it with
+        // the guest's first name on AirBNB ("Shatara", "Makayla", etc).
+        // Final fallback is the platform-tagged "Guest" so empty/missing
+        // titles still render readably.
+        guest_display_name: b?.guest_name ?? (t.title?.trim() || null) ?? "Guest",
         check_in: b?.check_in ?? null,
         check_out: b?.check_out ?? null,
       };
