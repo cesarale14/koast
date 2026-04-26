@@ -285,7 +285,12 @@ export const cleaningTasks = pgTable("cleaning_tasks", {
   propertyId: uuid("property_id").notNull().references(() => properties.id),
   bookingId: uuid("booking_id").references(() => bookings.id),
   nextBookingId: uuid("next_booking_id").references(() => bookings.id),
-  cleanerId: uuid("cleaner_id"),
+  // TURN-S1a — FK fix. Migration 001:158 declared this REFERENCES
+  // auth.users; migration 20260426050000 corrects it to cleaners(id)
+  // with ON DELETE SET NULL. Drizzle's references() callback resolves
+  // the cleaners table at runtime, so the forward declaration to
+  // schema.ts:502 below works.
+  cleanerId: uuid("cleaner_id").references(() => cleaners.id, { onDelete: "set null" }),
   status: text("status").default("pending"),
   scheduledDate: date("scheduled_date").notNull(),
   scheduledTime: time("scheduled_time"),

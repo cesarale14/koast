@@ -48,25 +48,44 @@ export default function CleanerMobilePage({
       .catch(() => { setError("Failed to load task"); setLoading(false); });
   }, [params.taskId, params.token]);
 
-  const updateTask = async (updates: Record<string, unknown>) => {
+  // TURN-S1a — surface server errors. Was fire-and-forget; the cleaner
+  // would see a checkbox tick even if the DB write 500'd. Now the
+  // optimistic state reverts and an inline banner explains the failure.
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const updateTask = async (updates: Record<string, unknown>, prevChecklist?: ChecklistItem[]) => {
     setSaving(true);
-    await fetch(`/api/clean/${params.taskId}/${params.token}/update`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    if (updates.status && data) {
-      setData({ ...data, task: { ...data.task, status: updates.status as string } });
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/clean/${params.taskId}/${params.token}/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const respData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(respData?.error ?? `HTTP ${res.status}`);
+      }
+      if (updates.status && data) {
+        setData({ ...data, task: { ...data.task, status: updates.status as string } });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Save failed";
+      setSaveError(msg);
+      // Revert optimistic checklist if the caller provided the prior state.
+      if (prevChecklist) setChecklist(prevChecklist);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const toggleItem = (id: string) => {
+    const prev = checklist;
     const updated = checklist.map((item) =>
       item.id === id ? { ...item, done: !item.done } : item
     );
     setChecklist(updated);
-    updateTask({ checklist: updated });
+    void updateTask({ checklist: updated }, prev);
   };
 
   const doneCount = checklist.filter((i) => i.done).length;
@@ -189,6 +208,25 @@ export default function CleanerMobilePage({
             />
           </div>
         </div>
+
+        {/* TURN-S1a — server error banner. Surfaces failed updateTask
+            calls (previously fire-and-forget; cleaner saw fake success). */}
+        {saveError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+            <span className="text-red-600 text-sm font-medium flex-shrink-0">!</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-700">Couldn&apos;t save</p>
+              <p className="text-xs text-red-600 mt-0.5 break-words">{saveError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSaveError(null)}
+              className="text-red-600 text-xs font-medium flex-shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="space-y-3">

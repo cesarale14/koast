@@ -2,7 +2,7 @@ import { eq, and, sql, isNull } from "drizzle-orm";
 import { parseICalFeed } from "./parser";
 import { icalFeeds, bookings, calendarRates, properties } from "@/lib/db/schema";
 import type { ICalBooking } from "./types";
-import { createCleaningTask } from "@/lib/turnover/auto-create";
+import { backfillCleaningTasks } from "@/lib/turnover/auto-create";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 
@@ -87,6 +87,17 @@ async function syncFeedBookings(
   // channel isn't wired up (e.g. the Modern House MFA situation).
   const channexAvailUpdates: Array<{ action: "created" | "cancelled"; checkIn: string; checkOut: string }> = [];
 
+  // TURN-S1a Amendment 1 — wrap the bulk-insert loop in a transaction
+  // and SET LOCAL the bypass GUC. The pg_net trigger
+  // `bookings_fire_turnover_task` (installed inert by migration 2a;
+  // activated by 2b) reads this GUC and skips the http_post when it's
+  // 'true'. This prevents thundering-herd against Vercel on a fresh
+  // host's first iCal import (potentially dozens of bookings inserted
+  // back-to-back). After the loop completes, we call
+  // backfillCleaningTasks once to create any missing tasks.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await db.transaction(async (tx: any) => {
+    await tx.execute(sql`SET LOCAL app.skip_turnover_trigger = 'true'`);
   for (const entry of parsed) {
     feedUids.add(entry.uid);
 
@@ -96,17 +107,17 @@ async function syncFeedBookings(
       const co = new Date(entry.checkOut);
       for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split("T")[0];
-        const existing = await db.select({ id: calendarRates.id })
+        const existing = await tx.select({ id: calendarRates.id })
           .from(calendarRates)
           .where(and(eq(calendarRates.propertyId, propertyId), eq(calendarRates.date, dateStr), isNull(calendarRates.channelCode)))
           .limit(1);
 
         if (existing.length > 0) {
-          await db.update(calendarRates)
+          await tx.update(calendarRates)
             .set({ isAvailable: false })
             .where(eq(calendarRates.id, existing[0].id));
         } else {
-          await db.insert(calendarRates).values({
+          await tx.insert(calendarRates).values({
             propertyId, date: dateStr, isAvailable: false, rateSource: "ical",
           });
         }
@@ -116,7 +127,7 @@ async function syncFeedBookings(
     }
 
     // Check if booking exists by platformBookingId (uid)
-    const existing = await db.select({ id: bookings.id, checkIn: bookings.checkIn, checkOut: bookings.checkOut })
+    const existing = await tx.select({ id: bookings.id, checkIn: bookings.checkIn, checkOut: bookings.checkOut })
       .from(bookings)
       .where(and(eq(bookings.propertyId, propertyId), eq(bookings.platformBookingId, entry.uid)))
       .limit(1);
@@ -124,7 +135,7 @@ async function syncFeedBookings(
     if (existing.length > 0) {
       // Update if dates changed
       if (existing[0].checkIn !== entry.checkIn || existing[0].checkOut !== entry.checkOut) {
-        await db.update(bookings)
+        await tx.update(bookings)
           .set({
             checkIn: entry.checkIn,
             checkOut: entry.checkOut,
@@ -144,7 +155,7 @@ async function syncFeedBookings(
       // candidates. A row with a different non-null platform_booking_id is
       // a distinct legitimate booking (e.g. two real reservations that
       // happen to share dates) and must not be deduped.
-      const dupCheck = await db.select({ id: bookings.id, platformBookingId: bookings.platformBookingId })
+      const dupCheck = await tx.select({ id: bookings.id, platformBookingId: bookings.platformBookingId })
         .from(bookings)
         .where(and(
           eq(bookings.propertyId, propertyId),
@@ -157,7 +168,7 @@ async function syncFeedBookings(
         .limit(1);
 
       if (dupCheck.length > 0) {
-        await db.update(bookings)
+        await tx.update(bookings)
           .set({ platformBookingId: entry.uid, guestName: entry.guestName })
           .where(eq(bookings.id, dupCheck[0].id));
         console.log(`[iCal] Promoted Channex-sourced row ${dupCheck[0].id} with iCal UID ${entry.uid}`);
@@ -166,7 +177,7 @@ async function syncFeedBookings(
       }
 
       // Insert new booking
-      await db.insert(bookings).values({
+      await tx.insert(bookings).values({
         propertyId,
         platform: entry.platform,
         platformBookingId: entry.uid,
@@ -178,28 +189,28 @@ async function syncFeedBookings(
       });
       newCount++;
       channexAvailUpdates.push({ action: "created", checkIn: entry.checkIn, checkOut: entry.checkOut });
-
-      // Auto-create cleaning task for new booking. Non-fatal — if the
-      // task creation fails, we keep the booking and surface the failure
-      // in the sync warnings so the user knows to create the task by hand.
-      const supabase = createServiceClient();
-      const [inserted] = await db.select({ id: bookings.id }).from(bookings)
-        .where(and(eq(bookings.propertyId, propertyId), eq(bookings.platformBookingId, entry.uid)))
-        .limit(1);
-      if (inserted) {
-        try {
-          await createCleaningTask(supabase, {
-            id: inserted.id,
-            property_id: propertyId,
-            check_out: entry.checkOut,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          warnings.push(`cleaning task creation failed for booking ${inserted.id} (${entry.guestName ?? "iCal"} ${entry.checkIn}→${entry.checkOut}): ${msg}`);
-          console.warn(`[iCal] Cleaning task failure for ${inserted.id}: ${msg}`);
-        }
-      }
+      // TURN-S1a — cleaning_task creation moved to the bookings
+      // pg_net trigger (`bookings_fire_turnover_task`). The trigger's
+      // GUC bypass (set above) means no per-row http_post fires
+      // during this iCal sweep. The end-of-sweep
+      // backfillCleaningTasks call below catches up.
     }
+  }
+  });  // end db.transaction
+
+  // TURN-S1a — end-of-sweep cleaning_task creation. Replaces the
+  // per-booking inline createCleaningTask calls that previously lived
+  // inside the for-loop. Scoped to the current property only.
+  try {
+    const svc = createServiceClient();
+    const { data: propRow } = await svc.from("properties").select("user_id").eq("id", propertyId).limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userId = ((propRow ?? []) as any[])[0]?.user_id ?? undefined;
+    if (userId) await backfillCleaningTasks(svc, userId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    warnings.push(`cleaning_task backfill failed: ${msg}`);
+    console.warn(`[iCal] backfillCleaningTasks failed for ${propertyId}: ${msg}`);
   }
 
   // Cancel bookings no longer in feed. We cancel BOTH iCal-originated rows

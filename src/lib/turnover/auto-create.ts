@@ -47,14 +47,19 @@ export async function createCleaningTask(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nextBooking = ((nextBookings ?? []) as any[])[0] ?? null;
 
-  // Check for default cleaner on this property
-  const { data: propRow } = await supabase
+  // Look up default_cleaner_id + the property's name + user_id in
+  // one trip. user_id flows into notifyCleanerAssigned as
+  // `opts.userId` so sms_log.user_id gets populated (TURN-S1a
+  // Amendment 7 — was previously NULL on every iCal-source create
+  // and will be the dominant case once the trigger is live).
+  const { data: propLookup } = await supabase
     .from("properties")
-    .select("default_cleaner_id")
+    .select("default_cleaner_id, name, user_id")
     .eq("id", booking.property_id)
     .limit(1);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const defaultCleanerId = ((propRow ?? []) as any[])[0]?.default_cleaner_id ?? null;
+  const propLookupRow = ((propLookup ?? []) as any[])[0] ?? null;
+  const defaultCleanerId: string | null = propLookupRow?.default_cleaner_id ?? null;
 
   const taskData = {
     property_id: booking.property_id,
@@ -75,9 +80,31 @@ export async function createCleaningTask(
     .single();
 
   if (error) {
+    // TURN-S1a Amendment 2 — TOCTOU race tolerance: another concurrent
+    // caller (typically the trigger fired after the host clicked
+    // Auto-Create, or vice versa) may have inserted the same booking
+    // between our SELECT-then-INSERT guard above and this call. The
+    // UNIQUE constraint on cleaning_tasks.booking_id catches that and
+    // raises 23505. Treat as no-op success and return the existing
+    // task id so callers see consistent behavior.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((error as any)?.code === "23505") {
+      const { data: raceWinner } = await supabase
+        .from("cleaning_tasks").select("id").eq("booking_id", booking.id).limit(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const winner = ((raceWinner ?? []) as any[])[0];
+      if (winner?.id) {
+        console.log(`[turnover/auto-create] 23505 race won by concurrent insert; returning existing task ${winner.id}`);
+        return winner.id;
+      }
+    }
     console.error("[turnover/auto-create] Insert error:", error);
     return null;
   }
+
+  // Reuse the property lookup from above for name + user_id.
+  const propName: string = propLookupRow?.name ?? "Property";
+  const propUserId: string | null = propLookupRow?.user_id ?? null;
 
   // Auto-send SMS to default cleaner
   if (defaultCleanerId && data) {
@@ -87,14 +114,14 @@ export async function createCleaningTask(
         .from("cleaners").select("id, name, phone").eq("id", defaultCleanerId).limit(1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cleaner = ((cleanerRows ?? []) as any[])[0];
-      const { data: propInfo } = await supabase
-        .from("properties").select("name").eq("id", booking.property_id).limit(1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const propName = ((propInfo ?? []) as any[])[0]?.name ?? "Property";
       if (cleaner) {
+        // TURN-S1a Amendment 7 — pass userId so sms_log.user_id gets
+        // populated for trigger-fired auto-assigns. Was previously
+        // NULL for every iCal-source create; the trigger path makes
+        // this the dominant case.
         await notifyCleanerAssigned(supabase,
           { id: data.id, scheduled_date: booking.check_out, cleaner_token: data.cleaner_token },
-          propName, cleaner);
+          propName, cleaner, { userId: propUserId ?? undefined });
       }
     } catch (err) {
       console.error("[turnover/auto-create] SMS notification failed:", err);

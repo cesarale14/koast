@@ -182,12 +182,14 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
   const backfill = useCallback(async () => {
     setBackfilling(true);
     try {
+      // TURN-S1a Amendment 6 (silent-fail fix per tech-debt.md:41).
       const res = await fetch("/api/turnover/auto-create", { method: "POST" });
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
       toast(`Created ${data.created} tasks, ${data.skipped} skipped`);
       router.refresh();
-    } catch {
-      toast("Backfill failed", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Backfill failed", "error");
     }
     setBackfilling(false);
   }, [toast, router]);
@@ -215,11 +217,41 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
 
   const removeCleaner = useCallback(async (id: string) => {
     try {
-      await fetch(`/api/cleaners?id=${id}`, { method: "DELETE" });
+      // TURN-S1a Amendment 6 (silent-fail fix per tech-debt.md:42).
+      const res = await fetch(`/api/cleaners?id=${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
       setCleaners((prev) => prev.filter((c) => c.id !== id));
       toast("Cleaner removed");
-    } catch { toast("Failed", "error"); }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    }
   }, [toast]);
+
+  // TURN-S1a — per-task notify state. Disables the Notify button
+  // while a send is in flight; toast surfaces success/failure.
+  const [notifying, setNotifying] = useState<Set<string>>(new Set());
+
+  const notifyCleaner = useCallback(async (taskId: string, cleanerName: string) => {
+    if (notifying.has(taskId)) return;
+    setNotifying((prev) => { const n = new Set(prev); n.add(taskId); return n; });
+    try {
+      const res = await fetch("/api/turnover/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      toast(`SMS sent to ${cleanerName}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Notify failed", "error");
+    } finally {
+      setNotifying((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
+    }
+  }, [notifying, toast]);
 
   // SMS state per cleaner: sending | success | error message
   const [smsState, setSmsState] = useState<Record<string, { status: "sending" | "success" | "error"; message?: string }>>({});
@@ -436,7 +468,9 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                         onToggle={() => toggleExpand(task.id)}
                         onUpdateStatus={updateStatus}
                         onAssign={assignCleaner}
+                        onNotify={notifyCleaner}
                         updating={updatingTask === task.id}
+                        notifying={notifying.has(task.id)}
                         compact
                       />
                     </div>
@@ -474,7 +508,9 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 onToggle={() => toggleExpand(task.id)}
                 onUpdateStatus={updateStatus}
                 onAssign={assignCleaner}
+                onNotify={notifyCleaner}
                 updating={updatingTask === task.id}
+                notifying={notifying.has(task.id)}
               />
             </div>
           ))}
@@ -535,7 +571,7 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
 }
 
 // ====== Task Card ======
-function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, onToggle, onUpdateStatus, onAssign, updating, compact }: {
+function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, onToggle, onUpdateStatus, onAssign, onNotify, updating, notifying, compact }: {
   task: Task;
   propMap: Map<string, { id: string; name: string; cover_photo_url?: string | null }>;
   bookingMap: Map<string, { id: string; guest_name: string | null; check_in: string; check_out: string }>;
@@ -545,7 +581,9 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
   onToggle: () => void;
   onUpdateStatus: (taskId: string, status: string) => Promise<void>;
   onAssign: (taskId: string, cleanerId: string) => Promise<void>;
+  onNotify: (taskId: string, cleanerName: string) => Promise<void>;
   updating: boolean;
+  notifying: boolean;
   compact?: boolean;
 }) {
   const prop = propMap.get(task.property_id);
@@ -572,7 +610,9 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
     e.preventDefault();
     e.stopPropagation();
     if (assignedCleaner) {
-      alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`);
+      // TURN-S1a — replaces the prior alert() placeholder. Real
+      // POST /api/turnover/notify → notifyCleanerReminder.
+      void onNotify(task.id, assignedCleaner.name);
     }
   };
 
@@ -638,14 +678,16 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
               </span>
             )}
 
-            {/* Notify cleaner button */}
+            {/* Notify cleaner button — only renders when a cleaner is
+                actually assigned (Q8 from MSG-S2-PRE → TURN-S1a). */}
             {assignedCleaner && task.status !== "completed" && (
               <button
                 type="button"
                 onClick={handleNotify}
-                className="p-1.5 rounded-lg transition-colors"
+                disabled={notifying}
+                className="p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ color: "var(--tideline)" }}
-                title={`Notify ${assignedCleaner.name}`}
+                title={notifying ? "Sending..." : `Notify ${assignedCleaner.name}`}
               >
                 <MessageSquare size={14} />
               </button>
@@ -746,11 +788,12 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                 </select>
                 {assignedCleaner && task.status !== "completed" && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); alert(`SMS notifications coming soon.\n\nCleaner: ${assignedCleaner.name}\nPhone: ${cleanerMap.get(task.cleaner_id!)?.phone ?? ""}`); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors flex-shrink-0"
+                    onClick={(e) => { e.stopPropagation(); void onNotify(task.id, assignedCleaner.name); }}
+                    disabled={notifying}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: "rgba(26,122,90,0.1)", color: "var(--lagoon)", borderRadius: 10 }}
                   >
-                    <MessageSquare size={12} /> Notify
+                    <MessageSquare size={12} /> {notifying ? "Sending..." : "Notify"}
                   </button>
                 )}
               </div>
