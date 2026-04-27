@@ -27,8 +27,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle, ChevronLeft } from "lucide-react";
+import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle, ChevronLeft, Sparkles } from "lucide-react";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
+import ConversationContextCard, { type ConversationContext } from "./ConversationContextCard";
 
 // ============ Types ============
 
@@ -170,6 +171,7 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [activeMessages, setActiveMessages] = useState<MessageRow[]>([]);
+  const [activeContext, setActiveContext] = useState<ConversationContext | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   // Per-thread composer state — keyed by thread.id. Stays mounted
   // when the host switches conversations so half-typed drafts survive.
@@ -212,17 +214,17 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
 
   // Fetch messages on activeId change AND fire mark-read.
   useEffect(() => {
-    if (!activeId) { setActiveMessages([]); return; }
+    if (!activeId) { setActiveMessages([]); setActiveContext(null); return; }
     let cancelled = false;
     setLoadingMessages(true);
     fetch(`/api/messages/threads/${activeId}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setActiveMessages((data?.messages ?? []) as MessageRow[]);
+        setActiveContext((data?.context ?? null) as ConversationContext | null);
       })
-      .catch(() => { if (!cancelled) setActiveMessages([]); })
+      .catch(() => { if (!cancelled) { setActiveMessages([]); setActiveContext(null); } })
       .finally(() => { if (!cancelled) setLoadingMessages(false); });
 
     // Mark-read: optimistic local update first, then fire-and-forget POST.
@@ -334,19 +336,14 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
     }
   }, [activeThread, activeComposer, sending]);
 
-  // Session 8a — automation draft handling.
-  // Pending drafts surface in their own card above the composer; they
-  // are filtered out of the main message stream so they don't render
-  // as already-sent outbound bubbles. Discarded drafts are hidden
-  // entirely (firings row is the idempotency gate, not the message).
-  const pendingDrafts = useMemo(
-    () => activeMessages.filter((m) => m.draft_status === "draft_pending_approval"),
-    [activeMessages],
-  );
+  // Session 8a.1 — automation drafts now render inline as their own
+  // bubble in the message stream (not in a card above the composer).
+  // visibleMessages keeps pending-approval drafts; only discarded
+  // drafts are hidden. The firings row remains the idempotency gate
+  // regardless of draft state — re-fire is prevented even when a
+  // draft is hard-deleted.
   const visibleMessages = useMemo(
-    () => activeMessages.filter(
-      (m) => m.draft_status !== "draft_pending_approval" && m.draft_status !== "discarded",
-    ),
+    () => activeMessages.filter((m) => m.draft_status !== "discarded"),
     [activeMessages],
   );
 
@@ -427,7 +424,7 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
       <ThreadColumn
         thread={activeThread}
         messages={visibleMessages}
-        pendingDrafts={pendingDrafts}
+        context={activeContext}
         loading={loadingMessages}
         threadScrollRef={threadScrollRef}
         mounted={mounted}
@@ -648,12 +645,12 @@ function ConversationItem({ t, active, index, onSelect }: {
 // ============ Center: Thread ============
 
 function ThreadColumn({
-  thread, messages, pendingDrafts, loading, threadScrollRef, mounted,
+  thread, messages, context, loading, threadScrollRef, mounted,
   composer, setComposer, onSend, onRetry, onApproveDraft, onDiscardDraft, sending, onBack,
 }: {
   thread: ThreadRow | null;
   messages: MessageRow[];
-  pendingDrafts: MessageRow[];
+  context: ConversationContext | null;
   loading: boolean;
   threadScrollRef: React.RefObject<HTMLDivElement>;
   mounted: boolean;
@@ -748,46 +745,44 @@ function ThreadColumn({
       </div>
 
       {/* Messages */}
-      <div ref={threadScrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5" style={{ backgroundColor: "var(--shore)" }}>
+      <div ref={threadScrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5" style={{ backgroundColor: "var(--shore)" }}>
+        {/* Session 8a.1 — context card at the top of every booking-anchored
+            or inquiry thread; replaces the prior empty-state for those. */}
+        {context && context.type !== "unknown" && <ConversationContextCard context={context} />}
+
         {loading && messages.length === 0 ? (
           <div className="text-center text-[13px]" style={{ color: "var(--tideline)" }}>Loading…</div>
         ) : messagesByDay.length === 0 ? (
-          <div className="text-center text-[13px]" style={{ color: "var(--tideline)" }}>No messages in this conversation yet.</div>
+          // Only fall back to the bare empty state if there's no context card
+          // anchoring the thread either. With a context card visible, the
+          // empty messages list is self-explanatory.
+          (!context || context.type === "unknown") && (
+            <div className="text-center text-[13px]" style={{ color: "var(--tideline)" }}>No messages in this conversation yet.</div>
+          )
         ) : (
-          messagesByDay.map((group) => (
-            <div key={group.label}>
-              <DateDivider label={group.label} />
-              <div className="mt-3 space-y-3">
-                {group.messages.map((msg) => (
-                  <MessageBubble key={msg.__optimistic?.clientId ?? msg.id} msg={msg} platform={platform} onRetry={onRetry} />
-                ))}
+          <div className="space-y-5">
+            {messagesByDay.map((group) => (
+              <div key={group.label}>
+                <DateDivider label={group.label} />
+                <div className="mt-3 space-y-3">
+                  {group.messages.map((msg) =>
+                    msg.draft_status === "draft_pending_approval" ? (
+                      <PendingDraftBubble
+                        key={msg.id}
+                        msg={msg}
+                        onApprove={() => onApproveDraft(msg)}
+                        onDiscard={() => onDiscardDraft(msg)}
+                      />
+                    ) : (
+                      <MessageBubble key={msg.__optimistic?.clientId ?? msg.id} msg={msg} platform={platform} onRetry={onRetry} />
+                    ),
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
-
-      {/* Session 8a — automation drafts pending host approval. Renders
-          above the composer, distinct from the message stream. */}
-      {pendingDrafts.length > 0 && (
-        <div
-          className="flex-shrink-0"
-          style={{
-            background: "var(--shore-soft)",
-            borderTop: "1px solid var(--hairline)",
-            borderBottom: "1px solid var(--hairline)",
-          }}
-        >
-          {pendingDrafts.map((draft) => (
-            <PendingDraftCard
-              key={draft.id}
-              draft={draft}
-              onApprove={() => onApproveDraft(draft)}
-              onDiscard={() => onDiscardDraft(draft)}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Content filter warning (Airbnb only — anti-disintermediation) */}
       <ContentFilterWarning composer={composer} platform={thread.platform} />
@@ -856,64 +851,72 @@ function ThreadColumn({
   );
 }
 
-// Session 8a — pending automation draft. Distinct visual treatment
-// (shore-soft surface, hairline border, golden left rail) so the host
-// reads it as system-generated, not a sent message. Two actions only.
-function PendingDraftCard({
-  draft,
+// Session 8a.1 — pending automation draft, rendered inline as a
+// right-aligned bubble in the conversation flow (matches outbound
+// position because drafts are outbound-direction). Visual treatment:
+// shore-soft surface, golden left-rail, "Sparkles + SUGGESTED MESSAGE"
+// header, Approve & Send + Discard actions attached to the bubble
+// itself. Replaces the off-stream PendingDraftCard from 8a.
+function PendingDraftBubble({
+  msg,
   onApprove,
   onDiscard,
 }: {
-  draft: MessageRow;
+  msg: MessageRow;
   onApprove: () => void;
   onDiscard: () => void;
 }) {
-  const body = (draft.ai_draft ?? draft.content ?? "").trim();
+  const body = (msg.ai_draft ?? msg.content ?? "").trim();
   return (
-    <div
-      style={{
-        padding: "14px 16px",
-        borderLeft: "3px solid var(--golden)",
-        background: "rgba(255,255,255,0.55)",
-      }}
-    >
-      <div
-        className="text-[10px] font-bold tracking-[0.08em] uppercase mb-1.5"
-        style={{ color: "var(--golden)" }}
-      >
-        Suggested message · pending your approval
-      </div>
-      <div
-        className="whitespace-pre-wrap text-[13px] leading-relaxed mb-3"
-        style={{ color: "var(--coastal)" }}
-      >
-        {body}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onApprove}
-          className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
+    <div className="flex justify-end">
+      <div className="max-w-[70%] flex flex-col" style={{ alignItems: "flex-end" }}>
+        <div
+          className="px-4 py-3 w-full"
           style={{
-            background: "var(--coastal)",
-            color: "var(--shore)",
-            border: "1px solid var(--coastal)",
-          }}
-        >
-          Approve & Send
-        </button>
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
-          style={{
-            background: "transparent",
-            color: "var(--tideline)",
+            borderRadius: 14,
+            background: "var(--shore-soft)",
+            borderLeft: "3px solid var(--golden)",
             border: "1px solid var(--hairline)",
+            borderLeftWidth: 3,
+            borderLeftColor: "var(--golden)",
+            color: "var(--coastal)",
           }}
         >
-          Discard
-        </button>
+          <div
+            className="flex items-center gap-1.5 mb-2 text-[10px] font-bold tracking-[0.08em] uppercase"
+            style={{ color: "var(--golden)" }}
+          >
+            <Sparkles size={10} strokeWidth={2.25} />
+            Suggested message · pending your approval
+          </div>
+          <p className="whitespace-pre-wrap text-[13px] leading-[1.5]">{body}</p>
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              type="button"
+              onClick={onApprove}
+              className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
+              style={{
+                background: "var(--coastal)",
+                color: "var(--shore)",
+                border: "1px solid var(--coastal)",
+              }}
+            >
+              Approve & Send
+            </button>
+            <button
+              type="button"
+              onClick={onDiscard}
+              className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
+              style={{
+                background: "transparent",
+                color: "var(--tideline)",
+                border: "1px solid var(--hairline)",
+              }}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
