@@ -325,10 +325,12 @@ The `notifications` table is an audit log for every outbound SMS/email/push. Wri
 ---
 
 ## VPS Workers (`~/staycommand-workers/` on Virginia 44.195.218.19)
+Source repo: [`cesarale14/staycommand-workers`](https://github.com/cesarale14/staycommand-workers) (private). Companion to this repo. Deployed to `/home/ubuntu/staycommand-workers/` on the Virginia VPS; systemd units in `<repo>/systemd/` are symlinked into `/etc/systemd/system/` per the supervised-first-run gate convention. When a session changes both repos, commit each to its own repo and mention the companion commit hash in the body — see the "Two-headed sync subsystem" playbook in the koast-development skill.
+
 - `booking_sync.py` — iCal sync + Channex revision polling (every 15 min via systemd timer)
 - `pricing_validator.py` — daily 6 AM ET, writes to `pricing_recommendations` (480 rows so far)
 - `pricing_worker.py` — rate calculation + market refresh
-- `market_sync.py` — AirROI market data collection
+- `market_sync.py` — AirROI market data collection (paused via `KOAST_DISABLE_AIRROI=true`)
 - `ical_parser.py` — iCal feed parsing
 - `db.py` — direct PostgreSQL (psycopg2) shared connection helpers
 - `status.sh` — health check
