@@ -20,6 +20,14 @@ export default async function PropertyDetailPage({
   const endDate730 = new Date();
   endDate730.setDate(endDate730.getDate() + 730);
   const end60 = endDate730.toISOString().split("T")[0]; // 24 months for calendar
+  // PD-B1: backward window for stats. Replaces the prior "last 200 by
+  // check_in DESC" sample with an explicit 6-month look-back. For our
+  // current fleet (≤2 properties, ~50 active bookings) the populations
+  // are identical; for a future power-host the windowed view is
+  // arguably more correct than a row-count cap anyway.
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const windowStart = sixMonthsAgo.toISOString().split("T")[0];
 
   // Fetch property
   const propRes = await supabase
@@ -56,12 +64,16 @@ export default async function PropertyDetailPage({
     }));
   }
 
+  // PD-B1: single bookings query covering [-6mo, +24mo]. Replaces the prior
+  // pair of queries (`last 200 by check_in DESC` for stats + `next 24 months
+  // active` for the Calendar tab). The Calendar slice is derived in JS below.
   const bookingsRes = await supabase
     .from("bookings")
     .select("id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes")
     .eq("property_id", params.id)
-    .order("check_in", { ascending: false })
-    .limit(200);
+    .lte("check_in", end60)
+    .gte("check_out", windowStart)
+    .order("check_in", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allBookings = (bookingsRes.data ?? []) as any[];
 
@@ -87,27 +99,43 @@ export default async function PropertyDetailPage({
   );
   const totalBookingsCount = allBookings.filter((b: { status: string }) => b.status !== "cancelled").length;
 
-  // ADR
+  // PD-B1: single calendar_rates query covering [monthStart, end60].
+  // Replaces the prior pair (`current month base rates` for ADR + `next 24
+  // months base` for the Calendar tab). Both downstream consumers derive
+  // their slice in JS.
   const ratesRes = await supabase
     .from("calendar_rates")
-    .select("applied_rate")
+    .select("property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source")
     .eq("property_id", params.id)
     .is("channel_code", null)
     .gte("date", monthStart)
-    .lte("date", monthEnd)
-    .not("applied_rate", "is", null);
-  const rates = (ratesRes.data ?? []) as { applied_rate: number | null }[];
+    .lte("date", end60);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allRates = (ratesRes.data ?? []) as any[];
+  const monthRates = allRates.filter(
+    (r: { date: string; applied_rate: number | null }) =>
+      r.date >= monthStart && r.date <= monthEnd && r.applied_rate != null
+  );
   const adr =
-    rates.length > 0
-      ? Math.round(rates.reduce((s, r) => s + (r.applied_rate ?? 0), 0) / rates.length)
+    monthRates.length > 0
+      ? Math.round(
+          monthRates.reduce(
+            (s: number, r: { applied_rate: number | null }) => s + (r.applied_rate ?? 0),
+            0
+          ) / monthRates.length
+        )
       : 0;
 
-  // Rating (avg of guest_reviews.rating)
+  // Rating (avg of guest_reviews.rating). PD-B1: capped at the most
+  // recent 1000 reviews so the payload stays bounded for power-hosts.
+  // For our current fleet the cap is well above the actual review count.
   const ratingRes = await supabase
     .from("guest_reviews")
     .select("rating")
     .eq("property_id", params.id)
-    .not("rating", "is", null);
+    .not("rating", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1000);
   const ratingRows = (ratingRes.data ?? []) as { rating: number | string | null }[];
   let rating = 0;
   if (ratingRows.length > 0) {
@@ -168,22 +196,15 @@ export default async function PropertyDetailPage({
   // Pricing recommendations are now fetched client-side by the
   // polish-pass PricingTab via usePricingTab (PR D). No server prefetch.
 
-  // Calendar data (next 60 days)
-  const calBookingsRes = await supabase
-    .from("bookings")
-    .select("id, property_id, guest_name, guest_email, guest_phone, check_in, check_out, platform, total_price, num_guests, status, notes")
-    .eq("property_id", params.id)
-    .lte("check_in", end60)
-    .gte("check_out", today)
-    .in("status", ["confirmed", "completed", "pending"]);
-
-  const calRatesRes = await supabase
-    .from("calendar_rates")
-    .select("property_id, date, base_rate, suggested_rate, applied_rate, min_stay, is_available, rate_source")
-    .eq("property_id", params.id)
-    .is("channel_code", null)
-    .gte("date", today)
-    .lte("date", end60);
+  // PD-B1: derive Calendar slices from the wider single queries.
+  const ACTIVE_STATUSES = new Set(["confirmed", "completed", "pending"]);
+  const calendarBookings = allBookings.filter(
+    (b: { check_in: string; check_out: string; status: string }) =>
+      b.check_in <= end60 && b.check_out >= today && ACTIVE_STATUSES.has(b.status)
+  );
+  const calendarRates = allRates.filter(
+    (r: { date: string }) => r.date >= today && r.date <= end60
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channels = ((channelsRes.data ?? []) as any[]).map((ch) => ({
@@ -200,8 +221,8 @@ export default async function PropertyDetailPage({
       stats={{ occupancy, revenue, adr, totalBookings: totalBookingsCount, rating, avgLOS }}
       channelRevenue={channelRevenue}
       cleaningToday={cleaningToday}
-      calendarBookings={(calBookingsRes.data ?? []) as never[]}
-      calendarRates={(calRatesRes.data ?? []) as never[]}
+      calendarBookings={calendarBookings as never[]}
+      calendarRates={calendarRates as never[]}
       channels={channels}
     />
   );

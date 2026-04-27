@@ -2,6 +2,100 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
+import { propertyUpdateSchema, flattenFieldErrors } from "@/lib/validators/properties";
+import { geocodeAddress } from "@/lib/geocode";
+
+/**
+ * PUT /api/properties/[propertyId]
+ *
+ * Host-editable update from the Property Settings modal. Validates body via
+ * `propertyUpdateSchema`. If the body has no lat/lng but does have an address,
+ * server-side geocodes via Nominatim before writing.
+ *
+ * Note on Nominatim usage: the lift to server side means all geocode calls
+ * originate from a single Vercel IP. Nominatim's 1 req/sec policy still holds
+ * comfortably at our current write volume (a few property edits per day across
+ * the fleet). A future bulk-import flow that exceeds that rate would need a
+ * request queue or a paid geocoder.
+ *
+ * Note on `updated_at`: explicitly bumped here. Drizzle's `defaultNow()` only
+ * fires on INSERT and there is no BEFORE UPDATE trigger on the properties
+ * table, so other write paths (booking_sync, messaging sync, Channex
+ * reconnect) leave `updated_at` stale. Tracked as a separate schema migration.
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { propertyId: string } }
+) {
+  try {
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isOwner = await verifyPropertyOwnership(user.id, params.propertyId);
+    if (!isOwner) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const parsed = propertyUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "validation_failed",
+          field_errors: flattenFieldErrors(parsed.error.issues),
+        },
+        { status: 400 }
+      );
+    }
+
+    const data: Record<string, unknown> = { ...parsed.data };
+
+    // Server-side geocode fallback when lat/lng absent but address present.
+    const hasCoords = data.latitude != null && data.longitude != null;
+    const hasAddress = !!(data.address || data.city);
+    if (!hasCoords && hasAddress) {
+      try {
+        const result = await geocodeAddress(
+          (data.address as string | null | undefined) ?? null,
+          (data.city as string | null | undefined) ?? null,
+          (data.state as string | null | undefined) ?? null
+        );
+        if (result) {
+          data.latitude = result.lat;
+          data.longitude = result.lng;
+        }
+      } catch {
+        /* geocode failure is non-fatal — save without coords */
+      }
+    }
+
+    data.updated_at = new Date().toISOString();
+
+    const supabase = createServiceClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rows, error } = await (supabase.from("properties") as any)
+      .update(data)
+      .eq("id", params.propertyId)
+      .select()
+      .limit(1);
+
+    if (error) {
+      return NextResponse.json({ error: `Update failed: ${error.message}` }, { status: 500 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updated = ((rows ?? []) as any[])[0] ?? null;
+    return NextResponse.json({ ok: true, property: updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[properties/PUT]", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
 
 /**
  * DELETE /api/properties/[propertyId]

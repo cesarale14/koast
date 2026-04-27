@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   ArrowLeft,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import PolishCalendarView from "@/components/polish/CalendarView";
 import PolishPricingTab from "@/components/polish/PricingTab";
@@ -477,7 +476,7 @@ function OverviewTab({
       <StatsGrid stats={stats} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-        <UpcomingBookings bookings={upcomingBookings} />
+        <UpcomingBookings bookings={upcomingBookings} propertyId={property.id} />
         <ChannelPerformance
           channelRevenue={channelRevenue}
           totalRevenue={stats.revenue}
@@ -684,7 +683,7 @@ function GlassStatCard({
   );
 }
 
-function UpcomingBookings({ bookings }: { bookings: Booking[] }) {
+function UpcomingBookings({ bookings, propertyId }: { bookings: Booking[]; propertyId: string }) {
   return (
     <div className="pd-anim" style={{ animationDelay: "700ms" }}>
       <SectionLabel label="Upcoming bookings" />
@@ -713,7 +712,7 @@ function UpcomingBookings({ bookings }: { bookings: Booking[] }) {
             return (
               <Link
                 key={b.id}
-                href={`/calendar?property=${b.id}`}
+                href={`/calendar?property=${propertyId}&date=${b.check_in}`}
                 className="flex items-center gap-3 px-4 py-3 transition-colors"
                 style={{
                   borderBottom: i < bookings.length - 1 ? "1px solid rgba(237,231,219,0.5)" : "none",
@@ -900,50 +899,56 @@ function PropertySettingsModal({
     property_type: property.property_type ?? "entire_home",
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const handleSave = useCallback(async () => {
     setSaving(true);
-    let lat: number | null = form.latitude ? parseFloat(form.latitude) : null;
-    let lng: number | null = form.longitude ? parseFloat(form.longitude) : null;
-    if (!lat && (form.address || form.city)) {
-      try {
-        const { geocodeAddress } = await import("@/lib/geocode");
-        const result = await geocodeAddress(form.address, form.city, form.state);
-        if (result) {
-          lat = result.lat;
-          lng = result.lng;
-        }
-      } catch {
-        /* geocode failed — save without coords */
+    setFieldErrors({});
+
+    const latNum = form.latitude.trim() ? Number(form.latitude) : null;
+    const lngNum = form.longitude.trim() ? Number(form.longitude) : null;
+
+    const body = {
+      name: form.name,
+      address: form.address || null,
+      city: form.city || null,
+      state: form.state || null,
+      zip: form.zip || null,
+      latitude: latNum,
+      longitude: lngNum,
+      bedrooms: form.bedrooms,
+      bathrooms: form.bathrooms,
+      max_guests: form.max_guests,
+      property_type: form.property_type,
+    };
+
+    try {
+      const res = await fetch(`/api/properties/${property.id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 400 && data?.field_errors) {
+        setFieldErrors(data.field_errors as Record<string, string>);
+        setSaving(false);
+        return;
       }
-    }
+      if (!res.ok) {
+        toast(data?.error ?? `Failed to update property (HTTP ${res.status})`, "error");
+        setSaving(false);
+        return;
+      }
 
-    const supabase = createClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const table = supabase.from("properties") as any;
-    const { error } = await table
-      .update({
-        name: form.name,
-        address: form.address || null,
-        city: form.city || null,
-        state: form.state || null,
-        zip: form.zip || null,
-        latitude: lat,
-        longitude: lng,
-        bedrooms: form.bedrooms,
-        bathrooms: form.bathrooms,
-        max_guests: form.max_guests,
-        property_type: form.property_type,
-      })
-      .eq("id", property.id);
-
-    setSaving(false);
-    if (error) {
-      toast("Failed to update property", "error");
-      return;
+      setSaving(false);
+      toast("Property updated");
+      onSaved();
+      onClose();
+    } catch (err) {
+      setSaving(false);
+      toast(err instanceof Error ? err.message : "Failed to update property", "error");
     }
-    toast("Property updated");
-    onSaved();
-    onClose();
   }, [form, property.id, toast, onClose, onSaved]);
 
   const handleDelete = useCallback(async () => {
@@ -995,15 +1000,16 @@ function PropertySettingsModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          <Field label="Property name">
+          <Field label="Property name" error={fieldErrors.name}>
             <TextInput
               value={form.name}
               onChange={(v) => setForm({ ...form, name: v })}
               placeholder="e.g. Villa Jamaica"
+              error={fieldErrors.name}
             />
           </Field>
 
-          <Field label="Address">
+          <Field label="Address" error={fieldErrors.address}>
             <AddressAutocomplete
               value={form.address}
               onChange={(v) => setForm({ ...form, address: v })}
@@ -1023,18 +1029,18 @@ function PropertySettingsModal({
           </Field>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="City">
-              <TextInput value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
+            <Field label="City" error={fieldErrors.city}>
+              <TextInput value={form.city} onChange={(v) => setForm({ ...form, city: v })} error={fieldErrors.city} />
             </Field>
-            <Field label="State">
-              <TextInput value={form.state} onChange={(v) => setForm({ ...form, state: v })} />
+            <Field label="State" error={fieldErrors.state}>
+              <TextInput value={form.state} onChange={(v) => setForm({ ...form, state: v })} error={fieldErrors.state} />
             </Field>
-            <Field label="ZIP">
-              <TextInput value={form.zip} onChange={(v) => setForm({ ...form, zip: v })} />
+            <Field label="ZIP" error={fieldErrors.zip}>
+              <TextInput value={form.zip} onChange={(v) => setForm({ ...form, zip: v })} error={fieldErrors.zip} />
             </Field>
           </div>
 
-          <Field label="Property type">
+          <Field label="Property type" error={fieldErrors.property_type}>
             <select
               value={form.property_type}
               onChange={(e) => setForm({ ...form, property_type: e.target.value })}
@@ -1058,14 +1064,14 @@ function PropertySettingsModal({
           </Field>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Bedrooms">
+            <Field label="Bedrooms" error={fieldErrors.bedrooms}>
               <Stepper
                 value={form.bedrooms}
                 min={0}
                 onChange={(v) => setForm({ ...form, bedrooms: v })}
               />
             </Field>
-            <Field label="Bathrooms">
+            <Field label="Bathrooms" error={fieldErrors.bathrooms}>
               <Stepper
                 value={form.bathrooms}
                 min={0}
@@ -1073,7 +1079,7 @@ function PropertySettingsModal({
                 onChange={(v) => setForm({ ...form, bathrooms: v })}
               />
             </Field>
-            <Field label="Max guests">
+            <Field label="Max guests" error={fieldErrors.max_guests}>
               <Stepper
                 value={form.max_guests}
                 min={1}

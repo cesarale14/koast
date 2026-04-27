@@ -2,7 +2,15 @@
 
 import { Minus, Plus } from "lucide-react";
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+}) {
   return (
     <div>
       <label
@@ -12,6 +20,14 @@ export function Field({ label, children }: { label: string; children: React.Reac
         {label}
       </label>
       {children}
+      {error && (
+        <span
+          className="block mt-1 text-[11px]"
+          style={{ color: "var(--coral-reef)" }}
+        >
+          {error}
+        </span>
+      )}
     </div>
   );
 }
@@ -20,11 +36,14 @@ export function TextInput({
   value,
   onChange,
   placeholder,
+  error,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  error?: string;
 }) {
+  const idleBorder = error ? "var(--coral-reef)" : "var(--dry-sand)";
   return (
     <input
       type="text"
@@ -34,7 +53,7 @@ export function TextInput({
       className="w-full outline-none transition-all"
       style={{
         padding: "9px 12px",
-        border: "1.5px solid var(--dry-sand)",
+        border: `1.5px solid ${idleBorder}`,
         borderRadius: 10,
         fontSize: 14,
         fontWeight: 500,
@@ -42,11 +61,13 @@ export function TextInput({
         backgroundColor: "rgba(255,255,255,0.7)",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = "var(--golden)";
-        e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)";
+        e.currentTarget.style.borderColor = error ? "var(--coral-reef)" : "var(--golden)";
+        e.currentTarget.style.boxShadow = error
+          ? "0 0 0 3px rgba(196,64,64,0.12)"
+          : "0 0 0 3px rgba(196,154,90,0.12)";
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "var(--dry-sand)";
+        e.currentTarget.style.borderColor = idleBorder;
         e.currentTarget.style.boxShadow = "";
       }}
     />
