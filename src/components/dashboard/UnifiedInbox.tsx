@@ -70,6 +70,11 @@ interface MessageRow {
   read_at: string | null;
   channex_inserted_at: string | null;
   created_at: string;
+  // Session 8a — automation draft fields. ai_draft holds the
+  // template-rendered body; draft_status discriminates the lifecycle.
+  ai_draft?: string | null;
+  draft_status?: string | null;
+  sent_at?: string | null;
   // Optimistic-UI state — only set on temp rows. Slice 2.
   __optimistic?: { status: "sending" | "sent" | "failed"; clientId: string; error?: string };
 }
@@ -329,6 +334,73 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
     }
   }, [activeThread, activeComposer, sending]);
 
+  // Session 8a — automation draft handling.
+  // Pending drafts surface in their own card above the composer; they
+  // are filtered out of the main message stream so they don't render
+  // as already-sent outbound bubbles. Discarded drafts are hidden
+  // entirely (firings row is the idempotency gate, not the message).
+  const pendingDrafts = useMemo(
+    () => activeMessages.filter((m) => m.draft_status === "draft_pending_approval"),
+    [activeMessages],
+  );
+  const visibleMessages = useMemo(
+    () => activeMessages.filter(
+      (m) => m.draft_status !== "draft_pending_approval" && m.draft_status !== "discarded",
+    ),
+    [activeMessages],
+  );
+
+  const approveDraft = useCallback(async (draftMsg: MessageRow) => {
+    if (!activeThread) return;
+    const body = (draftMsg.ai_draft ?? draftMsg.content ?? "").trim();
+    if (!body) return;
+    try {
+      const res = await fetch(`/api/messages/threads/${activeThread.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      const real = data.message as MessageRow | undefined;
+      // Flip the original draft to 'sent' locally and append the
+      // real outbound row returned by the send route.
+      setActiveMessages((prev) => {
+        const flipped = prev.map((m) =>
+          m.id === draftMsg.id ? { ...m, draft_status: "sent" } : m,
+        );
+        return real ? [...flipped, real] : flipped;
+      });
+    } catch (err) {
+      console.error("[UnifiedInbox] approve draft failed:", err);
+    }
+  }, [activeThread]);
+
+  const discardDraft = useCallback(async (draftMsg: MessageRow) => {
+    if (!activeThread) return;
+    // Optimistic: hide immediately.
+    setActiveMessages((prev) => prev.map((m) =>
+      m.id === draftMsg.id ? { ...m, draft_status: "discarded" } : m,
+    ));
+    try {
+      const res = await fetch(`/api/messages/threads/${activeThread.id}/discard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: draftMsg.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error("[UnifiedInbox] discard draft failed:", err);
+      // Roll back optimistic hide.
+      setActiveMessages((prev) => prev.map((m) =>
+        m.id === draftMsg.id ? { ...m, draft_status: "draft_pending_approval" } : m,
+      ));
+    }
+  }, [activeThread]);
+
   const retrySend = useCallback((failedMsg: MessageRow) => {
     if (!failedMsg.__optimistic) return;
     void sendMessage(failedMsg.content, failedMsg.__optimistic.clientId);
@@ -354,7 +426,8 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
 
       <ThreadColumn
         thread={activeThread}
-        messages={activeMessages}
+        messages={visibleMessages}
+        pendingDrafts={pendingDrafts}
         loading={loadingMessages}
         threadScrollRef={threadScrollRef}
         mounted={mounted}
@@ -362,6 +435,8 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
         setComposer={setActiveComposer}
         onSend={() => void sendMessage()}
         onRetry={retrySend}
+        onApproveDraft={approveDraft}
+        onDiscardDraft={discardDraft}
         sending={sending}
         onBack={() => setActiveId(null)}
       />
@@ -573,11 +648,12 @@ function ConversationItem({ t, active, index, onSelect }: {
 // ============ Center: Thread ============
 
 function ThreadColumn({
-  thread, messages, loading, threadScrollRef, mounted,
-  composer, setComposer, onSend, onRetry, sending, onBack,
+  thread, messages, pendingDrafts, loading, threadScrollRef, mounted,
+  composer, setComposer, onSend, onRetry, onApproveDraft, onDiscardDraft, sending, onBack,
 }: {
   thread: ThreadRow | null;
   messages: MessageRow[];
+  pendingDrafts: MessageRow[];
   loading: boolean;
   threadScrollRef: React.RefObject<HTMLDivElement>;
   mounted: boolean;
@@ -585,6 +661,8 @@ function ThreadColumn({
   setComposer: (v: string) => void;
   onSend: () => void;
   onRetry: (msg: MessageRow) => void;
+  onApproveDraft: (msg: MessageRow) => void;
+  onDiscardDraft: (msg: MessageRow) => void;
   sending: boolean;
   onBack: () => void;
 }) {
@@ -689,6 +767,28 @@ function ThreadColumn({
         )}
       </div>
 
+      {/* Session 8a — automation drafts pending host approval. Renders
+          above the composer, distinct from the message stream. */}
+      {pendingDrafts.length > 0 && (
+        <div
+          className="flex-shrink-0"
+          style={{
+            background: "var(--shore-soft)",
+            borderTop: "1px solid var(--hairline)",
+            borderBottom: "1px solid var(--hairline)",
+          }}
+        >
+          {pendingDrafts.map((draft) => (
+            <PendingDraftCard
+              key={draft.id}
+              draft={draft}
+              onApprove={() => onApproveDraft(draft)}
+              onDiscard={() => onDiscardDraft(draft)}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Content filter warning (Airbnb only — anti-disintermediation) */}
       <ContentFilterWarning composer={composer} platform={thread.platform} />
 
@@ -751,6 +851,69 @@ function ThreadColumn({
             <Send size={15} strokeWidth={2} />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Session 8a — pending automation draft. Distinct visual treatment
+// (shore-soft surface, hairline border, golden left rail) so the host
+// reads it as system-generated, not a sent message. Two actions only.
+function PendingDraftCard({
+  draft,
+  onApprove,
+  onDiscard,
+}: {
+  draft: MessageRow;
+  onApprove: () => void;
+  onDiscard: () => void;
+}) {
+  const body = (draft.ai_draft ?? draft.content ?? "").trim();
+  return (
+    <div
+      style={{
+        padding: "14px 16px",
+        borderLeft: "3px solid var(--golden)",
+        background: "rgba(255,255,255,0.55)",
+      }}
+    >
+      <div
+        className="text-[10px] font-bold tracking-[0.08em] uppercase mb-1.5"
+        style={{ color: "var(--golden)" }}
+      >
+        Suggested message · pending your approval
+      </div>
+      <div
+        className="whitespace-pre-wrap text-[13px] leading-relaxed mb-3"
+        style={{ color: "var(--coastal)" }}
+      >
+        {body}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onApprove}
+          className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
+          style={{
+            background: "var(--coastal)",
+            color: "var(--shore)",
+            border: "1px solid var(--coastal)",
+          }}
+        >
+          Approve & Send
+        </button>
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
+          style={{
+            background: "transparent",
+            color: "var(--tideline)",
+            border: "1px solid var(--hairline)",
+          }}
+        >
+          Discard
+        </button>
       </div>
     </div>
   );

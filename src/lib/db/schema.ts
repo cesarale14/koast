@@ -256,7 +256,10 @@ export const messages = pgTable("messages", {
   attachments: jsonb("attachments").notNull().default([]),
   channexMeta: jsonb("channex_meta"),
   aiDraft: text("ai_draft"),
-  aiDraftStatus: text("ai_draft_status").default("none"),
+  // Session 8a: renamed from ai_draft_status. Union now covers AI-generated
+  // drafts AND template-rendered drafts produced by messaging_executor.py.
+  // Values: none | generated | sent | draft_pending_approval | discarded
+  draftStatus: text("draft_status").default("none"),
   readAt: timestamp("read_at", { withTimezone: true }),
   channexInsertedAt: timestamp("channex_inserted_at", { withTimezone: true }),
   channexUpdatedAt: timestamp("channex_updated_at", { withTimezone: true }),
@@ -277,6 +280,24 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   booking: one(bookings, { fields: [messages.bookingId], references: [bookings.id] }),
   thread: one(messageThreads, { fields: [messages.threadId], references: [messageThreads.id] }),
 }));
+
+// ==================== Message Automation Firings (Session 8a) ====================
+
+// Idempotency table for the messaging template executor. Worker
+// INSERT ON CONFLICT DO NOTHING RETURNING id; draft message is
+// created only when the insert succeeded. Discarding a draft does
+// NOT remove the firings row — re-fire is gated here, not by the
+// draft's eventual status.
+export const messageAutomationFirings = pgTable("message_automation_firings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  templateId: uuid("template_id").notNull().references(() => messageTemplates.id, { onDelete: "cascade" }),
+  bookingId: uuid("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
+  draftMessageId: uuid("draft_message_id").references(() => messages.id, { onDelete: "set null" }),
+  firedAt: timestamp("fired_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_message_automation_firings_unique").on(t.templateId, t.bookingId),
+  index("idx_message_automation_firings_template").on(t.templateId),
+]);
 
 // ==================== Cleaning Tasks ====================
 

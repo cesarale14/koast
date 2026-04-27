@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     // Save draft to message
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("messages") as any)
-      .update({ ai_draft: draft, ai_draft_status: "generated" })
+      .update({ ai_draft: draft, draft_status: "generated" })
       .eq("id", messageId);
 
     return NextResponse.json({ draft, messageId });

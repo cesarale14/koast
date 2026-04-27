@@ -38,7 +38,10 @@ export async function GET(
     const { data: msgs } = await (supabase.from("messages") as any)
       .select(
         "id, thread_id, channex_message_id, direction, sender, sender_name, content, " +
-        "attachments, read_at, channex_inserted_at, created_at"
+        "attachments, read_at, channex_inserted_at, created_at, " +
+        // Session 8a: surface ai_draft + draft_status so the inbox
+        // can render pending automation drafts inline.
+        "ai_draft, draft_status, sent_at"
       )
       .eq("thread_id", threadId)
       .order("channex_inserted_at", { ascending: true });

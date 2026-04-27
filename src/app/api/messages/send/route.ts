@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         direction: "outbound",
         sender_name: "Host",
         content,
-        ai_draft_status: isAutoReply ? "sent" : "none",
+        draft_status: isAutoReply ? "sent" : "none",
         sent_at: new Date().toISOString(),
       })
       .select("id")
