@@ -27,9 +27,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle, ChevronLeft, Sparkles } from "lucide-react";
+import { Search, Send, Phone, MoreHorizontal, MessageCircle, User, RotateCcw, AlertTriangle, ChevronLeft } from "lucide-react";
 import { PLATFORMS, platformKeyFrom } from "@/lib/platforms";
 import ConversationContextCard, { type ConversationContext } from "./ConversationContextCard";
+import PendingDraftBubble from "./PendingDraftBubble";
 
 // ============ Types ============
 
@@ -845,77 +846,6 @@ function ThreadColumn({
           >
             <Send size={15} strokeWidth={2} />
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Session 8a.1 — pending automation draft, rendered inline as a
-// right-aligned bubble in the conversation flow (matches outbound
-// position because drafts are outbound-direction). Visual treatment:
-// shore-soft surface, golden left-rail, "Sparkles + SUGGESTED MESSAGE"
-// header, Approve & Send + Discard actions attached to the bubble
-// itself. Replaces the off-stream PendingDraftCard from 8a.
-function PendingDraftBubble({
-  msg,
-  onApprove,
-  onDiscard,
-}: {
-  msg: MessageRow;
-  onApprove: () => void;
-  onDiscard: () => void;
-}) {
-  const body = (msg.ai_draft ?? msg.content ?? "").trim();
-  return (
-    <div className="flex justify-end">
-      <div className="max-w-[70%] flex flex-col" style={{ alignItems: "flex-end" }}>
-        <div
-          className="px-4 py-3 w-full"
-          style={{
-            borderRadius: 14,
-            background: "var(--shore-soft)",
-            borderLeft: "3px solid var(--golden)",
-            border: "1px solid var(--hairline)",
-            borderLeftWidth: 3,
-            borderLeftColor: "var(--golden)",
-            color: "var(--coastal)",
-          }}
-        >
-          <div
-            className="flex items-center gap-1.5 mb-2 text-[10px] font-bold tracking-[0.08em] uppercase"
-            style={{ color: "var(--golden)" }}
-          >
-            <Sparkles size={10} strokeWidth={2.25} />
-            Suggested message · pending your approval
-          </div>
-          <p className="whitespace-pre-wrap text-[13px] leading-[1.5]">{body}</p>
-          <div className="flex items-center gap-2 mt-3">
-            <button
-              type="button"
-              onClick={onApprove}
-              className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
-              style={{
-                background: "var(--coastal)",
-                color: "var(--shore)",
-                border: "1px solid var(--coastal)",
-              }}
-            >
-              Approve & Send
-            </button>
-            <button
-              type="button"
-              onClick={onDiscard}
-              className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors"
-              style={{
-                background: "transparent",
-                color: "var(--tideline)",
-                border: "1px solid var(--hairline)",
-              }}
-            >
-              Discard
-            </button>
-          </div>
         </div>
       </div>
     </div>
