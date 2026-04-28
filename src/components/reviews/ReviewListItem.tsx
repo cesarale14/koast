@@ -69,7 +69,7 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
         className="text-[10px] font-semibold px-2 py-0.5"
         style={{ borderRadius: 999, background: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}
       >
-        Responded
+        Replied
       </span>
     );
   }
@@ -88,7 +88,7 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
       className="text-[10px] font-semibold px-2 py-0.5"
       style={{ borderRadius: 999, background: "rgba(212,150,11,0.1)", color: "var(--amber-tide)" }}
     >
-      Needs response
+      Needs reply
     </span>
   );
 }

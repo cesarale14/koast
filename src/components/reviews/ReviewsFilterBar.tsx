@@ -15,13 +15,18 @@ interface ReviewsFilterBarProps {
 }
 
 // RDX-6 — "Closed" bucket holds expired-unreplied reviews. Default
-// 'All' view excludes these so they don't drag down "Needs response"
-// (the response window is over, action isn't possible). Click the
+// 'All' view excludes these so they don't drag down "Needs reply"
+// (the reply window is over, action isn't possible). Click the
 // Closed chip to surface them as muted history.
 const CHIPS: Array<{ key: ReviewFilter; label: string; muted?: boolean }> = [
   { key: "all", label: "All" },
-  { key: "needs_response", label: "Needs response" },
-  { key: "responded", label: "Responded" },
+  // Session 6.7c — user-visible labels disambiguated to prevent the
+  // host confusion where "respond" overloads with both the public reply
+  // and the host→guest counter-review. Filter keys stay as
+  // `needs_response` / `responded` to avoid breaking persisted state
+  // and the URL hash callers downstream.
+  { key: "needs_response", label: "Needs reply" },
+  { key: "responded", label: "Replied" },
   { key: "bad", label: "Bad reviews" },
   { key: "private", label: "Private feedback" },
   { key: "closed", label: "Closed", muted: true },
@@ -130,7 +135,7 @@ export default function ReviewsFilterBar({
           <option value="oldest">Oldest</option>
           <option value="lowest_rating">Lowest rated</option>
           <option value="highest_rating">Highest rated</option>
-          <option value="needs_response">Needs response first</option>
+          <option value="needs_response">Needs reply first</option>
         </select>
       </div>
     </div>
