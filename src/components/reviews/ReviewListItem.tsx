@@ -79,7 +79,7 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
         className="text-[10px] font-semibold px-2 py-0.5"
         style={{ borderRadius: 999, background: "rgba(42,90,138,0.12)", color: "var(--deep-water)" }}
       >
-        Response ready
+        Draft ready
       </span>
     );
   }
