@@ -44,6 +44,18 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleString();
 }
 
+// Session 6.7.1 — same cleanup the list card already does. Stripping
+// the legacy " - StayCommand" / " - Koast" suffix until the property
+// table is backfilled fully.
+function cleanPropertyName(name: string): string {
+  return (name ?? "").replace(/ - StayCommand$/i, "").replace(/ - Koast$/i, "").trim();
+}
+
+function formatDisclosureDate(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function nightsBetween(ci: string | null, co: string | null): number | null {
   if (!ci || !co) return null;
   const a = new Date(ci).getTime();
@@ -514,11 +526,21 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
             </section>
           )}
 
-          {/* Reply composer */}
-          {!review.response_sent && (
+          {/* Session 6.7.1 — Two distinct host actions, clearly audienced.
+              Both sections are rendered separately with their own headers
+              so the host knows which surface they're acting on:
+                1. Public reply on {property}    → Channex POST /reviews/:id/reply
+                2. Submit a review for {guest}   → POST /reviews/:id/guest_review
+              Pre-disclosure reviews (`is_hidden=true`) hide the reply
+              section entirely — there's no review text to reply to yet —
+              and elevate the counter-review section as the primary action. */}
+
+          {/* Reply composer — visible only when the review is disclosed
+              AND the host hasn't already replied. */}
+          {!review.is_hidden && !review.response_sent && (
             <section>
               <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--golden)" }}>
-                Your reply
+                Public reply on {cleanPropertyName(review.property_name)}
               </h3>
               {channelRule && (
                 <p className="text-[11px] mb-2" style={{ color: "var(--tideline)" }}>
@@ -563,7 +585,6 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                   <Check size={12} />
                   {publishing ? "Publishing…" : "Publish to Channex"}
                 </button>
-                {guestReviewBlock && <div className="ml-auto">{guestReviewBlock}</div>}
               </div>
               <p className="text-[11px] mt-2" style={{ color: "var(--tideline)" }}>
                 {review.response_draft && !review.response_sent
@@ -573,10 +594,10 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
             </section>
           )}
 
-          {review.response_sent && (
+          {!review.is_hidden && review.response_sent && (
             <section>
               <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--lagoon)" }}>
-                Your reply
+                Public reply on {cleanPropertyName(review.property_name)}
               </h3>
               <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: "var(--coastal)" }}>
                 {review.response_draft || review.incoming_text}
@@ -585,7 +606,25 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: "var(--lagoon)" }}>
                   <CheckCircle2 size={11} /> Published
                 </span>
-                {guestReviewBlock && guestReviewBlock}
+              </div>
+            </section>
+          )}
+
+          {/* Counter-review section — separate from the public reply. Always
+              visible (subject to the existing channex_review_id / submission-
+              already-sent / window-expired gates inside guestReviewBlock). */}
+          {guestReviewBlock && (
+            <section>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--golden)" }}>
+                Submit a review for {review.display_guest_name}
+              </h3>
+              <p className="text-[11px] mb-3" style={{ color: "var(--tideline)" }}>
+                {review.is_hidden
+                  ? `Your review of the guest is sent to Airbnb. Once you submit, the guest's review of ${cleanPropertyName(review.property_name)} is revealed to you${review.expired_at ? ` — or it auto-reveals when the disclosure window closes on ${formatDisclosureDate(review.expired_at)}` : ""}.`
+                  : "Airbnb's two-sided review model: your review of the guest is private to them until both sides have submitted (or the 14-day window expires)."}
+              </p>
+              <div className="flex">
+                {guestReviewBlock}
               </div>
             </section>
           )}
