@@ -204,7 +204,7 @@ export default function ReviewsDashboardStrip({ propertyIds }: ReviewsDashboardS
         sublabel="rolling 30 days"
       />
       <Tile
-        label="Response rate"
+        label="Reply rate"
         value={metrics.response_rate != null ? `${metrics.response_rate}%` : "—"}
         sublabel="lifetime"
       />
