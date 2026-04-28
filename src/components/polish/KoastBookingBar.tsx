@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState, type CSSProperties, type MouseEvent } from "react";
 import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
+import { resolveBookingPillLabel } from "@/lib/guest-name";
 
 // New (Apr 21) API modeled on Airbnb's multicalendar mechanic:
 //   - `borderRadius` drives the pill cap shape (both/left/right/none).
@@ -82,14 +83,12 @@ function radiusCss(shape: BarBorderRadius): string {
   }
 }
 
-function firstAndInitial(name: string | null): string {
-  if (!name) return "Guest";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "Guest";
-  const first = parts[0];
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return last ? `${first} ${last}.` : first;
-}
+// Session 6.7 — label rendering moved to the canonical helper at
+// `src/lib/guest-name.ts:resolveBookingPillLabel`. The local
+// `firstAndInitial` was sentinel-blind: it rendered "Airbnb Guest"
+// (the iCal sync's no-name fallback) as the literal "Airbnb G." on
+// the pill. Shared helper handles sentinel + sync-artifact
+// (`guest_name='X None'`) + platform-aware fallback.
 
 const SUBTLE_BORDER = "1px solid rgba(255,255,255,0.18)";
 
@@ -110,7 +109,7 @@ export function KoastBookingBar({
   const shape: BarBorderRadius = borderRadiusProp ?? (position ? positionToRadius(position) : "both");
   const config = PLATFORMS[platform];
   const showLabel = shape === "left" || shape === "both";
-  const label = firstAndInitial(guest);
+  const label = resolveBookingPillLabel({ guestName: guest, platform });
   const title = `${config.name} · ${label} · ${checkIn} → ${checkOut}`;
   const hPad = compact ? 10 : 14;
   const [hover, setHover] = useState(false);

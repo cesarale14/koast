@@ -69,6 +69,7 @@ export async function GET() {
         is_bad_review: guestReviews.isBadReview,
         is_low_rating: guestReviews.isLowRating,
         is_flagged_by_host: guestReviews.isFlaggedByHost,
+        is_hidden: guestReviews.isHidden,
         guest_review_submitted_at: guestReviews.guestReviewSubmittedAt,
         guest_review_channex_acked_at: guestReviews.guestReviewChannexAckedAt,
         guest_review_airbnb_confirmed_at: guestReviews.guestReviewAirbnbConfirmedAt,
@@ -196,6 +197,7 @@ export async function GET() {
         is_bad_review: r.is_bad_review ?? false,
         is_low_rating: r.is_low_rating ?? false,
         is_flagged_by_host: r.is_flagged_by_host ?? false,
+        is_hidden: r.is_hidden ?? false,
         // Per-review channel: linked booking wins; else default airbnb
         // (Villa Jamaica is Airbnb-only today; BDC reviews will need an
         // explicit `ota` column on guest_reviews before they arrive — see

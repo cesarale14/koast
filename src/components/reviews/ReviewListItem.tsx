@@ -48,6 +48,21 @@ function Stars({ rating }: { rating: number | null }) {
 }
 
 function statusBadge(review: ReviewListEntry): React.ReactNode {
+  // Session 6.7 — pre-disclosure state takes precedence. Channex sets
+  // is_hidden=true while the 14-day mutual-disclosure window is open.
+  // The host can't yet read the review, can't yet respond — but they
+  // CAN submit their host-side review of the guest, which is what the
+  // "Submit guest review" surface is for.
+  if (review.is_hidden) {
+    return (
+      <span
+        className="text-[10px] font-semibold px-2 py-0.5"
+        style={{ borderRadius: 999, background: "rgba(196,154,90,0.1)", color: "var(--golden)" }}
+      >
+        Awaiting guest review
+      </span>
+    );
+  }
   if (review.response_sent) {
     return (
       <span
@@ -76,6 +91,12 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
       Needs response
     </span>
   );
+}
+
+// Session 6.7 — disclosure-window helper for the pre-disclosure UI.
+function formatDisclosureDate(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 const AVATAR_SIZE = 44;
@@ -152,7 +173,13 @@ export default function ReviewListItem({
   const text = review.incoming_text ?? "";
   const truncated = text.length > PREVIEW_LEN;
   const preview = truncated ? text.slice(0, PREVIEW_LEN).trimEnd() + "…" : text;
-  const isBad = review.is_low_rating || review.is_flagged_by_host;
+  // Session 6.7 — pre-disclosure reviews can never trip the bad-review
+  // tag (sync.ts already gates is_low_rating on !is_hidden, but the
+  // host-asserted is_flagged_by_host flag could in theory still light
+  // up). Treat is_hidden as the hard suppressor for the bad-review
+  // affordance.
+  const isBad = !review.is_hidden && (review.is_low_rating || review.is_flagged_by_host);
+  const disclosureDate = review.is_hidden ? formatDisclosureDate(review.expired_at) : null;
   const propertyLabel = cleanPropertyName(review.property_name);
 
   const onRowClick = () => onOpen(review.id);
@@ -216,8 +243,14 @@ export default function ReviewListItem({
           </div>
         )}
 
-        {/* Row 2: text preview */}
-        {preview ? (
+        {/* Row 2: text preview — pre-disclosure reviews show a
+            disclosure-window message instead of the empty body. */}
+        {review.is_hidden ? (
+          <p className="text-[13px] italic" style={{ color: "var(--tideline)" }}>
+            Guest&apos;s review is hidden until you submit yours
+            {disclosureDate ? ` or the disclosure window closes on ${disclosureDate}` : ""}.
+          </p>
+        ) : preview ? (
           <p className="text-[13px] leading-snug line-clamp-2" style={{ color: "var(--coastal)" }}>
             {preview}
           </p>
@@ -227,10 +260,11 @@ export default function ReviewListItem({
           </p>
         )}
 
-        {/* Row 3: meta — rating + badges */}
+        {/* Row 3: meta — rating + badges. Pre-disclosure reviews mute
+            stars (no rating to show yet) and skip the bad-review tag. */}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <Stars rating={review.incoming_rating} />
-          {review.incoming_rating != null && (
+          {!review.is_hidden && <Stars rating={review.incoming_rating} />}
+          {!review.is_hidden && review.incoming_rating != null && (
             <span className="text-[11px] font-semibold" style={{ color: "var(--tideline)" }}>
               {review.incoming_rating.toFixed(1)}
             </span>

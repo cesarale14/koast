@@ -380,6 +380,11 @@ export const guestReviews = pgTable("guest_reviews", {
   // for one release cycle; remove in tech-debt cleanup.
   isLowRating: boolean("is_low_rating").default(false).notNull(),
   isFlaggedByHost: boolean("is_flagged_by_host").default(false).notNull(),
+  // Session 6.7 — Channex /reviews `attributes.is_hidden`. True while
+  // the 14-day mutual-disclosure window is open. Sync extracts every
+  // iteration; classifier guards is_low_rating on it so pre-disclosure
+  // reviews (rating=0 sentinel) never get the "Bad review" tag.
+  isHidden: boolean("is_hidden").default(false).notNull(),
   aiContext: jsonb("ai_context"),
   // Session 6 sync columns
   channexReviewId: text("channex_review_id"),

@@ -144,6 +144,12 @@ async function syncOneProperty(
 
       // Initial-insert-only defaults for status + is_bad_review so
       // local workflow state isn't stomped on later runs.
+      // Session 6.7 — Channex /reviews carries `attributes.is_hidden`.
+      // True for pre-disclosure reviews (14-day mutual-disclosure window
+      // open: rating=0, content=null). Required to gate the
+      // is_low_rating classifier so rating=0 doesn't trip the
+      // "Bad review" tag.
+      const isHidden = rv.is_hidden === true;
       const row: Record<string, unknown> = {
         channex_review_id: rv.id,
         booking_id: localBookingId,
@@ -157,11 +163,14 @@ async function syncOneProperty(
         incoming_date: incomingAt,
         subratings,
         expired_at: rv.expired_at ?? null,
+        is_hidden: isHidden,
       };
       // RDX-4 — algorithmic low-rating flag, written every iteration.
       // is_bad_review (legacy) is no longer touched by sync; host-mark
       // semantics live on is_flagged_by_host now.
-      row.is_low_rating = rating5 != null && rating5 < 4;
+      // Session 6.7 — gate on is_hidden so pre-disclosure reviews
+      // (rating=0 sentinel + window open) never trip the threshold.
+      row.is_low_rating = !isHidden && rating5 != null && rating5 < 4;
       if (isNew) {
         row.status = rv.is_replied ? "published" : "pending";
       }

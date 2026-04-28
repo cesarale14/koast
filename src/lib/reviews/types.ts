@@ -30,6 +30,10 @@ export interface ReviewListEntry {
   // RDX-4 decomposed flags. UI predicate: is_low_rating || is_flagged_by_host.
   is_low_rating: boolean;
   is_flagged_by_host: boolean;
+  // Session 6.7 — pre-disclosure flag from Channex /reviews
+  // attributes.is_hidden. True while the 14-day disclosure window is
+  // open. UI predicate: render "Awaiting guest review" state when true.
+  is_hidden: boolean;
   platform: string;
   booking_check_in: string | null;
   booking_check_out: string | null;
