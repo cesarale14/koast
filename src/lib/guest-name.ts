@@ -107,6 +107,25 @@ function shortPlatformFallback(platform: string | null | undefined): string {
   }
 }
 
+// Session 6.7d — predicate for the inline-edit affordance. A name is
+// a "platform fallback" when no override + no real booking name was
+// available, so resolveDisplayGuestName fell through to platformFallback
+// (one of: "Airbnb Guest", "Booking.com guest", "Vrbo guest", "Guest").
+// Used to give the pencil affordance higher visual weight when the
+// host needs to recover an identity (per Andrew@Channex Apr 28: pre-
+// OAuth iCal-cohort bookings are permanently invisible to /bookings,
+// override is the canonical workaround).
+const PLATFORM_FALLBACK_NAMES = new Set<string>([
+  "Airbnb Guest",
+  "Booking.com guest",
+  "Vrbo guest",
+  "Guest",
+]);
+
+export function isPlatformFallbackName(name: string | null | undefined): boolean {
+  return PLATFORM_FALLBACK_NAMES.has((name ?? "").trim());
+}
+
 export function resolveBookingPillLabel({
   guestName,
   platform,

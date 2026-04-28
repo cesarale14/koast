@@ -16,6 +16,7 @@ import {
 import PlatformLogo from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import GuestReviewForm from "./GuestReviewForm";
+import { isPlatformFallbackName } from "@/lib/guest-name";
 import type { ReviewListEntry } from "@/lib/reviews/types";
 
 interface ReviewSlideOverProps {
@@ -251,6 +252,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
 
   const nights = nightsBetween(review.booking_check_in, review.booking_check_out);
   const channelRule = CHANNEL_REPLY_RULES[review.platform];
+  const nameIsFallback = isPlatformFallbackName(review.display_guest_name);
 
   // Outgoing-eligible CTA gating mirrors the prior ReviewCard logic.
   let guestReviewBlock: React.ReactNode = null;
@@ -409,9 +411,9 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                     else if (e.key === "Escape") { e.preventDefault(); setEditingName(false); setNameDraft(review.guest_name_override ?? ""); }
                   }}
                   placeholder="Guest name…"
-                  maxLength={200}
+                  maxLength={50}
                   className="px-2 py-1 text-[15px] font-semibold"
-                  style={{ border: "1px solid var(--dry-sand)", borderRadius: 8, color: "var(--coastal)", outline: "none" }}
+                  style={{ border: "1px solid var(--coastal)", borderRadius: 8, color: "var(--coastal)", outline: "none" }}
                 />
               ) : (
                 <h2 className="text-[15px] font-semibold truncate" style={{ color: "var(--coastal)" }}>
@@ -423,8 +425,12 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
                   type="button"
                   onClick={() => { setNameDraft(review.guest_name_override ?? ""); setEditingName(true); }}
                   aria-label="Edit guest name"
+                  title={nameIsFallback ? "Set the guest's real name" : "Edit guest name"}
                   className="p-1 rounded hover:bg-shore"
-                  style={{ color: "var(--tideline)" }}
+                  style={{
+                    color: nameIsFallback ? "var(--coastal)" : "var(--tideline)",
+                    opacity: nameIsFallback ? 0.9 : 0.4,
+                  }}
                 >
                   <Pencil size={11} />
                 </button>

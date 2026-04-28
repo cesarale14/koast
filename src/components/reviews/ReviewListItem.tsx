@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, AlertTriangle, Home } from "lucide-react";
+import { Lock, AlertTriangle, Home, Pencil } from "lucide-react";
 import PlatformLogo from "@/components/ui/PlatformLogo";
+import { useToast } from "@/components/ui/Toast";
+import { isPlatformFallbackName } from "@/lib/guest-name";
 import type { ReviewListEntry } from "@/lib/reviews/types";
 
 const PREVIEW_LEN = 120;
@@ -161,6 +163,143 @@ interface ReviewListItemProps {
   animationDelayMs?: number;
   mounted: boolean;
   onOpen: (id: string) => void;
+  onRefresh: () => void;
+}
+
+// Session 6.7d — inline guest-name editor. Renders next to whichever
+// guest-name slot is visible (row 1 in single-property view, row 1b in
+// the all-properties "showProperty" view). Pencil affordance is
+// prominent when the rendered name is a platform fallback (host needs
+// to recover the identity for pre-OAuth iCal-cohort reviews per
+// Andrew@Channex Apr 28), subordinate when a real name resolved.
+function GuestNameInlineEditor({
+  reviewId,
+  displayName,
+  initialOverride,
+  isFallback,
+  onRefresh,
+  className,
+  style,
+}: {
+  reviewId: string;
+  displayName: string;
+  initialOverride: string | null;
+  isFallback: boolean;
+  onRefresh: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initialOverride ?? "");
+  const [optimisticName, setOptimisticName] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const cancel = useCallback(() => {
+    setEditing(false);
+    setDraft(initialOverride ?? "");
+  }, [initialOverride]);
+
+  const save = useCallback(async (raw: string) => {
+    const trimmed = raw.trim();
+    const next = trimmed === "" ? null : trimmed;
+    // No-op when nothing changed.
+    if (next === (initialOverride ?? null)) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setEditing(false);
+    // Optimistic flip — show the new override (or revert to displayName
+    // when clearing and we don't yet know the post-clear fallback).
+    const optimistic = next ?? displayName;
+    setOptimisticName(optimistic);
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}/guest-name`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? `Failed (${res.status})`);
+      onRefresh();
+    } catch (e) {
+      setOptimisticName(null);
+      setDraft(initialOverride ?? "");
+      toast(e instanceof Error ? e.message : "Failed to save name", "error");
+    } finally {
+      setSaving(false);
+    }
+  }, [reviewId, initialOverride, displayName, onRefresh, toast]);
+
+  const rendered = optimisticName ?? displayName;
+
+  if (editing) {
+    return (
+      <span
+        className={className}
+        style={style}
+        // Stop row click while editing.
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          autoFocus
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => save(draft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              save(draft);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          placeholder="Guest name…"
+          maxLength={50}
+          className="px-1.5 py-0.5 text-[12px]"
+          style={{
+            border: "1px solid var(--coastal)",
+            borderRadius: 6,
+            color: "var(--coastal)",
+            outline: "none",
+            background: "#fff",
+            minWidth: 120,
+          }}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className={className} style={style}>
+      {rendered}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDraft(initialOverride ?? "");
+          setEditing(true);
+        }}
+        disabled={saving}
+        aria-label="Edit guest name"
+        title={isFallback ? "Set the guest's real name" : "Edit guest name"}
+        className="inline-flex items-center justify-center ml-1 align-middle hover:bg-shore"
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 4,
+          color: isFallback ? "var(--coastal)" : "var(--tideline)",
+          opacity: isFallback ? 0.9 : 0.4,
+          cursor: saving ? "wait" : "pointer",
+        }}
+      >
+        <Pencil size={10} />
+      </button>
+    </span>
+  );
 }
 
 export default function ReviewListItem({
@@ -169,6 +308,7 @@ export default function ReviewListItem({
   animationDelayMs = 0,
   mounted,
   onOpen,
+  onRefresh,
 }: ReviewListItemProps) {
   const text = review.incoming_text ?? "";
   const truncated = text.length > PREVIEW_LEN;
@@ -181,6 +321,7 @@ export default function ReviewListItem({
   const isBad = !review.is_hidden && (review.is_low_rating || review.is_flagged_by_host);
   const disclosureDate = review.is_hidden ? formatDisclosureDate(review.expired_at) : null;
   const propertyLabel = cleanPropertyName(review.property_name);
+  const isFallback = isPlatformFallbackName(review.display_guest_name);
 
   const onRowClick = () => onOpen(review.id);
   const onRowKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -224,9 +365,15 @@ export default function ReviewListItem({
               {propertyLabel}
             </span>
           ) : (
-            <span className="font-semibold truncate" style={{ color: "var(--coastal)", maxWidth: "60%" }}>
-              {review.display_guest_name}
-            </span>
+            <GuestNameInlineEditor
+              reviewId={review.id}
+              displayName={review.display_guest_name}
+              initialOverride={review.guest_name_override}
+              isFallback={isFallback}
+              onRefresh={onRefresh}
+              className="font-semibold truncate inline-flex items-center"
+              style={{ color: "var(--coastal)", maxWidth: "60%" }}
+            />
           )}
           {review.incoming_date && (
             <>
@@ -238,8 +385,15 @@ export default function ReviewListItem({
 
         {/* Row 1b: guest name when 'all' (otherwise rendered above) */}
         {showProperty && propertyLabel && (
-          <div className="text-[11px] mb-1" style={{ color: "var(--tideline)" }}>
-            {review.display_guest_name}
+          <div className="text-[11px] mb-1 inline-flex items-center" style={{ color: "var(--tideline)" }}>
+            <GuestNameInlineEditor
+              reviewId={review.id}
+              displayName={review.display_guest_name}
+              initialOverride={review.guest_name_override}
+              isFallback={isFallback}
+              onRefresh={onRefresh}
+              className="inline-flex items-center"
+            />
           </div>
         )}
 

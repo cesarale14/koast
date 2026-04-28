@@ -8,9 +8,10 @@ interface ReviewsListProps {
   showProperty: boolean;
   mounted: boolean;
   onOpen: (id: string) => void;
+  onRefresh: () => void;
 }
 
-export default function ReviewsList({ reviews, showProperty, mounted, onOpen }: ReviewsListProps) {
+export default function ReviewsList({ reviews, showProperty, mounted, onOpen, onRefresh }: ReviewsListProps) {
   return (
     <div className="space-y-2">
       {reviews.map((r, i) => (
@@ -21,6 +22,7 @@ export default function ReviewsList({ reviews, showProperty, mounted, onOpen }: 
           mounted={mounted}
           animationDelayMs={i * 30}
           onOpen={onOpen}
+          onRefresh={onRefresh}
         />
       ))}
     </div>

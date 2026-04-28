@@ -459,6 +459,7 @@ export default function ReviewsPage() {
                 showProperty={showProperty}
                 mounted={mounted}
                 onOpen={openSlide}
+                onRefresh={fetchData}
               />
             </>
           )}
