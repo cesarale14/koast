@@ -18,7 +18,7 @@
  * but messages don't surface a parallel control. If/when one ships,
  * slot it ahead of tier 1.
  *
- * The Python worker `~/staycommand-workers/messaging_executor.py`
+ * The Python worker `~/koast-workers/messaging_executor.py`
  * mirrors this logic with a comment pointing here as canonical.
  * Keep the two in sync.
  */

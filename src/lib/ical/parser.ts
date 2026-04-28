@@ -34,7 +34,7 @@ function unfold(icsText: string): string {
 }
 
 export async function parseICalFeed(url: string): Promise<ICalBooking[]> {
-  const res = await fetch(url, { headers: { "User-Agent": "StayCommand/1.0" } });
+  const res = await fetch(url, { headers: { "User-Agent": "Koast/1.0" } });
   if (!res.ok) {
     throw new Error(`Failed to fetch iCal feed: ${res.status} ${res.statusText}`);
   }

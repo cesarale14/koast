@@ -1,5 +1,5 @@
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
-const USER_AGENT = "StayCommand/1.0 (contact@luxeshinesolutionsllc.com)";
+const USER_AGENT = "Koast/1.0 (contact@luxeshinesolutionsllc.com)";
 
 interface GeoResult {
   lat: number;

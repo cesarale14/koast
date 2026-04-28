@@ -275,7 +275,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `staycommand-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `koast-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast("Export downloaded");
@@ -306,7 +306,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `staycommand-bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `koast-bookings-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast("CSV downloaded");

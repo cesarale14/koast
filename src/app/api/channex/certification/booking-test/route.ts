@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       room_type_id: roomTypeId,
       rate_plan_id: ratePlanId,
       guest_name: "Test Guest",
-      guest_email: "testguest@staycommand.com",
+      guest_email: "testguest@koast.com",
     };
 
     // Step 1: Create

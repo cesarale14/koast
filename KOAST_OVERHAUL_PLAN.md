@@ -125,7 +125,7 @@ These aren't per-page fixes — they're one-time infrastructure gaps.
 
 ### Current state — verified facts (not assumptions)
 - **Engine**: `src/lib/pricing/engine.ts` + `signals/` + `forecast.ts` + `scenarios.ts`. 9 signals documented and weighted in `CLAUDE.md`. Exposed via `/api/pricing/calculate/[propertyId]`.
-- **Validator**: `~/staycommand-workers/pricing_validator.py` — runs daily 6 AM ET (10:00 UTC), calls `/api/pricing/calculate/{property_id}` via HTTP, fetches live Airbnb rate from Channex, writes `pricing_recommendations`. Read-only by design.
+- **Validator**: `~/koast-workers/pricing_validator.py` — runs daily 6 AM ET (10:00 UTC), calls `/api/pricing/calculate/{property_id}` via HTTP, fetches live Airbnb rate from Channex, writes `pricing_recommendations`. Read-only by design.
 - **Data today**: 480 rows in `pricing_recommendations` (2 props × 60 dates × 4 runs Apr 13-16). `pricing_recommendations_latest` view exists.
 - **Tables present**: `pricing_outcomes` (used by seasonality signal after 30+ days). `pricing_recommendations`. `calendar_rates` (has `rate` / `suggested_rate` / `applied_rate` columns; `channel_code` added per the calendar per-channel migration).
 - **Tables missing**: `pricing_rules`, `pricing_performance` (documented but no migration).

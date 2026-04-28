@@ -2,7 +2,7 @@
 
 ## Strategic Context
 
-**Prime Directive check:** A native channel manager is the single biggest feature gap between StayCommand and production-ready PMS status. Every competing PMS (Hostaway, Guesty, Hospitable) has this. Without it, hosts can't manage their OTA connections from StayCommand, which means we're not their system of record — just a supplementary tool.
+**Prime Directive check:** A native channel manager is the single biggest feature gap between Koast and production-ready PMS status. Every competing PMS (Hostaway, Guesty, Hospitable) has this. Without it, hosts can't manage their OTA connections from Koast, which means we're not their system of record — just a supplementary tool.
 
 **Competitive analysis:**
 - **Hostaway:** Channel manager is their core product. Clean UI, per-channel status cards, connection wizard. Weakness: no intelligent pricing built in.
@@ -10,7 +10,7 @@
 - **Hospitable (formerly Smartbnb):** Minimal channel management — mostly automation/messaging. Weakness: relies on iCal for many connections.
 - **PriceLabs/Wheelhouse:** No channel management at all — they push rates and rely on PMS for connectivity.
 
-**StayCommand advantage:** We combine channel management + 9-signal pricing + market intelligence in one product. A host connects their Airbnb, and we automatically price it, push rates, sync bookings, and show them market intelligence — all from one dashboard. No one else does this end-to-end.
+**Koast advantage:** We combine channel management + 9-signal pricing + market intelligence in one product. A host connects their Airbnb, and we automatically price it, push rates, sync bookings, and show them market intelligence — all from one dashboard. No one else does this end-to-end.
 
 ---
 
@@ -20,7 +20,7 @@
 
 Channex offers two paths for channel management:
 
-1. **IFrame embed** — Channex provides a pre-built UI at `app.channex.io/auth/exchange?oauth_session_key=TOKEN&app_mode=headless`. Quick to ship, handles all OTA-specific connection flows, mapping, and edge cases. Looks like Channex, not StayCommand.
+1. **IFrame embed** — Channex provides a pre-built UI at `app.channex.io/auth/exchange?oauth_session_key=TOKEN&app_mode=headless`. Quick to ship, handles all OTA-specific connection flows, mapping, and edge cases. Looks like Channex, not Koast.
 
 2. **Native API (whitelabel)** — Use Channex Channel API endpoints directly. Full control over UX, matches our Emerald/Nunito design system. More work, but looks like a $50M SaaS product.
 
@@ -35,7 +35,7 @@ This is what Hostaway and Guesty both do — they use the channel manager's ifra
 ### Data Flow
 
 ```
-StayCommand UI
+Koast UI
     │
     ├── Channel Overview ──── GET /api/v1/properties (Channex)
     │                         GET room_types, rate_plans, channels
@@ -231,14 +231,14 @@ After connection, redirect to mapping page. Show room type/rate plan mapping int
 
 ### Page 3: Channel Mapping (`/channels/[channelId]/mapping`)
 
-**Purpose:** Map StayCommand room types and rate plans to OTA listings.
+**Purpose:** Map Koast room types and rate plans to OTA listings.
 
 **Layout:**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Airbnb Mapping — Villa Jamaica                         │
 ├───────────────────────┬─────────────────────────────────┤
-│  OTA Listing          │  StayCommand Room & Rate        │
+│  OTA Listing          │  Koast Room & Rate        │
 ├───────────────────────┼─────────────────────────────────┤
 │  "Stunning 4BR Villa" │  Room: Entire Home - Standard   │
 │  Listing #12345       │  Rate: Standard BAR ($160-200)  │
@@ -452,7 +452,7 @@ async getRestrictions(propertyId: string, dateFrom: string, dateTo: string,
 - Channel logos: Use official SVGs for Airbnb, Booking.com, VRBO, Expedia at 24x24px
 - Status colors: emerald-500 (active), amber-500 (pending), red-500 (error), neutral-400 (inactive)
 - Cards: `card-elevated` style with shadow, rounded-xl, 24px padding
-- IFrame modal: Full-height drawer from right side, 480px wide, with StayCommand header bar
+- IFrame modal: Full-height drawer from right side, 480px wide, with Koast header bar
 - Rate parity: Green = matched, amber = <5% difference, red = >5% difference
 - Sync log: Real-time feel with relative timestamps ("3m ago"), auto-refresh every 30s
 - Font: Nunito Variable throughout, monospace for prices/IDs

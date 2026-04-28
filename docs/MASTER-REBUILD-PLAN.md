@@ -1,7 +1,7 @@
-# StayCommand — Master Rebuild Plan
+# Koast — Master Rebuild Plan
 
 **Date:** 2026-04-09
-**Goal:** Transform StayCommand from prototype to production PMS that competes with Hospitable, Hostaway, and Guesty.
+**Goal:** Transform Koast from prototype to production PMS that competes with Hospitable, Hostaway, and Guesty.
 
 ---
 
@@ -74,7 +74,7 @@ Revenue estimate: calendar_rates suggested_rate × booked nights. Label "Estimat
 - **Property detail:** Overview | Calendar | Bookings | Settings tabs
 - **Settings:** name, photo, iCal feeds, Channex connection (Pro), beds/baths/guests
 
-### 5. Pricing Engine (StayCommand's differentiator)
+### 5. Pricing Engine (Koast's differentiator)
 
 - **Property + date range selectors**
 - **Heatmap calendar** showing suggested rates with color intensity
@@ -199,7 +199,7 @@ Remove Revenue Tool from sidebar (keep as standalone /revenue-check).
 | **Pricing Engine** | Suggested rates (9 signals) | Free |
 | **AirROI** | Market data, comps, nearby listings | Free |
 | **Claude API** | AI message drafts, review generation | Free |
-| **StayCommand** | Cleaning schedules, revenue estimates, gap detection | Free |
+| **Koast** | Cleaning schedules, revenue estimates, gap detection | Free |
 
 ---
 

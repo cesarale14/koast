@@ -517,10 +517,10 @@ The `?from=reviews` plumbing post-6.7-POST:
 
 ### 7.1 `reviews_sync.py`
 
-Lives at `~/staycommand-workers/reviews_sync.py` on the Virginia VPS.
+Lives at `~/koast-workers/reviews_sync.py` on the Virginia VPS.
 ~230 LOC. Mirrors `booking_sync.py` patterns: `dotenv`, service-role
 Supabase client, `httpx`, file+stdout logging at
-`/var/log/staycommand/reviews.log`.
+`/var/log/koast/reviews.log`.
 
 **Behavior:**
 - Reads all `properties` with `channex_property_id IS NOT NULL` (global, not per-user).
@@ -533,11 +533,11 @@ Supabase client, `httpx`, file+stdout logging at
 
 ### 7.2 systemd
 
-`~/staycommand-workers/systemd/koast-reviews-sync.{service,timer}`.
+`~/koast-workers/systemd/koast-reviews-sync.{service,timer}`.
 - Service: oneshot, `User=ubuntu`.
 - Timer: `OnUnitActiveSec=20min`, `RandomizedDelaySec=300`,
   `OnBootSec=2min`.
-- **Not enabled.** Per Session 6.6 commit body, deliberate — needs supervised manual run before enable. As of 2026-04-25, `/var/log/staycommand/reviews.log` does not exist; the worker has never run on the VPS.
+- **Not enabled.** Per Session 6.6 commit body, deliberate — needs supervised manual run before enable. As of 2026-04-25, `/var/log/koast/reviews.log` does not exist; the worker has never run on the VPS.
 
 ### 7.3 On-connect trigger pattern
 
@@ -722,7 +722,7 @@ Ordered by priority. Each item is a single session unless noted.
 #### T1.2 — Enable VPS reviews timer
 
 - Implements §7.2.
-- Supervised manual run; tail `/var/log/staycommand/reviews.log`;
+- Supervised manual run; tail `/var/log/koast/reviews.log`;
   enable timer.
 - No code change.
 - **Size: small** (~30min).
@@ -879,8 +879,8 @@ src/components/reviews/GuestReviewForm.tsx        373L
 src/components/reviews/ReviewFilterChips.tsx       87L
 src/components/reviews/ReviewSkeletonCard.tsx      26L
 src/components/reviews/ReviewsSettingsModal.tsx   195L
-~/staycommand-workers/reviews_sync.py             ~230L (VPS, not git-tracked)
-~/staycommand-workers/systemd/koast-reviews-sync.{service,timer}
+~/koast-workers/reviews_sync.py             ~230L (VPS, not git-tracked)
+~/koast-workers/systemd/koast-reviews-sync.{service,timer}
 ```
 
 Channex client (review-relevant section): `src/lib/channex/client.ts:736-810`.

@@ -342,11 +342,11 @@ After each page ships:
 ### Session 1 — Calendar rebuild
 
 ````
-Read ~/staycommand/CLAUDE.md, repomix-output.xml, 
-~/staycommand/KOAST_POLISH_PASS_MASTER_PLAN.md (entire file, pay 
+Read ~/koast/CLAUDE.md, repomix-output.xml, 
+~/koast/KOAST_POLISH_PASS_MASTER_PLAN.md (entire file, pay 
 special attention to Shared Primitives and Design Principles), 
-~/staycommand/src/app/(dashboard)/calendar/page.tsx (current), 
-and ~/staycommand/src/hooks/usePricingTab.ts first.
+~/koast/src/app/(dashboard)/calendar/page.tsx (current), 
+and ~/koast/src/hooks/usePricingTab.ts first.
 
 /ultraplan
 

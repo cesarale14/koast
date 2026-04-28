@@ -129,7 +129,7 @@ This document is the contract for the follow-up build session.
   (`koast-development/references/tech-debt.md:126-132`).
 
 **Workers (gap):**
-- `~/staycommand-workers/` (Virginia VPS) has `booking_sync.py`,
+- `~/koast-workers/` (Virginia VPS) has `booking_sync.py`,
   `pricing_validator.py`, `pricing_worker.py`, `market_sync.py`,
   `ical_parser.py`, `reviews_sync.py`. **No `messages_sync.py`.**
 - No `vercel.json` cron entries for messaging.
@@ -758,7 +758,7 @@ Build on top of MVI:
   Koast AI — review before sending" affordance.
 
 - **Templates wired to a trigger executor** (medium): add a Python
-  worker `~/staycommand-workers/automation_executor.py` that runs
+  worker `~/koast-workers/automation_executor.py` that runs
   every 5-15 minutes, reads `message_templates WHERE is_active =
   true`, computes whether each (booking, template) pair should fire
   based on `trigger_type` + `trigger_days_offset` + `trigger_time`,
@@ -815,8 +815,8 @@ Its patterns directly transfer to messaging.
 - **Two-headed sync subsystem** — `koast-development/references/playbooks.md`
   candidate playbook (per `REVIEWS_BLUEPRINT.md §11.3`). Sync logic
   lives once in `src/lib/reviews/sync.ts` and is mirrored as
-  `~/staycommand-workers/reviews_sync.py`. **Apply identically:**
-  `src/lib/messages/sync.ts` ↔ `~/staycommand-workers/messages_sync.py`.
+  `~/koast-workers/reviews_sync.py`. **Apply identically:**
+  `src/lib/messages/sync.ts` ↔ `~/koast-workers/messages_sync.py`.
   Worker handles steady-state polling reconciliation; route handles
   manual refresh + on-connect trigger; helper is the single source of
   truth for upsert shape.
@@ -1087,7 +1087,7 @@ Saved JSON dumps (PII intact, for reference only):
 
 ## Appendix B — DB queries made (this session)
 
-All read-only via `~/staycommand-workers/db.py` (psycopg2).
+All read-only via `~/koast-workers/db.py` (psycopg2).
 
 ```
 SELECT COUNT(*) FROM messages
@@ -1127,10 +1127,10 @@ docs/codebase-analysis.md                                      —   reference o
 
 Worker layer (Virginia VPS):
 ```
-~/staycommand-workers/booking_sync.py             — active (NOT messaging-related; ref only)
-~/staycommand-workers/reviews_sync.py             — active (PATTERN to mirror for messages_sync.py)
-~/staycommand-workers/messages_sync.py            — MISSING
-~/staycommand-workers/automation_executor.py      — MISSING
+~/koast-workers/booking_sync.py             — active (NOT messaging-related; ref only)
+~/koast-workers/reviews_sync.py             — active (PATTERN to mirror for messages_sync.py)
+~/koast-workers/messages_sync.py            — MISSING
+~/koast-workers/automation_executor.py      — MISSING
 ```
 
 Channex client (`src/lib/channex/client.ts`): no messaging methods

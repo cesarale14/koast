@@ -10,7 +10,7 @@ Sources consulted:
 - Every `supabase/migrations/*.sql` file (27 migrations)
 - Every `src/app/api/**/route.ts` (85 routes)
 - Every `src/app/(dashboard)/**/page.tsx` and public page
-- `~/staycommand-workers/` (7 Python modules + systemd units)
+- `~/koast-workers/` (7 Python modules + systemd units)
 - `docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md`
 
 ---
@@ -229,9 +229,9 @@ The #1 competitive differentiator. 9-signal engine + per-property rules + apply 
 | Auto-create pricing rules on first GET | ✅ | Inference-or-defaults fallback. | `GET /api/pricing/rules/[propertyId]` | — |
 | `pricing_performance` table | ✅ | `suggested_rate`, `applied_rate`, `actual_rate`, `booked`, `booked_at`, generated `revenue_delta`, `channels_pushed[]`. | `supabase/migrations/20260418000000` | — |
 | `pricing_outcomes` table | ✅ | Feeds seasonality signal after 30+ days. | `supabase/migrations/005_pricing_outcomes_events.sql` | — |
-| Validator worker (daily 6 AM ET) | ✅ | `pricing_validator.py` + `koast-pricing-validator.service`/`.timer`. 480 rows logged across 4 runs × 2 props × 60 dates. | `~/staycommand-workers/pricing_validator.py` | — |
+| Validator worker (daily 6 AM ET) | ✅ | `pricing_validator.py` + `koast-pricing-validator.service`/`.timer`. 480 rows logged across 4 runs × 2 props × 60 dates. | `~/koast-workers/pricing_validator.py` | — |
 | Validator UPSERT on (property_id, date) | ✅ | `ON CONFLICT … DO UPDATE`. | Same | — |
-| Pricing performance reconciler (nightly 02:30 UTC) | ✅ | `pricing_performance_reconciler.py` + systemd timer. | `~/staycommand-workers/pricing_performance_reconciler.py`, CLAUDE.md Reliability Infrastructure | — |
+| Pricing performance reconciler (nightly 02:30 UTC) | ✅ | `pricing_performance_reconciler.py` + systemd timer. | `~/koast-workers/pricing_performance_reconciler.py`, CLAUDE.md Reliability Infrastructure | — |
 | Multi-channel apply dispatch | ✅ | `/api/pricing/apply` routes BDC through `buildSafeBdcRestrictions`, non-BDC direct. Writes `calendar_rates` base + per-channel rows. | `src/app/api/pricing/apply/[propertyId]/route.ts` (commit `b44410f`) | `pricing_performance.insert()` should be `.upsert()` (SESSION_5a_HANDOFF #2) |
 | Safe BDC restrictions helper | ✅ | Pre-flight BDC read + safe-merge plan. Protects host-managed state. | `src/lib/channex/safe-restrictions.ts`, postmortem | — |
 | BDC preview (dry-run) | ✅ | `POST /api/pricing/preview-bdc-push/[propertyId]`, no writes. | `src/app/api/pricing/preview-bdc-push/[propertyId]/route.ts` | — |
@@ -759,7 +759,7 @@ Everything under the app: deploys, workers, webhooks, idempotency, design system
 | Property covers migration | ✅ | `cover_photo_url`. | `supabase/migrations/20260331020000_property_cover_photos.sql` | Source resolution ≈720px vs 2560px needed (CLAUDE.md Known Gaps — Image Assets) |
 | HTML-entity decoded image URLs | 🟡 | `decodeImageUrl` helper in `PropertyDetail.tsx`. | CLAUDE.md Known Gaps | Fix at ingest in `booking_sync.py` |
 | systemd timers on VPS | ✅ | `koast-pricing-validator.service/.timer`, `koast-pricing-performance-reconciler.service/.timer`. | CLAUDE.md VPS Workers | — |
-| Repomix output up-to-date | ✅ | `~/staycommand/repomix-output.xml`. | CLAUDE.md FIRST STEPS | — |
+| Repomix output up-to-date | ✅ | `~/koast/repomix-output.xml`. | CLAUDE.md FIRST STEPS | — |
 | Sidebar navigation (9 items) | ✅ | Dashboard, Calendar, Messages \| MANAGE: Properties, Pricing, Reviews, Turnovers \| INSIGHTS: Market Intel, Comp Sets. | `src/app/(dashboard)/layout.tsx` | — |
 | Keyboard shortcuts (⌘K, ⌘+/) | ✅ | CommandPalette, KoastRail collapse. | `src/components/polish/CommandPalette.tsx`, `KoastRail.tsx` | — |
 | Keyframes `fadeSlideIn` / `cardReveal` / `aiGlow` in globals.css | 🔵 | Specified; globals.css currently has different set. | DESIGN_SYSTEM.md §16 | One-file fix; unblocks page entrance choreography |

@@ -235,7 +235,7 @@ async function syncIcalBookings(
   supabase: SupabaseClient
 ): Promise<number> {
   const res = await fetch(icalUrl, {
-    headers: { "User-Agent": "StayCommand/1.0" },
+    headers: { "User-Agent": "Koast/1.0" },
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) return 0;

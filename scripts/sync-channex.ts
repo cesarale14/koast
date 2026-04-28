@@ -11,7 +11,7 @@
  *   npx tsx scripts/sync-channex.ts
  *
  * Example cron entry (every 15 min):
- *   STAR/15 * * * * cd /home/ubuntu/staycommand && set -a && source .env.local && set +a && npx tsx scripts/sync-channex.ts >> /var/log/staycommand/sync-channex.log 2>&1
+ *   STAR/15 * * * * cd /home/ubuntu/koast && set -a && source .env.local && set +a && npx tsx scripts/sync-channex.ts >> /var/log/koast/sync-channex.log 2>&1
  */
 
 import postgres from "postgres";

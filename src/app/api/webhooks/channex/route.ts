@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ok", message: `Event ${event} not handled` });
   }
 
-  // Unmapped-channel events: we don't yet know which StayCommand
+  // Unmapped-channel events: we don't yet know which Koast
   // property the booking belongs to, so log + ack without mutating any
   // rows. They'll show up in channex_webhook_log for debugging.
   if (event.startsWith("booking_unmapped")) {

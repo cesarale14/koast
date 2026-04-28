@@ -415,7 +415,7 @@ No other schema changes are required to fix any §1 row.
 - `src/components/reviews/ReviewReplyPanel.tsx` (259L) — keep as-is unless rebuild wants a different reply UX; not in this scope.
 - `src/components/reviews/GuestReviewForm.tsx` (373L) — keep as-is.
 - `src/components/reviews/ReviewsSettingsModal.tsx` (195L) — keep as-is.
-- `~/staycommand-workers/reviews_sync.py` — VPS worker, correct.
+- `~/koast-workers/reviews_sync.py` — VPS worker, correct.
 - All migrations.
 
 ### 5.3 Data assumptions the new render layer is allowed to make
@@ -535,7 +535,7 @@ No per-id `GET /reviews/:id` was needed because the listing payload
 already exposed every field of interest. The optional probe budget
 was conserved.
 
-**DB queries:** read-only via psycopg2 + `~/staycommand-workers/db.py`. Saved to `/tmp/reviews-data-dump.txt` (453L). Queries:
+**DB queries:** read-only via psycopg2 + `~/koast-workers/db.py`. Saved to `/tmp/reviews-data-dump.txt` (453L). Queries:
 - `SELECT * FROM properties WHERE user_id = $cesar`
 - `SELECT * FROM guest_reviews WHERE property_id IN (…)`
 - `SELECT id, ota_reservation_code, platform_booking_id, guest_name, guest_first_name, guest_last_name, platform, property_id, check_in, check_out, status FROM bookings WHERE property_id IN (…)`
@@ -546,7 +546,7 @@ was conserved.
 ## Appendix B — Cross-reference index
 
 - Sync helper: `src/lib/reviews/sync.ts` (305L)
-- Worker: `~/staycommand-workers/reviews_sync.py` (~230L)
+- Worker: `~/koast-workers/reviews_sync.py` (~230L)
 - Page: `src/app/(dashboard)/reviews/page.tsx` (454L)
 - Card: `src/components/reviews/ReviewCard.tsx` (448L)
 - Pending route: `src/app/api/reviews/pending/route.ts` (219L)

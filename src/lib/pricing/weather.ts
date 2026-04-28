@@ -5,7 +5,7 @@ import type { WeatherDay } from "./signals";
 
 const memCache = new Map<string, { data: WeatherDay[]; fetchedAt: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-const USER_AGENT = "StayCommand/1.0 (contact@luxeshinesolutionsllc.com)";
+const USER_AGENT = "Koast/1.0 (contact@luxeshinesolutionsllc.com)";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchWeatherForecast(lat: number | null, lng: number | null, supabase?: any): Promise<WeatherDay[]> {

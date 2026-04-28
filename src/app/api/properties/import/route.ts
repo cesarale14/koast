@@ -7,7 +7,7 @@ import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
 /**
  * POST /api/properties/import
  *
- * Imports or updates a StayCommand property from a Channex property that was
+ * Imports or updates a Koast property from a Channex property that was
  * scaffolded via auto-scaffold and mapped via the Channex iframe.
  *
  * Body:
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     // suffix at import time. Idempotent.
     propertyName = propertyName.replace(/ - (StayCommand|Koast)$/i, "").trim();
 
-    // 3. Create or update StayCommand property
+    // 3. Create or update Koast property
     const { data: existingProps } = await supabase
       .from("properties")
       .select("id, name, channex_property_id, cover_photo_url")

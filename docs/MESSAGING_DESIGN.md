@@ -112,7 +112,7 @@ the primary load.
 
 
                                  (reconciliation, every 60min)
-   Cron timer (Virginia VPS)  ─►  ~/staycommand-workers/messages_sync.py
+   Cron timer (Virginia VPS)  ─►  ~/koast-workers/messages_sync.py
                                             │
                                             └─► for each property:
                                                   list threads → upsert
@@ -865,9 +865,9 @@ small commit chain). Sequence matters — don't reorder.
    - Stamps `properties.messages_last_synced_at` on success.
 
 6. **Polling worker** (~250 LOC Python).
-   - `~/staycommand-workers/messages_sync.py` — mirror of
+   - `~/koast-workers/messages_sync.py` — mirror of
      `reviews_sync.py`.
-   - `~/staycommand-workers/systemd/koast-messages-sync.{service,timer}`
+   - `~/koast-workers/systemd/koast-messages-sync.{service,timer}`
      — `OnUnitActiveSec=60min`, `RandomizedDelaySec=300`,
      `OnBootSec=2min`.
    - **NOT enabled in commit** — needs supervised first run, same
@@ -1106,9 +1106,9 @@ NEW
   src/app/api/messages/threads/[id]/route.ts             GET
   src/app/api/messages/sync/route.ts                     POST
   scripts/widen-channex-webhook-mask.ts                  one-shot
-  ~/staycommand-workers/messages_sync.py
-  ~/staycommand-workers/systemd/koast-messages-sync.service
-  ~/staycommand-workers/systemd/koast-messages-sync.timer
+  ~/koast-workers/messages_sync.py
+  ~/koast-workers/systemd/koast-messages-sync.service
+  ~/koast-workers/systemd/koast-messages-sync.timer
 
 EDITED
   src/app/api/webhooks/channex/route.ts                  +messageEvents branch
@@ -1145,5 +1145,5 @@ UNCHANGED (slice 1)
 - `src/lib/channex/client.ts:740-810` — reviews methods on the
   Channex client; the shape messaging methods will mirror.
 - `src/lib/reviews/sync.ts` — sync helper structure to mirror.
-- `~/staycommand-workers/reviews_sync.py` — Python worker structure
+- `~/koast-workers/reviews_sync.py` — Python worker structure
   to mirror.

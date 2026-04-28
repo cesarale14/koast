@@ -4,7 +4,7 @@
  *   - POST /api/properties/import (on Airbnb connect)
  *   - POST /api/channels/connect-booking-com/activate (on BDC connect)
  *
- * The Python worker at ~/staycommand-workers/reviews_sync.py mirrors
+ * The Python worker at ~/koast-workers/reviews_sync.py mirrors
  * the same upsert + booking-resolution shape but runs out-of-process
  * with service-role auth — it does NOT import this module.
  */

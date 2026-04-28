@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       const timeout = setTimeout(() => ctl.abort(), 15_000);
       let res: Response;
       try {
-        res = await fetch(feed_url, { headers: { "User-Agent": "StayCommand/1.0" }, signal: ctl.signal });
+        res = await fetch(feed_url, { headers: { "User-Agent": "Koast/1.0" }, signal: ctl.signal });
       } finally {
         clearTimeout(timeout);
       }

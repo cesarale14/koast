@@ -1,4 +1,4 @@
-# StayCommand Codebase Analysis
+# Koast Codebase Analysis
 
 **Date:** 2026-04-08
 **Context:** Post-Channex production migration, live Airbnb connection, pre-launch assessment
@@ -174,7 +174,7 @@ None in application code. One reference in `docs/channel-manager-plan.md` (TODO 
 
 ### 2.3 Availability Flow
 
-StayCommand controls availability. On every booking create/modify/cancel, the webhook handler pushes `availability: 0` (booked) or `availability: 1` (available) to Channex for all room types.
+Koast controls availability. On every booking create/modify/cancel, the webhook handler pushes `availability: 0` (booked) or `availability: 1` (available) to Channex for all room types.
 
 **Gap:** iCal-synced blocked dates only set `calendar_rates.is_available=false` locally — they don't push to Channex. This means dates blocked in an iCal feed won't block on connected OTAs.
 
@@ -217,7 +217,7 @@ The `pricing_outcomes` table has 63 rows populated by the booking_sync.py worker
 
 3. **No guest messaging integration** — Inbox has AI drafts but can't actually send/receive messages through Airbnb/VRBO messaging APIs. Hospitable's entire value prop is automated guest messaging.
 
-4. **No financial reporting** — No revenue dashboard, no payout tracking, no expense management. Guesty has comprehensive financial reporting. StayCommand shows market data but not actual P&L.
+4. **No financial reporting** — No revenue dashboard, no payout tracking, no expense management. Guesty has comprehensive financial reporting. Koast shows market data but not actual P&L.
 
 5. **No mobile app** — Every competitor has a mobile app. The cleaner mobile view exists but hosts can't manage from their phone.
 
@@ -266,7 +266,7 @@ The `pricing_outcomes` table has 63 rows populated by the booking_sync.py worker
 | Issue | Impact | Location |
 |-------|--------|----------|
 | `getEventsForDate()` called per-date in pricing loop | 90 calls per engine run | engine.ts:199 |
-| No database connection pooling in workers | New connection per query | staycommand-workers/db.py |
+| No database connection pooling in workers | New connection per query | koast-workers/db.py |
 | PropertyDetail.tsx is 1,133 lines | Slow re-renders | Single monolithic component |
 | AnalyticsDashboard.tsx is 965 lines | Same issue | Contains business logic + UI |
 

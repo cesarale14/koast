@@ -1,7 +1,7 @@
 // Session 6.3 — single source of truth for mapping a Channex booking
 // entity into a Koast bookings row. Used by the webhook handler at
 // /api/webhooks/channex and any future TS-side sync route. The Python
-// poller (~/staycommand-workers/booking_sync.py) keeps an in-sync
+// poller (~/koast-workers/booking_sync.py) keeps an in-sync
 // copy of this mapping — when fields change here, mirror them there.
 
 import type { SupabaseClient } from "@supabase/supabase-js";

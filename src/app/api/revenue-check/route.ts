@@ -7,7 +7,7 @@ import { createAirROIClient } from "@/lib/airroi/client";
 async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
   const res = await fetch(url, {
-    headers: { "User-Agent": "StayCommand/1.0 (contact@staycommand.com)" },
+    headers: { "User-Agent": "Koast/1.0 (contact@luxeshinesolutionsllc.com)" },
   });
   if (!res.ok) return null;
   const data = await res.json();

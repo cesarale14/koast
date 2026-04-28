@@ -6,7 +6,7 @@ import { createChannexClient } from "@/lib/channex/client";
 /**
  * GET /api/channels/listings
  * Returns all mapped OTA listings across all connected channels,
- * with import status (whether each listing has a StayCommand property).
+ * with import status (whether each listing has a Koast property).
  */
 export async function GET() {
   try {
@@ -23,7 +23,7 @@ export async function GET() {
       .eq("user_id", user.id);
     const properties = (props ?? []) as { id: string; name: string; channex_property_id: string | null }[];
 
-    // Build map: channex_property_id → StayCommand property
+    // Build map: channex_property_id → Koast property
     const existingByChannexId = new Map<string, { id: string; name: string }>();
     for (const p of properties) {
       if (p.channex_property_id) {
@@ -83,7 +83,7 @@ export async function GET() {
           displayName = `${channelName} Listing #${String(listingId).slice(-4)}`;
         }
 
-        // Check if this listing is ALREADY imported into StayCommand
+        // Check if this listing is ALREADY imported into Koast
         // Match by channex_property_id, not by channel title
         const isImported = !!existingProp && existingProp.name !== "My Property" && !existingProp.name.match(/^Property \d+$/);
 
@@ -99,8 +99,8 @@ export async function GET() {
           rate_plan_id: rp.rate_plan_id,
           channex_property_id: mappedChannexPropId,
           imported: isImported,
-          staycommand_property_id: existingProp?.id ?? null,
-          staycommand_property_name: isImported ? existingProp?.name : null,
+          koast_property_id: existingProp?.id ?? null,
+          koast_property_name: isImported ? existingProp?.name : null,
         });
       }
     }

@@ -6,12 +6,12 @@
 3. Read `DESIGN_SYSTEM.md` before any UI work. Every component, color, shadow, animation, and spacing must match the design system exactly.
 4. Read `KOAST_POLISH_PASS_MASTER_PLAN.md` if doing polish-pass work — the 30+ spec corrections are binding.
 5. Read `KOAST_PRODUCT_SPEC.md` for feature requirements before implementation.
-6. Run `cat ~/staycommand/repomix-output.xml | head -200` for project structure. If stale: `cd ~/staycommand && repomix`.
+6. Run `cat ~/koast/repomix-output.xml | head -200` for project structure. If stale: `cd ~/koast && repomix`.
 7. Never run `npm run build` on the VPS — use `npx tsc --noEmit` then `git push`. Vercel builds with 8GB RAM.
 
 ## Prompt Format
 Every prompt to Claude Code should start with:
-"Read ~/staycommand/CLAUDE.md and repomix-output.xml first."
+"Read ~/koast/CLAUDE.md and repomix-output.xml first."
 
 ## Planning Mode
 - Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API + UI + DB changes).
@@ -69,7 +69,7 @@ Koast is a unified STR (short-term rental) operating system with AI-powered pric
 
 - **Live URL:** https://app.koasthq.com
 - **Domain:** koasthq.com (apex 308s to app.koasthq.com)
-- **GitHub:** cesarale14/staycommand
+- **GitHub:** cesarale14/koast
 
 ## Tech Stack
 - **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS
@@ -200,7 +200,7 @@ Weights (sum = 1.0):
 - Supply Pressure 0.05 (month-over-month listing-count change)
 
 ### Pricing Validator (LIVE — Virginia VPS)
-- **Script:** `~/staycommand-workers/pricing_validator.py`
+- **Script:** `~/koast-workers/pricing_validator.py`
 - **Unit:** `koast-pricing-validator.service` + `.timer`
 - **Schedule:** daily at 6:00 AM ET / 10:00 UTC
 - **Writes to:** `pricing_recommendations` table (+ `pricing_recommendations_latest` view) — rows now include `reason_signals.clamps` (raw_engine_suggestion, clamped_by, guardrail_trips), `reason_text` (plain-English), `urgency` (act_now/coming_up/review), `status` (pending by default).
@@ -324,7 +324,7 @@ The `notifications` table is an audit log for every outbound SMS/email/push. Wri
 
 ---
 
-## VPS Workers (`~/staycommand-workers/` on Virginia 44.195.218.19)
+## VPS Workers (`~/koast-workers/` on Virginia 44.195.218.19)
 - `booking_sync.py` — iCal sync + Channex revision polling (every 15 min via systemd timer)
 - `pricing_validator.py` — daily 6 AM ET, writes to `pricing_recommendations` (480 rows so far)
 - `pricing_worker.py` — rate calculation + market refresh
@@ -341,7 +341,7 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 ---
 
 ## Development Workflow
-1. Make changes in `~/staycommand`.
+1. Make changes in `~/koast`.
 2. `npx tsc --noEmit 2>&1 | head -20`.
 3. If clean: `git add -A && git commit -m "message" && git push`.
 4. Vercel auto-builds (~30s).
@@ -370,7 +370,7 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 ## Known Gaps — Image Assets
 - **Property hero source resolution.** Today's `properties.cover_photo_url` values are ~720×480 pulled from Airbnb / iCal / imported sources. The Koast hero renders the banner at ~2560×560 (retina, full 1760px container), so `next/image` still upscales a 720-wide source. We wrap with `next/image` + `sizes` so at least we're not requesting a naive 2×+ upscale, but the source itself is the bottleneck. Fix: during import, pull the highest-res variant available (Airbnb's CDN supports `?im_w=2560`) and store that URL instead of the lower-res thumb. Backend-only change — no UI churn — scheduled for the property-import polish pass.
 - **Property card thumbs.** Same source-resolution gap affects card thumbs at 320×200. Same fix (higher-res import) resolves both.
-- **HTML-entity-encoded image URLs.** Airbnb iCal sync writes image URLs with `&amp;` instead of `&` as query separators, which breaks Vercel's `/_next/image` loader (400 when it tries to proxy the malformed URL to the Airbnb CDN). Render-layer workaround: `decodeImageUrl` helper in `src/components/dashboard/PropertyDetail.tsx` unescapes at the `<Image>` src boundary. Proper fix: decode at the ingest point in the iCal sync worker (`~/staycommand-workers/booking_sync.py`) so the DB never stores encoded entities — then drop the render-time helper.
+- **HTML-entity-encoded image URLs.** Airbnb iCal sync writes image URLs with `&amp;` instead of `&` as query separators, which breaks Vercel's `/_next/image` loader (400 when it tries to proxy the malformed URL to the Airbnb CDN). Render-layer workaround: `decodeImageUrl` helper in `src/components/dashboard/PropertyDetail.tsx` unescapes at the `<Image>` src boundary. Proper fix: decode at the ingest point in the iCal sync worker (`~/koast-workers/booking_sync.py`) so the DB never stores encoded entities — then drop the render-time helper.
 
 ## Known Gaps / Not Wired
 - **Property Detail Pricing tab UI** — backend complete (PR D shipped read APIs + `usePricingTab` hook). UI wiring scheduled for the dedicated polish pass immediately after Track B Stage 1. Apply/Dismiss buttons in `/properties/[id]` Pricing tab don't call the live routes yet.

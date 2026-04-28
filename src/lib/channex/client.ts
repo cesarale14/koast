@@ -276,7 +276,7 @@ class ChannexClient {
         body: JSON.stringify({
           property: {
             ...data,
-            content: { description: "StayCommand test property" },
+            content: { description: "Koast test property" },
           },
         }),
       }
@@ -451,7 +451,7 @@ class ChannexClient {
           customer: {
             name: data.guest_name.split(" ")[0],
             surname: data.guest_name.split(" ").slice(1).join(" ") || "Guest",
-            mail: data.guest_email ?? "test@staycommand.com",
+            mail: data.guest_email ?? "test@koast.com",
           },
         },
       }),
@@ -518,7 +518,7 @@ class ChannexClient {
           customer: {
             name: originalData.guest_name.split(" ")[0],
             surname: originalData.guest_name.split(" ").slice(1).join(" ") || "Guest",
-            mail: originalData.guest_email ?? "test@staycommand.com",
+            mail: originalData.guest_email ?? "test@koast.com",
           },
         },
       }),

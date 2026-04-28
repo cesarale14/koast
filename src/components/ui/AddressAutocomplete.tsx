@@ -62,7 +62,7 @@ export default function AddressAutocomplete({
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&countrycodes=us&limit=5`,
-          { headers: { "User-Agent": "StayCommand/1.0 (contact@luxeshinesolutionsllc.com)" } }
+          { headers: { "User-Agent": "Koast/1.0 (contact@luxeshinesolutionsllc.com)" } }
         );
         const data: NominatimResult[] = await res.json();
         setResults(data);

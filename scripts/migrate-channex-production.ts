@@ -432,7 +432,7 @@ async function main() {
     console.log("  Next steps:");
     console.log("  1. Update CHANNEX_API_KEY in .env.local and Vercel to the production key");
     console.log("  2. Update CHANNEX_API_URL to https://app.channex.io/api/v1 (or remove to use default)");
-    console.log("  3. Update staycommand-workers/.env with production key and URL");
+    console.log("  3. Update koast-workers/.env with production key and URL");
     console.log("  4. Run full sync: POST /api/channex/certification-runner { test: 1 }");
     console.log("  5. Set up webhook on production Channex pointing to your webhook URL");
   }

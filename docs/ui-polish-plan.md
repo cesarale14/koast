@@ -215,7 +215,7 @@ No shared table component. Each component builds tables differently.
 1. **Loading skeletons** for Pricing, Channels, Reviews, Settings pages
 2. **Empty states** for Messages, Cleaning, Channels (when no Channex)
 3. **Error boundaries** — no page has error recovery UI. If an API call fails, user sees nothing.
-4. **Favicon** — check if StayCommand favicon is set (beacon logo)
+4. **Favicon** — check if Koast favicon is set (beacon logo)
 5. **Page titles** — check if `<title>` tags are set per page via metadata exports
 
 ### Nice to have:

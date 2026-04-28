@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
               if (rawRate == null || rawRate === "") continue;
               // Channex bucketed /restrictions returns rate as a decimal
               // string in whole currency units ("200.00"), NOT cents —
-              // verified against docs + ~/staycommand-workers/pricing_validator.py:91
+              // verified against docs + ~/koast-workers/pricing_validator.py:91
               // (which calls the same endpoint and does float(rate) with
               // no division). The legacy non-bucketed endpoint returned
               // an integer in minor units; don't carry that assumption

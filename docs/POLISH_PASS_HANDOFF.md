@@ -10,8 +10,8 @@ transcript. Start here, then read the files it points at.
 
 ## 0. Orientation
 
-- **Project**: Koast (formerly Moora / StayCommand). Short-term-rental PMS with a 9-signal pricing engine + market intelligence + channel manager. Live at `https://app.koasthq.com`. GitHub: `cesarale14/staycommand`.
-- **Repo root**: `/home/ubuntu/staycommand` on the Virginia VPS (`44.195.218.19`). Branch: `main`. Always push after committing — Vercel auto-deploys.
+- **Project**: Koast (formerly Moora / StayCommand). Short-term-rental PMS with a 9-signal pricing engine + market intelligence + channel manager. Live at `https://app.koasthq.com`. GitHub: `cesarale14/koast`.
+- **Repo root**: `/home/ubuntu/koast` on the Virginia VPS (`44.195.218.19`). Branch: `main`. Always push after committing — Vercel auto-deploys.
 - **Stack**: Next.js 14 App Router · TypeScript · Tailwind · Supabase (Postgres + Auth) · Channex.io channel manager · AirROI market data · Claude API for AI · Twilio · Ticketmaster · Weather.gov. Font: Plus Jakarta Sans + Fraunces (Dashboard display face).
 - **Build rule (hard)**: Never run `npm run build` on this VPS — insufficient RAM. Only `npx tsc --noEmit` + `npx eslint`. Vercel builds in the cloud.
 - **Two Supabase clients**: `createClient` (session-scoped, RLS-aware) and `createServiceClient` (bypasses RLS via service key). Server routes use service client after calling `verifyPropertyOwnership`.
@@ -187,7 +187,7 @@ The master plan's `## Spec corrections` section has 30+ binding rules accumulate
 - `/api/calendar/rates` (**new in 5a**) — GET master + platforms bundle
 - `/api/calendar/rates/apply` (**new in 5a**) — POST with mode master|platform + wipe_overrides
 
-### 3.4 Worker scripts on VPS (`~/staycommand-workers/`)
+### 3.4 Worker scripts on VPS (`~/koast-workers/`)
 - `pricing_validator.py` — daily 6 AM ET pricing validation. Writes `pricing_recommendations` with `ON CONFLICT … DO UPDATE`. Reads Airbnb live rates via Channex to populate `current_rate`.
 - `pricing_performance_reconciler.py` — nightly 02:30 UTC outcome backfill.
 - `pricing_worker.py` — rate calculation + market refresh.

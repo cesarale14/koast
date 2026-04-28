@@ -349,7 +349,7 @@ export async function POST(request: NextRequest) {
       case 11:
         result = {
           taskIds: [],
-          details: "MANUAL TEST: Use Channex Booking CRS app to create a booking, then modify it, then cancel it. Take screenshots of each state in StayCommand UI. Webhook handler is active at /api/webhooks/channex.",
+          details: "MANUAL TEST: Use Channex Booking CRS app to create a booking, then modify it, then cancel it. Take screenshots of each state in Koast UI. Webhook handler is active at /api/webhooks/channex.",
           apiCalls: 0,
         };
         break;

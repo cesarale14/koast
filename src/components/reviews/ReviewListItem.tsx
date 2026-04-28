@@ -9,14 +9,20 @@ import { isPlatformFallbackName } from "@/lib/guest-name";
 import type { ReviewListEntry } from "@/lib/reviews/types";
 
 const PREVIEW_LEN = 120;
-const STAYCOMMAND_SUFFIX = / - StayCommand$/i;
+// BR1 — keep these regex literals on the legacy brand spelling
+// "StayCommand" intact. The const name has been renamed to
+// LEGACY_BRAND_SUFFIX, but the literal must stay: Channex's
+// `properties.attributes.title` still contains
+// "Villa Jamaica - StayCommand" verbatim from pre-rebrand onboarding,
+// and this regex is the render-time stripper that hides the legacy
+// brand from the host until a settings UI lets them rewrite the
+// canonical name. Phase E backfilled the DB but this stays as
+// belt-and-suspenders for any rows that slip through pre-strip.
+const LEGACY_BRAND_SUFFIX = / - StayCommand$/i;
 const KOAST_SUFFIX = / - Koast$/i;
 
-// Render-time cleanup until a settings UI lets hosts override
-// properties.name. Phase E backfilled the DB but this stays as
-// belt-and-suspenders for any rows that slip through pre-strip.
 function cleanPropertyName(name: string): string {
-  return (name ?? "").replace(STAYCOMMAND_SUFFIX, "").replace(KOAST_SUFFIX, "").trim();
+  return (name ?? "").replace(LEGACY_BRAND_SUFFIX, "").replace(KOAST_SUFFIX, "").trim();
 }
 
 function relativeDate(iso: string | null): string {

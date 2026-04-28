@@ -214,7 +214,7 @@ export function createAirROIClient(): AirROIClient {
   // Hard kill switch. When set, every caller (market-sync, compsets,
   // revenue-check) errors out before a billable request can leave the
   // app. Safer than per-caller checks because it catches new callers
-  // added later. Paired with systemd `staycommand-market.timer`
+  // added later. Paired with systemd `koast-market.timer`
   // being disabled on the VPS (2026-04-21). Remove once we've moved
   // off AirROI onto the Koast-host-data moat.
   if (process.env.KOAST_DISABLE_AIRROI === "true") {

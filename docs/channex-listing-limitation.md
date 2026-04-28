@@ -29,7 +29,7 @@ The Channex iframe mapping UI can show all 4 Airbnb listings because it uses an 
 **Two-step flow:**
 1. **Auto-scaffold:** Before opening the iframe, create N Channex properties with default room types and rate plans (one per listing we want to import)
 2. **Iframe mapping:** Open the Channex iframe at group level. The iframe shows ALL Airbnb listings and ALL Channex properties. User maps each listing to a property.
-3. **Post-mapping import:** After iframe closes, query the API for newly mapped listings and import them into StayCommand.
+3. **Post-mapping import:** After iframe closes, query the API for newly mapped listings and import them into Koast.
 
 **For the first connection (no properties yet):**
 - We can't know how many listings the user has until they see the iframe

@@ -1,7 +1,7 @@
 # Guest Messaging Agent — Implementation Plan
 
 **Date:** 2026-04-09
-**Strategic context:** This is StayCommand's competitive moat against Hospitable, whose entire value prop is automated guest messaging.
+**Strategic context:** This is Koast's competitive moat against Hospitable, whose entire value prop is automated guest messaging.
 
 ## Architecture
 
@@ -17,7 +17,7 @@
                     └─────────┬───────────┘
                               │
                     ┌─────────▼───────────┐
-                    │  StayCommand API    │
+                    │  Koast API    │
                     │  /api/messages/     │
                     │  incoming           │
                     └─────────┬───────────┘
@@ -63,7 +63,7 @@
 
 ```python
 agent = client.beta.agents.create(
-    name="StayCommand Guest Assistant",
+    name="Koast Guest Assistant",
     model="claude-sonnet-4-6",
     system="""You are a professional Airbnb/vacation rental guest communication assistant.
 

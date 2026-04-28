@@ -18,7 +18,7 @@
 -- Writer-side updates (delete-then-insert in the API route, ON CONFLICT
 -- WHERE in the Python worker) ship alongside this migration. See
 -- src/app/api/pricing/calculate/[propertyId]/route.ts and
--- ~/staycommand-workers/pricing_validator.py in the same commit.
+-- ~/koast-workers/pricing_validator.py in the same commit.
 
 BEGIN;
 

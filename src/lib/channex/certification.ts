@@ -27,9 +27,9 @@ export async function setupTestProperty(): Promise<CertificationConfig> {
 
   console.log("[cert] Creating test property...");
   const property = await channex.createProperty({
-    title: "Test Property - StayCommand",
+    title: "Test Property - Koast",
     currency: "USD",
-    email: "test@staycommand.com",
+    email: "test@koast.com",
     phone: "+1234567890",
     zip_code: "33602",
     country: "US",

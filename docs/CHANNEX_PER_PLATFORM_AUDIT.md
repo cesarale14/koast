@@ -82,11 +82,11 @@ This IS the surface the Calendar sidebar redesign should consume.
 
 ### 2.4 iCal sync — rate ingestion
 
-`~/staycommand-workers/booking_sync.py:567-670` — the Airbnb iCal path reads `calendar_rates` (already written by other flows) to populate `pricing_outcomes`. It does **not** ingest rate data FROM iCal. iCal carries only availability + reservation data, not pricing. The worker never writes rate rows from iCal.
+`~/koast-workers/booking_sync.py:567-670` — the Airbnb iCal path reads `calendar_rates` (already written by other flows) to populate `pricing_outcomes`. It does **not** ingest rate data FROM iCal. iCal carries only availability + reservation data, not pricing. The worker never writes rate rows from iCal.
 
 ### 2.5 Rate validation — current_rate source
 
-`~/staycommand-workers/pricing_validator.py:68-96` — `fetch_airbnb_live_rates` calls Channex's `/restrictions?filter[property_id]=…&filter[rate_plan_id]=<ABB plan>&filter[restrictions]=rate` and records the dollar rate per date. This is the value that populates `pricing_recommendations.current_rate`. It's **Airbnb-centric** (ABB rate plan only).
+`~/koast-workers/pricing_validator.py:68-96` — `fetch_airbnb_live_rates` calls Channex's `/restrictions?filter[property_id]=…&filter[rate_plan_id]=<ABB plan>&filter[restrictions]=rate` and records the dollar rate per date. This is the value that populates `pricing_recommendations.current_rate`. It's **Airbnb-centric** (ABB rate plan only).
 
 BDC "current rate" is NOT recorded anywhere as a first-class column today. It's read on-demand during a BDC apply via `getRestrictionsBucketed` inside `buildSafeBdcRestrictions`.
 
