@@ -220,6 +220,21 @@ async function syncFeedBookings(
   // channex_booking_id here, which left ghost bookings live in Moora after
   // an Airbnb/VRBO cancellation that wasn't picked up by the Channex
   // webhook (e.g. Channex channel not yet active).
+  // Cancellation pass: any iCal-source row with a platform_booking_id
+  // not currently in the iCal feed gets cancelled. Two guards prevent
+  // over-cancellation (mirror of booking_sync.py:497-520):
+  //   1. source='ical' — Channex-canonical rows (source='channex')
+  //      are excluded; their truth lives in /bookings, not iCal.
+  //   2. channex_booking_id IS NULL — defensive second filter catching
+  //      pre-canonical-helper rows where source='ical' but the booking
+  //      is also tracked in Channex (legacy insert lineage). source='ical'
+  //      alone is insufficient because pre-2026-04-25 rows were inserted
+  //      via paths that defaulted source to 'ical' even when Channex was
+  //      tracking them. (Diagnosed 2026-04-29 in 6.8a; Briana/Nadia/Kathy/
+  //      Venus were the worked examples.)
+  // Together: only iCal-only-managed rows are eligible for cancellation.
+  // Worker-side fix shipped in koast-workers commit 177bb08 (Session 6.8b);
+  // this is the TS-side parity for /api/ical/sync/[propertyId] (Session 6.8c).
   const existingBookings = await db.select({
     id: bookings.id,
     platformBookingId: bookings.platformBookingId,
@@ -231,6 +246,8 @@ async function syncFeedBookings(
     .where(and(
       eq(bookings.propertyId, propertyId),
       eq(bookings.platform, feed.platform),
+      eq(bookings.source, "ical"),
+      isNull(bookings.channexBookingId),
       eq(bookings.status, "confirmed")
     ));
 
