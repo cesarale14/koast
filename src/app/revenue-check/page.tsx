@@ -85,7 +85,7 @@ export default function RevenueCheckPage() {
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 leading-tight mb-4">
               How much revenue is your rental
-              <span className="text-brand-500"> leaving on the table?</span>
+              <span className="text-coastal"> leaving on the table?</span>
             </h1>
             <p className="text-lg text-neutral-500 max-w-2xl mx-auto">
               Get a free 9-signal AI pricing analysis in 30 seconds. No signup required.
@@ -105,31 +105,31 @@ export default function RevenueCheckPage() {
                   onChange={(v) => setForm({ ...form, address: v })}
                   onSelect={(r) => setForm({ ...form, address: r.address, city: r.city, state: r.state, zip: r.zip })}
                   placeholder="Start typing an address..."
-                  className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                   <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" placeholder="Tampa" />
+                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal" placeholder="Tampa" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                   <input type="text" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}
-                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" placeholder="FL" />
+                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal" placeholder="FL" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                   <input type="text" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })}
-                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" placeholder="33602" />
+                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal" placeholder="33602" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                   <select value={form.bedrooms} onChange={(e) => setForm({ ...form, bedrooms: e.target.value })}
-                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                    className="w-full px-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n} BR</option>)}
                   </select>
                 </div>
@@ -138,7 +138,7 @@ export default function RevenueCheckPage() {
                   <div className="relative">
                     <span className="absolute left-4 top-3 text-neutral-400">$</span>
                     <input type="number" value={form.current_rate} onChange={(e) => setForm({ ...form, current_rate: e.target.value })}
-                      className="w-full pl-8 pr-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      className="w-full pl-8 pr-4 py-3 h-12 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal"
                       placeholder="150" />
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export default function RevenueCheckPage() {
               <button
                 onClick={analyze}
                 disabled={!form.current_rate || !form.city}
-                className="revenue-check-cta w-full py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-lg mt-2"
+                className="revenue-check-cta w-full py-4 bg-coastal text-white font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-40 disabled:cursor-not-allowed text-lg mt-2"
               >
                 Analyze My Property
               </button>
@@ -160,7 +160,7 @@ export default function RevenueCheckPage() {
       {/* Loading */}
       {step === "loading" && (
         <div className="max-w-md mx-auto px-6 pt-32 text-center">
-          <div className="w-16 h-16 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-8" />
+          <div className="w-16 h-16 border-4 border-success-light border-t-coastal rounded-full animate-spin mx-auto mb-8" />
           <div className="space-y-3">
             {loadingSteps.map((s, i) => (
               <div key={i} className={`flex items-center gap-3 transition-opacity duration-500 ${i <= loadingStep ? "opacity-100" : "opacity-20"}`}>
@@ -169,7 +169,7 @@ export default function RevenueCheckPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : i === loadingStep ? (
-                  <div className="w-5 h-5 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-success-light border-t-coastal rounded-full animate-spin" />
                 ) : (
                   <div className="w-5 h-5 rounded-full border border-neutral-300" />
                 )}
@@ -197,7 +197,7 @@ export default function RevenueCheckPage() {
                 <div className="text-xs sm:text-sm text-neutral-500 mt-1">Your Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl sm:text-4xl font-bold font-mono text-brand-500">${result.market_adr}</div>
+                <div className="text-2xl sm:text-4xl font-bold font-mono text-coastal">${result.market_adr}</div>
                 <div className="text-xs sm:text-sm text-neutral-500 mt-1">Market Avg</div>
               </div>
               <div className="text-center">
@@ -220,9 +220,9 @@ export default function RevenueCheckPage() {
 
           {/* Revenue opportunity */}
           {result.annual_opportunity > 0 && (
-            <div className="card-elevated bg-brand-50 border border-brand-200 rounded-lg p-8 mb-6 text-center">
-              <p className="text-sm text-brand-600 font-medium mb-2">ESTIMATED ANNUAL REVENUE OPPORTUNITY</p>
-              <p className="text-4xl font-bold font-mono text-brand-500 mb-2">${result.annual_opportunity.toLocaleString()}</p>
+            <div className="card-elevated bg-success-light border border-success-light rounded-lg p-8 mb-6 text-center">
+              <p className="text-sm text-deep-sea font-medium mb-2">ESTIMATED ANNUAL REVENUE OPPORTUNITY</p>
+              <p className="text-4xl font-bold font-mono text-coastal mb-2">${result.annual_opportunity.toLocaleString()}</p>
               <p className="text-sm text-neutral-500">
                 Based on ${result.suggested_rate}/night suggested rate x {Math.round(365 * (result.market_occupancy / 100))} booked nights
               </p>
@@ -279,7 +279,7 @@ export default function RevenueCheckPage() {
             </h3>
             <div className="grid grid-cols-10 gap-1">
               {result.rate_preview?.map((r: AnyData) => {
-                const color = r.status === "good" ? "bg-brand-100" : r.status === "close" ? "bg-amber-100" : "bg-red-100";
+                const color = r.status === "good" ? "bg-success-light" : r.status === "close" ? "bg-amber-100" : "bg-red-100";
                 const d = new Date(r.date + "T00:00:00");
                 return (
                   <div key={r.date} className={`${color} rounded p-1 text-center`}
@@ -291,22 +291,22 @@ export default function RevenueCheckPage() {
               })}
             </div>
             <div className="flex gap-4 mt-3 text-[10px] text-neutral-500">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-brand-100" /> Priced right</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-success-light" /> Priced right</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-100" /> Close</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-100" /> Leaving money</span>
             </div>
           </div>
 
           {/* Email capture */}
-          <div className="bg-brand-50 border border-brand-200 rounded-lg p-8 text-center mb-12">
+          <div className="bg-success-light border border-success-light rounded-lg p-8 text-center mb-12">
             <h3 className="text-xl font-bold text-neutral-900 mb-2">Get your full report + weekly market updates</h3>
             <p className="text-sm text-neutral-500 mb-4">We&apos;ll send a detailed PDF breakdown and weekly pricing insights for your market.</p>
             <div className="flex gap-2 max-w-md mx-auto">
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 px-4 py-3 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                className="flex-1 px-4 py-3 bg-neutral-0 border border-[var(--border)] rounded-lg text-neutral-900 placeholder-neutral-400 outline-none focus:border-coastal focus:ring-1 focus:ring-coastal"
                 placeholder="you@email.com" />
               <button onClick={captureLead} disabled={!email}
-                className="btn-primary-3d px-6 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-40">
+                className="btn-primary-3d px-6 py-3 bg-coastal text-white font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-40">
                 Send Report
               </button>
             </div>
@@ -319,13 +319,13 @@ export default function RevenueCheckPage() {
               Koast automatically optimizes your pricing using AI, market data, and local events — so you earn more on every booking.
             </p>
             <Link href="/signup"
-              className="revenue-check-cta inline-flex px-8 py-4 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 text-lg">
+              className="revenue-check-cta inline-flex px-8 py-4 bg-coastal text-white font-semibold rounded-lg hover:bg-deep-sea text-lg">
               Start Free
             </Link>
             <div className="flex justify-center gap-8 mt-8 text-sm text-neutral-500">
               {["AI Pricing Engine", "Guest Messaging", "Turnover Ops", "Market Analytics"].map((f) => (
                 <span key={f} className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   {f}
@@ -339,14 +339,14 @@ export default function RevenueCheckPage() {
       {/* Email captured confirmation */}
       {step === "captured" && (
         <div className="max-w-md mx-auto px-6 pt-32 text-center">
-          <div className="w-16 h-16 bg-brand-50 rounded-lg flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-success-light rounded-lg flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">Check your email!</h2>
           <p className="text-neutral-500 mb-8">We&apos;ll send your full revenue report shortly.</p>
-          <Link href="/signup" className="btn-primary-3d inline-flex px-8 py-3 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600">
+          <Link href="/signup" className="btn-primary-3d inline-flex px-8 py-3 bg-coastal text-white font-semibold rounded-lg hover:bg-deep-sea">
             Create Your Free Account
           </Link>
         </div>

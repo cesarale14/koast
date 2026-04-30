@@ -150,17 +150,17 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-hairline">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#003580] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[var(--booking-com)] flex items-center justify-center">
                 <span className="text-white text-xs font-bold">B.</span>
               </div>
               <div>
                 <h2 className="text-sm font-bold text-[#222]">Connect Booking.com</h2>
-                <p className="text-[11px] text-[#999]">{propertyName}</p>
+                <p className="text-[11px] text-[var(--tideline)]">{propertyName}</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+            <button onClick={onClose} className="p-1.5 text-ink-muted hover:text-ink rounded-lg hover:bg-shore-soft transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -173,16 +173,16 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
             {step === "form" && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#333] mb-1.5">Hotel ID</label>
+                  <label className="block text-sm font-medium text-[var(--ink)] mb-1.5">Hotel ID</label>
                   <input
                     type="text"
                     value={hotelId}
                     onChange={(e) => setHotelId(e.target.value)}
                     placeholder="e.g. 1234567"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003580]/30 focus:border-[#003580] transition-colors"
+                    className="w-full px-3 py-2.5 text-sm border border-shell rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003580]/30 focus:border-[var(--booking-com)] transition-colors"
                     autoFocus
                   />
-                  <p className="text-[11px] text-[#999] mt-1.5">
+                  <p className="text-[11px] text-[var(--tideline)] mt-1.5">
                     Find this in your Booking.com Extranet under Property → General Info → Property ID
                   </p>
                 </div>
@@ -190,7 +190,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                 <button
                   onClick={handleConnect}
                   disabled={!hotelId.trim()}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-[#003580] rounded-lg hover:bg-[#00265c] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[var(--booking-com)] rounded-lg hover:bg-[#00265c] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Connect
                 </button>
@@ -206,17 +206,17 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   return (
                     <div key={label} className="flex items-center gap-3">
                       {isDone ? (
-                        <div className="w-5 h-5 rounded-full bg-[#1a3a2a] flex items-center justify-center flex-shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-[var(--positive)] flex items-center justify-center flex-shrink-0">
                           <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
                       ) : isCurrent ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-[#003580] border-t-transparent animate-spin flex-shrink-0" />
+                        <div className="w-5 h-5 rounded-full border-2 border-[var(--booking-com)] border-t-transparent animate-spin flex-shrink-0" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-200 flex-shrink-0" />
+                        <div className="w-5 h-5 rounded-full border-2 border-shell flex-shrink-0" />
                       )}
-                      <span className={`text-sm ${isDone ? "text-[#1a3a2a]" : isCurrent ? "text-[#222] font-medium" : "text-[#ccc]"}`}>
+                      <span className={`text-sm ${isDone ? "text-[var(--positive)]" : isCurrent ? "text-[#222] font-medium" : "text-[var(--shell)]"}`}>
                         {label}
                       </span>
                     </div>
@@ -246,11 +246,11 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wide text-[#3d6b52] mb-3">
+                <div className="bg-shore-soft rounded-lg p-4">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wide text-tideline mb-3">
                     Step-by-step
                   </h4>
-                  <ol className="space-y-3 text-[13px] text-[#555]">
+                  <ol className="space-y-3 text-[13px] text-[var(--tideline)]">
                     <li className="flex gap-2">
                       <span className="font-bold text-[#222] flex-shrink-0 w-5">1.</span>
                       <div className="flex-1">
@@ -258,7 +258,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                           href="https://admin.booking.com/"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[#003580] font-semibold underline hover:no-underline"
+                          className="text-[var(--booking-com)] font-semibold underline hover:no-underline"
                         >
                           Open admin.booking.com
                         </a>{" "}
@@ -269,7 +269,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                       <span className="font-bold text-[#222] flex-shrink-0 w-5">2.</span>
                       <div className="flex-1">
                         Click your profile icon (top right) → <strong>Account</strong> → <strong>Connectivity provider</strong>.
-                        <p className="text-[11px] text-[#999] mt-0.5">
+                        <p className="text-[11px] text-[var(--tideline)] mt-0.5">
                           On some accounts the path is <strong>Inbox → Connectivity</strong> or <strong>Settings → Connectivity provider</strong>.
                         </p>
                       </div>
@@ -291,7 +291,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                       <span className="font-bold text-[#222] flex-shrink-0 w-5">5.</span>
                       <div className="flex-1">
                         Return to this tab and click <strong>Retry connection</strong> below.
-                        <p className="text-[11px] text-[#999] mt-0.5">
+                        <p className="text-[11px] text-[var(--tideline)] mt-0.5">
                           Booking.com may take up to 60 seconds to propagate the authorization.
                         </p>
                       </div>
@@ -304,11 +304,11 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                     connectivity provider flow because of MFA or missing
                     permissions, they can still sync availability via iCal
                     to prevent overbookings. */}
-                <details className="bg-[#f8f6f1] border border-[#efe9dd] rounded-lg p-3">
-                  <summary className="text-[12px] font-semibold text-[#3d6b52] cursor-pointer hover:text-[#1a3a2a]">
+                <details className="bg-[var(--shore-soft)] border border-[var(--dry-sand)] rounded-lg p-3">
+                  <summary className="text-[12px] font-semibold text-tideline cursor-pointer hover:text-[var(--positive)]">
                     Can&apos;t complete authorization? (MFA, missing permissions, or blocked account)
                   </summary>
-                  <div className="mt-3 text-[12px] text-[#555] leading-relaxed space-y-2">
+                  <div className="mt-3 text-[12px] text-[var(--tideline)] leading-relaxed space-y-2">
                     <p>
                       If Booking.com&apos;s connectivity provider page is blocked by MFA, or
                       your admin account doesn&apos;t have permission to change connectivity
@@ -329,7 +329,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                         Airbnb and Vrbo.
                       </li>
                     </ol>
-                    <p className="text-[11px] text-[#999]">
+                    <p className="text-[11px] text-[var(--tideline)]">
                       Note: iCal is one-way (Koast reads BDC bookings) and doesn&apos;t
                       push rates to Booking.com — you&apos;ll still need to manage pricing
                       from the Booking.com extranet until the Channex connection is
@@ -340,13 +340,13 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
 
                 <button
                   onClick={handleRetryTest}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-[#003580] rounded-lg hover:bg-[#00265c] transition-colors"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[var(--booking-com)] rounded-lg hover:bg-[#00265c] transition-colors"
                 >
                   Retry connection
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-full py-2 text-[12px] font-medium text-[#666] hover:text-[#222] transition-colors"
+                  className="w-full py-2 text-[12px] font-medium text-[var(--tideline)] hover:text-[#222] transition-colors"
                 >
                   I&apos;ll finish this later
                 </button>
@@ -357,23 +357,23 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
             {step === "ical" && (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#eef5f0] flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-[#1a3a2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-10 h-10 rounded-full bg-success-light flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-[var(--positive)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-[#222]">Channel Connected</h3>
-                    <p className="text-[11px] text-[#999]">Hotel ID: {hotelId}</p>
+                    <p className="text-[11px] text-[var(--tideline)]">Hotel ID: {hotelId}</p>
                   </div>
                 </div>
 
-                <div className="bg-[#f8f6f1] rounded-lg p-4">
+                <div className="bg-[var(--shore-soft)] rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-[#222] mb-1.5">Import existing bookings</h4>
-                  <p className="text-[12px] text-[#666] leading-relaxed mb-3">
+                  <p className="text-[12px] text-[var(--tideline)] leading-relaxed mb-3">
                     Paste your Booking.com iCal URL to import existing reservations into your calendar.
                   </p>
-                  <ol className="space-y-1.5 text-[12px] text-[#555] mb-3">
+                  <ol className="space-y-1.5 text-[12px] text-[var(--tideline)] mb-3">
                     <li className="flex gap-2">
                       <span className="font-bold text-[#222] flex-shrink-0">1.</span>
                       <span>Log into <strong>admin.booking.com</strong></span>
@@ -392,10 +392,10 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                     value={icalUrl}
                     onChange={(e) => { setIcalUrl(e.target.value); setIcalResult(null); }}
                     placeholder="https://admin.booking.com/...ics"
-                    className="w-full px-3 py-2 text-sm border border-[#efe9dd] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/20 focus:border-[#1a3a2a] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-[var(--dry-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--positive)]/20 focus:border-[var(--positive)] bg-white"
                   />
                   {icalResult && (
-                    <p className={`text-xs mt-1.5 ${icalResult.ok ? "text-[#3d6b52]" : "text-[#c44040]"}`}>
+                    <p className={`text-xs mt-1.5 ${icalResult.ok ? "text-tideline" : "text-[var(--coral-reef)]"}`}>
                       {icalResult.message}
                     </p>
                   )}
@@ -425,14 +425,14 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                     }
                   }}
                   disabled={icalLoading}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-[#003580] rounded-lg hover:bg-[#00265c] disabled:opacity-50 transition-colors"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[var(--booking-com)] rounded-lg hover:bg-[#00265c] disabled:opacity-50 transition-colors"
                 >
                   {icalLoading ? "Importing..." : icalUrl.trim() ? "Import Bookings" : "Skip for now"}
                 </button>
 
                 <button
                   onClick={() => setStep("success")}
-                  className="w-full py-2 text-sm font-medium text-[#999] hover:text-[#666] transition-colors"
+                  className="w-full py-2 text-sm font-medium text-[var(--tideline)] hover:text-[var(--tideline)] transition-colors"
                 >
                   Skip — I&apos;ll do this later
                 </button>
@@ -442,16 +442,16 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
             {/* ---- SUCCESS ---- */}
             {step === "success" && (
               <div className="text-center space-y-4">
-                <div className="w-14 h-14 rounded-full bg-[#eef5f0] flex items-center justify-center mx-auto">
-                  <svg className="w-7 h-7 text-[#1a3a2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-14 h-14 rounded-full bg-success-light flex items-center justify-center mx-auto">
+                  <svg className="w-7 h-7 text-[var(--positive)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-[#222]">Booking.com Connected</h3>
-                  <p className="text-sm text-[#999] mt-1">Hotel ID: {hotelId}</p>
+                  <p className="text-sm text-[var(--tideline)] mt-1">Hotel ID: {hotelId}</p>
                 </div>
-                <p className="text-[13px] text-[#666] leading-relaxed">
+                <p className="text-[13px] text-[var(--tideline)] leading-relaxed">
                   New bookings will sync automatically via Channex. Calendar availability is managed by Koast.
                 </p>
 
@@ -459,38 +459,38 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                     after /activate. Shows a small live status so Sarah
                     knows what's happening without blocking the modal. */}
                 {rateDiscovery === "in_progress" && (
-                  <div className="rounded-lg border border-[#efe9dd] bg-[#f8f6f1] px-3 py-2 text-left">
+                  <div className="rounded-lg border border-[var(--dry-sand)] bg-[var(--shore-soft)] px-3 py-2 text-left">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-[#3d6b52] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[12px] font-semibold text-[#1a3a2a]">Discovering rate configuration…</span>
+                      <div className="w-3 h-3 border-2 border-tideline border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[12px] font-semibold text-[var(--positive)]">Discovering rate configuration…</span>
                     </div>
-                    <p className="text-[11px] text-[#3d6b52] mt-1 leading-snug">
+                    <p className="text-[11px] text-tideline mt-1 leading-snug">
                       Finding the right Booking.com rate plan code. This takes up to 90 seconds and runs in the background — you can close this modal and keep working.
                     </p>
                   </div>
                 )}
                 {rateDiscovery === "complete" && parentRateCode != null && (
-                  <div className="rounded-lg border border-[#eef5f0] bg-[#eef5f0]/40 px-3 py-2 text-left">
+                  <div className="rounded-lg border border-success-light bg-success-light/40 px-3 py-2 text-left">
                     <div className="flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-[#1a3a2a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <svg className="w-3.5 h-3.5 text-[var(--positive)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-[12px] font-semibold text-[#1a3a2a]">Rate configuration ready</span>
+                      <span className="text-[12px] font-semibold text-[var(--positive)]">Rate configuration ready</span>
                     </div>
-                    <p className="text-[11px] text-[#3d6b52] mt-1">
+                    <p className="text-[11px] text-tideline mt-1">
                       Using parent rate plan {parentRateCode}. Pushes will sync to Booking.com.
                     </p>
                   </div>
                 )}
                 {rateDiscovery === "failed" && (
-                  <div className="rounded-lg border border-[#b8860b]/30 bg-[#b8860b]/5 px-3 py-2 text-left">
+                  <div className="rounded-lg border border-[var(--amber-tide)]/30 bg-[var(--amber-tide)]/5 px-3 py-2 text-left">
                     <div className="flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-[#b8860b]" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3.5 h-3.5 text-[var(--amber-tide)]" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.515 2.625H3.72c-1.345 0-2.188-1.458-1.515-2.625L8.485 2.495zM10 6a1 1 0 011 1v3a1 1 0 11-2 0V7a1 1 0 011-1zm0 8a1 1 0 100-2 1 1 0 000 2z" />
                       </svg>
-                      <span className="text-[12px] font-semibold text-[#b8860b]">Rate plan setup needs attention</span>
+                      <span className="text-[12px] font-semibold text-[var(--amber-tide)]">Rate plan setup needs attention</span>
                     </div>
-                    <p className="text-[11px] text-[#b8860b]/90 mt-1">
+                    <p className="text-[11px] text-[var(--amber-tide)]/90 mt-1">
                       We couldn&apos;t automatically find the right parent rate code. Rates won&apos;t sync to Booking.com until this is resolved — please contact support.
                     </p>
                   </div>
@@ -504,7 +504,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                       window.location.href = redirectTo;
                     }
                   }}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-[#1a3a2a] rounded-lg hover:bg-[#264d38] transition-colors"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[var(--positive)] rounded-lg hover:bg-[#264d38] transition-colors"
                 >
                   Done
                 </button>
@@ -521,7 +521,7 @@ export default function BookingComConnect({ propertyId, propertyName, onClose, o
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setStep("form"); setErrorMsg(""); }}
-                    className="flex-1 py-2 text-sm font-medium text-[#666] bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex-1 py-2 text-sm font-medium text-[var(--tideline)] bg-white border border-shell rounded-lg hover:bg-shore-soft transition-colors"
                   >
                     Try Again
                   </button>

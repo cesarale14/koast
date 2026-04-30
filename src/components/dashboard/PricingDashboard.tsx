@@ -52,14 +52,17 @@ interface PricingDashboardProps {
 
 // ---------- Helpers ----------
 
+// Rate-calendar heatmap — 5-stop scale (low → high). Hex literals are
+// retained intentionally: this is data-viz scale infrastructure with no
+// shared semantic role elsewhere in the design system.
 function rateColor(rate: number, min: number, max: number): string {
-  if (max === min) return "bg-brand-100";
+  if (max === min) return "bg-[#d5e8da]";
   const t = (rate - min) / (max - min);
-  if (t < 0.2) return "bg-brand-50";
-  if (t < 0.4) return "bg-brand-100";
-  if (t < 0.6) return "bg-brand-200";
-  if (t < 0.8) return "bg-brand-300";
-  return "bg-brand-400";
+  if (t < 0.2) return "bg-success-light";
+  if (t < 0.4) return "bg-[#d5e8da]";
+  if (t < 0.6) return "bg-[#a8d1b4]";
+  if (t < 0.8) return "bg-[#6aad7e]";
+  return "bg-[#3d8a5a]";
 }
 
 function formatDate(d: string) {
@@ -77,13 +80,13 @@ function SignalBar({ name, score, weight, reason }: { name: string; score: numbe
     <div className="mb-3">
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="font-medium text-neutral-700 capitalize">{name.replace("_", " ")}</span>
-        <span className={`font-mono font-semibold ${isPositive ? "text-[#1a3a2a]" : "text-danger"}`}>
+        <span className={`font-mono font-semibold ${isPositive ? "text-[var(--positive)]" : "text-danger"}`}>
           {score >= 0 ? "+" : ""}{score.toFixed(2)} &times; {weight.toFixed(2)}
         </span>
       </div>
       <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full ${isPositive ? "bg-brand-400" : "bg-danger"}`}
+          className={`h-full rounded-full ${isPositive ? "bg-lagoon" : "bg-danger"}`}
           style={{ width: `${Math.max(2, pct)}%` }}
         />
       </div>
@@ -353,7 +356,7 @@ export default function PricingDashboard({
                 key={mode}
                 onClick={() => setPricingMode(mode)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-                  pricingMode === mode ? "bg-brand-500 text-white" : "text-neutral-500 hover:text-neutral-700"
+                  pricingMode === mode ? "bg-coastal text-white" : "text-neutral-500 hover:text-neutral-700"
                 }`}
               >
                 {mode}
@@ -396,7 +399,7 @@ export default function PricingDashboard({
         <button
           onClick={runEngine}
           disabled={loading === "engine"}
-          className="btn-primary-3d px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
+          className="btn-primary-3d px-4 py-2 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50"
         >
           {loading === "engine" ? "Running..." : "Run Pricing Engine"}
         </button>
@@ -404,7 +407,7 @@ export default function PricingDashboard({
           <button
             onClick={approveAll}
             disabled={loading === "approve"}
-            className="btn-secondary-3d px-4 py-2 bg-neutral-0 text-brand-500 text-sm font-medium rounded-lg border border-brand-500 hover:bg-brand-50 disabled:opacity-50"
+            className="btn-secondary-3d px-4 py-2 bg-neutral-0 text-coastal text-sm font-medium rounded-lg border border-coastal hover:bg-success-light disabled:opacity-50"
           >
             {loading === "approve" ? "Approving..." : `Apply All Suggestions (${stats.needsApproval})`}
           </button>
@@ -434,13 +437,13 @@ export default function PricingDashboard({
             <div className="flex items-center gap-2 text-[10px] text-neutral-400">
               <span>Low</span>
               <div className="flex gap-0.5">
-                {["bg-brand-50", "bg-brand-100", "bg-brand-200", "bg-brand-300", "bg-brand-400"].map((c) => (
+                {["bg-success-light", "bg-[#d5e8da]", "bg-[#a8d1b4]", "bg-[#6aad7e]", "bg-[#3d8a5a]"].map((c) => (
                   <div key={c} className={`w-4 h-3 rounded-sm ${c}`} />
                 ))}
               </div>
               <span>High</span>
               <span className="mx-1 text-neutral-200">|</span>
-              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-[#1a3a2a] inline-block" /> raise</span>
+              <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-[var(--positive)] inline-block" /> raise</span>
               <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-danger inline-block" /> lower</span>
             </div>
           </div>
@@ -453,12 +456,12 @@ export default function PricingDashboard({
 
           {/* Bulk action bar */}
           {selectedDates.size > 1 && (
-            <div className="flex items-center gap-3 p-3 mb-4 bg-brand-50 rounded-lg border border-brand-200">
+            <div className="flex items-center gap-3 p-3 mb-4 bg-success-light rounded-lg border border-success-light">
               <span className="text-sm font-medium text-neutral-800">{selectedDates.size} dates selected</span>
               <button
                 onClick={approveSelected}
                 disabled={!!loading}
-                className="px-3 py-1.5 text-xs font-medium bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium bg-coastal text-white rounded-lg hover:bg-deep-sea disabled:opacity-50"
               >
                 Approve Selected
               </button>
@@ -503,7 +506,7 @@ export default function PricingDashboard({
                     <div
                       key={r.date}
                       className={`relative p-1.5 rounded-lg cursor-pointer transition-all select-none ${bg} ${
-                        isActive ? "ring-2 ring-brand-500" : isSelected ? "ring-2 ring-brand-300" : "hover:ring-1 hover:ring-neutral-300"
+                        isActive ? "ring-2 ring-coastal" : isSelected ? "ring-2 ring-mangrove" : "hover:ring-1 hover:ring-neutral-300"
                       } ${!r.is_available ? "opacity-40" : ""}`}
                       onClick={() => handleDateClick(r.date)}
                       onMouseDown={() => handleMouseDown(r.date)}
@@ -516,12 +519,12 @@ export default function PricingDashboard({
                         ${rate > 0 ? Math.round(rate) : "\u2014"}
                       </div>
                       {hasSuggestion && (
-                        <div className={`text-[10px] font-medium font-mono ${suggestUp ? "text-[#1a3a2a]" : "text-danger"}`}>
+                        <div className={`text-[10px] font-medium font-mono ${suggestUp ? "text-[var(--positive)]" : "text-danger"}`}>
                           {suggestUp ? "\u2191" : "\u2193"}${Math.round(r.suggested_rate!)}
                         </div>
                       )}
                       {(suggestUp || suggestDown) && (
-                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-[#1a3a2a]" : "bg-danger"}`} />
+                        <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${suggestUp ? "bg-[var(--positive)]" : "bg-danger"}`} />
                       )}
                     </div>
                   );
@@ -548,7 +551,7 @@ export default function PricingDashboard({
                   </div>
                   <div>
                     <p className="text-xs text-neutral-400">Suggested Rate</p>
-                    <p className="text-xl font-bold font-mono text-brand-500">
+                    <p className="text-xl font-bold font-mono text-coastal">
                       {selectedRateEntry.suggested_rate != null ? `$${Math.round(selectedRateEntry.suggested_rate)}` : "\u2014"}
                     </p>
                   </div>
@@ -570,7 +573,7 @@ export default function PricingDashboard({
                         });
                         toast(`Accepted $${Math.round(selectedRateEntry.suggested_rate!)} for ${formatDate(selectedDate!)}`);
                       }}
-                      className="btn-primary-3d w-full py-2 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600"
+                      className="btn-primary-3d w-full py-2 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea"
                     >
                       Accept Suggestion
                     </button>

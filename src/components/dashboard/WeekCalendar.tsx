@@ -28,7 +28,7 @@ interface BookingSpan {
   guestName: string;
 }
 
-const platformColor = "#10B981"; // brand-500 for mini calendar
+const platformColor = "var(--coastal)";
 
 /** Group consecutive booked days with same guest into spans */
 function getBookingSpans(days: PropertyWeek["days"]): BookingSpan[] {
@@ -73,11 +73,11 @@ export default function WeekCalendar({ days, properties }: WeekCalendarProps) {
             <div
               key={d.date}
               className={`text-center text-xs py-1 ${
-                d.isToday ? "text-brand-500 font-semibold" : "text-neutral-400"
+                d.isToday ? "text-coastal font-semibold" : "text-neutral-400"
               }`}
             >
               <div>{d.dayLabel}</div>
-              <div className={`text-lg font-semibold ${d.isToday ? "text-brand-500" : "text-neutral-700"}`}>
+              <div className={`text-lg font-semibold ${d.isToday ? "text-coastal" : "text-neutral-700"}`}>
                 {d.dayNum}
               </div>
             </div>

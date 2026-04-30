@@ -83,7 +83,7 @@ function PreviewCard({ photo, name, platformCode, bookingCount, onNameChange }: 
         // eslint-disable-next-line @next/next/no-img-element
         <div className="h-44 overflow-hidden"><img src={photo} alt={name} className="w-full h-full object-cover" /></div>
       ) : (
-        <div className="h-44 bg-gradient-to-br from-[#eef5f0] to-[#d5e8da] flex items-center justify-center"><Home size={36} className="text-[#a8d1b4]" strokeWidth={1.5} /></div>
+        <div className="h-44 bg-gradient-to-br from-success-light to-[var(--success-light)] flex items-center justify-center"><Home size={36} className="text-[var(--success-light)]" strokeWidth={1.5} /></div>
       )}
       <div className="p-4 space-y-3">
         {b && <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${b.bg} ${b.text}`}>{b.label}</span>}
@@ -560,7 +560,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 
               {loading && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-8">
-                  <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
+                  <Loader2 size={20} className="animate-spin text-tideline" />
                   <p className="text-sm text-tideline">{loadMsg}</p>
                 </div>
               )}
@@ -595,7 +595,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
 
               {importing && (
                 <div className="flex items-center gap-2 mt-6 justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-[#3d6b52]" />
+                  <Loader2 size={20} className="animate-spin text-tideline" />
                   <p className="text-sm text-tideline">Importing property and syncing bookings...</p>
                 </div>
               )}
@@ -620,7 +620,7 @@ function AddPropertyModal({ onClose }: { onClose: (didImport: boolean) => void }
           {step === 4 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center max-w-sm">
-                <div className="w-16 h-16 bg-[#eef5f0] rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-[#3d6b52]" strokeWidth={2.5} /></div>
+                <div className="w-16 h-16 bg-success-light rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} className="text-tideline" strokeWidth={2.5} /></div>
                 <h2 className="text-xl font-bold text-coastal mb-2">Property added!</h2>
                 {bookingCount > 0 && <p className="text-sm text-tideline mb-4">{bookingCount} booking{bookingCount !== 1 ? "s" : ""} imported</p>}
                 <div className="mt-4 mb-8">

@@ -93,7 +93,7 @@ export default function CleanerMobilePage({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-success-light border-t-coastal rounded-full animate-spin" />
       </div>
     );
   }
@@ -116,7 +116,7 @@ export default function CleanerMobilePage({
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-brand-500 text-white px-4 py-5">
+      <div className="bg-coastal text-white px-4 py-5">
         <div className="flex items-center gap-2 mb-1">
           <span className="w-2 h-2 rounded-full bg-white/60" />
           <p className="text-xs font-medium opacity-80">CLEANING TASK</p>
@@ -165,7 +165,7 @@ export default function CleanerMobilePage({
                 <span>3:00 PM</span>
               </div>
               <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-400 rounded-full" style={{ width: "100%" }} />
+                <div className="h-full bg-lagoon rounded-full" style={{ width: "100%" }} />
               </div>
               <p className="text-xs text-neutral-500 mt-1 text-center">4-hour cleaning window</p>
             </div>
@@ -193,7 +193,7 @@ export default function CleanerMobilePage({
                   type="checkbox"
                   checked={item.done}
                   onChange={() => toggleItem(item.id)}
-                  className="w-6 h-6 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+                  className="w-6 h-6 rounded border-neutral-300 text-coastal focus:ring-coastal"
                 />
                 <span className={`text-sm ${item.done ? "text-neutral-400 line-through" : "text-neutral-900"}`}>
                   {item.label}
@@ -203,7 +203,7 @@ export default function CleanerMobilePage({
           </div>
           <div className="mt-3 h-2 bg-neutral-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-brand-500 rounded-full transition-all"
+              className="h-full bg-coastal rounded-full transition-all"
               style={{ width: `${checklist.length > 0 ? (doneCount / checklist.length) * 100 : 0}%` }}
             />
           </div>
@@ -234,7 +234,7 @@ export default function CleanerMobilePage({
             <button
               onClick={() => updateTask({ status: "in_progress" })}
               disabled={saving}
-              className="w-full py-4 bg-brand-500 text-white text-base font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
+              className="w-full py-4 bg-coastal text-white text-base font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50"
             >
               {saving ? "Starting..." : "Start Cleaning"}
             </button>
@@ -244,7 +244,7 @@ export default function CleanerMobilePage({
             <button
               onClick={() => updateTask({ status: "completed", checklist })}
               disabled={saving}
-              className="w-full py-4 bg-brand-500 text-white text-base font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50"
+              className="w-full py-4 bg-coastal text-white text-base font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50"
             >
               {saving ? "Completing..." : `Mark Complete (${doneCount}/${checklist.length})`}
             </button>

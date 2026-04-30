@@ -69,7 +69,7 @@ function approximatePosition(
 }
 
 export default function CompMap({ center, propertyName, comps, medianOccupancy }: CompMapProps) {
-  const propertyIcon = createIcon("#10b981", 20);
+  const propertyIcon = createIcon("var(--golden)", 20);
 
   return (
     <div className="h-[400px] rounded-lg overflow-hidden border border-[var(--border)]">
@@ -108,7 +108,7 @@ export default function CompMap({ center, propertyName, comps, medianOccupancy }
               );
 
           const occ = comp.comp_occupancy ?? 0;
-          const color = occ >= medianOccupancy ? "#10b981" : "#ef4444";
+          const color = occ >= medianOccupancy ? "var(--lagoon)" : "var(--coral-reef)";
           const icon = createIcon(color, 12);
 
           const compName = comp.comp_name ?? "Listing";

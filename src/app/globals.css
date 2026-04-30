@@ -40,6 +40,17 @@
   --deep-water: #2a5a8a;     /* info, links */
   --bar-dark: #222222;       /* booking bar bg */
 
+  /* Lume — cool teal AI accent (3-stop scale; SVG masters use the 5-stop) */
+  --lume-light: #d4eef0;
+  --lume: #4cc4cc;           /* BRAND PRIMARY — AI accent */
+  --lume-deep: #0e7a8a;
+
+  /* Positive delta — between coastal and tideline; rate raises, success pills */
+  --positive: #1a3a2a;
+
+  /* Abyss — gradient terminus (paired with --deep-sea in radial/linear stops) */
+  --abyss: #0e2218;
+
   /* Koast shadows — all use rgba(19,46,32) coastal tint */
   --shadow-card: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
   --shadow-card-hover: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);
@@ -62,19 +73,6 @@
   --brass-dark: #b08f52;
   --linen: var(--shore);
   --linen-dark: var(--dry-sand);
-
-  /* Brand scale (used by old components) */
-  --brand-50: #eef5f0;
-  --brand-100: #d5e8da;
-  --brand-200: #a8d1b4;
-  --brand-300: #6aad7e;
-  --brand-400: #3d8a5a;
-  --brand-500: var(--coastal);
-  --brand-600: var(--deep-sea);
-  --brand-700: var(--deep-sea);
-  --brand-800: #142e21;
-  --brand-900: #0d1f16;
-  --brand-950: #07120c;
 
   /* Ink — text */
   --ink: var(--coastal);

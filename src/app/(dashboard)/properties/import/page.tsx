@@ -124,9 +124,9 @@ export default function ImportPage() {
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                 i < step
-                  ? "bg-brand-500 text-white"
+                  ? "bg-coastal text-white"
                   : i === step
-                  ? "bg-brand-100 text-brand-700 ring-2 ring-brand-500"
+                  ? "bg-success-light text-deep-sea ring-2 ring-coastal"
                   : "bg-neutral-100 text-neutral-400"
               }`}
             >
@@ -150,8 +150,8 @@ export default function ImportPage() {
         {/* Step 0: Connect */}
         {step === 0 && (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-success-light rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
@@ -170,7 +170,7 @@ export default function ImportPage() {
             <button
               onClick={handleConnect}
               disabled={loading}
-              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+              className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
             >
               {loading ? "Connecting..." : "Connect & Fetch Properties"}
             </button>
@@ -184,7 +184,7 @@ export default function ImportPage() {
               <h2 className="text-lg font-semibold text-neutral-800">
                 {properties.length} properties found
               </h2>
-              <button onClick={toggleAll} className="text-sm text-brand-500 hover:underline">
+              <button onClick={toggleAll} className="text-sm text-coastal hover:underline">
                 {selected.size === properties.length ? "Deselect All" : "Select All"}
               </button>
             </div>
@@ -199,14 +199,14 @@ export default function ImportPage() {
                   <label
                     key={p.channex_id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selected.has(p.channex_id) ? "border-brand-200 bg-brand-50/30" : "border-[var(--border)] hover:border-neutral-300"
+                      selected.has(p.channex_id) ? "border-success-light bg-success-light/30" : "border-[var(--border)] hover:border-neutral-300"
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.channex_id)}
                       onChange={() => toggleSelect(p.channex_id)}
-                      className="w-4 h-4 rounded border-neutral-300 text-brand-500"
+                      className="w-4 h-4 rounded border-neutral-300 text-coastal"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-neutral-800">{p.name}</p>
@@ -231,7 +231,7 @@ export default function ImportPage() {
               <button
                 onClick={handleImport}
                 disabled={selected.size === 0}
-                className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+                className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
               >
                 Import {selected.size} {selected.size === 1 ? "Property" : "Properties"}
               </button>
@@ -242,7 +242,7 @@ export default function ImportPage() {
         {/* Step 2: Importing */}
         {step === 2 && importing && (
           <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-10 h-10 border-4 border-success-light border-t-coastal rounded-full animate-spin mx-auto mb-4" />
             <p className="text-neutral-600 font-medium">Importing properties...</p>
             <p className="text-sm text-neutral-400 mt-1">
               Fetching properties, bookings, and rates from Channex
@@ -269,7 +269,7 @@ export default function ImportPage() {
               onClick={() =>
                 router.push(fromReviews ? "/reviews?just_connected=1" : "/properties")
               }
-              className="w-full px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+              className="w-full px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea transition-colors"
             >
               {fromReviews ? "Go to Reviews" : "Go to Properties"}
             </button>
@@ -293,10 +293,10 @@ function ResultRow({ result: r }: { result: ImportResult }) {
   // Status-specific color and label
   let pillClass = "bg-neutral-100 text-neutral-600";
   let pillLabel: string = r.status;
-  if (r.status === "imported") { pillClass = "bg-[#eef5f0] text-[#1a3a2a]"; pillLabel = "Imported"; }
-  else if (r.status === "imported_with_errors") { pillClass = "bg-[#fff4d6] text-[#b8860b]"; pillLabel = "Imported with warnings"; }
-  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[#fff4d6] text-[#b8860b]" : "bg-[#c44040]/10 text-[#c44040]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
-  else if (r.status === "unmatched") { pillClass = "bg-[#eef5f0] text-[#3d6b52]"; pillLabel = "Needs your input"; }
+  if (r.status === "imported") { pillClass = "bg-success-light text-[var(--positive)]"; pillLabel = "Imported"; }
+  else if (r.status === "imported_with_errors") { pillClass = "bg-[var(--warning-light)] text-[var(--amber-tide)]"; pillLabel = "Imported with warnings"; }
+  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[var(--warning-light)] text-[var(--amber-tide)]" : "bg-[#c44040]/10 text-[var(--coral-reef)]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
+  else if (r.status === "unmatched") { pillClass = "bg-success-light text-tideline"; pillLabel = "Needs your input"; }
 
   return (
     <div className="border border-[var(--border)] rounded-lg overflow-hidden">
@@ -314,7 +314,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
           {/* Imported but with booking failures */}
           {r.status === "imported_with_errors" && (
             <>
-              <p className="text-xs text-[#b8860b] mt-0.5">
+              <p className="text-xs text-[var(--amber-tide)] mt-0.5">
                 {r.bookings ?? 0} of {(r.bookings ?? 0) + (r.bookings_failed ?? 0)} bookings imported
                 {r.bookings_failed ? ` — ${r.bookings_failed} failed` : ""}
               </p>
@@ -322,7 +322,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
                 <button
                   type="button"
                   onClick={() => setExpanded((e) => !e)}
-                  className="text-[11px] text-[#b8860b] underline hover:no-underline mt-1"
+                  className="text-[11px] text-[var(--amber-tide)] underline hover:no-underline mt-1"
                 >
                   {expanded ? "Hide" : "Show"} {r.booking_errors.length} error{r.booking_errors.length === 1 ? "" : "s"}
                 </button>
@@ -333,7 +333,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
           {/* Quota-exceeded error gets an upgrade CTA */}
           {r.status === "error" && isQuotaError && (
             <>
-              <p className="text-xs text-[#b8860b] mt-0.5">
+              <p className="text-xs text-[var(--amber-tide)] mt-0.5">
                 Your plan doesn&apos;t allow more properties.
               </p>
               <Link
@@ -347,22 +347,22 @@ function ResultRow({ result: r }: { result: ImportResult }) {
 
           {/* Generic error */}
           {r.status === "error" && !isQuotaError && r.error && (
-            <p className="text-xs text-[#c44040] mt-0.5 break-all">{r.error}</p>
+            <p className="text-xs text-[var(--coral-reef)] mt-0.5 break-all">{r.error}</p>
           )}
 
           {/* Unmatched / multiple candidates — user needs to pick */}
           {r.status === "unmatched" && (
             <>
-              <p className="text-xs text-[#3d6b52] mt-0.5">
+              <p className="text-xs text-tideline mt-0.5">
                 {r.reason === "multiple_candidates"
                   ? "Multiple Koast properties match this name. Pick the right one or import as a new property."
                   : "This property couldn't be auto-matched."}
               </p>
               {r.candidates && r.candidates.length > 0 && (
                 <div className="mt-2">
-                  <label className="block text-[10px] text-[#3d6b52] mb-1">Link to:</label>
+                  <label className="block text-[10px] text-tideline mb-1">Link to:</label>
                   <select
-                    className="text-xs border border-[#efe9dd] rounded px-2 py-1 bg-white"
+                    className="text-xs border border-[var(--dry-sand)] rounded px-2 py-1 bg-white"
                     defaultValue=""
                   >
                     <option value="" disabled>Choose a property…</option>
@@ -370,7 +370,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-[#999] mt-1">
+                  <p className="text-[10px] text-[var(--tideline)] mt-1">
                     (Manual linking is coming soon — for now, rename one of the conflicting properties and re-import.)
                   </p>
                 </div>
@@ -385,10 +385,10 @@ function ResultRow({ result: r }: { result: ImportResult }) {
 
       {/* Expanded booking errors list */}
       {expanded && r.booking_errors && (
-        <div className="border-t border-[#efe9dd] bg-[#fff4d6]/30 px-3 py-2">
+        <div className="border-t border-[var(--dry-sand)] bg-[var(--warning-light)]/30 px-3 py-2">
           <ul className="list-disc list-inside space-y-0.5">
             {r.booking_errors.map((err, i) => (
-              <li key={i} className="text-[11px] text-[#b8860b] break-all">{err}</li>
+              <li key={i} className="text-[11px] text-[var(--amber-tide)] break-all">{err}</li>
             ))}
           </ul>
         </div>

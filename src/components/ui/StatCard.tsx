@@ -19,7 +19,7 @@ export default function StatCard({
 }: StatCardProps) {
   const changeBg =
     changeType === "positive"
-      ? "bg-brand-50 text-brand-600"
+      ? "bg-success-light text-deep-sea"
       : changeType === "negative"
         ? "bg-danger-light text-danger"
         : "bg-neutral-50 text-neutral-400";

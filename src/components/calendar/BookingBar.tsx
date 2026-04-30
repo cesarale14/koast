@@ -3,11 +3,11 @@
 import PlatformLogo from "@/components/ui/PlatformLogo";
 
 const platformColors: Record<string, string> = {
-  airbnb: "#FF5A5F",
+  airbnb: "var(--airbnb)",
   vrbo: "#3B5998",
-  booking_com: "#003580",
-  booking: "#003580",
-  direct: "#10B981",
+  booking_com: "var(--booking-com)",
+  booking: "var(--booking-com)",
+  direct: "var(--direct)",
 };
 
 export interface BookingBarData {
@@ -35,7 +35,7 @@ interface BookingBarProps {
 }
 
 export default function BookingBar({ booking, left, width, hasFollower, hasPredecessor, onClick }: BookingBarProps) {
-  const color = platformColors[booking.platform] ?? "#6B7280";
+  const color = platformColors[booking.platform] ?? "var(--tideline)";
   const nights = (() => {
     const ci = Date.UTC(+booking.check_in.slice(0, 4), +booking.check_in.slice(5, 7) - 1, +booking.check_in.slice(8, 10));
     const co = Date.UTC(+booking.check_out.slice(0, 4), +booking.check_out.slice(5, 7) - 1, +booking.check_out.slice(8, 10));

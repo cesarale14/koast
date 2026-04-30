@@ -45,9 +45,9 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  airbnb: "border-[#FF5A5F] bg-[#FF5A5F]/5 text-[#FF5A5F]",
+  airbnb: "border-airbnb bg-[#FF385C]/5 text-airbnb",
   vrbo: "border-[#3B5998] bg-[#3B5998]/5 text-[#3B5998]",
-  booking_com: "border-[#003580] bg-[#003580]/5 text-[#003580]",
+  booking_com: "border-[var(--booking-com)] bg-[#003580]/5 text-[var(--booking-com)]",
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -76,7 +76,7 @@ const TRIGGER_LABELS: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 const inputClass =
-  "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors";
+  "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -335,7 +335,7 @@ export default function OnboardingPage() {
           <div
             key={label}
             className={`text-xs font-medium ${
-              i <= step ? "text-brand-600" : "text-neutral-400"
+              i <= step ? "text-deep-sea" : "text-neutral-400"
             } ${i === 0 || i === STEPS.length - 1 ? "" : "hidden sm:block"}`}
           >
             {label}
@@ -345,7 +345,7 @@ export default function OnboardingPage() {
       {/* Bar */}
       <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
         <div
-          className="h-full bg-brand-500 rounded-full transition-all duration-500"
+          className="h-full bg-coastal rounded-full transition-all duration-500"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -360,7 +360,7 @@ export default function OnboardingPage() {
     <div className="text-center py-8">
       {/* Logo */}
       <div className="flex items-center justify-center gap-2 mb-6">
-        <div className="w-3 h-3 rounded-full bg-brand-500" />
+        <div className="w-3 h-3 rounded-full bg-coastal" />
         <span className="text-xl font-bold text-neutral-800 tracking-tight">
           Koast
         </span>
@@ -380,14 +380,14 @@ export default function OnboardingPage() {
           onClick={() => setPath("ical")}
           className={`p-5 rounded-lg border-2 text-left transition-all ${
             path === "ical"
-              ? "border-brand-500 bg-brand-50/50 ring-1 ring-brand-200"
+              ? "border-coastal bg-success-light/50 ring-1 ring-success-light"
               : "border-[var(--border)] hover:border-neutral-300"
           }`}
         >
           <div
             className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
               path === "ical"
-                ? "bg-brand-100 text-brand-600"
+                ? "bg-success-light text-deep-sea"
                 : "bg-neutral-100 text-neutral-400"
             }`}
           >
@@ -406,14 +406,14 @@ export default function OnboardingPage() {
           onClick={() => setPath("manual")}
           className={`p-5 rounded-lg border-2 text-left transition-all ${
             path === "manual"
-              ? "border-brand-500 bg-brand-50/50 ring-1 ring-brand-200"
+              ? "border-coastal bg-success-light/50 ring-1 ring-success-light"
               : "border-[var(--border)] hover:border-neutral-300"
           }`}
         >
           <div
             className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
               path === "manual"
-                ? "bg-brand-100 text-brand-600"
+                ? "bg-success-light text-deep-sea"
                 : "bg-neutral-100 text-neutral-400"
             }`}
           >
@@ -438,7 +438,7 @@ export default function OnboardingPage() {
     <div className="space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Building2 className="w-4 h-4 text-brand-500" />
+          <Building2 className="w-4 h-4 text-coastal" />
           <h2 className="text-lg font-bold text-neutral-800">
             Property Details
           </h2>
@@ -580,7 +580,7 @@ export default function OnboardingPage() {
     <div className="space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Calendar className="w-4 h-4 text-brand-500" />
+          <Calendar className="w-4 h-4 text-coastal" />
           <h2 className="text-lg font-bold text-neutral-800">
             Connect Calendar
           </h2>
@@ -653,9 +653,9 @@ export default function OnboardingPage() {
 
       {/* Success */}
       {icalResult && (
-        <div className="flex items-center gap-2 p-3 bg-[#eef5f0] border border-[#d5e8da] rounded-lg">
-          <Check className="w-4 h-4 text-[#1a3a2a] flex-shrink-0" />
-          <p className="text-sm text-[#1a3a2a]">
+        <div className="flex items-center gap-2 p-3 bg-success-light border border-[var(--success-light)] rounded-lg">
+          <Check className="w-4 h-4 text-[var(--positive)] flex-shrink-0" />
+          <p className="text-sm text-[var(--positive)]">
             Calendar connected! Found{" "}
             <span className="font-semibold">{icalResult.bookings}</span>{" "}
             booking{icalResult.bookings !== 1 ? "s" : ""} and{" "}
@@ -689,7 +689,7 @@ export default function OnboardingPage() {
     <div className="space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Wifi className="w-4 h-4 text-brand-500" />
+          <Wifi className="w-4 h-4 text-coastal" />
           <h2 className="text-lg font-bold text-neutral-800">
             Guest Information
           </h2>
@@ -803,7 +803,7 @@ export default function OnboardingPage() {
     <div className="space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <MessageSquare className="w-4 h-4 text-brand-500" />
+          <MessageSquare className="w-4 h-4 text-coastal" />
           <h2 className="text-lg font-bold text-neutral-800">
             Message Templates
           </h2>
@@ -863,7 +863,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => toggleTemplate(t.templateType)}
                   className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
-                    isActive ? "bg-brand-500" : "bg-neutral-300"
+                    isActive ? "bg-coastal" : "bg-neutral-300"
                   }`}
                 >
                   <span
@@ -914,8 +914,8 @@ export default function OnboardingPage() {
 
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Sparkles className="w-8 h-8 text-brand-500" />
+        <div className="w-16 h-16 bg-success-light rounded-full flex items-center justify-center mx-auto mb-4">
+          <Sparkles className="w-8 h-8 text-coastal" />
         </div>
 
         <h2 className="text-2xl font-bold text-neutral-800 mb-2">
@@ -934,7 +934,7 @@ export default function OnboardingPage() {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   c.done
-                    ? "bg-brand-100 text-brand-600"
+                    ? "bg-success-light text-deep-sea"
                     : "bg-neutral-100 text-neutral-400"
                 }`}
               >
@@ -954,7 +954,7 @@ export default function OnboardingPage() {
                 {c.label}
               </span>
               {c.done && (
-                <Check className="w-4 h-4 text-brand-500 ml-auto" />
+                <Check className="w-4 h-4 text-coastal ml-auto" />
               )}
             </div>
           ))}
@@ -962,7 +962,7 @@ export default function OnboardingPage() {
 
         <button
           onClick={() => router.push("/")}
-          className="px-8 py-3 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 transition-colors inline-flex items-center gap-2"
+          className="px-8 py-3 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea transition-colors inline-flex items-center gap-2"
         >
           <Home className="w-4 h-4" />
           Go to Dashboard
@@ -1003,7 +1003,7 @@ export default function OnboardingPage() {
           <button
             onClick={goNext}
             disabled={!canNext()}
-            className="px-8 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+            className="px-8 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
           >
             Get Started
             <ChevronRight className="w-4 h-4" />
@@ -1035,7 +1035,7 @@ export default function OnboardingPage() {
             <button
               onClick={handleSaveDetails}
               disabled={saving}
-              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+              className="px-6 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors inline-flex items-center gap-2"
             >
               {saving ? "Saving..." : "Save & Continue"}
               <ChevronRight className="w-4 h-4" />
@@ -1059,7 +1059,7 @@ export default function OnboardingPage() {
           <button
             onClick={handleSaveTemplates}
             disabled={saving}
-            className="px-6 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+            className="px-6 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors inline-flex items-center gap-2"
           >
             {saving ? "Saving..." : "Save Templates & Finish"}
             <ChevronRight className="w-4 h-4" />
@@ -1090,7 +1090,7 @@ export default function OnboardingPage() {
           <button
             onClick={goNext}
             disabled={!canNext() || saving}
-            className="px-6 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+            className="px-6 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
           >
             {saving ? "Saving..." : "Continue"}
             <ChevronRight className="w-4 h-4" />

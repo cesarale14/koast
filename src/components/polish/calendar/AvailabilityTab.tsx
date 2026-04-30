@@ -56,7 +56,7 @@ export default function AvailabilityTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
       <section>
         <div style={eyebrowStyle}>Status</div>
-        <div style={{ marginTop: 8, display: "inline-flex", gap: 4, padding: 4, borderRadius: 999, background: "#F5F1E8" }}>
+        <div style={{ marginTop: 8, display: "inline-flex", gap: 4, padding: 4, borderRadius: 999, background: "var(--shore-soft)" }}>
           {(["available", "booked", "blocked"] as const).map((s) => {
             const active = current === s;
             const disabled = s === "booked" && !isBooked;

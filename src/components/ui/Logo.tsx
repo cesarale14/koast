@@ -9,9 +9,9 @@ interface LogoProps {
 function BeaconIcon({ size = 32, className = "" }: { size?: number; className?: string }) {
   return (
     <svg viewBox="0 0 40 40" width={size} height={size} className={className} fill="none">
-      <path d="M13 30 L20 14 L27 30" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="20" cy="10" r="2.5" fill="#10b981" />
-      <path d="M15 8 Q20 2 25 8" stroke="#10b981" strokeWidth="1.2" opacity="0.4" strokeLinecap="round" />
+      <path d="M13 30 L20 14 L27 30" stroke="#4cc4cc" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="20" cy="10" r="2.5" fill="#4cc4cc" />
+      <path d="M15 8 Q20 2 25 8" stroke="#4cc4cc" strokeWidth="1.2" opacity="0.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -19,7 +19,7 @@ function BeaconIcon({ size = 32, className = "" }: { size?: number; className?: 
 function BeaconApp({ size = 40, className = "" }: { size?: number; className?: string }) {
   return (
     <svg viewBox="0 0 48 48" width={size} height={size} className={className}>
-      <rect width="48" height="48" rx="12" fill="#10b981" />
+      <rect width="48" height="48" rx="12" fill="#4cc4cc" />
       <path d="M15 36 L24 14 L33 36" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="24" cy="10" r="3" fill="#ffffff" />
       <path d="M18 8 Q24 1 30 8" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" strokeLinecap="round" />

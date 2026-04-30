@@ -12,7 +12,7 @@ interface KoastChipProps extends HTMLAttributes<HTMLSpanElement> {
 function styleFor(variant: Variant): React.CSSProperties {
   switch (variant) {
     case "neutral":
-      return { border: "1px solid #E5E2DC", color: "var(--tideline)", background: "#fff" };
+      return { border: "1px solid var(--hairline)", color: "var(--tideline)", background: "#fff" };
     case "success":
       return { color: "var(--lagoon)", background: "rgba(26,122,90,0.1)" };
     case "warning":

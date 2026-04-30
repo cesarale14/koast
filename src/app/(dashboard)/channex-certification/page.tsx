@@ -136,7 +136,7 @@ export default function CertificationPage() {
           <button
             onClick={runAll}
             disabled={runningAll || running !== null}
-            className="px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white bg-coastal rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
           >
             {runningAll ? "Running..." : "Run All (1-10 + Reset)"}
           </button>
@@ -155,16 +155,16 @@ export default function CertificationPage() {
             <div
               key={t.num}
               className={`bg-neutral-0 rounded-xl border p-4 transition-colors ${
-                passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
+                passed ? "border-[var(--success-light)] bg-success-light/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
               }`}
             >
               <div className="flex items-start gap-3">
                 {/* Status indicator */}
                 <div className="flex-shrink-0 mt-0.5">
                   {isRunning ? (
-                    <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-success-light border-t-coastal rounded-full animate-spin" />
                   ) : passed ? (
-                    <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-[var(--positive)] flex items-center justify-center">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
@@ -214,7 +214,7 @@ export default function CertificationPage() {
                               </code>
                               <button
                                 onClick={() => copyText(tid)}
-                                className="text-[10px] text-brand-500 hover:text-brand-600 font-medium"
+                                className="text-[10px] text-coastal hover:text-deep-sea font-medium"
                               >
                                 {copied === tid ? "Copied!" : "Copy"}
                               </button>
@@ -236,7 +236,7 @@ export default function CertificationPage() {
                   <button
                     onClick={() => runTest(t.num)}
                     disabled={isRunning || runningAll}
-                    className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 disabled:opacity-50 transition-colors"
+                    className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-deep-sea bg-success-light rounded-lg hover:bg-success-light disabled:opacity-50 transition-colors"
                   >
                     {isRunning ? "Running..." : passed ? "Re-run" : "Run"}
                   </button>
@@ -261,13 +261,13 @@ export default function CertificationPage() {
         const isResetting = running === -1;
         const passed = r.success && !r.error;
         return (
-          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : "border-[var(--border)]"}`}>
+          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-[var(--success-light)] bg-success-light/30" : "border-[var(--border)]"}`}>
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {isResetting ? (
-                  <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-success-light border-t-coastal rounded-full animate-spin" />
                 ) : passed ? (
-                  <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-[var(--positive)] flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
@@ -322,7 +322,7 @@ export default function CertificationPage() {
                   .join("\n")
               )
             }
-            className="mt-3 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+            className="mt-3 px-4 py-2 text-sm font-medium text-deep-sea bg-success-light rounded-lg hover:bg-success-light transition-colors"
           >
             {copied && copied.includes("Test") ? "Copied!" : "Copy Summary"}
           </button>
@@ -377,7 +377,7 @@ function WebhookLogViewer() {
             Test 11: Booking Webhook Events
           </h2>
           {hasAll3 && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-[#eef5f0] text-[#1a3a2a] rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-success-light text-[var(--positive)] rounded-full">
               ALL 3 RECEIVED
             </span>
           )}
@@ -385,7 +385,7 @@ function WebhookLogViewer() {
         <button
           onClick={fetchLogs}
           disabled={loading}
-          className="text-xs text-brand-500 hover:text-brand-600 font-medium disabled:opacity-50"
+          className="text-xs text-coastal hover:text-deep-sea font-medium disabled:opacity-50"
         >
           {loading ? "Refreshing..." : "Refresh"}
         </button>
@@ -398,7 +398,7 @@ function WebhookLogViewer() {
 
       {logs.length === 0 ? (
         <div className="text-center py-8">
-          <div className="w-8 h-8 border-2 border-neutral-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+          <div className="w-8 h-8 border-2 border-neutral-200 border-t-coastal rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm text-neutral-400">Waiting for webhook events...</p>
           <p className="text-xs text-neutral-300 mt-1">
             Webhook URL: {(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "")}/api/webhooks/channex
@@ -427,7 +427,7 @@ function WebhookLogViewer() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[10px] text-neutral-400">{timeStr}</span>
-                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-[#1a3a2a]" : "text-red-500"}`}>
+                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-[var(--positive)]" : "text-red-500"}`}>
                       {log.ack_sent ? "ACK sent" : "ACK pending"}
                     </span>
                     <code className="text-[10px] text-neutral-400 font-mono">{log.booking_id?.substring(0, 8)}...</code>

@@ -13,9 +13,9 @@ interface StatusDotProps {
 }
 
 const COLOR: Record<Tone, string> = {
-  ok: "#1a7a5a",
-  warn: "#d4960b",
-  alert: "#c44040",
+  ok: "var(--lagoon)",
+  warn: "var(--amber-tide)",
+  alert: "var(--coral-reef)",
   muted: "rgba(61, 107, 82, 0.4)",
 };
 

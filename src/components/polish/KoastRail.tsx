@@ -42,7 +42,7 @@ export function KoastRail({
 
   const isDark = variant === "dark";
   const bg = isDark ? "var(--coastal)" : "#fff";
-  const borderColor = isDark ? "rgba(247,243,236,0.1)" : "#E5E2DC";
+  const borderColor = isDark ? "rgba(247,243,236,0.1)" : "var(--hairline)";
   const toggleColor = isDark ? "rgba(247,243,236,0.7)" : "var(--tideline)";
 
   return (

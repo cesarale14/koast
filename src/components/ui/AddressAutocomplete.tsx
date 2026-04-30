@@ -134,11 +134,11 @@ export default function AddressAutocomplete({
         onKeyDown={handleKeyDown}
         onFocus={() => results.length > 0 && setOpen(true)}
         placeholder={placeholder}
-        className={className || "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"}
+        className={className || "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"}
       />
       {loading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-success-light border-t-coastal rounded-full animate-spin" />
         </div>
       )}
 
@@ -153,7 +153,7 @@ export default function AddressAutocomplete({
                 onClick={() => selectResult(r)}
                 onMouseEnter={() => setActiveIdx(i)}
                 className={`px-3 py-2 text-sm cursor-pointer ${
-                  i === activeIdx ? "bg-brand-50 text-brand-900" : "text-neutral-700 hover:bg-neutral-50"
+                  i === activeIdx ? "bg-success-light text-deep-sea" : "text-neutral-700 hover:bg-neutral-50"
                 }`}
               >
                 {r.display_name}

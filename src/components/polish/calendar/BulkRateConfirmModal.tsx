@@ -440,7 +440,7 @@ const footerStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 12,
-  background: "#FAFAF7",
+  background: "var(--shore-soft)",
 };
 
 const summaryStyle: React.CSSProperties = {

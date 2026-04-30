@@ -42,7 +42,7 @@ export default function KoastSegmentedControl({
         gap: 4,
         padding: 4,
         borderRadius: 999,
-        background: "#F5F1E8",
+        background: "var(--shore-soft)",
       }}
     >
       {options.map((opt) => {

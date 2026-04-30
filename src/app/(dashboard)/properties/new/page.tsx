@@ -223,20 +223,20 @@ export default function AddPropertyPage() {
       {/* Import from Channex option */}
       <Link
         href="/properties/import"
-        className="flex items-center gap-3 p-4 mb-8 bg-gradient-to-r from-brand-50 to-indigo-50 border border-brand-200 rounded-lg hover:border-brand-300 transition-colors"
+        className="flex items-center gap-3 p-4 mb-8 bg-gradient-to-r from-success-light to-indigo-50 border border-success-light rounded-lg hover:border-mangrove transition-colors"
       >
-        <div className="w-10 h-10 bg-brand-100 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-10 h-10 bg-success-light rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
         </div>
         <div>
-          <p className="text-sm font-semibold text-brand-900">Import from Channex</p>
-          <p className="text-xs text-brand-500">
+          <p className="text-sm font-semibold text-deep-sea">Import from Channex</p>
+          <p className="text-xs text-coastal">
             Automatically import properties, bookings, and rates from your channel manager
           </p>
         </div>
-        <svg className="w-5 h-5 text-brand-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5 text-mangrove ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </Link>
@@ -248,9 +248,9 @@ export default function AddPropertyPage() {
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 i < step
-                  ? "bg-brand-500 text-white"
+                  ? "bg-coastal text-white"
                   : i === step
-                  ? "bg-brand-100 text-brand-700 ring-2 ring-brand-500"
+                  ? "bg-success-light text-deep-sea ring-2 ring-coastal"
                   : "bg-neutral-100 text-neutral-400"
               }`}
             >
@@ -280,7 +280,7 @@ export default function AddPropertyPage() {
                 type="text"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                 placeholder="e.g., Beachfront Villa"
               />
             </div>
@@ -304,39 +304,39 @@ export default function AddPropertyPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                 <input type="text" value={form.city} onChange={(e) => updateField("city", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                 <input type="text" value={form.state} onChange={(e) => updateField("state", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={(e) => updateField("zip", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" />
               </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Bedrooms</label>
                 <input type="number" value={form.bedrooms} onChange={(e) => updateField("bedrooms", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" min="0" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Bathrooms</label>
                 <input type="number" value={form.bathrooms} onChange={(e) => updateField("bathrooms", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="0" step="0.5" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" min="0" step="0.5" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Max Guests</label>
                 <input type="number" value={form.max_guests} onChange={(e) => updateField("max_guests", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" min="1" />
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors" min="1" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
                 <select value={form.property_type} onChange={(e) => updateField("property_type", e.target.value as PropertyType)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors bg-neutral-0">
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors bg-neutral-0">
                   <option value="entire_home">Entire Home</option>
                   <option value="private_room">Private Room</option>
                   <option value="shared_room">Shared Room</option>
@@ -353,13 +353,13 @@ export default function AddPropertyPage() {
               Connect your calendars to sync bookings automatically.
             </p>
             {Object.entries(form.platforms).filter(([p]) => p !== "direct").map(([platform, data]) => (
-              <div key={platform} className={`border rounded-lg p-4 transition-colors ${data.enabled ? "border-brand-200 bg-brand-50/30" : "border-[var(--border)]"}`}>
+              <div key={platform} className={`border rounded-lg p-4 transition-colors ${data.enabled ? "border-success-light bg-success-light/30" : "border-[var(--border)]"}`}>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={data.enabled}
                     onChange={(e) => updatePlatform(platform, "enabled", e.target.checked)}
-                    className="w-4 h-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+                    className="w-4 h-4 rounded border-neutral-300 text-coastal focus:ring-coastal"
                   />
                   <span className="text-sm font-medium text-neutral-800">{platformLabels[platform]}</span>
                 </label>
@@ -370,13 +370,13 @@ export default function AddPropertyPage() {
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name={`mode-${platform}`} checked={data.connectionMode === "ical"}
                           onChange={() => updatePlatform(platform, "connectionMode", "ical")}
-                          className="w-3.5 h-3.5 text-brand-500" />
+                          className="w-3.5 h-3.5 text-coastal" />
                         <span className="text-xs font-medium text-neutral-700">iCal (free)</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name={`mode-${platform}`} checked={data.connectionMode === "channex"}
                           onChange={() => updatePlatform(platform, "connectionMode", "channex")}
-                          className="w-3.5 h-3.5 text-brand-500" />
+                          className="w-3.5 h-3.5 text-coastal" />
                         <span className="text-xs font-medium text-neutral-700">Channex (premium)</span>
                       </label>
                     </div>
@@ -387,7 +387,7 @@ export default function AddPropertyPage() {
                         <div className="flex gap-2">
                           <input type="url" value={data.icalUrl}
                             onChange={(e) => updatePlatform(platform, "icalUrl", e.target.value)}
-                            className="flex-1 h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                            className="flex-1 h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                             placeholder="https://www.airbnb.com/calendar/ical/..." />
                           <button
                             type="button"
@@ -420,7 +420,7 @@ export default function AddPropertyPage() {
                           </button>
                         </div>
                         {data.icalStatus === "success" && (
-                          <p className="text-xs text-[#1a3a2a] mt-1 flex items-center gap-1">
+                          <p className="text-xs text-[var(--positive)] mt-1 flex items-center gap-1">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                             Connected — {data.icalMessage}
                           </p>
@@ -436,14 +436,14 @@ export default function AddPropertyPage() {
                           <label className="block text-xs text-neutral-500 mb-1">Channex Listing ID</label>
                           <input type="text" value={data.platform_listing_id}
                             onChange={(e) => updatePlatform(platform, "platform_listing_id", e.target.value)}
-                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                             placeholder="Optional" />
                         </div>
                         <div>
                           <label className="block text-xs text-neutral-500 mb-1">Listing URL</label>
                           <input type="url" value={data.listing_url}
                             onChange={(e) => updatePlatform(platform, "listing_url", e.target.value)}
-                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                            className="w-full h-9 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                             placeholder="https://..." />
                         </div>
                       </div>
@@ -461,7 +461,7 @@ export default function AddPropertyPage() {
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Default Nightly Rate ($) *</label>
               <input type="number" value={form.base_rate} onChange={(e) => updateField("base_rate", e.target.value)}
-                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                 placeholder="150" min="0" step="1" />
               <p className="text-xs text-neutral-400 mt-1">This will be applied to all dates for the next 90 days.</p>
             </div>
@@ -469,20 +469,20 @@ export default function AddPropertyPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Min Rate ($)</label>
                 <input type="number" value={form.min_rate} onChange={(e) => updateField("min_rate", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                   placeholder="100" min="0" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Max Rate ($)</label>
                 <input type="number" value={form.max_rate} onChange={(e) => updateField("max_rate", e.target.value)}
-                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                  className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                   placeholder="300" min="0" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Default Min Stay (nights)</label>
               <input type="number" value={form.min_stay} onChange={(e) => updateField("min_stay", e.target.value)}
-                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                 min="1" />
             </div>
             <div>
@@ -494,12 +494,12 @@ export default function AddPropertyPage() {
                   { value: "auto", label: "Auto", desc: "Engine sets rates automatically" },
                 ].map((mode) => (
                   <label key={mode.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    form.pricing_mode === mode.value ? "border-brand-200 bg-brand-50/30" : "border-[var(--border)] hover:border-neutral-300"
+                    form.pricing_mode === mode.value ? "border-success-light bg-success-light/30" : "border-[var(--border)] hover:border-neutral-300"
                   }`}>
                     <input type="radio" name="pricing_mode" value={mode.value}
                       checked={form.pricing_mode === mode.value}
                       onChange={(e) => updateField("pricing_mode", e.target.value as PricingMode)}
-                      className="mt-0.5 w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                      className="mt-0.5 w-4 h-4 text-coastal focus:ring-coastal" />
                     <div>
                       <p className="text-sm font-medium text-neutral-800">{mode.label}</p>
                       <p className="text-xs text-neutral-500">{mode.desc}</p>
@@ -534,7 +534,7 @@ export default function AddPropertyPage() {
                 {Object.entries(form.platforms)
                   .filter(([, v]) => v.enabled)
                   .map(([p]) => (
-                    <span key={p} className="text-xs font-medium px-2.5 py-1 rounded-full bg-brand-50 text-brand-700">
+                    <span key={p} className="text-xs font-medium px-2.5 py-1 rounded-full bg-success-light text-deep-sea">
                       {platformLabels[p]}
                     </span>
                   ))}
@@ -577,7 +577,7 @@ export default function AddPropertyPage() {
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canNext()}
-              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Next
             </button>
@@ -585,7 +585,7 @@ export default function AddPropertyPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+              className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
             >
               {saving ? "Creating..." : "Create Property"}
             </button>

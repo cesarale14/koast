@@ -17,12 +17,12 @@ function styleFor(variant: Variant, padding?: number): React.CSSProperties {
     case "elevated":
       return {
         background: "#fff",
-        border: "1px solid #E5E2DC",
+        border: "1px solid var(--hairline)",
         borderRadius: 16,
         padding: p,
       };
     case "quiet":
-      return { background: "#FAFAF7", borderRadius: 12, padding: p };
+      return { background: "var(--shore-soft)", borderRadius: 12, padding: p };
     case "dark":
       return {
         background: "var(--coastal)",

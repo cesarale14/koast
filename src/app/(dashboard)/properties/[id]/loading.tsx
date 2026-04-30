@@ -8,7 +8,7 @@ export default function PropertyDetailLoading() {
         style={{
           height: 280,
           width: "100%",
-          background: "linear-gradient(135deg, var(--deep-sea), #0a1c14 50%, #0e2218)",
+          background: "linear-gradient(135deg, var(--deep-sea), var(--abyss) 50%, var(--abyss))",
           position: "relative",
         }}
       >

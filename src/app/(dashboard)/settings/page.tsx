@@ -61,7 +61,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       type="button"
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-        checked ? "bg-brand-500" : "bg-neutral-300"
+        checked ? "bg-coastal" : "bg-neutral-300"
       }`}
     >
       <span
@@ -368,7 +368,7 @@ export default function SettingsPage() {
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
               placeholder="Your name"
             />
           </div>
@@ -390,14 +390,14 @@ export default function SettingsPage() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+              className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
               placeholder="+1 (555) 000-0000"
             />
           </div>
           <button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50"
+            className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50"
           >
             {savingProfile ? "Saving..." : "Save Profile"}
           </button>
@@ -408,7 +408,7 @@ export default function SettingsPage() {
       <SectionCard icon={CreditCard} title="Plan & Billing" description="Your current subscription and usage.">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-[#eef5f0] text-[#1a3a2a]">
+            <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-success-light text-[var(--positive)]">
               Free
             </span>
           </div>
@@ -419,7 +419,7 @@ export default function SettingsPage() {
             </div>
             <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-brand-500 rounded-full transition-all duration-500"
+                className="h-full bg-coastal rounded-full transition-all duration-500"
                 style={{ width: `${usagePercent}%` }}
               />
             </div>
@@ -428,7 +428,7 @@ export default function SettingsPage() {
             {featureList.map((f) => (
               <div key={f.label} className="flex items-center gap-2 text-sm text-neutral-600">
                 {f.included ? (
-                  <Check size={14} className="text-brand-500" />
+                  <Check size={14} className="text-coastal" />
                 ) : (
                   <Lock size={14} className="text-neutral-400" />
                 )}
@@ -439,7 +439,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <button
               disabled
-              className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 rounded-lg opacity-50 cursor-not-allowed"
+              className="h-9 px-4 text-sm font-semibold text-white bg-coastal rounded-lg opacity-50 cursor-not-allowed"
             >
               Upgrade to Pro &mdash; $79/mo
             </button>
@@ -461,7 +461,7 @@ export default function SettingsPage() {
             href="https://app.channex.io"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2 text-sm font-semibold text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors flex-shrink-0"
+            className="px-4 py-2 text-sm font-semibold text-deep-sea bg-success-light rounded-lg hover:bg-success-light transition-colors flex-shrink-0"
           >
             Open Channex &rarr;
           </a>
@@ -475,7 +475,7 @@ export default function SettingsPage() {
             <button
               onClick={handleSyncChannex}
               disabled={syncingChannex}
-              className="h-9 px-4 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 flex items-center gap-2"
+              className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 flex items-center gap-2"
             >
               {syncingChannex && (
                 <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
@@ -492,7 +492,7 @@ export default function SettingsPage() {
                 Last sync: <span className="font-medium text-neutral-700">{formatLastSync(lastSync.at)}</span>
               </span>
               <span className="text-neutral-500">
-                <span className="inline-flex items-center gap-1 text-[#1a3a2a] font-medium">
+                <span className="inline-flex items-center gap-1 text-[var(--positive)] font-medium">
                   <Check size={12} strokeWidth={3} />
                   {lastSync.checked} checked
                 </span>
@@ -569,7 +569,7 @@ export default function SettingsPage() {
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       ch.status === "active"
-                        ? "bg-[#eef5f0] text-[#1a3a2a]"
+                        ? "bg-success-light text-[var(--positive)]"
                         : "bg-neutral-100 text-neutral-500"
                     }`}
                   >
@@ -598,7 +598,7 @@ export default function SettingsPage() {
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       feed.is_active
-                        ? "bg-[#eef5f0] text-[#1a3a2a]"
+                        ? "bg-success-light text-[var(--positive)]"
                         : "bg-neutral-100 text-neutral-500"
                     }`}
                   >
@@ -611,7 +611,7 @@ export default function SettingsPage() {
           })()}
           <a
             href="/properties"
-            className="inline-flex items-center text-sm font-medium text-brand-500 hover:text-brand-600 transition-colors"
+            className="inline-flex items-center text-sm font-medium text-coastal hover:text-deep-sea transition-colors"
           >
             Manage Connections &rarr;
           </a>
@@ -728,7 +728,7 @@ export default function SettingsPage() {
               onClick={() => t !== "dark" && setTheme(t)}
               className={`relative flex flex-col items-center gap-2 p-4 rounded-lg border transition-all ${
                 theme === t
-                  ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/20"
+                  ? "border-coastal bg-success-light ring-2 ring-coastal/20"
                   : "border-[var(--border)] hover:border-neutral-300"
               } ${t === "dark" ? "cursor-not-allowed" : ""}`}
             >

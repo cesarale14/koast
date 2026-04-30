@@ -717,7 +717,7 @@ function TopChrome({
       style={{
         height: 56,
         flexShrink: 0,
-        borderBottom: "1px solid #E5E2DC",
+        borderBottom: "1px solid var(--hairline)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -743,11 +743,11 @@ function TopChrome({
           }}
         >
           <span style={{ color: "var(--coastal)", fontWeight: 600 }}>Koast</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span>Properties</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span style={{ color: "var(--coastal)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{propertyName}</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span>Calendar</span>
         </div>
       )}
@@ -815,7 +815,7 @@ function TopChrome({
           )}
         </div>
 
-        {!isMobile && showSwitcher && <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />}
+        {!isMobile && showSwitcher && <div style={{ width: 1, height: 24, background: "var(--hairline)" }} />}
 
         {!isMobile && showSwitcher && (
           <div style={{ position: "relative" }}>
@@ -864,7 +864,7 @@ function PropertyMenu({
         left: 0,
         right: 0,
         background: "#fff",
-        border: "1px solid #E5E2DC",
+        border: "1px solid var(--hairline)",
         borderRadius: 12,
         padding: 6,
         minWidth: 240,
@@ -885,7 +885,7 @@ function PropertyMenu({
             padding: "8px 10px",
             borderRadius: 8,
             border: "none",
-            background: p.id === activeId ? "#FAFAF7" : "transparent",
+            background: p.id === activeId ? "var(--shore-soft)" : "transparent",
             cursor: "pointer",
             fontSize: 13,
             fontWeight: p.id === activeId ? 600 : 500,
@@ -957,7 +957,7 @@ function PropertyHero({
           borderRadius: isMobile ? 12 : 16,
           overflow: "hidden",
           flexShrink: 0,
-          background: "#F0ECE3",
+          background: "var(--dry-sand)",
         }}
       >
         {property.cover_photo_url && (
@@ -991,7 +991,7 @@ function PropertyHero({
           }}
         >
           <span>Synced {lastSynced}</span>
-          <span style={{ color: "#C8C4BC" }}>·</span>
+          <span style={{ color: "var(--shell)" }}>·</span>
           <span>{accept != null ? `${Math.round(accept * 100)}% acceptance` : "Accepting data"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1119,7 +1119,7 @@ function MonthBlock({
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(7, minmax(${isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP}px, 1fr))`,
-          borderBottom: "1px solid #E5E2DC",
+          borderBottom: "1px solid var(--hairline)",
           paddingBottom: isMobile ? 4 : 8,
           marginBottom: isMobile ? 4 : 8,
           textAlign: "center",

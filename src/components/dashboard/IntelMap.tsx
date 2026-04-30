@@ -66,7 +66,7 @@ function approximatePosition(cLat: number, cLng: number, distKm: number, idx: nu
 export default function IntelMap({ properties, comps, events = [], center, snapshot, propertyStats }: IntelMapProps) {
   const [layers, setLayers] = useState({ properties: true, comps: true, events: true });
 
-  const propIcon = useMemo(() => createIcon("#10b981", 22, true), []);
+  const propIcon = useMemo(() => createIcon("var(--golden)", 22, true), []);
   const eventIcon = starIcon;
 
   const allPositions = useMemo((): [number, number][] => {
@@ -79,16 +79,16 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
       {/* Layer toggles */}
       <div className="flex items-center gap-4 mb-3">
         {[
-          { key: "properties" as const, label: "My Properties", color: "#10b981" },
-          { key: "comps" as const, label: "Competitors", color: "#6b7280" },
-          { key: "events" as const, label: "Events", color: "#f59e0b" },
+          { key: "properties" as const, label: "My Properties", color: "var(--golden)" },
+          { key: "comps" as const, label: "Competitors", color: "var(--tideline)" },
+          { key: "events" as const, label: "Events", color: "var(--amber-tide)" },
         ].map(({ key, label, color }) => (
           <label key={key} className="flex items-center gap-1.5 cursor-pointer text-xs text-neutral-600">
             <input
               type="checkbox"
               checked={layers[key]}
               onChange={() => setLayers((l) => ({ ...l, [key]: !l[key] }))}
-              className="w-3.5 h-3.5 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+              className="w-3.5 h-3.5 rounded border-neutral-300 text-coastal focus:ring-coastal"
             />
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
             {label}
@@ -110,7 +110,7 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
             <Marker key={p.id} position={[p.lat, p.lng]} icon={propIcon}>
               <Popup>
                 <div className="text-sm min-w-[180px]">
-                  <p className="font-bold text-brand-600">{p.name}</p>
+                  <p className="font-bold text-deep-sea">{p.name}</p>
                   <div className="mt-1.5 space-y-0.5 text-neutral-600">
                     {propertyStats && <p>Occupancy: <span className="font-mono font-semibold">{propertyStats.occupancy}%</span></p>}
                     {propertyStats && <p>Avg Rate: <span className="font-mono font-semibold">${propertyStats.avgRate}</span></p>}
@@ -141,7 +141,7 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
                         <p className="pt-1 border-t border-neutral-100 font-medium">
                           {c.adr > propertyStats.avgRate
                             ? <span className="text-amber-600">They charge ${Math.round(c.adr - propertyStats.avgRate)} more</span>
-                            : <span className="text-[#1a3a2a]">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
+                            : <span className="text-[var(--positive)]">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
                         </p>
                       )}
                     </div>

@@ -42,7 +42,7 @@ export function KoastSignalBar({ label, score, weight, confidence }: KoastSignal
           height: 4,
           width: "100%",
           borderRadius: 2,
-          background: "#F0ECE3",
+          background: "var(--dry-sand)",
           overflow: "hidden",
         }}
       >

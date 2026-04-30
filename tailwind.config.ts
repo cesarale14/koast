@@ -27,8 +27,18 @@ const config: Config = {
         sandbar: "var(--sandbar)",
         // Neutral — sandy shore
         shore: "var(--shore)",
+        "shore-soft": "var(--shore-soft)",
         "dry-sand": "var(--dry-sand)",
         shell: "var(--shell)",
+        hairline: "var(--hairline)",
+        white: "var(--white)",
+        // Lume — cool teal AI accent
+        "lume-light": "var(--lume-light)",
+        lume: "var(--lume)",
+        "lume-deep": "var(--lume-deep)",
+        // Untokenized decisions
+        positive: "var(--positive)",
+        abyss: "var(--abyss)",
         // Semantic
         "coral-reef": "var(--coral-reef)",
         "amber-tide": "var(--amber-tide)",
@@ -54,19 +64,6 @@ const config: Config = {
           DEFAULT: "var(--ink)",
           secondary: "var(--ink-secondary)",
           muted: "var(--ink-muted)",
-        },
-        brand: {
-          50: "var(--brand-50)",
-          100: "var(--brand-100)",
-          200: "var(--brand-200)",
-          300: "var(--brand-300)",
-          400: "var(--brand-400)",
-          500: "var(--brand-500)",
-          600: "var(--brand-600)",
-          700: "var(--brand-700)",
-          800: "var(--brand-800)",
-          900: "var(--brand-900)",
-          950: "var(--brand-950)",
         },
         neutral: {
           0: "var(--neutral-0)",
