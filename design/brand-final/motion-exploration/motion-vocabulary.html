@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Motion Vocabulary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf7; --shore: #f7f3ec; --deep-sea: #132e20;
+    --ink: #0f1815; --ink-2: #4a5552; --ink-3: #6e7976;
+    --rule: #e7e2d6;
+    --teal-light: #d4eef0; --teal-3: #4cc4cc; --teal-deep: #0e7a8a;
+    --good: #2a7a4a; --warn: #b34141;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 64px 32px 96px; }
+
+  /* HEADER */
+  header.hero { padding: 0 0 32px; margin: 0 0 48px; border-bottom: 0.5px solid var(--rule); }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 8px; }
+  h1 { font-size: 38px; font-weight: 500; letter-spacing: -0.022em; margin: 0 0 14px; line-height: 1.1; }
+  .lede { font-size: 16px; color: var(--ink-2); max-width: 60ch; margin: 0; }
+  .hero-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin: 18px 0 0; letter-spacing: 0.06em; }
+
+  /* SECTION PRIMITIVES */
+  section { margin: 0 0 56px; padding: 0 0 40px; border-bottom: 0.5px solid var(--rule); }
+  section:last-of-type { border-bottom: none; }
+  h2 { font-size: 26px; font-weight: 500; letter-spacing: -0.018em; margin: 0 0 8px; line-height: 1.2; }
+  h3 { font-size: 13px; font-weight: 500; color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; margin: 28px 0 12px; font-family: 'JetBrains Mono', monospace; }
+  p { margin: 0 0 12px; max-width: 70ch; }
+  p.pdesc { font-size: 14px; color: var(--ink-2); margin: 0 0 20px; max-width: 64ch; line-height: 1.65; }
+  .pnum { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 14px 0 0; vertical-align: middle; }
+
+  /* DEMO TILES */
+  .demo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+  .tile { border-radius: 12px; padding: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; }
+  .tile.light { background: var(--shore); }
+  .tile.dark { background: var(--deep-sea); }
+  .tile-mark { display: flex; align-items: center; justify-content: center; height: 130px; }
+  .tile-mark-small { display: flex; align-items: center; justify-content: center; height: 64px; }
+  .tile-bg { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-3); letter-spacing: 0.12em; text-transform: uppercase; margin: 12px 0 0; opacity: 0.7; }
+  .tile.dark .tile-bg { color: var(--shore); opacity: 0.55; }
+
+  /* CODE */
+  pre { background: var(--shore); border-radius: 10px; padding: 18px 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; color: var(--ink); overflow-x: auto; margin: 12px 0 18px; }
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--shore); padding: 1px 5px; border-radius: 3px; }
+  pre code { background: transparent; padding: 0; }
+
+  /* TABLES */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; }
+  table th, table td { text-align: left; padding: 12px 16px; border-bottom: 0.5px solid var(--rule); font-size: 13px; vertical-align: top; }
+  table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  table td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-2); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; }
+  .badge.fire { background: rgba(76, 196, 204, 0.18); color: var(--teal-deep); }
+  .badge.silent { background: rgba(110, 121, 118, 0.16); color: var(--ink-3); }
+
+  /* CALLOUT */
+  .callout { background: rgba(76, 196, 204, 0.07); border-left: 3px solid var(--teal-3); border-radius: 10px; padding: 22px 26px; margin: 16px 0 24px; }
+  .callout p { margin: 0; font-size: 13.5px; line-height: 1.7; }
+  .callout strong { color: var(--ink); }
+
+  .stamp { font-family: 'JetBrains Mono', monospace; background: rgba(76, 196, 204, 0.18); padding: 2px 8px; border-radius: 4px; font-size: 11.5px; color: var(--teal-deep); }
+
+  /* ============================================================ */
+  /* ===================== ANIMATION SYSTEM ===================== */
+  /* ============================================================ */
+
+  /* IDLE — static, no animation */
+
+  /* ACTIVE — cascade soft, top-down opacity wave */
+  @keyframes cascade-pulse {
+    0%, 40%, 65%, 100% { opacity: 1; }
+    50%, 55%           { opacity: 0.55; }
+  }
+  .active .b1 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .active .b2 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.13s; }
+  .active .b3 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.26s; }
+  .active .b4 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.39s; }
+  .active .b5 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.52s; }
+
+  /* PULSE — small-size active fallback */
+  @keyframes brightness-pulse {
+    0%, 100% { filter: brightness(1) saturate(1); }
+    50%      { filter: brightness(1.12) saturate(1.1); }
+  }
+  .pulse .bands { animation: brightness-pulse 1.6s infinite ease-in-out; transform-origin: center; }
+
+  /* MILESTONE — deposit, dramatic event with rest */
+  @keyframes ms-ghost {
+    0%, 50%, 100% { transform: translateY(0); opacity: 0; }
+    68%, 82%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes ms-stack {
+    0%, 50%, 100% { transform: translateY(0); }
+    68%, 82%      { transform: translateY(18px); }
+  }
+  .milestone .ghost { animation: ms-ghost 5s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+  .milestone .stack { animation: ms-stack 5s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+
+  /* MARKETING HERO — continuous cascade, no rest */
+  @keyframes cascade-hero {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+  .hero-cascade .b1 { animation: cascade-hero 2.4s infinite ease-in-out; }
+  .hero-cascade .b2 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.1s; }
+  .hero-cascade .b3 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.2s; }
+  .hero-cascade .b4 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.3s; }
+  .hero-cascade .b5 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.4s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============== HEADER ============== -->
+<header class="hero">
+  <div class="eyebrow">koast brand · motion vocabulary v1.0</div>
+  <h1>A layered motion system.</h1>
+  <p class="lede">Three motion registers — <strong>idle</strong>, <strong>active</strong>, <strong>milestone</strong> — plus a small-size fallback. Each register has a distinct gesture and trigger condition. The motion does real work: it tells the user what Koast is doing, when something happens, and when it's at rest.</p>
+  <div class="hero-meta">v1.0 · 2026.04.30 · supersedes motion-philosophies.html · canonical reference</div>
+</header>
+
+
+<!-- ============== IDLE ============== -->
+<section>
+  <div><span class="pnum">register 1</span><h2 style="display:inline; vertical-align:middle;">Idle — static</h2></div>
+  <p class="pdesc">No motion. The composed brand mark at rest. This is the default state for any deployment of the banded-O when no work is happening: app header, browser favicon, email signature, document watermark, anywhere the mark just exists.</p>
+
+  <div class="demo-row">
+    <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="il"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#il)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light</div></div>
+    <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="id"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#id)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark</div></div>
+  </div>
+
+  <div class="callout">
+    <p><strong>Why static:</strong> with cascade as a strong active signal, breath at 1-2% adds nothing — it either doesn't register (invisible to most users) or competes with cascade for "motion = active" semantics. Static is most defensible, conventional (Stripe, Linear, Vercel, Anthropic all ship static marks), and accessible by default.</p>
+  </div>
+</section>
+
+
+<!-- ============== ACTIVE — CASCADE ============== -->
+<section>
+  <div><span class="pnum">register 2</span><h2 style="display:inline; vertical-align:middle;">Active — cascade</h2></div>
+  <p class="pdesc">Bands fade through in top-down sequence. Reads as <em>consulting layers of memory</em> — the AI co-host is reading, computing, processing. This is the production "thinking" indicator. Triggered while AI generation is in flight, sync is running, or any user-perceptible background work is happening.</p>
+
+  <div class="demo-row">
+    <div class="tile light"><div class="tile-mark active"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="al"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#al)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light · ≥48px</div></div>
+    <div class="tile dark"><div class="tile-mark active"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="ad"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#ad)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark · ≥48px</div></div>
+  </div>
+
+  <h3>Specification</h3>
+  <table>
+    <tr><th>property</th><th>value</th><th>notes</th></tr>
+    <tr><td class="mono">opacity range</td><td class="mono">1.0 → 0.55 → 1.0</td><td>Bands never go below 0.55 — readability preserved throughout</td></tr>
+    <tr><td class="mono">cycle</td><td class="mono">3.0s</td><td>~43% wave, ~57% rest</td></tr>
+    <tr><td class="mono">stagger</td><td class="mono">130ms per band</td><td>5 bands × 130ms = 650ms wave duration</td></tr>
+    <tr><td class="mono">direction</td><td class="mono">top-down</td><td>Reads as natural scan / read direction</td></tr>
+    <tr><td class="mono">easing</td><td class="mono">cubic-bezier(0.45, 0, 0.55, 1)</td><td>Smooth in/out, no overshoot</td></tr>
+    <tr><td class="mono">size threshold</td><td class="mono">≥32px</td><td>Below this, switch to <em>pulse</em> (small-size fallback)</td></tr>
+  </table>
+
+  <h3>CSS reference</h3>
+<pre>@keyframes cascade-pulse {
+  0%, 40%, 65%, 100% { opacity: 1; }
+  50%, 55%           { opacity: 0.55; }
+}
+
+.koast-mark[data-state="active"] .b1 {
+  animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.koast-mark[data-state="active"] .b2 {
+  animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+  animation-delay: 0.13s;
+}
+.koast-mark[data-state="active"] .b3 {
+  animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+  animation-delay: 0.26s;
+}
+.koast-mark[data-state="active"] .b4 {
+  animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+  animation-delay: 0.39s;
+}
+.koast-mark[data-state="active"] .b5 {
+  animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+  animation-delay: 0.52s;
+}</pre>
+
+  <h3>When active fires</h3>
+  <table>
+    <tr><th>condition</th><th>state</th></tr>
+    <tr><td>AI generating a guest message reply</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Pricing engine recalculating recommendations</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Booking sync in flight (Channex / Airbnb)</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Channel manager re-syncing after error</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Property data refresh / iCal poll</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Initial onboarding analysis (first-time setup)</td><td><span class="badge fire">active</span></td></tr>
+    <tr><td>Routine background polling, no user-perceptible work</td><td><span class="badge silent">silent (idle)</span></td></tr>
+    <tr><td>Page navigation, route changes</td><td><span class="badge silent">silent (idle)</span></td></tr>
+    <tr><td>Form input, UI interactions</td><td><span class="badge silent">silent (idle)</span></td></tr>
+  </table>
+</section>
+
+
+<!-- ============== ACTIVE — PULSE (SMALL SIZE) ============== -->
+<section>
+  <div><span class="pnum">register 2b</span><h2 style="display:inline; vertical-align:middle;">Active fallback — pulse</h2></div>
+  <p class="pdesc">At 16-31px, cascade's per-band opacity changes are too subtle to perceive. The pulse fallback affects the <em>entire mark</em> via CSS <code>filter</code> — a brightness/saturation lift that reads as "the mark is lit up while thinking." Visible at small sizes because color/brightness changes survive any pixel resolution.</p>
+
+  <div class="demo-row">
+    <div class="tile light"><div class="tile-mark-small pulse"><svg width="32" height="32" viewBox="0 0 100 100"><defs><clipPath id="pl1"><circle cx="50" cy="50" r="46"/></clipPath></defs><g class="bands" clip-path="url(#pl1)"><rect x="0" y="4" width="100" height="32" fill="#d4eef0"/><rect x="0" y="36" width="100" height="30" fill="#4cc4cc"/><rect x="0" y="66" width="100" height="30" fill="#0e7a8a"/></g></svg></div><div class="tile-mark-small pulse" style="margin-top: 12px;"><svg width="48" height="48" viewBox="0 0 100 100"><defs><clipPath id="pl2"><circle cx="50" cy="50" r="46"/></clipPath></defs><g class="bands" clip-path="url(#pl2)"><rect x="0" y="4" width="100" height="32" fill="#d4eef0"/><rect x="0" y="36" width="100" height="30" fill="#4cc4cc"/><rect x="0" y="66" width="100" height="30" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light · 32px / 48px shown</div></div>
+    <div class="tile dark"><div class="tile-mark-small pulse"><svg width="32" height="32" viewBox="0 0 100 100"><defs><clipPath id="pd1"><circle cx="50" cy="50" r="46"/></clipPath></defs><g class="bands" clip-path="url(#pd1)"><rect x="0" y="4" width="100" height="32" fill="#d4eef0"/><rect x="0" y="36" width="100" height="30" fill="#4cc4cc"/><rect x="0" y="66" width="100" height="30" fill="#2e8c95"/></g></svg></div><div class="tile-mark-small pulse" style="margin-top: 12px;"><svg width="48" height="48" viewBox="0 0 100 100"><defs><clipPath id="pd2"><circle cx="50" cy="50" r="46"/></clipPath></defs><g class="bands" clip-path="url(#pd2)"><rect x="0" y="4" width="100" height="32" fill="#d4eef0"/><rect x="0" y="36" width="100" height="30" fill="#4cc4cc"/><rect x="0" y="66" width="100" height="30" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark · 32px / 48px shown</div></div>
+  </div>
+
+  <h3>Specification</h3>
+  <table>
+    <tr><th>property</th><th>value</th></tr>
+    <tr><td class="mono">brightness range</td><td class="mono">1.0 → 1.12 → 1.0</td></tr>
+    <tr><td class="mono">saturation range</td><td class="mono">1.0 → 1.10 → 1.0</td></tr>
+    <tr><td class="mono">cycle</td><td class="mono">1.6s</td></tr>
+    <tr><td class="mono">easing</td><td class="mono">ease-in-out</td></tr>
+    <tr><td class="mono">size range</td><td class="mono">16-31px</td></tr>
+    <tr><td class="mono">below 16px</td><td class="mono">no active state — favicons should not animate</td></tr>
+  </table>
+
+  <h3>CSS reference</h3>
+<pre>@keyframes brightness-pulse {
+  0%, 100% { filter: brightness(1)    saturate(1);   }
+  50%      { filter: brightness(1.12) saturate(1.1); }
+}
+
+.koast-mark[data-state="active"][data-size="small"] .bands {
+  animation: brightness-pulse 1.6s infinite ease-in-out;
+}</pre>
+</section>
+
+
+<!-- ============== MILESTONE — DEPOSIT ============== -->
+<section>
+  <div><span class="pnum">register 3</span><h2 style="display:inline; vertical-align:middle;">Milestone — deposit</h2></div>
+  <p class="pdesc">A single ghost band drops in from above; the existing stack shifts down a full band-height to make room; everything settles. <strong>Reads as "memory just deposited"</strong> — Koast just stored something significant. This is a celebration gesture, fired only on specific positive events. It's a one-shot in production, not a loop.</p>
+
+  <div class="demo-row">
+    <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="milestone"><defs><clipPath id="ml"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#ml)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg></div><div class="tile-bg">light · loop preview only</div></div>
+    <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="milestone"><defs><clipPath id="md"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#md)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></g></svg></div><div class="tile-bg">dark · loop preview only</div></div>
+  </div>
+
+  <h3>Specification</h3>
+  <table>
+    <tr><th>property</th><th>value</th><th>notes</th></tr>
+    <tr><td class="mono">gesture</td><td class="mono">ghost-deposit + stack shift 18px</td><td>Full band-height shift, dramatic settle</td></tr>
+    <tr><td class="mono">event duration</td><td class="mono">2.0s</td><td>Single visible event</td></tr>
+    <tr><td class="mono">cycle (preview)</td><td class="mono">5s</td><td>50% rest in looped preview only; not used in production</td></tr>
+    <tr><td class="mono">production deployment</td><td class="mono">one-shot</td><td>Fires once per trigger, then mark returns to idle</td></tr>
+    <tr><td class="mono">easing</td><td class="mono">cubic-bezier(0.4, 0, 0.6, 1)</td><td>Gentler than active — settled, deliberate</td></tr>
+  </table>
+
+  <h3>CSS reference</h3>
+<pre>@keyframes milestone-ghost {
+  0%, 50%, 100% { transform: translateY(0);    opacity: 0; }
+  68%, 82%      { transform: translateY(23px); opacity: 1; }
+}
+@keyframes milestone-stack {
+  0%, 50%, 100% { transform: translateY(0);    }
+  68%, 82%      { transform: translateY(18px); }
+}
+
+/* Production: trigger as one-shot via JS state change */
+.koast-mark[data-state="milestone"] .ghost {
+  animation: milestone-ghost 2s ease-out forwards;
+}
+.koast-mark[data-state="milestone"] .stack {
+  animation: milestone-stack 2s ease-out forwards;
+}
+
+/* Component listens for animationend, transitions back to idle */</pre>
+
+  <h3>Trigger taxonomy — what fires deposit</h3>
+  <p style="font-size:13px; color:var(--ink-2); max-width:64ch;">The brand layer defines <em>which events deserve the gesture</em>; the product-side state machine that fires them lives in <code>koast/koast-workers</code> and is implemented as a follow-up. The list below is the locked recommendation.</p>
+
+  <table>
+    <tr><th>tier</th><th>event</th><th>cadence</th></tr>
+    <tr><td rowspan="5"><strong>Tier 1<br>Host milestones</strong></td><td>First listing onboarded</td><td>Once per host</td></tr>
+    <tr><td>First booking received</td><td>Once per host</td></tr>
+    <tr><td>First AI-drafted message approved</td><td>Once per host</td></tr>
+    <tr><td>First public reply published</td><td>Once per host</td></tr>
+    <tr><td>First successful guest review submitted</td><td>Once per host</td></tr>
+    <tr><td rowspan="4"><strong>Tier 2<br>System milestones</strong></td><td>Daily pricing sync completed</td><td>~once/day</td></tr>
+    <tr><td>Weekly reviews wrap-up sent</td><td>Once/week</td></tr>
+    <tr><td>Monthly summary email delivered</td><td>Once/month</td></tr>
+    <tr><td>Major bug fix or feature launch (admin manual trigger)</td><td>Rare</td></tr>
+    <tr><td rowspan="4"><strong>Silent</strong><br>(do not fire deposit)</td><td>Every individual booking after the first</td><td><span class="badge silent">silent</span></td></tr>
+    <tr><td>Every individual AI message after the first</td><td><span class="badge silent">cascade only</span></td></tr>
+    <tr><td>Routine API calls / polling / background sync</td><td><span class="badge silent">silent</span></td></tr>
+    <tr><td>Errors, warnings, failures</td><td><span class="badge silent">different visual</span></td></tr>
+  </table>
+
+  <div class="callout">
+    <p><strong>The "rare, deserves attention" rule.</strong> Tier 1 fires <em>once per host</em> — a host who has been active for two years should never see a Tier 1 deposit again, ever. Tier 2 fires on natural cadence (daily/weekly/monthly), so a typical active host sees roughly 1-3 deposits per day. If you find yourself firing the deposit on every booking, every message, or every pricing recommendation, the bar's too low and the gesture loses its meaning. Routine events get the cascade (active state) only, which is doing a different job.</p>
+  </div>
+
+  <div class="callout" style="border-left-color: #b34141; background: rgba(179, 65, 65, 0.05);">
+    <p><strong>Implementation note for product code:</strong> the deposit gesture is fired by the React component when its <code>data-state</code> attribute transitions from <code>idle</code> to <code>milestone</code>. The component listens for <code>animationend</code> and transitions back to <code>idle</code>. Backend services emit milestone events to a dedicated event bus; the frontend subscribes via WebSocket and triggers state changes. Tier 1 events should be deduplicated via persistent storage — a host who completes "first booking" should never see that deposit again, even across sessions, devices, or account re-logins.</p>
+  </div>
+</section>
+
+
+<!-- ============== MARKETING HERO ============== -->
+<section>
+  <div><span class="pnum">surface</span><h2 style="display:inline; vertical-align:middle;">Marketing hero — continuous cascade</h2></div>
+  <p class="pdesc">For one specific surface — the public marketing landing hero — the cascade runs continuously without rest. Same gesture, faster tempo, no quiet phase. First-time visitors evaluating Koast see motion as discovery, not fatigue.</p>
+
+  <div class="demo-row">
+    <div class="tile light"><div class="tile-mark hero-cascade"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="hl"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#hl)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light · marketing hero only</div></div>
+    <div class="tile dark"><div class="tile-mark hero-cascade"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="hd"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#hd)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark · marketing hero only</div></div>
+  </div>
+
+  <h3>CSS reference</h3>
+<pre>@keyframes cascade-hero {
+  0%, 100% { opacity: 1;    }
+  50%      { opacity: 0.55; }
+}
+
+.koast-mark.hero .b1 { animation: cascade-hero 2.4s infinite ease-in-out; }
+.koast-mark.hero .b2 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.10s; }
+.koast-mark.hero .b3 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.20s; }
+.koast-mark.hero .b4 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.30s; }
+.koast-mark.hero .b5 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.40s; }</pre>
+
+  <div class="callout">
+    <p><strong>Single context only.</strong> The hero variant lives on the public landing page hero, nowhere else. Don't propagate ambient motion to the body, pricing page, blog, or any in-app surface. The hero earns motion because users haven't committed yet — once they're in the app, they need calm.</p>
+  </div>
+</section>
+
+
+<!-- ============== STATIC SURFACES ============== -->
+<section>
+  <div><span class="pnum">surfaces · static only</span><h2 style="display:inline; vertical-align:middle;">Where motion does <em>not</em> live.</h2></div>
+  <p class="pdesc">Active state with motion is for <strong>live web/app contexts only</strong>. The motion vocabulary does its work on the actual site, not on share previews, app launchers, or printed material. The following surfaces are <strong>locked as pure static</strong> — all bands at full opacity, evenly stacked, no motion implied.</p>
+
+  <table>
+    <tr><th>surface</th><th>format</th><th>rule</th></tr>
+    <tr><td><strong>OG / social cards</strong></td><td>1200×630, 1080×1080</td><td>Pure static. Twitter/LinkedIn/Slack compress aggressively; static survives, cascade-still might compress into confusion.</td></tr>
+    <tr><td><strong>iOS app icon</strong></td><td>1024×1024 rounded square</td><td>Static. App launchers don't render animation; motion would never be seen.</td></tr>
+    <tr><td><strong>Android adaptive icon</strong></td><td>432×432 foreground + bg</td><td>Static.</td></tr>
+    <tr><td><strong>Windows tile</strong></td><td>310×310</td><td>Static.</td></tr>
+    <tr><td><strong>Apple touch icon</strong></td><td>180×180</td><td>Static.</td></tr>
+    <tr><td><strong>Favicon (192, 512)</strong></td><td>PNG</td><td>Static. Browser tab favicons render at 16px regardless; large variants exist for PWA install only.</td></tr>
+    <tr><td><strong>Favicon (16, 24, 32, 48)</strong></td><td>PNG / .ico</td><td>Static. Below 16px no animation possible; favicons should not animate at any size as a category rule.</td></tr>
+    <tr><td><strong>Print / PDF brand assets</strong></td><td>any</td><td>Static. Obviously.</td></tr>
+    <tr><td><strong>Email signatures</strong></td><td>PNG / SVG static</td><td>Static. Most email clients block animated content.</td></tr>
+  </table>
+
+  <div class="callout">
+    <p><strong>Why this rule matters.</strong> First-time viewers seeing the brand on a share preview need the cleanest read of what Koast is. A cascade-still — a single frame mid-fade — would look like a degraded version of the static composition. The bands would look unevenly weighted. The motion vocabulary earns its place in live product surfaces because users see it across time; in a single frame, motion is invisible at best, broken-looking at worst.</p>
+  </div>
+</section>
+
+<section>
+  <h2>State transitions</h2>
+  <p class="pdesc">How states move into and out of one another. The mark has three runtime states: <code>idle</code>, <code>active</code>, <code>milestone</code>. Transitions are handled via a <code>data-state</code> attribute on the mark element; CSS handles the visual change.</p>
+
+  <table>
+    <tr><th>from</th><th>to</th><th>trigger</th><th>visual</th></tr>
+    <tr><td class="mono">idle</td><td class="mono">active</td><td>Async work starts (AI generating, sync running, etc.)</td><td>Cascade begins on next animation frame</td></tr>
+    <tr><td class="mono">active</td><td class="mono">idle</td><td>Async work completes</td><td>Cascade fades; mark settles to static via opacity transition</td></tr>
+    <tr><td class="mono">idle</td><td class="mono">milestone</td><td>Tier 1 or Tier 2 event fires</td><td>One-shot deposit plays; <code>animationend</code> returns to idle</td></tr>
+    <tr><td class="mono">active</td><td class="mono">milestone</td><td>Rare — milestone event fires while still active</td><td>Active completes current cycle, milestone plays, returns to idle (cancels active even if work continues — motion budget rule)</td></tr>
+    <tr><td class="mono">milestone</td><td class="mono">idle</td><td>Deposit animation completes</td><td>Single transition; clean settle</td></tr>
+  </table>
+
+  <h3>Implementation pattern (React)</h3>
+<pre>function KoastMark({ size = 96 }) {
+  const state = useKoastState(); // 'idle' | 'active' | 'milestone'
+
+  return (
+    &lt;span
+      className="koast-mark"
+      data-state={state}
+      data-size={size &lt; 32 ? 'small' : 'normal'}
+    &gt;
+      &lt;svg viewBox="0 0 100 100" width={size} height={size}&gt;
+        {/* 5 band rects with .b1...b5 classes */}
+        {/* + .ghost rect at y=-23 for milestone */}
+      &lt;/svg&gt;
+    &lt;/span&gt;
+  );
+}</pre>
+
+  <h3>Reduced-motion compliance</h3>
+<pre>@media (prefers-reduced-motion: reduce) {
+  .koast-mark .b1,
+  .koast-mark .b2,
+  .koast-mark .b3,
+  .koast-mark .b4,
+  .koast-mark .b5,
+  .koast-mark .ghost,
+  .koast-mark .stack,
+  .koast-mark .bands {
+    animation: none !important;
+  }
+}</pre>
+  <p style="font-size: 12.5px; color: var(--ink-2);">When users opt out of motion, all three registers collapse to static. Active and milestone states should fall back to a non-motion indicator if a status signal is required (e.g. a small loading spinner adjacent to the mark, or a text status label).</p>
+</section>
+
+
+<!-- ============== ASSET INDEX ============== -->
+<section>
+  <h2>Asset index</h2>
+  <p class="pdesc">Where each motion register lives. Surfaces marked "static only" never animate, regardless of context.</p>
+  <table>
+    <tr><th>file</th><th>register</th><th>where it lives</th></tr>
+    <tr><td class="mono">koast-mark-5band-light/dark.svg</td><td>idle</td><td>App chrome, headers, all static surfaces, ≥48px</td></tr>
+    <tr><td class="mono">koast-mark-3band-light/dark.svg</td><td>idle</td><td>Favicon, &lt;48px contexts</td></tr>
+    <tr><td class="mono">koast-mark-cascade-light/dark.svg</td><td>active</td><td>App "thinking" indicator, ≥32px live web/app only</td></tr>
+    <tr><td class="mono">koast-mark-pulse-light/dark.svg</td><td>active small</td><td>App "thinking" indicator, 16-31px live web/app only</td></tr>
+    <tr><td class="mono">koast-mark-milestone-light/dark.svg</td><td>milestone</td><td>One-shot on Tier 1/2 events, live app only</td></tr>
+    <tr><td>marketing hero</td><td>hero</td><td>Public landing hero only — CSS variant of cascade, no separate file</td></tr>
+    <tr><td colspan="3" style="background: rgba(76, 196, 204, 0.07); padding-top: 18px; padding-bottom: 18px;"><strong>Static-only surfaces — never animate</strong></td></tr>
+    <tr><td class="mono">og-card-1200x630-{light,dark}.png</td><td>static</td><td>Share previews (Twitter, LinkedIn, Slack, etc.)</td></tr>
+    <tr><td class="mono">square-1080x1080-{light,dark}.png</td><td>static</td><td>Square social posts</td></tr>
+    <tr><td class="mono">ios-1024.png · android-adaptive-* · windows-tile-310.png</td><td>static</td><td>App launchers</td></tr>
+    <tr><td class="mono">apple-touch-icon-180.png · android-chrome-{192,512}.png</td><td>static</td><td>PWA install</td></tr>
+    <tr><td class="mono">favicon-{16,24,32,48}.png · favicon.ico</td><td>static</td><td>Browser tabs</td></tr>
+    <tr><td class="mono">print, PDF, email signatures</td><td>static</td><td>Obviously</td></tr>
+  </table>
+
+  <p style="margin-top: 24px;"><span class="stamp">v1.0</span> &nbsp; This document is the canonical motion reference. The previous <code>motion-philosophies.html</code> is preserved as a historical record of the philosophy exploration that led to this vocabulary.</p>
+</section>
+
+</div>
+</body>
+</html>

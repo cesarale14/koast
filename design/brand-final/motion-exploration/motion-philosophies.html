@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Motion philosophy comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf7; --shore: #f7f3ec; --deep-sea: #132e20;
+    --ink: #0f1815; --ink-2: #4a5552; --ink-3: #6e7976;
+    --rule: #e7e2d6;
+    --teal-light: #d4eef0; --teal-3: #4cc4cc; --teal-deep: #0e7a8a;
+    --good: #2a7a4a; --warn: #b34141; --neutral: #7a8a87;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 64px 32px 96px; }
+
+  /* ----------- HEADER ----------- */
+  header.hero { padding: 0 0 32px; margin: 0 0 48px; border-bottom: 0.5px solid var(--rule); }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 8px; }
+  h1 { font-size: 38px; font-weight: 500; letter-spacing: -0.022em; margin: 0 0 14px; line-height: 1.1; }
+  .lede { font-size: 16px; color: var(--ink-2); max-width: 60ch; margin: 0; }
+  .hero-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin: 18px 0 0; letter-spacing: 0.06em; }
+
+  /* ----------- SECTION PRIMITIVES ----------- */
+  section { margin: 0 0 56px; padding: 0 0 40px; border-bottom: 0.5px solid var(--rule); }
+  section:last-of-type { border-bottom: none; }
+  h2 { font-size: 26px; font-weight: 500; letter-spacing: -0.018em; margin: 0 0 8px; line-height: 1.2; }
+  h3 { font-size: 13px; font-weight: 500; color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; margin: 28px 0 12px; font-family: 'JetBrains Mono', monospace; }
+  p { margin: 0 0 12px; max-width: 70ch; }
+  p.pdesc { font-size: 14px; color: var(--ink-2); margin: 0 0 24px; max-width: 64ch; line-height: 1.65; }
+
+  .pnum { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 14px 0 0; vertical-align: middle; }
+
+  /* ----------- DEMO TILES ----------- */
+  .demos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 24px; }
+  .demo-pair { display: grid; grid-template-rows: auto auto; gap: 8px; }
+  .demo-state { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); letter-spacing: 0.14em; text-transform: uppercase; padding: 0 4px; }
+  .demo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile { border-radius: 12px; padding: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; }
+  .tile.light { background: var(--shore); }
+  .tile.dark { background: var(--deep-sea); }
+  .tile-mark { display: flex; align-items: center; justify-content: center; height: 130px; }
+  .tile-bg { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-3); letter-spacing: 0.12em; text-transform: uppercase; margin: 12px 0 0; opacity: 0.7; }
+  .tile.dark .tile-bg { color: var(--shore); opacity: 0.55; }
+  .demo-meta { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.04em; text-align: center; margin: 4px 0 0; }
+
+  /* ----------- CODE BLOCKS ----------- */
+  pre { background: var(--shore); border-radius: 10px; padding: 18px 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; color: var(--ink); overflow-x: auto; margin: 12px 0 18px; }
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--shore); padding: 1px 5px; border-radius: 3px; }
+  pre code { background: transparent; padding: 0; }
+
+  /* ----------- TRADEOFF BLOCK ----------- */
+  .tradeoff { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0 0; }
+  .tcard { border-radius: 12px; padding: 20px 22px; }
+  .tcard.pro { background: rgba(42, 122, 74, 0.06); border-left: 3px solid var(--good); }
+  .tcard.con { background: rgba(179, 65, 65, 0.06); border-left: 3px solid var(--warn); }
+  .tcard h4 { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; margin: 0 0 10px; font-weight: 500; }
+  .tcard.pro h4 { color: var(--good); }
+  .tcard.con h4 { color: var(--warn); }
+  .tcard ul { list-style: none; padding: 0; margin: 0; }
+  .tcard li { font-size: 12.5px; line-height: 1.6; padding: 4px 0; }
+  .tcard li::before { content: "·"; margin-right: 8px; color: var(--ink-3); }
+
+  /* ----------- DECISION MATRIX ----------- */
+  table.matrix { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+  table.matrix th, table.matrix td { text-align: left; padding: 12px 16px; border-bottom: 0.5px solid var(--rule); font-size: 12.5px; vertical-align: top; }
+  table.matrix th { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  table.matrix td.label { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--ink-2); letter-spacing: 0.04em; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; }
+  .badge.good { background: rgba(42, 122, 74, 0.15); color: var(--good); }
+  .badge.bad  { background: rgba(179, 65, 65, 0.13); color: var(--warn); }
+  .badge.mid  { background: rgba(110, 121, 118, 0.18); color: var(--ink-3); }
+
+  /* ----------- VERDICT BLOCK ----------- */
+  .verdict { background: rgba(76, 196, 204, 0.08); border-left: 3px solid var(--good); border-radius: 12px; padding: 28px 32px; margin: 32px 0 0; }
+  .verdict h3 { color: var(--good); margin-top: 0; }
+  .verdict p { font-size: 14px; line-height: 1.7; }
+  .stamp { font-family: 'JetBrains Mono', monospace; background: rgba(76, 196, 204, 0.18); padding: 3px 9px; border-radius: 4px; font-size: 12px; color: var(--teal-deep); }
+
+  /* ----------- IMPL GUIDANCE TABLE ----------- */
+  .impl { margin: 24px 0 0; }
+  .impl table { width: 100%; border-collapse: collapse; }
+  .impl th, .impl td { text-align: left; padding: 14px 16px; border-bottom: 0.5px solid var(--rule); font-size: 13px; vertical-align: top; }
+  .impl th { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .impl td.context { font-weight: 500; }
+  .impl td.spec { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-2); }
+
+  /* ============================================================ */
+  /* ============== ANIMATION SYSTEM ============================ */
+  /* ============================================================ */
+
+  /* Philosophy A — IDLE: 2% whole-mark opacity breath, 8s */
+  @keyframes breath-A-idle {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.98; }
+  }
+  .pa-idle svg { animation: breath-A-idle 8s infinite ease-in-out; }
+
+  /* Philosophy A — ACTIVE: 1.8s deposit, full band shift, 30% rest */
+  @keyframes ghost-A-active {
+    0%, 30%, 100% { transform: translateY(0); opacity: 0; }
+    55%, 75%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes stack-A-active {
+    0%, 30%, 100% { transform: translateY(0); }
+    55%, 75%      { transform: translateY(18px); }
+  }
+  .pa-active .ghost { animation: ghost-A-active 1.8s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .pa-active .stack { animation: stack-A-active 1.8s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+
+  /* Philosophy B — PASSIVE: 4s deposit, gentle settle, 70% rest */
+  @keyframes ghost-B-passive {
+    0%, 70%, 100% { transform: translateY(0); opacity: 0; }
+    82%, 90%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes stack-B-passive {
+    0%, 70%, 100% { transform: translateY(0); }
+    82%, 90%      { transform: translateY(3px); }
+  }
+  .pb-passive .ghost { animation: ghost-B-passive 4s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .pb-passive .stack { animation: stack-B-passive 4s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+
+  /* Philosophy B — ACTIVE: 2s deposit + saturation 1.18× */
+  @keyframes ghost-B-active {
+    0%, 50%, 100% { transform: translateY(0); opacity: 0; }
+    70%, 85%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes stack-B-active {
+    0%, 50%, 100% { transform: translateY(0); }
+    70%, 85%      { transform: translateY(3px); }
+  }
+  .pb-active { filter: saturate(1.18); }
+  .pb-active .ghost { animation: ghost-B-active 2s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .pb-active .stack { animation: stack-B-active 2s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+
+  /* Philosophy C — IDLE: no animation (intentional) */
+  /* Philosophy C — ACTIVE: 3s deposit, full band shift, 50% rest */
+  @keyframes ghost-C-active {
+    0%, 50%, 100% { transform: translateY(0); opacity: 0; }
+    70%, 85%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes stack-C-active {
+    0%, 50%, 100% { transform: translateY(0); }
+    70%, 85%      { transform: translateY(18px); }
+  }
+  .pc-active .ghost { animation: ghost-C-active 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .pc-active .stack { animation: stack-C-active 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+
+  /* Reduced-motion: kill all animations */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============== HEADER ============== -->
+<header class="hero">
+  <div class="eyebrow">koast brand · motion philosophy exploration</div>
+  <h1>Idle motion vs active motion.</h1>
+  <p class="lede">If the banded-O is both the brand mark <em>and</em> the thinking indicator, motion has to do real work distinguishing "Koast at rest" from "Koast working." Three philosophies, evaluated honestly. Output: a recommendation, with implementation guidance for every deployment surface.</p>
+  <div class="hero-meta">v0.1 · 2026.04.30 · blocks production deliverables until decision is made</div>
+</header>
+
+
+<!-- ============== PHILOSOPHY A ============== -->
+<section>
+  <div><span class="pnum">A</span><h2 style="display:inline; vertical-align:middle;">Quiet idle, distinct active</h2></div>
+  <p class="pdesc">Two distinct motion registers. Idle is <strong>near-imperceptible</strong> — a 2% opacity breath over 8s, just enough to feel "alive" without demanding attention. Active is the deposit gesture at faster tempo, clearly visible while processing. The transition between states is itself the signal.</p>
+
+  <div class="demos">
+    <div class="demo-pair">
+      <div class="demo-state">idle · breathing</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark pa-idle"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="paIL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#paIL)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark pa-idle"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="paID"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#paID)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">2% opacity · 8s · ease-in-out</div>
+    </div>
+    <div class="demo-pair">
+      <div class="demo-state">active · depositing</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pa-active"><defs><clipPath id="paAL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#paAL)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pa-active"><defs><clipPath id="paAD"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#paAD)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">1.8s · 30% rest · full band shift</div>
+    </div>
+  </div>
+
+  <h3>CSS specification</h3>
+<pre>/* IDLE — whole-mark breath */
+@keyframes koast-breath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.98; }
+}
+.koast-mark[data-state="idle"] svg {
+  animation: koast-breath 8s infinite ease-in-out;
+}
+
+/* ACTIVE — dramatic deposit, 1.8s cycle */
+@keyframes koast-ghost-active {
+  0%, 30%, 100% { transform: translateY(0);    opacity: 0; }
+  55%, 75%      { transform: translateY(23px); opacity: 1; }
+}
+@keyframes koast-stack-active {
+  0%, 30%, 100% { transform: translateY(0);    }
+  55%, 75%      { transform: translateY(18px); }
+}
+.koast-mark[data-state="active"] .ghost {
+  animation: koast-ghost-active 1.8s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.koast-mark[data-state="active"] .stack {
+  animation: koast-stack-active 1.8s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}</pre>
+
+  <div class="tradeoff">
+    <div class="tcard pro">
+      <h4>strengths</h4>
+      <ul>
+        <li>Most refined of the three — Goldilocks balance</li>
+        <li>Clear behavioral distinction between idle and active</li>
+        <li>Mark feels "alive" without demanding attention</li>
+        <li>Two motion registers serve different functions cleanly</li>
+      </ul>
+    </div>
+    <div class="tcard con">
+      <h4>risks</h4>
+      <ul>
+        <li>2% opacity breath may be invisible to most users → A collapses into C functionally</li>
+        <li>Most complex to implement (two animation systems, state machine, transitions)</li>
+        <li>Subtle idle motion is fragile across browsers and rendering pipelines</li>
+        <li>If you have to explain the breath, it's not working</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== PHILOSOPHY B ============== -->
+<section>
+  <div><span class="pnum">B</span><h2 style="display:inline; vertical-align:middle;">Continuous motion, varying tempo</h2></div>
+  <p class="pdesc">Always animating. The mark is <strong>never still</strong>. Activity is signaled by speed change (slow → fast) plus a saturation lift on the colors. The motion <em>is</em> the brand presence. Same gesture, different tempo and intensity per state.</p>
+
+  <div class="demos">
+    <div class="demo-pair">
+      <div class="demo-state">passive · always on</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pb-passive"><defs><clipPath id="pbPL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pbPL)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pb-passive"><defs><clipPath id="pbPD"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pbPD)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">4s · 70% rest · gentle 3px settle</div>
+    </div>
+    <div class="demo-pair">
+      <div class="demo-state">active · faster + vivid</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pb-active"><defs><clipPath id="pbAL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pbAL)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pb-active"><defs><clipPath id="pbAD"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pbAD)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">2s · 50% rest · saturation 1.18×</div>
+    </div>
+  </div>
+
+  <h3>CSS specification</h3>
+<pre>/* PASSIVE — always-on gentle deposit */
+@keyframes koast-ghost-passive {
+  0%, 70%, 100% { transform: translateY(0);    opacity: 0; }
+  82%, 90%      { transform: translateY(23px); opacity: 1; }
+}
+@keyframes koast-stack-passive {
+  0%, 70%, 100% { transform: translateY(0);   }
+  82%, 90%      { transform: translateY(3px); }
+}
+.koast-mark .ghost { animation: koast-ghost-passive 4s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+.koast-mark .stack { animation: koast-stack-passive 4s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+
+/* ACTIVE — same gesture, faster + saturation lift */
+.koast-mark[data-state="active"] {
+  filter: saturate(1.18);
+}
+.koast-mark[data-state="active"] .ghost {
+  animation: koast-ghost-passive 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.koast-mark[data-state="active"] .stack {
+  animation: koast-stack-passive 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}</pre>
+
+  <div class="tradeoff">
+    <div class="tcard pro">
+      <h4>strengths</h4>
+      <ul>
+        <li>Mark always feels "alive" — strong personality</li>
+        <li>Single animation system (one gesture, two tempos) — simpler than A</li>
+        <li>Speed-change is a learnable signal users can internalize</li>
+        <li>Saturation lift adds a second axis of distinction</li>
+      </ul>
+    </div>
+    <div class="tcard con">
+      <h4>risks</h4>
+      <ul>
+        <li>Ambient motion in B2B dashboard is fatiguing — users staring for hours will tire of it</li>
+        <li>Animation fatigue: people stop noticing motion they always see</li>
+        <li>Battery + accessibility costs (especially in mobile contexts)</li>
+        <li>Speed-change is a subtler activity signal than presence/absence</li>
+        <li>Most successful brand marks (Stripe, Linear, Vercel, Anthropic) are static</li>
+        <li>Risk of being read as "loading forever" or "broken"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== PHILOSOPHY C ============== -->
+<section>
+  <div><span class="pnum">C</span><h2 style="display:inline; vertical-align:middle;">Static at rest, dramatic active</h2></div>
+  <p class="pdesc">No motion at rest. Period. Active state is the <strong>full deposit gesture</strong> — clearly visible, distinct moment of activity. The cleanest semantic split of the three: motion = activity, no motion = at rest. Most defensible on attention, accessibility, and convention grounds.</p>
+
+  <div class="demos">
+    <div class="demo-pair">
+      <div class="demo-state">idle · static</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="pcIL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pcIL)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="pcID"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pcID)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">no animation · composed</div>
+    </div>
+    <div class="demo-pair">
+      <div class="demo-state">active · clear deposit</div>
+      <div class="demo-row">
+        <div class="tile light"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pc-active"><defs><clipPath id="pcAL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pcAL)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg></div><div class="tile-bg">light</div></div>
+        <div class="tile dark"><div class="tile-mark"><svg width="120" height="120" viewBox="0 0 100 100" class="pc-active"><defs><clipPath id="pcAD"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#pcAD)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#8ad9dc"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#3aa3aa"/><rect x="0" y="82" width="100" height="14" fill="#2e8c95"/></g></g></svg></div><div class="tile-bg">dark</div></div>
+      </div>
+      <div class="demo-meta">3s · 50% rest · full band shift</div>
+    </div>
+  </div>
+
+  <h3>CSS specification</h3>
+<pre>/* IDLE — no animation. Mark is static. */
+.koast-mark[data-state="idle"] {
+  /* nothing */
+}
+
+/* ACTIVE — dramatic deposit, 3s cycle, 50% rest */
+@keyframes koast-ghost-active {
+  0%, 50%, 100% { transform: translateY(0);    opacity: 0; }
+  70%, 85%      { transform: translateY(23px); opacity: 1; }
+}
+@keyframes koast-stack-active {
+  0%, 50%, 100% { transform: translateY(0);    }
+  70%, 85%      { transform: translateY(18px); }
+}
+.koast-mark[data-state="active"] .ghost {
+  animation: koast-ghost-active 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.koast-mark[data-state="active"] .stack {
+  animation: koast-stack-active 3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}</pre>
+
+  <div class="tradeoff">
+    <div class="tcard pro">
+      <h4>strengths</h4>
+      <ul>
+        <li>Cleanest semantic split: motion = activity, no motion = rest</li>
+        <li>Aligns with industry convention (Stripe, Linear, Vercel, Anthropic)</li>
+        <li>Battery-friendly, accessibility-friendly</li>
+        <li>Doesn't compete with content for attention</li>
+        <li>Animation when present has more meaning</li>
+        <li>Easiest to implement and maintain</li>
+        <li>Most defensible on every dimension</li>
+      </ul>
+    </div>
+    <div class="tcard con">
+      <h4>risks</h4>
+      <ul>
+        <li>"Feels dead at rest" — but only if users expect motion (most don't)</li>
+        <li>Loses some "personality" if motion was the brand's defining trait</li>
+        <li>Less distinct from competitors who also use static marks</li>
+        <li>The mark needs to carry brand voltage on its own (which the strata gradient does)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== DECISION MATRIX ============== -->
+<section>
+  <h2 style="margin-bottom: 16px;">Decision matrix</h2>
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>dimension</th>
+        <th>A · quiet idle</th>
+        <th>B · always animating</th>
+        <th>C · static at rest</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="label">semantic clarity</td>
+        <td><span class="badge mid">medium</span> idle/active distinct but subtle</td>
+        <td><span class="badge bad">low</span> speed-change harder to read</td>
+        <td><span class="badge good">high</span> on / off, no ambiguity</td>
+      </tr>
+      <tr>
+        <td class="label">attention cost</td>
+        <td><span class="badge good">low</span> idle barely registers</td>
+        <td><span class="badge bad">high</span> always demanding</td>
+        <td><span class="badge good">none</span> idle is silent</td>
+      </tr>
+      <tr>
+        <td class="label">implementation</td>
+        <td><span class="badge bad">complex</span> two systems + transitions</td>
+        <td><span class="badge mid">moderate</span> one system, two tempos</td>
+        <td><span class="badge good">simple</span> conditional class</td>
+      </tr>
+      <tr>
+        <td class="label">battery / a11y</td>
+        <td><span class="badge mid">moderate</span> always running</td>
+        <td><span class="badge bad">high cost</span> always running, fatiguing</td>
+        <td><span class="badge good">low cost</span> only animates when needed</td>
+      </tr>
+      <tr>
+        <td class="label">brand personality</td>
+        <td><span class="badge good">strong</span> "alive but composed"</td>
+        <td><span class="badge good">strongest</span> motion as signature</td>
+        <td><span class="badge mid">moderate</span> static but distinctive</td>
+      </tr>
+      <tr>
+        <td class="label">convention fit</td>
+        <td><span class="badge mid">novel</span> uncommon pattern</td>
+        <td><span class="badge bad">contrarian</span> against B2B norms</td>
+        <td><span class="badge good">conventional</span> matches industry</td>
+      </tr>
+      <tr>
+        <td class="label">durability</td>
+        <td><span class="badge mid">fragile</span> depends on subtlety landing</td>
+        <td><span class="badge bad">low</span> motion fatigue over time</td>
+        <td><span class="badge good">high</span> simple = long-lasting</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ============== RECOMMENDATION ============== -->
+<section>
+  <h2>Recommendation</h2>
+
+  <div class="verdict">
+    <h3>Philosophy C, with one context-specific exception</h3>
+    <p><span class="stamp">C in app</span> &nbsp; <span class="stamp">B-passive on marketing hero</span> &nbsp; <span class="stamp">A reserved for future</span></p>
+    <p style="margin-top: 16px;"><strong>Why C is the strongest default:</strong> Industry convention favors static marks. Motion when present has more semantic meaning. In a B2B dashboard where users spend hours, attention conservation matters more than ambient personality. The brand metaphor (accumulated strata) doesn't need constant motion to communicate — the static bands already say "deposited over time." Reserving the deposit gesture for active states <em>strengthens</em> its meaning rather than diluting it.</p>
+    <p><strong>Why the exception:</strong> The public marketing landing hero is a "wow moment" surface — first-time visitors, no expectation of staying long, motion serves discovery rather than fatigue. Philosophy B's slow ambient deposit (4s cycle, 70% rest) earns its place there. <em>Treat this as a single-context exception, not a pattern.</em></p>
+    <p><strong>Why not A (yet):</strong> The 2% breath risks being invisible to most users, in which case A becomes C with extra implementation cost. If a future deployment surface needs "presence-without-attention" specifically (e.g. an always-visible app icon in a system tray, an omnibar, a passive widget), revisit A then. For now, simpler is better.</p>
+  </div>
+
+  <h3>Implementation guidance — by context</h3>
+  <div class="impl">
+    <table>
+      <thead>
+        <tr><th>context</th><th>state</th><th>spec</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="context">App header / chrome</td>
+          <td>STATIC always</td>
+          <td class="spec">No animation. The mark is the brand mark, not a status indicator.</td>
+        </tr>
+        <tr>
+          <td class="context">In-app Koast avatar (chat bubble)</td>
+          <td>STATIC unless active</td>
+          <td class="spec">Static when message is settled. Active deposit (3s cycle) while the AI is generating, like Claude/Cursor's "thinking" indicator.</td>
+        </tr>
+        <tr>
+          <td class="context">Loading / processing states</td>
+          <td>ACTIVE</td>
+          <td class="spec">3s cycle deposit. Replaces or augments traditional spinners — the gesture conveys both "working" and brand identity.</td>
+        </tr>
+        <tr>
+          <td class="context">Sync / pricing engine running</td>
+          <td>ACTIVE while running</td>
+          <td class="spec">3s cycle deposit. Stops when sync completes. Static otherwise.</td>
+        </tr>
+        <tr>
+          <td class="context">Browser tab favicon</td>
+          <td>STATIC always</td>
+          <td class="spec">Animated favicons are universally annoying. 3-band static, transparent bg.</td>
+        </tr>
+        <tr>
+          <td class="context">App icon (iOS, Android, Windows tile)</td>
+          <td>STATIC always</td>
+          <td class="spec">Platforms forbid animated app icons anyway.</td>
+        </tr>
+        <tr>
+          <td class="context">Marketing site — landing hero</td>
+          <td>AMBIENT</td>
+          <td class="spec">B-passive: 4s cycle gentle deposit, always on. Earns attention from new visitors.</td>
+        </tr>
+        <tr>
+          <td class="context">Marketing site — body / pricing / docs</td>
+          <td>STATIC</td>
+          <td class="spec">No motion outside the hero. Don't make the marketing site noisy.</td>
+        </tr>
+        <tr>
+          <td class="context">Email signatures, pitch decks, social cards</td>
+          <td>STATIC</td>
+          <td class="spec">Doesn't matter — static contexts. Use SVG masters as-is.</td>
+        </tr>
+        <tr>
+          <td class="context">Onboarding / empty states</td>
+          <td>ACTIVE for "first deposit" moment</td>
+          <td class="spec">When user completes their first action (connects iCal, ships first listing), trigger one full deposit cycle as a celebration moment. Then static.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Reduced-motion compliance</h3>
+<pre>@media (prefers-reduced-motion: reduce) {
+  .koast-mark .ghost,
+  .koast-mark .stack {
+    animation: none !important;
+  }
+}</pre>
+  <p style="font-size: 12.5px; color: var(--ink-2); margin: 0 0 24px;">All Koast deployments must honor <code>prefers-reduced-motion: reduce</code>. When users opt out of motion, the mark stays static in active states too — replace the deposit animation with a one-shot opacity fade or static "loading" indicator if a status signal is required.</p>
+
+  <h3>What this unblocks</h3>
+  <ul style="font-size: 13.5px; line-height: 1.8;">
+    <li><strong>Production GIFs:</strong> regenerate with the new C-active spec (3s cycle, full band shift). Replace the existing motion-variant-A/B GIFs with a single canonical "active" GIF.</li>
+    <li><strong>Brand guidelines update:</strong> Section 05 (Motion) in <code>brand-one-pager.html</code> needs revision — current copy implies always-on Variant A. Update to "C with marketing-hero exception."</li>
+    <li><strong>Animated SVG masters:</strong> regenerate <code>koast-mark-animated-A.svg</code> as <code>koast-mark-active.svg</code> with the new spec. Keep <code>koast-mark-animated-B.svg</code> for marketing-hero.</li>
+    <li><strong>In-app implementation:</strong> data-state attribute on the mark element. Backend sets <code>data-state="active"</code> when async work is happening, <code>data-state="idle"</code> otherwise. CSS handles the rest.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>
