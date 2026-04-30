@@ -155,7 +155,7 @@ export default function CertificationPage() {
             <div
               key={t.num}
               className={`bg-neutral-0 rounded-xl border p-4 transition-colors ${
-                passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
+                passed ? "border-[var(--brand-100)] bg-brand-50/30" : failed ? "border-red-200 bg-red-50/30" : "border-[var(--border)]"
               }`}
             >
               <div className="flex items-start gap-3">
@@ -261,7 +261,7 @@ export default function CertificationPage() {
         const isResetting = running === -1;
         const passed = r.success && !r.error;
         return (
-          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-[#d5e8da] bg-[#eef5f0]/30" : "border-[var(--border)]"}`}>
+          <div className={`mt-3 bg-neutral-0 rounded-xl border p-4 ${passed ? "border-[var(--brand-100)] bg-brand-50/30" : "border-[var(--border)]"}`}>
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {isResetting ? (
@@ -377,7 +377,7 @@ function WebhookLogViewer() {
             Test 11: Booking Webhook Events
           </h2>
           {hasAll3 && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-[#eef5f0] text-[#1a3a2a] rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-brand-50 text-[#1a3a2a] rounded-full">
               ALL 3 RECEIVED
             </span>
           )}

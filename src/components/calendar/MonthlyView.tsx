@@ -452,7 +452,7 @@ export default function MonthlyView({
                     <span
                       className="inline-flex items-center justify-center rounded-full text-white font-semibold"
                       style={{
-                        backgroundColor: "#FF385C",
+                        backgroundColor: "var(--airbnb)",
                         width: 24,
                         height: 24,
                         fontSize: 12,

@@ -8,7 +8,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     <div
       className="min-h-screen w-full flex items-center justify-center px-4 relative overflow-hidden"
       style={{
-        background: "linear-gradient(135deg, #132e20 0%, #0a1c14 50%, #0e2218 100%)",
+        background: "linear-gradient(135deg, var(--deep-sea) 0%, #0a1c14 50%, #0e2218 100%)",
       }}
     >
       {/* Ambient glows */}

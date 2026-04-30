@@ -293,10 +293,10 @@ function ResultRow({ result: r }: { result: ImportResult }) {
   // Status-specific color and label
   let pillClass = "bg-neutral-100 text-neutral-600";
   let pillLabel: string = r.status;
-  if (r.status === "imported") { pillClass = "bg-[#eef5f0] text-[#1a3a2a]"; pillLabel = "Imported"; }
+  if (r.status === "imported") { pillClass = "bg-brand-50 text-[#1a3a2a]"; pillLabel = "Imported"; }
   else if (r.status === "imported_with_errors") { pillClass = "bg-[#fff4d6] text-[#b8860b]"; pillLabel = "Imported with warnings"; }
-  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[#fff4d6] text-[#b8860b]" : "bg-[#c44040]/10 text-[#c44040]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
-  else if (r.status === "unmatched") { pillClass = "bg-[#eef5f0] text-[#3d6b52]"; pillLabel = "Needs your input"; }
+  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[#fff4d6] text-[#b8860b]" : "bg-[#c44040]/10 text-[var(--coral-reef)]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
+  else if (r.status === "unmatched") { pillClass = "bg-brand-50 text-tideline"; pillLabel = "Needs your input"; }
 
   return (
     <div className="border border-[var(--border)] rounded-lg overflow-hidden">
@@ -347,20 +347,20 @@ function ResultRow({ result: r }: { result: ImportResult }) {
 
           {/* Generic error */}
           {r.status === "error" && !isQuotaError && r.error && (
-            <p className="text-xs text-[#c44040] mt-0.5 break-all">{r.error}</p>
+            <p className="text-xs text-[var(--coral-reef)] mt-0.5 break-all">{r.error}</p>
           )}
 
           {/* Unmatched / multiple candidates — user needs to pick */}
           {r.status === "unmatched" && (
             <>
-              <p className="text-xs text-[#3d6b52] mt-0.5">
+              <p className="text-xs text-tideline mt-0.5">
                 {r.reason === "multiple_candidates"
                   ? "Multiple Koast properties match this name. Pick the right one or import as a new property."
                   : "This property couldn't be auto-matched."}
               </p>
               {r.candidates && r.candidates.length > 0 && (
                 <div className="mt-2">
-                  <label className="block text-[10px] text-[#3d6b52] mb-1">Link to:</label>
+                  <label className="block text-[10px] text-tideline mb-1">Link to:</label>
                   <select
                     className="text-xs border border-[#efe9dd] rounded px-2 py-1 bg-white"
                     defaultValue=""

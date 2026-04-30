@@ -5,8 +5,8 @@ import PlatformLogo from "@/components/ui/PlatformLogo";
 const platformColors: Record<string, string> = {
   airbnb: "#FF5A5F",
   vrbo: "#3B5998",
-  booking_com: "#003580",
-  booking: "#003580",
+  booking_com: "var(--booking-com)",
+  booking: "var(--booking-com)",
   direct: "#10B981",
 };
 

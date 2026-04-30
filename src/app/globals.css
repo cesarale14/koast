@@ -40,6 +40,11 @@
   --deep-water: #2a5a8a;     /* info, links */
   --bar-dark: #222222;       /* booking bar bg */
 
+  /* Lume — cool teal AI accent (3-stop scale; SVG masters use the 5-stop) */
+  --lume-light: #d4eef0;
+  --lume: #4cc4cc;           /* BRAND PRIMARY — AI accent */
+  --lume-deep: #0e7a8a;
+
   /* Koast shadows — all use rgba(19,46,32) coastal tint */
   --shadow-card: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
   --shadow-card-hover: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);

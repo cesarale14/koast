@@ -47,7 +47,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 const PLATFORM_COLORS: Record<string, string> = {
   airbnb: "border-[#FF5A5F] bg-[#FF5A5F]/5 text-[#FF5A5F]",
   vrbo: "border-[#3B5998] bg-[#3B5998]/5 text-[#3B5998]",
-  booking_com: "border-[#003580] bg-[#003580]/5 text-[#003580]",
+  booking_com: "border-[var(--booking-com)] bg-[#003580]/5 text-[var(--booking-com)]",
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -653,7 +653,7 @@ export default function OnboardingPage() {
 
       {/* Success */}
       {icalResult && (
-        <div className="flex items-center gap-2 p-3 bg-[#eef5f0] border border-[#d5e8da] rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-brand-50 border border-[var(--brand-100)] rounded-lg">
           <Check className="w-4 h-4 text-[#1a3a2a] flex-shrink-0" />
           <p className="text-sm text-[#1a3a2a]">
             Calendar connected! Found{" "}

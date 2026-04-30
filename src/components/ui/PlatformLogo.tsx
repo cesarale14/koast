@@ -56,8 +56,8 @@ const LABEL: Record<string, string> = {
 };
 
 const LABEL_COLOR: Record<string, string> = {
-  airbnb: "text-[#FF5A5F]", booking_com: "text-[#003580]", vrbo: "text-[#0B4DA2]",
-  ABB: "text-[#FF5A5F]", BDC: "text-[#003580]", VRBO: "text-[#0B4DA2]",
+  airbnb: "text-[#FF5A5F]", booking_com: "text-[var(--booking-com)]", vrbo: "text-[#0B4DA2]",
+  ABB: "text-[#FF5A5F]", BDC: "text-[var(--booking-com)]", VRBO: "text-[#0B4DA2]",
 };
 
 function resolve(platform: string) {

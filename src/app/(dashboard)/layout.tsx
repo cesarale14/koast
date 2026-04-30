@@ -43,7 +43,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const SIDEBAR_BG = "linear-gradient(180deg, #132e20 0%, #0e2218 100%)";
+const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, #0e2218 100%)";
 const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(196,154,90,0.15)";
 const INACTIVE_TEXT = "rgba(168,191,174,0.6)";
 
@@ -59,18 +59,18 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
       className="relative flex items-center justify-center w-11 h-11 rounded-lg transition-colors duration-150"
       style={{
-        color: isActive ? "#c49a5a" : INACTIVE_TEXT,
+        color: isActive ? "var(--golden)" : INACTIVE_TEXT,
         backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "#c49a5a" }} />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--golden)" }} />
       )}
       <Icon size={20} strokeWidth={1.5} />
       {item.badge != null && item.badge > 0 && (
         <span
           className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2"
-          style={{ backgroundColor: "#c44040", boxShadow: "0 0 0 2px #132e20" }}
+          style={{ backgroundColor: "var(--coral-reef)", boxShadow: "0 0 0 2px var(--deep-sea)" }}
         >
           {item.badge > 9 ? "9+" : item.badge}
         </span>
@@ -78,7 +78,7 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       {showTip && (
         <span
           className="fixed ml-[72px] px-3 py-2 rounded-lg text-white text-xs font-medium whitespace-nowrap z-[9999]"
-          style={{ backgroundColor: "#17392a", boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}
+          style={{ backgroundColor: "var(--coastal)", boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}
         >
           {item.name}
         </span>
@@ -98,19 +98,19 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       {...linkProps}
       className="relative flex items-center gap-3 px-3 h-11 text-sm font-medium rounded-lg transition-colors duration-150"
       style={{
-        color: isActive ? "#c49a5a" : INACTIVE_TEXT,
+        color: isActive ? "var(--golden)" : INACTIVE_TEXT,
         backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "#c49a5a" }} />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--golden)" }} />
       )}
-      <Icon size={20} strokeWidth={1.5} className="flex-shrink-0" style={{ color: isActive ? "#c49a5a" : INACTIVE_TEXT }} />
+      <Icon size={20} strokeWidth={1.5} className="flex-shrink-0" style={{ color: isActive ? "var(--golden)" : INACTIVE_TEXT }} />
       <span className="truncate">{item.name}</span>
       {item.badge != null && item.badge > 0 && (
         <span
           className="ml-auto min-w-[18px] h-[18px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-          style={{ backgroundColor: "#c44040" }}
+          style={{ backgroundColor: "var(--coral-reef)" }}
         >
           {item.badge > 9 ? "9+" : item.badge}
         </span>
@@ -124,7 +124,7 @@ function GroupLabel({ label }: { label: string }) {
   return (
     <div
       className="px-3 mb-1 mt-3 text-[10px] font-bold tracking-[0.08em]"
-      style={{ color: "#3d6b52" }}
+      style={{ color: "var(--tideline)" }}
     >
       {label}
     </div>
@@ -137,7 +137,7 @@ function LogoMark() {
     <div
       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
       style={{
-        backgroundColor: "#c49a5a",
+        backgroundColor: "var(--golden)",
         boxShadow: "0 2px 12px rgba(196,154,90,0.4)",
       }}
     >
@@ -180,7 +180,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
               <div className="flex items-center gap-3">
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-                  style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+                  style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
                 >
                   C
                 </div>
@@ -219,7 +219,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
               <Link
                 href="/settings"
                 className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold transition-colors"
-                style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+                style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
               >
                 C
               </Link>
@@ -234,8 +234,8 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
         style={{
           left: (expanded ? 240 : 60) - 12,
           top: 20,
-          backgroundColor: "#1f4d38",
-          borderColor: "#3d6b52",
+          backgroundColor: "var(--mangrove)",
+          borderColor: "var(--tideline)",
           color: INACTIVE_TEXT,
           boxShadow: "0 1px 3px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)",
           transitionProperty: "left, background-color, border-color, color",
@@ -283,7 +283,7 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-              style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "#c49a5a" }}
+              style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
             >
               C
             </div>

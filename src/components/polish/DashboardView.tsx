@@ -367,8 +367,8 @@ function CriticalAlertRow({ alert, vp }: { alert: Alert; vp: { isMobile: boolean
         marginTop: vp.isMobile ? 20 : 28,
         paddingTop: 14,
         paddingBottom: 14,
-        borderTop: "1px solid var(--hairline, #E5E2DC)",
-        borderBottom: "1px solid var(--hairline, #E5E2DC)",
+        borderTop: "1px solid var(--hairline)",
+        borderBottom: "1px solid var(--hairline)",
         display: "flex",
         alignItems: vp.isMobile ? "flex-start" : "center",
         flexDirection: vp.isMobile ? "column" : "row",
@@ -456,7 +456,7 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
         background: "#fff",
         boxShadow: hover
           ? "0 10px 30px rgba(19,46,32,0.08), 0 0 0 1px #d8d3c9"
-          : "0 0 0 1px var(--hairline, #E5E2DC)",
+          : "0 0 0 1px var(--hairline)",
         transform: hover ? "translateY(-2px)" : "translateY(0)",
         transition: "box-shadow 300ms cubic-bezier(0.4,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1)",
         overflow: "hidden",
@@ -519,7 +519,7 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
           style={{
             marginTop: 22,
             paddingTop: 20,
-            borderTop: "1px solid var(--hairline, #E5E2DC)",
+            borderTop: "1px solid var(--hairline)",
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
           }}
@@ -532,7 +532,7 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
           style={{
             marginTop: 16,
             paddingTop: 16,
-            borderTop: "1px dashed var(--hairline, #E5E2DC)",
+            borderTop: "1px dashed var(--hairline)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -584,7 +584,7 @@ function StatCell({ label, value, divider }: { label: string; value: string; div
     <div
       style={{
         padding: divider ? "0 0 0 20px" : "0 20px 0 0",
-        borderLeft: divider ? "1px solid var(--hairline, #E5E2DC)" : undefined,
+        borderLeft: divider ? "1px solid var(--hairline)" : undefined,
       }}
     >
       <div style={{ fontSize: 10, fontWeight: 600, color: "var(--tideline)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -615,7 +615,7 @@ function GhostAddCard() {
       onMouseLeave={() => setHover(false)}
       style={{
         borderRadius: 16,
-        border: `1.5px dashed ${hover ? "var(--driftwood)" : "var(--hairline, #E5E2DC)"}`,
+        border: `1.5px dashed ${hover ? "var(--driftwood)" : "var(--hairline)"}`,
         background: hover ? "rgba(196,154,90,0.03)" : "transparent",
         color: hover ? "var(--coastal)" : "var(--tideline)",
         display: "flex",
@@ -701,7 +701,7 @@ function PricingIntelligenceCard({ performance, propertyCount, vp }: { performan
         borderRadius: 20,
         padding: vp.isMobile ? "28px 24px" : "44px 48px",
         color: "var(--shore)",
-        background: "linear-gradient(150deg, #17392a 0%, #132e20 55%, #0e2419 100%)",
+        background: "linear-gradient(150deg, var(--coastal) 0%, var(--deep-sea) 55%, #0e2419 100%)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -807,7 +807,7 @@ function ActionCardStack({ actions }: { actions: FocusAction[] }) {
       <article
         style={{
           borderRadius: 12,
-          border: "1px solid var(--hairline, #E5E2DC)",
+          border: "1px solid var(--hairline)",
           padding: 24,
           background: "#fff",
         }}
@@ -838,7 +838,7 @@ function ActionCard({ action }: { action: FocusAction }) {
         alignItems: "center",
         gap: 14,
         padding: "16px 20px",
-        border: `1px solid ${hover ? "#d8d3c9" : "var(--hairline, #E5E2DC)"}`,
+        border: `1px solid ${hover ? "#d8d3c9" : "var(--hairline)"}`,
         borderRadius: 12,
         background: "#fff",
         textDecoration: "none",
@@ -909,7 +909,7 @@ function PortfolioPulseBlock({
           columnGap: vp.isMobile ? 16 : 0,
           rowGap: vp.isMobile ? 24 : 0,
           paddingTop: vp.isMobile ? 20 : 28,
-          borderTop: "1px solid var(--hairline, #E5E2DC)",
+          borderTop: "1px solid var(--hairline)",
         }}
       >
         {metrics.map((m, i) => (
@@ -935,7 +935,7 @@ function PulseMetricCell({ metric, isFirst, isLast, vp }: { metric: PulseMetric;
     <div
       style={{
         padding: `0 ${isLast ? 0 : padX}px 0 ${isFirst ? 0 : padX}px`,
-        borderLeft: isFirst ? undefined : "1px solid var(--hairline, #E5E2DC)",
+        borderLeft: isFirst ? undefined : "1px solid var(--hairline)",
       }}
     >
       <div
@@ -1014,7 +1014,7 @@ function FooterBlock({ syncStatus, vp }: { syncStatus: CommandCenterData["summar
       style={{
         marginTop: vp.isMobile ? 40 : 64,
         paddingTop: vp.isMobile ? 20 : 32,
-        borderTop: "1px solid var(--hairline, #E5E2DC)",
+        borderTop: "1px solid var(--hairline)",
         display: "flex",
         alignItems: vp.isMobile ? "flex-start" : "center",
         justifyContent: vp.isMobile ? "flex-start" : "space-between",

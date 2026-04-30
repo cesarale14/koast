@@ -717,7 +717,7 @@ function TopChrome({
       style={{
         height: 56,
         flexShrink: 0,
-        borderBottom: "1px solid #E5E2DC",
+        borderBottom: "1px solid var(--hairline)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -815,7 +815,7 @@ function TopChrome({
           )}
         </div>
 
-        {!isMobile && showSwitcher && <div style={{ width: 1, height: 24, background: "#E5E2DC" }} />}
+        {!isMobile && showSwitcher && <div style={{ width: 1, height: 24, background: "var(--hairline)" }} />}
 
         {!isMobile && showSwitcher && (
           <div style={{ position: "relative" }}>
@@ -864,7 +864,7 @@ function PropertyMenu({
         left: 0,
         right: 0,
         background: "#fff",
-        border: "1px solid #E5E2DC",
+        border: "1px solid var(--hairline)",
         borderRadius: 12,
         padding: 6,
         minWidth: 240,
@@ -1119,7 +1119,7 @@ function MonthBlock({
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(7, minmax(${isMobile ? CELL_MIN_WIDTH_MOBILE : CELL_MIN_WIDTH_DESKTOP}px, 1fr))`,
-          borderBottom: "1px solid #E5E2DC",
+          borderBottom: "1px solid var(--hairline)",
           paddingBottom: isMobile ? 4 : 8,
           marginBottom: isMobile ? 4 : 8,
           textAlign: "center",

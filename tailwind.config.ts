@@ -27,8 +27,15 @@ const config: Config = {
         sandbar: "var(--sandbar)",
         // Neutral — sandy shore
         shore: "var(--shore)",
+        "shore-soft": "var(--shore-soft)",
         "dry-sand": "var(--dry-sand)",
         shell: "var(--shell)",
+        hairline: "var(--hairline)",
+        white: "var(--white)",
+        // Lume — cool teal AI accent
+        "lume-light": "var(--lume-light)",
+        lume: "var(--lume)",
+        "lume-deep": "var(--lume-deep)",
         // Semantic
         "coral-reef": "var(--coral-reef)",
         "amber-tide": "var(--amber-tide)",

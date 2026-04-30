@@ -950,7 +950,7 @@ function AutoApplyToggle({ auto }: { auto: boolean }) {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "10px 12px",
-        border: "1px dashed #E5E2DC",
+        border: "1px dashed var(--hairline)",
         borderRadius: 10,
         background: "#FAFAF7",
       }}
@@ -1529,7 +1529,7 @@ function PreviewModal({
           position: "relative",
           background: "#fff",
           borderRadius: 16,
-          border: "1px solid #E5E2DC",
+          border: "1px solid var(--hairline)",
           width: "min(640px, 100%)",
           maxHeight: "90vh",
           display: "flex",
@@ -1544,7 +1544,7 @@ function PreviewModal({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid #E5E2DC",
+            borderBottom: "1px solid var(--hairline)",
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1598,7 +1598,7 @@ function PreviewModal({
         </div>
 
         {(phase === "plan" || phase === "confirming") && plan && (
-          <footer style={{ display: "flex", gap: 8, justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid #E5E2DC" }}>
+          <footer style={{ display: "flex", gap: 8, justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid var(--hairline)" }}>
             <KoastButton variant="ghost" size="md" onClick={onClose}>
               Cancel
             </KoastButton>
@@ -1608,7 +1608,7 @@ function PreviewModal({
           </footer>
         )}
         {phase === "success" && (
-          <footer style={{ display: "flex", justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid #E5E2DC" }}>
+          <footer style={{ display: "flex", justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid var(--hairline)" }}>
             <KoastButton variant="primary" size="md" onClick={onClose}>
               Done
             </KoastButton>
