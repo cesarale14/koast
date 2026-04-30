@@ -1,8 +1,8 @@
 # Koast Brand v1.0 — Handoff
 
-**Audience:** Claude Code instance on the Virginia VPS, integrating this brand package into the `staycommand` repo (Koast product surface at app.koasthq.com).
+**Audience:** Claude Code instance on the Virginia VPS, integrating this brand package into the `koast` repo (Koast product surface at app.koasthq.com).
 
-**TL;DR:** This zip contains every brand asset for Koast — SVG masters, raster outputs, motion vocabulary, full guidelines. Place at `~/koast/design/brand-final/` (where it's already extracted if you SCP'd from Cesar's local). Then propagate cool-teal palette tokens, swap favicons, update OG meta, and wire up motion vocabulary in shared components. **No code changes have been made to the StayCommand repo yet — that's your job.**
+**TL;DR:** This zip contains every brand asset for Koast — SVG masters, raster outputs, motion vocabulary, full guidelines. Place at `~/koast/design/brand-final/` (where it's already extracted if you SCP'd from Cesar's local). Then propagate cool-teal palette tokens, swap favicons, update OG meta, and wire up motion vocabulary in shared components. **No code changes have been made to the koast repo yet — that's your job.**
 
 ---
 
@@ -32,7 +32,7 @@ brand-final/
 
 ### 1. Positioning
 
-Koast is the AI co-host for short-term rentals — the consumer brand layer wrapping StayCommand (the underlying product). The wordmark is **always lowercase except the leading 'K'**: "Koast", never "KOAST" or "koast". Tagline: *"the AI co-host for short-term rentals."*
+Koast is the AI co-host for short-term rentals (formerly StayCommand pre-BR1, now unified under the Koast brand). The wordmark is **always lowercase except the leading 'K'**: "Koast", never "KOAST" or "koast". Tagline: *"the AI co-host for short-term rentals."*
 
 ### 2. Palette — cool teal
 
@@ -114,7 +114,7 @@ The bootstrap script installs Plus Jakarta Sans ExtraBold and re-runs `rasterize
 
 If Cesar wants this isolated for review:
 ```bash
-cd ~/staycommand   # or wherever the koast repo lives
+cd ~/koast
 git checkout -b brand/initial-identity
 mkdir -p public/brand
 cp -r ~/koast/design/brand-final public/brand/
@@ -132,7 +132,7 @@ git commit -m "brand: ship Koast identity v1.0
 
 ### Step 3 — Propagate palette tokens
 
-Find the existing design tokens in the StayCommand codebase. Likely locations (search in this order):
+Find the existing design tokens in the koast codebase. Likely locations (search in this order):
 1. `src/app/globals.css` — Tailwind v4 `@theme` block or CSS variables
 2. `tailwind.config.ts` (or `.js`) — `theme.extend.colors`
 3. `src/styles/tokens.css` — if a tokens file is broken out separately
