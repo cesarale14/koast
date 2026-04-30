@@ -13,16 +13,18 @@ brand-final/
 ├── README.md                 ← Top-level reference, SCP commands, font notes
 ├── HANDOFF.md                ← THIS FILE
 ├── regenerate-with-pjs.sh    ← Run ONCE: installs PJ Sans, re-renders PNGs
-├── rasterize.py              ← PNG pipeline (mark-only + wordmark + OG + icons)
-├── make-motion-gifs.py       ← Motion GIF preview pipeline
-├── masters/        12 SVG + 4 PNG previews — vector source of truth
-├── favicons/       7 PNG + 1 ICO — browser tabs, PWA install
-├── social/         4 PNG — OG cards (1200×630), square (1080×1080), light + dark
-├── app-icons/      4 PNG — iOS 1024, Android adaptive 432, Windows tile 310
-├── fallback/       5 SVG — wordmark-only variants (color, mono-black, mono-white, currentColor)
+├── rasterize.py              ← PNG pipeline (mark-only + wordmark + OG + icons). Can run directly without the bootstrap if PJ Sans is already installed system-wide.
+├── make-motion-gifs.py       ← Generates the 8 motion-exploration/*.gif preview files (240×240 indexed-palette GIFs of cascade / pulse / milestone / hero motion). Pillow-only; no headless browser. Run only when the motion vocabulary itself changes — the GIFs are previews, not canonical sources (the canonical motion lives as CSS keyframes in motion-vocabulary.html). One-shot, not a build-step.
+├── masters/        12 SVG + 4 PNG previews + README.md — vector source of truth
+├── favicons/       7 PNG + 1 ICO + README.md — browser tabs, PWA install
+├── social/         4 PNG + README.md — OG cards (1200×630), square (1080×1080), light + dark
+├── app-icons/      4 PNG + README.md — iOS 1024, Android adaptive 432, Windows tile 310
+├── fallback/       5 SVG + README.md — wordmark-only variants (color, mono-black, mono-white, currentColor)
 ├── guidelines/     1 HTML — brand-one-pager.html, canonical brand spec
-└── motion-exploration/  2 HTML + 8 GIF — motion vocabulary spec + previews
+└── motion-exploration/  2 HTML + 8 GIF + README.md — motion vocabulary spec + previews
 ```
+
+Each sub-directory README.md documents that directory's specific contents and conventions. The top-level README.md covers cross-cutting concerns (SCP commands, font dependencies, regeneration flow).
 
 **Total: 59 files, ~1.3 MB unpacked.**
 
@@ -67,7 +69,7 @@ The brand mark is a banded circle representing accumulated geological strata —
 - **Size rules:** 5-band variant ≥48px; 3-band variant <48px; wordmark-only fallback <16px
 - **Vertical band proportions are precise** — see `masters/koast-mark-5band-light.svg` for the canonical y-offsets (4, 27, 47, 65, 82, 96 in viewBox-100 units). Do not eyeball.
 
-### 4. Motion vocabulary v1.0 — three registers
+### 4. Motion vocabulary v1.0 — five registers
 
 | Register | Gesture | When |
 |---|---|---|
@@ -123,7 +125,7 @@ git commit -m "brand: ship Koast identity v1.0
 
 - 5/3-band logo system, Plus Jakarta Sans 800 wordmark
 - Cool teal palette (Tide #4cc4cc primary)
-- Three-register motion vocabulary: idle/active/milestone
+- Five-register motion vocabulary: idle / active / active-small / milestone / marketing-hero
 - All static + animated assets in public/brand/brand-final/
 "
 ```
@@ -132,36 +134,48 @@ git commit -m "brand: ship Koast identity v1.0
 
 ### Step 3 — Propagate palette tokens
 
+**As of 2026-04-30, none of these tokens are in globals.css yet.** Cool teal cluster locked at `--lume-light` / `--lume` / `--lume-deep` (3-stop scale). Middle bands (`#a8e0e3`, `#2ba2ad`) live ONLY in the SVG masters where the geological metaphor needs them — this is intentional, not a gap. Component code uses the 3-stop; SVG masters use the 5-stop. Propagation to globals.css is the palette-evolution session's job, not this branch's.
+
 Find the existing design tokens in the koast codebase. Likely locations (search in this order):
-1. `src/app/globals.css` — Tailwind v4 `@theme` block or CSS variables
-2. `tailwind.config.ts` (or `.js`) — `theme.extend.colors`
+1. `src/app/globals.css` — bare CSS variables under `:root` (Tailwind v3 convention used by this codebase)
+2. `tailwind.config.ts` — `theme.extend.colors` referencing the CSS vars via `var(--token)`
 3. `src/styles/tokens.css` — if a tokens file is broken out separately
 
-**Read the existing tokens before writing.** Cesar mentioned "PD-V1 tokens" in his instructions, suggesting there's a versioned token system already in place. Don't blow it away. Add the Koast tokens alongside or as an extension. Sample addition for Tailwind v4:
+**Read the existing tokens before writing.** PD-V1 tokens use bare coastal-feature names organized into Primary / Accent / Neutral / Semantic groups (e.g. `--deep-sea`, `--coastal`, `--golden`, `--lagoon`). Don't blow them away. Add the Koast AI-accent cluster as a new fifth group. Sample addition (matches existing PD-V1 convention):
 
 ```css
-@theme {
-  /* === Koast brand v1.0 === */
-  --color-koast-shore: #f7f3ec;
-  --color-koast-deep-sea: #132e20;
-  --color-koast-ink: #0f1815;
-
-  --color-koast-shore-mist: #d4eef0;
-  --color-koast-shoal: #a8e0e3;
-  --color-koast-tide: #4cc4cc;       /* primary */
-  --color-koast-reef: #2ba2ad;
-  --color-koast-trench: #0e7a8a;
+:root {
+  /* AI accent — cool teal (added by palette-evolution session) */
+  --lume-light: #d4eef0;
+  --lume:       #4cc4cc;   /* BRAND PRIMARY — AI accent */
+  --lume-deep:  #0e7a8a;
 }
 ```
 
-Match the existing naming convention. If tokens use camelCase or kebab-case patterns, follow suit. If there's a `--color-primary` slot already mapped to the old palette, decide with Cesar whether to remap or keep both during transition.
+Then expose via `tailwind.config.ts`:
+
+```ts
+theme: {
+  extend: {
+    colors: {
+      "lume-light": "var(--lume-light)",
+      "lume":       "var(--lume)",
+      "lume-deep":  "var(--lume-deep)",
+    },
+  },
+},
+```
+
+If component code needs the middle-band colors (`#a8e0e3` Shoal, `#2ba2ad` Reef) for some reason, escalate to Cesar — the locked decision was deliberately to keep those out of the token system.
 
 ### Step 4 — Swap favicons and PWA icons
 
 Move from old favicons to new ones:
 - Replace `public/favicon.ico` with `brand-final/favicons/favicon.ico`
 - Replace `public/apple-touch-icon.png` with `brand-final/favicons/apple-touch-icon-180.png`
-- Replace `public/android-chrome-192x192.png` and `-512x512.png` with corresponding new files
+- Copy `favicons/android-chrome-192.png` → `public/android-chrome-192x192.png`
+- Copy `favicons/android-chrome-512.png` → `public/android-chrome-512x512.png`
+  (the `x192`/`x512` suffix is Next.js convention for the `public/` destination filename; source files in `brand-final/favicons/` omit it)
 - Verify `app/manifest.json` (or `manifest.webmanifest`) icon paths still resolve
 
 In `app/layout.tsx` (or wherever `<head>` is defined), confirm favicon links point to the new files. Next.js 14 auto-detects `app/icon.png` and `app/apple-icon.png` — if those exist, they take precedence and need updating too.
