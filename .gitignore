@@ -43,3 +43,13 @@ repomix-output.xml
 /koast-development.zip
 /channex-expert.zip
 /channex-expert/
+
+# Windows
+Thumbs.db
+
+# Logs (generic — npm/yarn-specific globs already above)
+*.log
+
+# Python
+__pycache__/
+*.pyc
