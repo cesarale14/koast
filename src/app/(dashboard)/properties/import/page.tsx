@@ -124,9 +124,9 @@ export default function ImportPage() {
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                 i < step
-                  ? "bg-brand-500 text-white"
+                  ? "bg-coastal text-white"
                   : i === step
-                  ? "bg-brand-100 text-brand-700 ring-2 ring-brand-500"
+                  ? "bg-success-light text-deep-sea ring-2 ring-coastal"
                   : "bg-neutral-100 text-neutral-400"
               }`}
             >
@@ -150,8 +150,8 @@ export default function ImportPage() {
         {/* Step 0: Connect */}
         {step === 0 && (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-success-light rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
@@ -170,7 +170,7 @@ export default function ImportPage() {
             <button
               onClick={handleConnect}
               disabled={loading}
-              className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+              className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
             >
               {loading ? "Connecting..." : "Connect & Fetch Properties"}
             </button>
@@ -184,7 +184,7 @@ export default function ImportPage() {
               <h2 className="text-lg font-semibold text-neutral-800">
                 {properties.length} properties found
               </h2>
-              <button onClick={toggleAll} className="text-sm text-brand-500 hover:underline">
+              <button onClick={toggleAll} className="text-sm text-coastal hover:underline">
                 {selected.size === properties.length ? "Deselect All" : "Select All"}
               </button>
             </div>
@@ -199,14 +199,14 @@ export default function ImportPage() {
                   <label
                     key={p.channex_id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selected.has(p.channex_id) ? "border-brand-200 bg-brand-50/30" : "border-[var(--border)] hover:border-neutral-300"
+                      selected.has(p.channex_id) ? "border-success-light bg-success-light/30" : "border-[var(--border)] hover:border-neutral-300"
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.channex_id)}
                       onChange={() => toggleSelect(p.channex_id)}
-                      className="w-4 h-4 rounded border-neutral-300 text-brand-500"
+                      className="w-4 h-4 rounded border-neutral-300 text-coastal"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-neutral-800">{p.name}</p>
@@ -231,7 +231,7 @@ export default function ImportPage() {
               <button
                 onClick={handleImport}
                 disabled={selected.size === 0}
-                className="px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+                className="px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
               >
                 Import {selected.size} {selected.size === 1 ? "Property" : "Properties"}
               </button>
@@ -242,7 +242,7 @@ export default function ImportPage() {
         {/* Step 2: Importing */}
         {step === 2 && importing && (
           <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-10 h-10 border-4 border-success-light border-t-coastal rounded-full animate-spin mx-auto mb-4" />
             <p className="text-neutral-600 font-medium">Importing properties...</p>
             <p className="text-sm text-neutral-400 mt-1">
               Fetching properties, bookings, and rates from Channex
@@ -269,7 +269,7 @@ export default function ImportPage() {
               onClick={() =>
                 router.push(fromReviews ? "/reviews?just_connected=1" : "/properties")
               }
-              className="w-full px-6 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+              className="w-full px-6 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea transition-colors"
             >
               {fromReviews ? "Go to Reviews" : "Go to Properties"}
             </button>
@@ -293,10 +293,10 @@ function ResultRow({ result: r }: { result: ImportResult }) {
   // Status-specific color and label
   let pillClass = "bg-neutral-100 text-neutral-600";
   let pillLabel: string = r.status;
-  if (r.status === "imported") { pillClass = "bg-brand-50 text-[var(--positive)]"; pillLabel = "Imported"; }
+  if (r.status === "imported") { pillClass = "bg-success-light text-[var(--positive)]"; pillLabel = "Imported"; }
   else if (r.status === "imported_with_errors") { pillClass = "bg-[var(--warning-light)] text-[var(--amber-tide)]"; pillLabel = "Imported with warnings"; }
   else if (r.status === "error") { pillClass = isQuotaError ? "bg-[var(--warning-light)] text-[var(--amber-tide)]" : "bg-[#c44040]/10 text-[var(--coral-reef)]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
-  else if (r.status === "unmatched") { pillClass = "bg-brand-50 text-tideline"; pillLabel = "Needs your input"; }
+  else if (r.status === "unmatched") { pillClass = "bg-success-light text-tideline"; pillLabel = "Needs your input"; }
 
   return (
     <div className="border border-[var(--border)] rounded-lg overflow-hidden">

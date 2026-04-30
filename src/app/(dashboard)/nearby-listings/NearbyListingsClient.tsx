@@ -113,7 +113,7 @@ export default function NearbyListingsClient({
           <button
             onClick={refreshMarketData}
             disabled={refreshing}
-            className="px-3 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors disabled:opacity-50"
+            className="px-3 py-2 text-sm font-medium text-deep-sea bg-success-light border border-success-light rounded-lg hover:bg-success-light transition-colors disabled:opacity-50"
           >
             {refreshing ? "Refreshing…" : "Refresh Market Data"}
           </button>
@@ -123,7 +123,7 @@ export default function NearbyListingsClient({
       <div className={loading ? "opacity-50 pointer-events-none" : ""}>
         {/* Your property summary */}
         {currentProp && (
-          <div className="bg-brand-50 border border-brand-200 rounded-lg p-4 mb-6 flex items-center gap-4">
+          <div className="bg-success-light border border-success-light rounded-lg p-4 mb-6 flex items-center gap-4">
             <PropertyAvatar name={currentProp.name} photoUrl={currentProp.cover_photo_url} size={48} />
             <div>
               <p className="text-sm font-bold text-neutral-800">{currentProp.name}</p>
@@ -143,7 +143,7 @@ export default function NearbyListingsClient({
                 key={comp.comp_listing_id}
                 onClick={() => setSelectedId(isSelected ? null : comp.comp_listing_id)}
                 className={`bg-neutral-0 rounded-lg border overflow-hidden cursor-pointer transition-all hover:shadow-md ${
-                  isSelected ? "border-brand-400 ring-1 ring-brand-200" : "border-[var(--border)]"
+                  isSelected ? "border-mangrove ring-1 ring-success-light" : "border-[var(--border)]"
                 }`}
               >
                 {/* Photo */}
@@ -156,7 +156,7 @@ export default function NearbyListingsClient({
                       const n = (comp.comp_name ?? "").toLowerCase();
                       if (n.includes("sun") || n.includes("bay")) return "bg-gradient-to-br from-amber-100 to-orange-200";
                       if (n.includes("downtown") || n.includes("channel") || n.includes("river")) return "bg-gradient-to-br from-blue-100 to-cyan-200";
-                      if (n.includes("pool") || n.includes("beach") || n.includes("marina")) return "bg-gradient-to-br from-teal-100 to-[var(--brand-200)]";
+                      if (n.includes("pool") || n.includes("beach") || n.includes("marina")) return "bg-gradient-to-br from-teal-100 to-[var(--success-light)]";
                       if (n.includes("hyde") || n.includes("palma") || n.includes("garden")) return "bg-gradient-to-br from-green-100 to-lime-200";
                       if (n.includes("loft") || n.includes("studio") || n.includes("modern")) return "bg-gradient-to-br from-violet-100 to-purple-200";
                       return "bg-gradient-to-br from-rose-100 to-pink-200";

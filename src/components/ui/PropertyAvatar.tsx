@@ -22,7 +22,7 @@ export default function PropertyAvatar({ name, photoUrl, size = 32, className = 
 
   // Fallback: colored circle with first letter
   const colors = [
-    "bg-brand-100 text-brand-700",
+    "bg-success-light text-deep-sea",
     "bg-blue-100 text-blue-700",
     "bg-amber-100 text-amber-700",
     "bg-rose-100 text-rose-700",

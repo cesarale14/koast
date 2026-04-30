@@ -53,7 +53,7 @@ export default function DateCell({
     <div
       className={`w-[80px] h-full border-r border-neutral-100 relative cursor-pointer transition-colors select-none ${
         isSelected
-          ? "bg-brand-50 ring-1 ring-inset ring-brand-300"
+          ? "bg-success-light ring-1 ring-inset ring-mangrove"
           : isGap
             ? "bg-amber-50"
             : !isAvailable
@@ -63,7 +63,7 @@ export default function DateCell({
                 : rate?.suggested_rate && rate?.base_rate && rate.suggested_rate > rate.base_rate * 1.02
                   ? "bg-amber-50/40 hover:bg-amber-50" // medium demand
                   : "bg-neutral-0 hover:bg-neutral-50"  // normal
-      } ${isToday ? "ring-1 ring-inset ring-brand-400" : ""}`}
+      } ${isToday ? "ring-1 ring-inset ring-mangrove" : ""}`}
       onClick={() => onClick(date, rate)}
       onMouseDown={() => onDragStart(date)}
       onMouseEnter={() => onDragEnter(date)}

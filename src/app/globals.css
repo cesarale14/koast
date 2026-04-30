@@ -74,19 +74,6 @@
   --linen: var(--shore);
   --linen-dark: var(--dry-sand);
 
-  /* Brand scale (used by old components) */
-  --brand-50: #eef5f0;
-  --brand-100: #d5e8da;
-  --brand-200: #a8d1b4;
-  --brand-300: #6aad7e;
-  --brand-400: #3d8a5a;
-  --brand-500: var(--coastal);
-  --brand-600: var(--deep-sea);
-  --brand-700: var(--deep-sea);
-  --brand-800: #142e21;
-  --brand-900: #0d1f16;
-  --brand-950: #07120c;
-
   /* Ink — text */
   --ink: var(--coastal);
   --ink-secondary: #4a6355;

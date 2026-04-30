@@ -11,7 +11,7 @@ const platformColors: Record<string, string> = {
   vrbo: "bg-indigo-50 text-indigo-700",
   booking_com: "bg-[#003580]/10 text-[var(--booking-com)]",
   booking: "bg-[#003580]/10 text-[var(--booking-com)]",
-  direct: "bg-brand-50 text-[var(--positive)]",
+  direct: "bg-success-light text-[var(--positive)]",
 };
 
 const statusColors: Record<string, string> = {
@@ -159,7 +159,7 @@ export default function BookingSidePanel({ booking, onClose, propertyMap }: Book
           <div className="space-y-2 pt-2">
             <Link
               href="/messages"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-brand-500 text-brand-500 text-sm font-medium rounded-lg hover:bg-brand-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-coastal text-coastal text-sm font-medium rounded-lg hover:bg-success-light transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

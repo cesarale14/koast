@@ -21,8 +21,8 @@ export default async function PricingPage() {
         <h1 className="text-xl font-bold text-neutral-800 mb-1">Dynamic Pricing</h1>
         <p className="text-sm text-neutral-500 mb-8">AI-powered rate optimization</p>
         <div className="bg-neutral-0 rounded-lg border border-[var(--border)] p-16 text-center">
-          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-success-light rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-coastal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
@@ -30,7 +30,7 @@ export default async function PricingPage() {
           <p className="text-sm text-neutral-500 mb-6">Add a property to start using the pricing engine.</p>
           <Link
             href="/properties"
-            className="inline-flex px-5 py-2.5 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors"
+            className="inline-flex px-5 py-2.5 bg-coastal text-white text-sm font-medium rounded-lg hover:bg-deep-sea transition-colors"
           >
             Add Property
           </Link>

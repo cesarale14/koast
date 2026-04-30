@@ -73,7 +73,7 @@ function fillPreview(body: string): string {
 }
 
 const inputClass =
-  "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors";
+  "w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors";
 
 export default function TemplateManager({ templates: initialTemplates, properties }: TemplateManagerProps) {
   const router = useRouter();
@@ -286,7 +286,7 @@ export default function TemplateManager({ templates: initialTemplates, propertie
                   onClick={() => toggleActive(t.template_type, t.is_active, t.id)}
                   disabled={saving === t.template_type}
                   className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
-                    t.is_active ? "bg-brand-500" : "bg-neutral-300"
+                    t.is_active ? "bg-coastal" : "bg-neutral-300"
                   }`}
                 >
                   <span
@@ -306,7 +306,7 @@ export default function TemplateManager({ templates: initialTemplates, propertie
                       onClick={() => setPreviewing(isPreviewing ? null : t.template_type)}
                       className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
                         isPreviewing
-                          ? "bg-brand-50 text-brand-600"
+                          ? "bg-success-light text-deep-sea"
                           : "bg-neutral-100 text-neutral-500 hover:text-neutral-700"
                       }`}
                     >
@@ -342,7 +342,7 @@ export default function TemplateManager({ templates: initialTemplates, propertie
                       <button
                         onClick={() => saveBody(t.template_type, t.id)}
                         disabled={saving === t.template_type}
-                        className="px-4 py-1.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+                        className="px-4 py-1.5 text-sm font-medium text-white bg-coastal rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
                       >
                         {saving === t.template_type ? "Saving..." : "Save Changes"}
                       </button>

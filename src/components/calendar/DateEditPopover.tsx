@@ -96,7 +96,7 @@ export default function DateEditPopover({
               type="number"
               value={rate}
               onChange={(e) => handleRateChange(e.target.value)}
-              className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 ${
+              className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal ${
                 rateError ? "border-red-400" : "border-[var(--border)]"
               }`}
               placeholder="0"
@@ -116,7 +116,7 @@ export default function DateEditPopover({
               type="number"
               value={minStay}
               onChange={(e) => setMinStay(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+              className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal"
               min="1"
             />
           </div>
@@ -126,7 +126,7 @@ export default function DateEditPopover({
               type="checkbox"
               checked={available}
               onChange={(e) => setAvailable(e.target.checked)}
-              className="w-4 h-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+              className="w-4 h-4 rounded border-neutral-300 text-coastal focus:ring-coastal"
             />
             <span className="text-sm text-neutral-700">Available</span>
           </label>
@@ -142,7 +142,7 @@ export default function DateEditPopover({
           <button
             onClick={handleSave}
             disabled={saving || !!rateError}
-            className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+            className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-coastal rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving..." : "Save"}
           </button>
