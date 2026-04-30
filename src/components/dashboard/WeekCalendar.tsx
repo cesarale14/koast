@@ -28,7 +28,7 @@ interface BookingSpan {
   guestName: string;
 }
 
-const platformColor = "#10B981"; // brand-500 for mini calendar
+const platformColor = "var(--coastal)";
 
 /** Group consecutive booked days with same guest into spans */
 function getBookingSpans(days: PropertyWeek["days"]): BookingSpan[] {

@@ -66,7 +66,7 @@ function approximatePosition(cLat: number, cLng: number, distKm: number, idx: nu
 export default function IntelMap({ properties, comps, events = [], center, snapshot, propertyStats }: IntelMapProps) {
   const [layers, setLayers] = useState({ properties: true, comps: true, events: true });
 
-  const propIcon = useMemo(() => createIcon("#10b981", 22, true), []);
+  const propIcon = useMemo(() => createIcon("var(--golden)", 22, true), []);
   const eventIcon = starIcon;
 
   const allPositions = useMemo((): [number, number][] => {
@@ -79,7 +79,7 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
       {/* Layer toggles */}
       <div className="flex items-center gap-4 mb-3">
         {[
-          { key: "properties" as const, label: "My Properties", color: "#10b981" },
+          { key: "properties" as const, label: "My Properties", color: "var(--golden)" },
           { key: "comps" as const, label: "Competitors", color: "#6b7280" },
           { key: "events" as const, label: "Events", color: "#f59e0b" },
         ].map(({ key, label, color }) => (

@@ -3,11 +3,11 @@
 import PlatformLogo from "@/components/ui/PlatformLogo";
 
 const platformColors: Record<string, string> = {
-  airbnb: "#FF5A5F",
+  airbnb: "var(--airbnb)",
   vrbo: "#3B5998",
   booking_com: "var(--booking-com)",
   booking: "var(--booking-com)",
-  direct: "#10B981",
+  direct: "var(--direct)",
 };
 
 export interface BookingBarData {

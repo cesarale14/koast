@@ -45,7 +45,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  airbnb: "border-[#FF5A5F] bg-[#FF5A5F]/5 text-[#FF5A5F]",
+  airbnb: "border-airbnb bg-[#FF385C]/5 text-airbnb",
   vrbo: "border-[#3B5998] bg-[#3B5998]/5 text-[#3B5998]",
   booking_com: "border-[var(--booking-com)] bg-[#003580]/5 text-[var(--booking-com)]",
 };
