@@ -119,8 +119,22 @@ PLATFORMS.direct.tile / .icon / .iconWhite        // uses koast-tile.svg, golden
 
 `platformKeyFrom(code)` normalizes `"ABB" / "airbnb"`, `"BDC" / "booking" / "booking.com" / "booking_com" / "booking-com"`, `"direct" / "koast"`. Returns `null` for `"HMA" / "vrbo"` (alias accepted but maps to nothing, since VRBO isn't in PLATFORMS).
 
-### Legacy Token Cleanup (in progress)
-`bg-brand-500` resolves to `var(--coastal)`, `bg-brand-600` to `var(--deep-sea)`. Current count: **43 `bg-brand-500` occurrences across 17 files; 16 files with `bg-brand-600`; 65 `text-brand-*` occurrences; 132 total `brand-*` references across 24 files.** Migrate each file to Koast tokens when you touch it; deletion of the aliases is a phase-1 milestone.
+### Token system (consolidated 2026-04-30, merge `8529684`)
+The `--brand-{50..950}` legacy scale is RETIRED. Both the CSS variables and the Tailwind `brand: { ... }` color block have been removed; any new `brand-N` reference will fail Tailwind compilation. Migration map (for reading old PRs / git history):
+- `bg-brand-500` → `bg-coastal` (`var(--coastal)`)
+- `bg-brand-600` / `bg-brand-700` / `bg-brand-{800,900,950}` → `bg-deep-sea`
+- `bg-brand-50` → `bg-success-light` (exact hex match)
+- `brand-100`, `brand-200` → `success-light` for pale backgrounds, `mangrove` for darker borders/text (per-occurrence judgment was applied during the sweep)
+- `brand-300`, `brand-400` → `mangrove` (mid-tone), `lagoon` for "active/positive" semantics
+
+Tokens added in the same merge:
+- `--lume-light` / `--lume` / `--lume-deep` (cool-teal AI accent cluster, brand primary `--lume = #4cc4cc`)
+- `--positive` (`#1a3a2a`, "rate raised" green; success-pill text)
+- `--abyss` (`#0e2218`, gradient terminus paired with `--deep-sea`)
+
+Tailwind exposure also fixed: `shore-soft`, `hairline`, `white` are now reachable as utility classes (PD-V1 had defined them in `:root` but not in `tailwind.config.ts`).
+
+The `PricingDashboard` rate-calendar heatmap (`rateColor()` and the legend array) keeps four hex literals inline (`#d5e8da`, `#a8d1b4`, `#6aad7e`, `#3d8a5a`) — this is intentional, a 5-stop data-viz scale with no shared semantic role elsewhere.
 
 ---
 
@@ -496,7 +510,7 @@ What Koast has that competitors don't.
 - Channel health monitoring worker + `channel_health` table + disconnect banners.
 - Onboarding polish: signup → connect → first property in 3 minutes.
 - ~~Reconnect Airbnb OAuth (Villa Jamaica + Cozy Loft).~~ Done 2026-04-22 (re-verified MSG-S2-PRE).
-- First `brand-*` → Koast-token migration sweep (start with the 17 files touching `bg-brand-500`).
+- ~~First `brand-*` → Koast-token migration sweep.~~ Done 2026-04-30 (merge `8529684`). Full retirement: 188 occurrences across 27 files swept; tokens removed from `globals.css` and `tailwind.config.ts`.
 
 ### Phase 2 — Intelligence layer (4 weeks)
 - AI messaging pipeline (auto-draft, auto-send, operational routing).
@@ -525,7 +539,7 @@ What Koast has that competitors don't.
 11. `calendar_rates` columns: `rate` vs `suggested_rate` vs `applied_rate` — suggested is engine output.
 12. `/revenue-check` and `/clean` are public routes (auth middleware skips them).
 13. Calendar layout: GAP constant in `MonthlyView.tsx` must match the `--col` formula `calc((100% + GAP) / 7)`; bar width is `calc(var(--col) * span - GAP)` to prevent overflow.
-14. `bg-brand-500` → `var(--coastal)` aliased in `globals.css`; visually correct but each use should be migrated to `bg-coastal` when the file is touched.
+14. `brand-*` Tailwind classes are RETIRED (merge `8529684`, 2026-04-30). Use `coastal` (was 500), `deep-sea` (was 600/700/800/900/950), `success-light` (was 50), `mangrove`, or `lagoon` per the migration map in "Token system (consolidated…)" above. New `brand-N` references will fail Tailwind compilation.
 15. ChannelPopover positioning uses `@floating-ui/react` — don't re-implement with raw `position: absolute`.
 
 ---
