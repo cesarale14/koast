@@ -293,9 +293,9 @@ function ResultRow({ result: r }: { result: ImportResult }) {
   // Status-specific color and label
   let pillClass = "bg-neutral-100 text-neutral-600";
   let pillLabel: string = r.status;
-  if (r.status === "imported") { pillClass = "bg-brand-50 text-[#1a3a2a]"; pillLabel = "Imported"; }
-  else if (r.status === "imported_with_errors") { pillClass = "bg-[#fff4d6] text-[#b8860b]"; pillLabel = "Imported with warnings"; }
-  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[#fff4d6] text-[#b8860b]" : "bg-[#c44040]/10 text-[var(--coral-reef)]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
+  if (r.status === "imported") { pillClass = "bg-brand-50 text-[var(--positive)]"; pillLabel = "Imported"; }
+  else if (r.status === "imported_with_errors") { pillClass = "bg-[var(--warning-light)] text-[var(--amber-tide)]"; pillLabel = "Imported with warnings"; }
+  else if (r.status === "error") { pillClass = isQuotaError ? "bg-[var(--warning-light)] text-[var(--amber-tide)]" : "bg-[#c44040]/10 text-[var(--coral-reef)]"; pillLabel = isQuotaError ? "Plan limit" : "Failed"; }
   else if (r.status === "unmatched") { pillClass = "bg-brand-50 text-tideline"; pillLabel = "Needs your input"; }
 
   return (
@@ -314,7 +314,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
           {/* Imported but with booking failures */}
           {r.status === "imported_with_errors" && (
             <>
-              <p className="text-xs text-[#b8860b] mt-0.5">
+              <p className="text-xs text-[var(--amber-tide)] mt-0.5">
                 {r.bookings ?? 0} of {(r.bookings ?? 0) + (r.bookings_failed ?? 0)} bookings imported
                 {r.bookings_failed ? ` — ${r.bookings_failed} failed` : ""}
               </p>
@@ -322,7 +322,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
                 <button
                   type="button"
                   onClick={() => setExpanded((e) => !e)}
-                  className="text-[11px] text-[#b8860b] underline hover:no-underline mt-1"
+                  className="text-[11px] text-[var(--amber-tide)] underline hover:no-underline mt-1"
                 >
                   {expanded ? "Hide" : "Show"} {r.booking_errors.length} error{r.booking_errors.length === 1 ? "" : "s"}
                 </button>
@@ -333,7 +333,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
           {/* Quota-exceeded error gets an upgrade CTA */}
           {r.status === "error" && isQuotaError && (
             <>
-              <p className="text-xs text-[#b8860b] mt-0.5">
+              <p className="text-xs text-[var(--amber-tide)] mt-0.5">
                 Your plan doesn&apos;t allow more properties.
               </p>
               <Link
@@ -362,7 +362,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
                 <div className="mt-2">
                   <label className="block text-[10px] text-tideline mb-1">Link to:</label>
                   <select
-                    className="text-xs border border-[#efe9dd] rounded px-2 py-1 bg-white"
+                    className="text-xs border border-[var(--dry-sand)] rounded px-2 py-1 bg-white"
                     defaultValue=""
                   >
                     <option value="" disabled>Choose a property…</option>
@@ -370,7 +370,7 @@ function ResultRow({ result: r }: { result: ImportResult }) {
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-[#999] mt-1">
+                  <p className="text-[10px] text-[var(--tideline)] mt-1">
                     (Manual linking is coming soon — for now, rename one of the conflicting properties and re-import.)
                   </p>
                 </div>
@@ -385,10 +385,10 @@ function ResultRow({ result: r }: { result: ImportResult }) {
 
       {/* Expanded booking errors list */}
       {expanded && r.booking_errors && (
-        <div className="border-t border-[#efe9dd] bg-[#fff4d6]/30 px-3 py-2">
+        <div className="border-t border-[var(--dry-sand)] bg-[var(--warning-light)]/30 px-3 py-2">
           <ul className="list-disc list-inside space-y-0.5">
             {r.booking_errors.map((err, i) => (
-              <li key={i} className="text-[11px] text-[#b8860b] break-all">{err}</li>
+              <li key={i} className="text-[11px] text-[var(--amber-tide)] break-all">{err}</li>
             ))}
           </ul>
         </div>

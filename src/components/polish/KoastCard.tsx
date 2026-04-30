@@ -22,7 +22,7 @@ function styleFor(variant: Variant, padding?: number): React.CSSProperties {
         padding: p,
       };
     case "quiet":
-      return { background: "#FAFAF7", borderRadius: 12, padding: p };
+      return { background: "var(--shore-soft)", borderRadius: 12, padding: p };
     case "dark":
       return {
         background: "var(--coastal)",

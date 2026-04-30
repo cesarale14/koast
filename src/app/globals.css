@@ -45,6 +45,12 @@
   --lume: #4cc4cc;           /* BRAND PRIMARY — AI accent */
   --lume-deep: #0e7a8a;
 
+  /* Positive delta — between coastal and tideline; rate raises, success pills */
+  --positive: #1a3a2a;
+
+  /* Abyss — gradient terminus (paired with --deep-sea in radial/linear stops) */
+  --abyss: #0e2218;
+
   /* Koast shadows — all use rgba(19,46,32) coastal tint */
   --shadow-card: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
   --shadow-card-hover: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);

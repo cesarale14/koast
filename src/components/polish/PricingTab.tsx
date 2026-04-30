@@ -952,7 +952,7 @@ function AutoApplyToggle({ auto }: { auto: boolean }) {
         padding: "10px 12px",
         border: "1px dashed var(--hairline)",
         borderRadius: 10,
-        background: "#FAFAF7",
+        background: "var(--shore-soft)",
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1675,7 +1675,7 @@ function PreviewPlanBody({
                     gap: 8,
                     padding: "6px 10px",
                     borderRadius: 8,
-                    background: "#FAFAF7",
+                    background: "var(--shore-soft)",
                     fontSize: 12,
                   }}
                 >
@@ -1714,7 +1714,7 @@ function PreviewPlanBody({
             marginTop: 8,
             padding: 12,
             borderRadius: 8,
-            background: "#FAFAF7",
+            background: "var(--shore-soft)",
             fontSize: 11,
             lineHeight: 1.4,
             color: "var(--coastal)",

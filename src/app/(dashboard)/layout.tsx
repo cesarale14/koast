@@ -43,7 +43,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, #0e2218 100%)";
+const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, var(--abyss) 100%)";
 const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(196,154,90,0.15)";
 const INACTIVE_TEXT = "rgba(168,191,174,0.6)";
 

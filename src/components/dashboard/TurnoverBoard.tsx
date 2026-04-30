@@ -369,7 +369,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                       <button
                         onClick={() => testSMS(c.id, c.phone)}
                         disabled={sms?.status === "sending"}
-                        className="text-xs text-[#1a3a2a] hover:text-[#1a3a2a] font-medium disabled:opacity-50"
+                        className="text-xs text-[var(--positive)] hover:text-[var(--positive)] font-medium disabled:opacity-50"
                       >
                         {sms?.status === "sending" ? "Sending..." : "Test SMS"}
                       </button>
@@ -377,7 +377,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                     </div>
                   </div>
                   {sms?.status === "success" && (
-                    <p className="mt-1 text-xs text-[#1a3a2a] font-medium">✓ {sms.message}</p>
+                    <p className="mt-1 text-xs text-[var(--positive)] font-medium">✓ {sms.message}</p>
                   )}
                   {sms?.status === "error" && (
                     <p className="mt-1 text-xs text-red-600 font-medium">✗ Failed: {sms.message}</p>

@@ -743,11 +743,11 @@ function TopChrome({
           }}
         >
           <span style={{ color: "var(--coastal)", fontWeight: 600 }}>Koast</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span>Properties</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span style={{ color: "var(--coastal)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{propertyName}</span>
-          <span style={{ color: "#C8C4BC" }}>›</span>
+          <span style={{ color: "var(--shell)" }}>›</span>
           <span>Calendar</span>
         </div>
       )}
@@ -885,7 +885,7 @@ function PropertyMenu({
             padding: "8px 10px",
             borderRadius: 8,
             border: "none",
-            background: p.id === activeId ? "#FAFAF7" : "transparent",
+            background: p.id === activeId ? "var(--shore-soft)" : "transparent",
             cursor: "pointer",
             fontSize: 13,
             fontWeight: p.id === activeId ? 600 : 500,
@@ -957,7 +957,7 @@ function PropertyHero({
           borderRadius: isMobile ? 12 : 16,
           overflow: "hidden",
           flexShrink: 0,
-          background: "#F0ECE3",
+          background: "var(--dry-sand)",
         }}
       >
         {property.cover_photo_url && (
@@ -991,7 +991,7 @@ function PropertyHero({
           }}
         >
           <span>Synced {lastSynced}</span>
-          <span style={{ color: "#C8C4BC" }}>·</span>
+          <span style={{ color: "var(--shell)" }}>·</span>
           <span>{accept != null ? `${Math.round(accept * 100)}% acceptance` : "Accepting data"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

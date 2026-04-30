@@ -35,7 +35,7 @@ interface BookingBarProps {
 }
 
 export default function BookingBar({ booking, left, width, hasFollower, hasPredecessor, onClick }: BookingBarProps) {
-  const color = platformColors[booking.platform] ?? "#6B7280";
+  const color = platformColors[booking.platform] ?? "var(--tideline)";
   const nights = (() => {
     const ci = Date.UTC(+booking.check_in.slice(0, 4), +booking.check_in.slice(5, 7) - 1, +booking.check_in.slice(8, 10));
     const co = Date.UTC(+booking.check_out.slice(0, 4), +booking.check_out.slice(5, 7) - 1, +booking.check_out.slice(8, 10));

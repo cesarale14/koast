@@ -11,7 +11,7 @@ const platformColors: Record<string, string> = {
   vrbo: "bg-indigo-50 text-indigo-700",
   booking_com: "bg-[#003580]/10 text-[var(--booking-com)]",
   booking: "bg-[#003580]/10 text-[var(--booking-com)]",
-  direct: "bg-brand-50 text-[#1a3a2a]",
+  direct: "bg-brand-50 text-[var(--positive)]",
 };
 
 const statusColors: Record<string, string> = {

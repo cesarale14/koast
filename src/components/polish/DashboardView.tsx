@@ -347,9 +347,9 @@ function GreetingBlock({
         }}
       >
         <span>{summary.propertyCount} {summary.propertyCount === 1 ? "property" : "properties"}</span>
-        <span style={{ color: "#C8C4BC" }}>·</span>
+        <span style={{ color: "var(--shell)" }}>·</span>
         <span>{summary.bookingsThisMonth} {summary.bookingsThisMonth === 1 ? "booking" : "bookings"} this month</span>
-        <span style={{ color: "#C8C4BC" }}>·</span>
+        <span style={{ color: "var(--shell)" }}>·</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <StatusDot tone={tone} />
           {syncLabel(summary.syncStatus)}
@@ -455,7 +455,7 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
         borderRadius: 16,
         background: "#fff",
         boxShadow: hover
-          ? "0 10px 30px rgba(19,46,32,0.08), 0 0 0 1px #d8d3c9"
+          ? "0 10px 30px rgba(19,46,32,0.08), 0 0 0 1px var(--shell)"
           : "0 0 0 1px var(--hairline)",
         transform: hover ? "translateY(-2px)" : "translateY(0)",
         transition: "box-shadow 300ms cubic-bezier(0.4,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1)",
@@ -838,7 +838,7 @@ function ActionCard({ action }: { action: FocusAction }) {
         alignItems: "center",
         gap: 14,
         padding: "16px 20px",
-        border: `1px solid ${hover ? "#d8d3c9" : "var(--hairline)"}`,
+        border: `1px solid ${hover ? "var(--shell)" : "var(--hairline)"}`,
         borderRadius: 12,
         background: "#fff",
         textDecoration: "none",

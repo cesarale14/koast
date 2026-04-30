@@ -64,7 +64,7 @@ export default function CertificationPage() {
           {/* Summary */}
           <div className="flex gap-4 mb-6">
             <div className="bg-brand-50 rounded-lg p-4 flex-1 text-center">
-              <p className="text-3xl font-bold font-mono text-[#1a3a2a]">{results.summary.passed}</p>
+              <p className="text-3xl font-bold font-mono text-[var(--positive)]">{results.summary.passed}</p>
               <p className="text-xs text-tideline">Passed</p>
             </div>
             <div className="bg-red-50 rounded-lg p-4 flex-1 text-center">
@@ -91,7 +91,7 @@ export default function CertificationPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      r.status === "pass" ? "bg-brand-50 text-[#1a3a2a]" :
+                      r.status === "pass" ? "bg-brand-50 text-[var(--positive)]" :
                       r.status === "fail" ? "bg-red-100 text-red-700" :
                       "bg-neutral-100 text-neutral-500"
                     }`}>
@@ -105,7 +105,7 @@ export default function CertificationPage() {
                     </div>
                   </div>
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    r.status === "pass" ? "bg-brand-50 text-[#1a3a2a]" :
+                    r.status === "pass" ? "bg-brand-50 text-[var(--positive)]" :
                     r.status === "fail" ? "bg-red-50 text-red-700" :
                     "bg-neutral-100 text-neutral-500"
                   }`}>

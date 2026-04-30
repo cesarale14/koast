@@ -164,7 +164,7 @@ export default function CertificationPage() {
                   {isRunning ? (
                     <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
                   ) : passed ? (
-                    <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-[var(--positive)] flex items-center justify-center">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
@@ -267,7 +267,7 @@ export default function CertificationPage() {
                 {isResetting ? (
                   <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
                 ) : passed ? (
-                  <div className="w-6 h-6 rounded-full bg-[#1a3a2a] flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-[var(--positive)] flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
@@ -377,7 +377,7 @@ function WebhookLogViewer() {
             Test 11: Booking Webhook Events
           </h2>
           {hasAll3 && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-brand-50 text-[#1a3a2a] rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-brand-50 text-[var(--positive)] rounded-full">
               ALL 3 RECEIVED
             </span>
           )}
@@ -427,7 +427,7 @@ function WebhookLogViewer() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[10px] text-neutral-400">{timeStr}</span>
-                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-[#1a3a2a]" : "text-red-500"}`}>
+                    <span className={`text-[10px] font-medium ${log.ack_sent ? "text-[var(--positive)]" : "text-red-500"}`}>
                       {log.ack_sent ? "ACK sent" : "ACK pending"}
                     </span>
                     <code className="text-[10px] text-neutral-400 font-mono">{log.booking_id?.substring(0, 8)}...</code>

@@ -566,7 +566,7 @@ export default function AnalyticsDashboard({
         </div>
 
         {/* Revenue opportunity — AI dark card */}
-        <div className="koast-anim rounded-2xl p-[22px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, var(--deep-sea), #0e2218)", color: "var(--shore)", animationDelay: "600ms" }}>
+        <div className="koast-anim rounded-2xl p-[22px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, var(--deep-sea), var(--abyss))", color: "var(--shore)", animationDelay: "600ms" }}>
           {/* Ambient golden glow */}
           <div className="absolute pointer-events-none" style={{ top: "-50%", right: "-30%", width: "70%", height: "120%", background: "radial-gradient(ellipse, rgba(196,154,90,0.08), transparent 70%)", animation: "koast-breathe 4s ease-in-out infinite" }} />
           <style>{`@keyframes koast-breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }`}</style>

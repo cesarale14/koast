@@ -80,8 +80,8 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
       <div className="flex items-center gap-4 mb-3">
         {[
           { key: "properties" as const, label: "My Properties", color: "var(--golden)" },
-          { key: "comps" as const, label: "Competitors", color: "#6b7280" },
-          { key: "events" as const, label: "Events", color: "#f59e0b" },
+          { key: "comps" as const, label: "Competitors", color: "var(--tideline)" },
+          { key: "events" as const, label: "Events", color: "var(--amber-tide)" },
         ].map(({ key, label, color }) => (
           <label key={key} className="flex items-center gap-1.5 cursor-pointer text-xs text-neutral-600">
             <input
@@ -141,7 +141,7 @@ export default function IntelMap({ properties, comps, events = [], center, snaps
                         <p className="pt-1 border-t border-neutral-100 font-medium">
                           {c.adr > propertyStats.avgRate
                             ? <span className="text-amber-600">They charge ${Math.round(c.adr - propertyStats.avgRate)} more</span>
-                            : <span className="text-[#1a3a2a]">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
+                            : <span className="text-[var(--positive)]">You charge ${Math.round(propertyStats.avgRate - c.adr)} more</span>}
                         </p>
                       )}
                     </div>

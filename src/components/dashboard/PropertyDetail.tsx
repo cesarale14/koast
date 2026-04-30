@@ -302,7 +302,7 @@ function HeroSection({
         <div
           className="w-full h-full flex items-center justify-center"
           style={{
-            background: "linear-gradient(135deg, var(--deep-sea), #0a1c14 50%, #0e2218)",
+            background: "linear-gradient(135deg, var(--deep-sea), var(--abyss) 50%, var(--abyss))",
             color: "rgba(196,154,90,0.25)",
           }}
         >

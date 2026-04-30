@@ -36,6 +36,9 @@ const config: Config = {
         "lume-light": "var(--lume-light)",
         lume: "var(--lume)",
         "lume-deep": "var(--lume-deep)",
+        // Untokenized decisions
+        positive: "var(--positive)",
+        abyss: "var(--abyss)",
         // Semantic
         "coral-reef": "var(--coral-reef)",
         "amber-tide": "var(--amber-tide)",

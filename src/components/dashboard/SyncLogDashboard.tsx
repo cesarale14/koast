@@ -37,8 +37,8 @@ interface SyncLogDashboardProps {
 // ---------- Helpers ----------
 
 const EVENT_TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  booking_new: { label: "New Booking", color: "text-[#1a3a2a]", bg: "bg-brand-50" },
-  ota_booking_created: { label: "New Booking", color: "text-[#1a3a2a]", bg: "bg-brand-50" },
+  booking_new: { label: "New Booking", color: "text-[var(--positive)]", bg: "bg-brand-50" },
+  ota_booking_created: { label: "New Booking", color: "text-[var(--positive)]", bg: "bg-brand-50" },
   booking: { label: "Booking", color: "text-blue-700", bg: "bg-blue-50" },
   booking_modification: { label: "Modified", color: "text-amber-700", bg: "bg-amber-50" },
   ota_booking_modified: { label: "Modified", color: "text-amber-700", bg: "bg-amber-50" },
@@ -47,7 +47,7 @@ const EVENT_TYPE_LABELS: Record<string, { label: string; color: string; bg: stri
 };
 
 const ACTION_COLORS: Record<string, { dot: string; text: string }> = {
-  created: { dot: "bg-[#1a3a2a]", text: "text-[#1a3a2a]" },
+  created: { dot: "bg-[var(--positive)]", text: "text-[var(--positive)]" },
   modified: { dot: "bg-amber-500", text: "text-amber-600" },
   cancelled: { dot: "bg-red-500", text: "text-red-600" },
   skipped_self: { dot: "bg-neutral-400", text: "text-neutral-500" },
@@ -443,8 +443,8 @@ export default function SyncLogDashboard({
           </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-50 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-[#1a3a2a]" />
-          <span className="text-xs font-medium text-[#1a3a2a]">
+          <span className="w-2 h-2 rounded-full bg-[var(--positive)]" />
+          <span className="text-xs font-medium text-[var(--positive)]">
             <span className="font-mono font-bold">{stats.created}</span> created
           </span>
         </div>

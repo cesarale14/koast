@@ -750,7 +750,7 @@ function AIInsights({ actions }: { actions: ActionItem[] }) {
       <div
         className="koast-anim relative overflow-hidden rounded-2xl p-[22px]"
         style={{
-          background: "linear-gradient(135deg, var(--deep-sea), #0e2218)",
+          background: "linear-gradient(135deg, var(--deep-sea), var(--abyss))",
           color: "var(--shore)",
           animationDelay: "1100ms",
         }}
@@ -810,7 +810,7 @@ function AIInsightCard({ action, index }: { action: ActionItem; index: number })
     <div
       className="koast-anim relative overflow-hidden rounded-2xl p-[22px]"
       style={{
-        background: "linear-gradient(135deg, var(--deep-sea), #0e2218)",
+        background: "linear-gradient(135deg, var(--deep-sea), var(--abyss))",
         color: "var(--shore)",
         animationDelay: `${1100 + index * 100}ms`,
       }}

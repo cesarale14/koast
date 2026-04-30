@@ -193,7 +193,7 @@ export default function CommandPalette() {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "12px 20px",
-            background: "#FAFAF7",
+            background: "var(--shore-soft)",
             borderTop: "1px solid var(--dry-sand)",
             fontSize: 11,
             color: "var(--tideline)",
