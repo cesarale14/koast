@@ -1,0 +1,51 @@
+-- ============================================================================
+-- 20260407990000_drop_pre_408010000_dupe_policies.sql
+--
+-- Recovery: 005_pricing_outcomes_events.sql creates two RLS policies that
+-- 20260408010000_fix_rls_policies.sql also creates with plain CREATE POLICY
+-- (no DROP guard, and PostgreSQL's CREATE POLICY does not support
+-- IF NOT EXISTS). On fresh replay this causes 20260408010000 to fail because
+-- the policies already exist from 005.
+--
+-- This migration drops those 2 policies between 005 and 20260408010000 in
+-- chronological order, allowing 20260408010000 to re-create them cleanly.
+--
+-- ============================================================================
+-- ASYMMETRIC APPLICATION
+-- ============================================================================
+-- This migration is APPLIED to STAGING only.
+--
+-- On staging (fresh replay):
+--   1. 005_pricing_outcomes_events.sql creates the 2 policies
+--   2. THIS migration drops them
+--   3. 20260408010000_fix_rls_policies.sql re-creates them (plus its other
+--      policies)
+--   End state: policies exist with the same WHERE clauses they would have
+--   had if 005 alone had run. ✓
+--
+-- On production:
+--   - This migration is NOT applied via SQL execution.
+--   - Production's policies for pricing_outcomes and local_events were
+--     created in their final form long ago via the original migration
+--     history (whatever sequence of manual edits + migration applies
+--     produced today's correct state).
+--   - Applying the DROPs here against production would remove policies
+--     that should remain (with no later migration to recreate them
+--     because 20260408010000 has already run on production).
+--   - Instead, production's koast_migration_history is bootstrapped to
+--     mark this migration as already-applied (Phase 5) with a note
+--     pointing back to this asymmetric-application explanation.
+--
+-- This is different from 20260407040000_recovery_schema_drift.sql, which
+-- applies to BOTH environments because every statement in that migration
+-- is idempotent (CREATE TABLE IF NOT EXISTS, CREATE INDEX IF NOT EXISTS,
+-- DROP POLICY IF EXISTS where production already lacks the policy, etc.).
+-- Plain DROPs of policies that production must keep cannot be made
+-- idempotent without the conditional DO-block escape hatch — and that
+-- escape hatch hides the asymmetry rather than naming it. Naming the
+-- asymmetry explicitly is the cleaner discipline for the team.
+--
+-- ============================================================================
+
+DROP POLICY IF EXISTS "Users can view own pricing_outcomes" ON pricing_outcomes;
+DROP POLICY IF EXISTS "Users can view own local_events"     ON local_events;

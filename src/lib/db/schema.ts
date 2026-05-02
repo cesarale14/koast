@@ -268,12 +268,43 @@ export const messages = pgTable("messages", {
   hostSendChannexAckedAt: timestamp("host_send_channex_acked_at", { withTimezone: true }),
   hostSendOtaConfirmedAt: timestamp("host_send_ota_confirmed_at", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  // Agent loop v1 — actor attribution per migration 20260501040000.
+  // actor_kind names INTERNAL-side actors only — those who act on
+  // Koast's behalf. Values: 'host' | 'agent' | 'cleaner' | 'cohost' | 'system'.
+  // Guest-side rows (sender='guest') intentionally have actor_kind NULL
+  // because the guest is the external party Koast communicates WITH,
+  // not an internal actor. The sender column already distinguishes
+  // property-side from guest-side. actor_kind='agent' doubles as the
+  // voice-extraction-exclusion flag. See `MessagesActorKind` type
+  // exported below.
+  actorId: uuid("actor_id"),
+  actorKind: text("actor_kind"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 }, (t) => [
   index("idx_messages_property_created").on(t.propertyId, t.createdAt),
   index("idx_messages_thread_inserted").on(t.threadId, t.channexInsertedAt),
   uniqueIndex("idx_messages_channex_id").on(t.channexMessageId),
+  // Partial index — excludes inbound/unattributed rows naturally.
+  index("idx_messages_actor_voice_filter").on(t.actorKind, t.sender),
+  index("idx_messages_actor_id").on(t.actorId),
 ]);
+
+/**
+ * Controlled vocabulary for `messages.actor_kind`. Mirrors the CHECK
+ * constraint in migration 20260501040000. Exported so callers can
+ * type-check actor attribution at the application layer; the column
+ * itself is `text` per the codebase's no-pgEnum convention.
+ *
+ * NULL is also valid (the column is nullable) and represents
+ * external-actor or unattributed rows; use `MessagesActorKind | null`
+ * where appropriate.
+ */
+export type MessagesActorKind =
+  | "host"      // The authenticated user (or, post-multi-user, the primary owner of the property)
+  | "agent"     // An autonomous Koast generation (template executor, future agent draft autosend)
+  | "cleaner"   // A cleaner taking action via the cleaner-token landing page
+  | "cohost"    // Future multi-user: co-host actor distinct from the primary host
+  | "system";   // Platform-generated rows (booking confirmations, etc.)
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   property: one(properties, { fields: [messages.propertyId], references: [properties.id] }),
@@ -683,3 +714,255 @@ export const channexRatePlans = pgTable("channex_rate_plans", {
 export const channexRatePlansRelations = relations(channexRatePlans, ({ one }) => ({
   property: one(properties, { fields: [channexRatePlans.propertyId], references: [properties.id] }),
 }));
+
+// ==================== Channex Webhook Log ====================
+//
+// Inbound Channex webhook event log. The table was created in production via
+// the Studio SQL editor before the migrations directory was tracking schema
+// faithfully; supabase/migrations/20260407040000_recovery_schema_drift.sql
+// (D1) creates the 12-column base shape, and
+// 20260407050000_channex_revision_polling.sql adds revision_id. The Drizzle
+// declaration below describes the final 13-column shape.
+//
+// Writers: src/app/api/webhooks/channex/route.ts (every inbound webhook).
+// Readers: /channels/sync-log surface (the single host-facing audit feed).
+//
+// RLS: enabled in the database (see migration 20260407040000); policy
+// "Users can view own webhook logs" lives in 20260408010000_fix_rls_policies.sql.
+
+export const channexWebhookLog = pgTable("channex_webhook_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventType: text("event_type"),
+  bookingId: text("booking_id"),
+  channexPropertyId: text("channex_property_id"),
+  guestName: text("guest_name"),
+  checkIn: text("check_in"),
+  checkOut: text("check_out"),
+  payload: jsonb("payload"),
+  actionTaken: text("action_taken"),
+  ackSent: boolean("ack_sent").default(false),
+  ackResponse: text("ack_response"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  // Added by 20260407050000_channex_revision_polling.sql for dedup between
+  // webhook + the polling worker.
+  revisionId: text("revision_id"),
+}, (t) => [
+  index("idx_webhook_log_revision_id").on(t.revisionId),
+]);
+
+// ==================== Guests ====================
+
+export const guests = pgTable("guests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hostId: uuid("host_id").notNull(),
+  displayName: text("display_name"),
+  firstSeenBookingId: uuid("first_seen_booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_guests_host").on(t.hostId),
+  index("idx_guests_first_seen_booking").on(t.firstSeenBookingId),
+]);
+
+export const guestsRelations = relations(guests, ({ one, many }) => ({
+  firstSeenBooking: one(bookings, { fields: [guests.firstSeenBookingId], references: [bookings.id] }),
+  memoryFacts: many(memoryFacts),
+}));
+
+// ==================== Memory Facts ====================
+//
+// The Tier 1 memory schema. Mirrors the pricing_rules.source +
+// inferred_from JSONB precedent established by migration
+// 20260418000000. See docs/architecture/agent-loop-v1-design.md §6.
+
+export const memoryFacts = pgTable("memory_facts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hostId: uuid("host_id").notNull(),
+  // entity_type values: 'host' | 'property' | 'guest' | 'vendor' | 'booking'
+  // CHECK constraint lives in the migration.
+  entityType: text("entity_type").notNull(),
+  // Polymorphic reference; type-discriminated by entity_type. Not enforced
+  // as FK because cross-table polymorphism is expensive in Postgres.
+  entityId: uuid("entity_id").notNull(),
+  // sub_entity_type is a controlled vocabulary CHECK-constrained at the
+  // DB level (see migration 20260501010000). The TS-side typed union is
+  // exported as `MemoryFactSubEntityType` below — callers should narrow
+  // to that type rather than passing arbitrary strings. The column
+  // itself is text per the codebase's no-pgEnum convention.
+  // sub_entity_id is a free-text disambiguator (e.g., 'primary_router'
+  // when sub_entity_type='wifi'). Will become a typed uuid + FK in a
+  // future migration when sub-entity tables ship.
+  subEntityType: text("sub_entity_type"),
+  subEntityId: text("sub_entity_id"),
+  guestId: uuid("guest_id").references(() => guests.id, { onDelete: "set null" }),
+  attribute: text("attribute").notNull(),
+  // JSONB so values can be text, numeric, or structured.
+  value: jsonb("value").notNull(),
+  // source values: 'host_taught' | 'inferred' | 'observed'
+  source: text("source").notNull(),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }).notNull().default("1.00"),
+  // learned_from JSONB shape varies by source; see migration comment.
+  learnedFrom: jsonb("learned_from").notNull().default({}),
+  // status values: 'active' | 'superseded' | 'deprecated'
+  status: text("status").notNull().default("active"),
+  // Self-FK for supersession history walk.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supersededBy: uuid("superseded_by").references((): any => memoryFacts.id, { onDelete: "set null" }),
+  learnedAt: timestamp("learned_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_memory_facts_active_entity").on(t.entityType, t.entityId, t.status),
+  index("idx_memory_facts_sub_entity").on(t.entityType, t.entityId, t.subEntityType, t.subEntityId, t.attribute),
+  index("idx_memory_facts_host_learned").on(t.hostId, t.learnedAt),
+  index("idx_memory_facts_guest").on(t.guestId),
+  index("idx_memory_facts_superseded_by").on(t.supersededBy),
+]);
+
+export const memoryFactsRelations = relations(memoryFacts, ({ one }) => ({
+  guest: one(guests, { fields: [memoryFacts.guestId], references: [guests.id] }),
+  // supersededBy self-relation intentionally omitted from Drizzle's
+  // relations() helper: cyclic self-references confuse some Drizzle
+  // tooling. Walk the chain manually via id lookups.
+}));
+
+/**
+ * Controlled vocabulary for `memory_facts.sub_entity_type`. Mirrors the
+ * CHECK constraint in migration 20260501010000. The vocabulary is
+ * intentionally narrow at v1; future migrations expand it as new
+ * sub-entity types prove out (the agent extraction pipeline
+ * canonicalizes input to this set).
+ *
+ * NULL is valid and means the fact is scoped to the entity as a whole
+ * with no sub-entity narrowing.
+ */
+export type MemoryFactSubEntityType =
+  | "front_door"
+  | "lock"
+  | "parking"
+  | "wifi"
+  | "hvac"
+  | "kitchen_appliances";
+
+/**
+ * Controlled vocabulary for `memory_facts.entity_type` and
+ * `memory_facts.source` and `memory_facts.status`. The DB-level CHECK
+ * constraints are the canonical source of truth; these types mirror
+ * them for the application layer.
+ */
+export type MemoryFactEntityType = "host" | "property" | "guest" | "vendor" | "booking";
+export type MemoryFactSource = "host_taught" | "inferred" | "observed";
+export type MemoryFactStatus = "active" | "superseded" | "deprecated";
+
+// ==================== Agent Conversations ====================
+
+export const agentConversations = pgTable("agent_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hostId: uuid("host_id").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  lastTurnAt: timestamp("last_turn_at", { withTimezone: true }).notNull().defaultNow(),
+  // status values: 'active' | 'closed' | 'error'
+  status: text("status").notNull().default("active"),
+  title: text("title"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_agent_conversations_host_recent").on(t.hostId, t.lastTurnAt),
+  index("idx_agent_conversations_host_status").on(t.hostId, t.status),
+]);
+
+export const agentConversationsRelations = relations(agentConversations, ({ many }) => ({
+  turns: many(agentTurns),
+  artifacts: many(agentArtifacts),
+}));
+
+// ==================== Agent Turns ====================
+
+export const agentTurns = pgTable("agent_turns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => agentConversations.id, { onDelete: "cascade" }),
+  turnIndex: integer("turn_index").notNull(),
+  // role values: 'user' | 'assistant'
+  role: text("role").notNull(),
+  contentText: text("content_text"),
+  // Array of tool call records when role='assistant' and tools were
+  // invoked. Shape per call documented in the migration.
+  toolCalls: jsonb("tool_calls"),
+  // Array of artifact emission references: [{ "artifact_id": "..." }, ...]
+  artifacts: jsonb("artifacts"),
+  // Refusal-fallback metadata when the assistant turn produced a
+  // structured refusal: { "reason": "...", "missing_data": "...", "next_step": "..." }
+  refusal: jsonb("refusal"),
+  modelId: text("model_id"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  cacheReadTokens: integer("cache_read_tokens"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_agent_turns_conversation").on(t.conversationId, t.turnIndex),
+  uniqueIndex("idx_agent_turns_conversation_turn_index").on(t.conversationId, t.turnIndex),
+]);
+
+export const agentTurnsRelations = relations(agentTurns, ({ one, many }) => ({
+  conversation: one(agentConversations, { fields: [agentTurns.conversationId], references: [agentConversations.id] }),
+  artifacts: many(agentArtifacts),
+}));
+
+// ==================== Agent Artifacts ====================
+
+export const agentArtifacts = pgTable("agent_artifacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => agentConversations.id, { onDelete: "cascade" }),
+  turnId: uuid("turn_id").notNull().references(() => agentTurns.id, { onDelete: "cascade" }),
+  // Matches an entry in the artifact registry. v1: 'property_knowledge_confirmation'.
+  kind: text("kind").notNull(),
+  payload: jsonb("payload").notNull(),
+  // state values: 'emitted' | 'confirmed' | 'edited' | 'dismissed'
+  state: text("state").notNull().default("emitted"),
+  committedAt: timestamp("committed_at", { withTimezone: true }),
+  // commit_metadata shape varies by kind. For property_knowledge_confirmation:
+  //   { "memory_fact_id": "...", "edited_payload": { ... } | null }
+  commitMetadata: jsonb("commit_metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_agent_artifacts_conversation").on(t.conversationId, t.createdAt),
+  index("idx_agent_artifacts_turn").on(t.turnId),
+  index("idx_agent_artifacts_pending").on(t.conversationId, t.createdAt),
+]);
+
+export const agentArtifactsRelations = relations(agentArtifacts, ({ one }) => ({
+  conversation: one(agentConversations, { fields: [agentArtifacts.conversationId], references: [agentConversations.id] }),
+  turn: one(agentTurns, { fields: [agentArtifacts.turnId], references: [agentTurns.id] }),
+}));
+
+// ==================== Agent Audit Log ====================
+//
+// The unified action audit feed. See migration 20260501030000 for the
+// full design rationale.
+
+export const agentAuditLog = pgTable("agent_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hostId: uuid("host_id").notNull(),
+  actionType: text("action_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  // source values: 'frontend_api' | 'agent_artifact' | 'agent_tool' | 'worker'
+  source: text("source").notNull(),
+  // actor_kind values: 'host' | 'agent' | 'worker' | 'system'
+  actorKind: text("actor_kind").notNull(),
+  actorId: uuid("actor_id"),
+  // autonomy_level values: 'silent' | 'confirmed' | 'blocked'
+  autonomyLevel: text("autonomy_level").notNull(),
+  // outcome values: 'succeeded' | 'failed' | 'pending'
+  outcome: text("outcome").notNull(),
+  context: jsonb("context").notNull().default({}),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }),
+  latencyMs: integer("latency_ms"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_agent_audit_log_host_recent").on(t.hostId, t.createdAt),
+  index("idx_agent_audit_log_action_type").on(t.actionType, t.createdAt),
+  index("idx_agent_audit_log_failures").on(t.createdAt),
+  index("idx_agent_audit_log_source").on(t.source, t.createdAt),
+]);

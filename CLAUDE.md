@@ -386,7 +386,31 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - **Property card thumbs.** Same source-resolution gap affects card thumbs at 320×200. Same fix (higher-res import) resolves both.
 - **HTML-entity-encoded image URLs.** Airbnb iCal sync writes image URLs with `&amp;` instead of `&` as query separators, which breaks Vercel's `/_next/image` loader (400 when it tries to proxy the malformed URL to the Airbnb CDN). Render-layer workaround: `decodeImageUrl` helper in `src/components/dashboard/PropertyDetail.tsx` unescapes at the `<Image>` src boundary. Proper fix: decode at the ingest point in the iCal sync worker (`~/koast-workers/booking_sync.py`) so the DB never stores encoded entities — then drop the render-time helper.
 
+## Staging Environment (established 2026-05-02)
+
+Two Supabase projects, one codebase:
+- **Production**: `wxxpbgbfebpkvsxhpphb` in `aws-1-us-east-1`. Live `app.koasthq.com`.
+- **Staging**: `aljowaggoulsswtxdtmf` in `aws-0-us-east-1`. Free tier; empty schema after a fresh replay (synthetic seed deferred to a later session).
+
+Switching environments locally:
+```bash
+set -a; source ~/koast/.env.staging; set +a   # work against staging
+set -a; source ~/koast/.env.local;   set +a   # work against production
+echo "$SUPABASE_PROJECT_REF"                  # verify which one is active
+```
+
+Both `.env.local` and `.env.staging` are gitignored (in `koast/` and `koast-workers/`). Vercel deployment uses Vercel's per-environment values; the local files are for shell sessions and worker invocations.
+
+**Migration discipline (post-Session 2)**: every new migration runs against staging first, gets verified, then runs against production. Both environments record applies in the `koast_migration_history` table (created Session 2; populated with all 50 prior migrations). Once a migration is applied to either environment, the file is locked — corrections ship as new migrations. See `docs/architecture/staging-environment.md` for the full pattern + the asymmetric-migration exception (migrations that apply to staging but not production).
+
+Open carry-forwards:
+- ~~13 RLS-disabled tables on staging~~ — closed Session 3 (2026-05-02) via `20260502000000_recovery_rls_enables_late_tables.sql`. Staging and production now have identical RLS coverage (100% of public tables RLS-enabled in both). Going-forward discipline below prevents recurrence.
+- Synthetic seed for staging not yet shipped (deferred).
+- `scripts/apply-migration.sh` wrapping the staging-first discipline not yet shipped (deferred).
+
 ## Known Gaps / Not Wired
+- **CHECK-constrained text columns convention** — when adding a CHECK-constrained text column, also export a typed union from `src/lib/db/schema.ts` mirroring the constraint values, so application-layer callers get compile-time enforcement matching the database-layer enforcement. Established in Milestone 1 agent-loop-v1 work; see `MessagesActorKind`, `MemoryFactSubEntityType`, `MemoryFactEntityType`, `MemoryFactSource`, `MemoryFactStatus` in `src/lib/db/schema.ts` for the canonical examples.
+- **RLS enable is explicit, not implicit** (established Session 3, 2026-05-02). Production has an `ensure_rls` event trigger that auto-enables RLS on every CREATE TABLE in public schema; staging doesn't have it. To prevent drift between environments, every migration that creates a table includes an explicit `ALTER TABLE [name] ENABLE ROW LEVEL SECURITY` statement in the same file, regardless of whether the production trigger would handle it. This makes RLS protection a visible property of each migration file rather than an implicit consequence of platform infrastructure. Pattern established in `20260502000000_recovery_rls_enables_late_tables.sql`. The agent loop v1 Milestone 1 migrations already follow this pattern; their tables (`agent_artifacts`, `agent_audit_log`, `agent_conversations`, `agent_turns`, `guests`, `memory_facts`) were never in any drift list as a result.
 - **Property Detail Pricing tab UI** — backend complete (PR D shipped read APIs + `usePricingTab` hook). UI wiring scheduled for the dedicated polish pass immediately after Track B Stage 1. Apply/Dismiss buttons in `/properties/[id]` Pricing tab don't call the live routes yet.
 - **`KOAST_ALLOW_BDC_CALENDAR_PUSH` flag flip** — still default-off on Vercel. Flip happens in a separate session with browser-devtools controlled verification. Once live traffic confirms safe-restrictions works, the flag is removed per the "safety-mechanism conservatism" rule.
 - **AI messaging pipeline** — scaffolded in Messages UI, no automation. "AI Drafted" filter is dimmed.

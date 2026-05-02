@@ -53,3 +53,5 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+.env.staging
+.env.staging
