@@ -966,3 +966,30 @@ export const agentAuditLog = pgTable("agent_audit_log", {
   index("idx_agent_audit_log_failures").on(t.createdAt),
   index("idx_agent_audit_log_source").on(t.source, t.createdAt),
 ]);
+
+// Typed unions mirroring CHECK constraints on the agent loop tables.
+// Per CLAUDE.md "CHECK-constrained text columns convention": every
+// CHECK-constrained text column gets a matching typed union so the
+// application layer enforces the same vocabulary at compile time.
+
+export type AgentAuditLogSource =
+  | "frontend_api"
+  | "agent_artifact"
+  | "agent_tool"
+  | "worker";
+
+export type AgentAuditLogActorKind = "host" | "agent" | "worker" | "system";
+
+export type AgentAuditLogAutonomyLevel = "silent" | "confirmed" | "blocked";
+
+export type AgentAuditLogOutcome = "succeeded" | "failed" | "pending";
+
+export type AgentConversationStatus = "active" | "closed" | "error";
+
+export type AgentTurnRole = "user" | "assistant";
+
+export type AgentArtifactState =
+  | "emitted"
+  | "confirmed"
+  | "edited"
+  | "dismissed";
