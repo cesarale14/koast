@@ -129,8 +129,8 @@ export async function updateAuditOutcome(
     // Merge error_message into context. Fetch existing context first to
     // preserve `stakes_class` etc.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: row, error: fetchError } = await (supabase
-      .from("agent_audit_log") as any)
+    const fromBuilder = supabase.from("agent_audit_log") as any;
+    const { data: row, error: fetchError } = await fromBuilder
       .select("context")
       .eq("id", auditLogId)
       .single();
