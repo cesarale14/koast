@@ -13,6 +13,22 @@
 Every prompt to Claude Code should start with:
 "Read ~/koast/CLAUDE.md and repomix-output.xml first."
 
+## Phase 1 STOP discipline
+
+Before authoring code on any non-trivial change (multi-file architecture, new
+subsystems, schema changes, anything beyond a 1-3 file fix), Claude Code
+performs a Phase 1 STOP:
+
+1. Read the relevant design/conventions docs in full
+2. Run repomix and review
+3. Surface architectural questions that need answers from actual repo state
+4. Write findings to a working file (e.g., ~/koast/.{milestone}-phase1-stop.md)
+5. STOP and surface a summary
+6. Wait for explicit approval before proceeding to authoring
+
+This pattern was used in M2, M3, M4 and is the project standard. The working
+file is gitignored or removed before commit.
+
 ## Planning Mode
 - Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API + UI + DB changes).
 - Skip ultraplan for small fixes (1-3 files, UI tweaks, single bug fixes).
@@ -28,6 +44,12 @@ Every prompt to Claude Code should start with:
 - **Never use default Tailwind grays, shadows, or generic border-radius** — see DESIGN_SYSTEM.md.
 - **No emojis anywhere** — UI, AI-generated content, or user-visible SMS bodies.
 - **No pulsing/glowing animated dots.** Status indicators are solid colored dots.
+
+## Commit format
+
+Commits never include Co-Authored-By trailers. Claude Code is the executor;
+attribution is to Cesar as the author. This applies even when Claude Code
+authored the entire change — no Co-Authored-By: Claude trailer.
 
 ---
 
