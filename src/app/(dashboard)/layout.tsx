@@ -307,14 +307,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [conflictCount, setConflictCount] = useState(0);
 
-  // M5 D15 / D-Q5 — chat surface owns its own full-bleed layout
-  // (Rail + Surface). Skip the dashboard sidebar/topbar/CommandPalette
-  // chrome entirely so the chat shell renders edge to edge. Auth scope
-  // is preserved (still inside the (dashboard) route group).
-  if (pathname?.startsWith("/chat") || pathname?.startsWith("/_preview/m5-states")) {
-    return <>{children}</>;
-  }
-
   // Persist sidebar preference
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-expanded");
@@ -356,6 +348,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
   const sidebarWidth = sidebarExpanded ? 240 : 60;
+
+  // M5 D15 / D-Q5 — chat surface owns its own full-bleed layout (Rail +
+  // Surface). Skip the dashboard sidebar/topbar/CommandPalette chrome so
+  // the chat shell renders edge to edge. Auth scope preserved (still
+  // inside the (dashboard) route group). Placed AFTER all hook
+  // declarations to satisfy react-hooks/rules-of-hooks (Vercel build
+  // catches what local tsc doesn't).
+  if (pathname?.startsWith("/chat") || pathname?.startsWith("/_preview/m5-states")) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
