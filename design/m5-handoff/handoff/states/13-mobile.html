@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=375, initial-scale=1">
+<title>Koast · mobile</title>
+<link rel="icon" href="../../assets/favicons/favicon.ico">
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="stylesheet" href="../../koast-mark.css">
+<link rel="stylesheet" href="../chat-shell.css">
+<style>
+  /* center the 375-wide phone canvas inside the artboard */
+  body { background: #efebe0; display: flex; align-items: center; justify-content: center; }
+  .phone { width: 375px; height: 720px; background: var(--bg); box-shadow: 0 30px 60px -20px rgba(15,24,21,0.25); border-radius: 24px; overflow: hidden; position: relative; }
+  .phone .shell { height: 100%; }
+</style>
+</head>
+<body class="m-mobile">
+
+<div class="phone">
+<div class="shell">
+  <main class="surface">
+    <header class="topbar">
+      <button class="menu-btn" aria-label="Open conversation list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg></button>
+      <button class="ctx" aria-haspopup="true">
+        <span class="ctx-pill"></span>
+        <span class="ctx-name">Seabreeze Loft</span>
+        <span class="ctx-chev">▾</span>
+      </button>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Audit log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg></button>
+      </div>
+    </header>
+
+    <div class="scroll">
+      <div class="col">
+        <div class="day">today · 2:14 pm</div>
+        <div class="turn user">
+          <div class="meta"><span class="who">You</span><span>·</span><span class="stamp">2:14 pm</span><div class="av-me">JR</div></div>
+          <div class="user-msg">why is next weekend $184? feels low</div>
+        </div>
+        <div class="turn koast">
+          <div class="meta">
+    <div class="av"><span class="k-mark" data-state="idle">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Koast">
+  <defs><clipPath id="m-s13"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+  <g clip-path="url(#m-s13)" class="bands">
+    <rect class="b1" x="0" y="4"  width="100" height="23" fill="#d4eef0"/>
+    <rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/>
+    <rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/>
+    <rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/>
+    <rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/>
+  </g>
+</svg>
+</span></div>
+    <span class="who">Koast</span><span>·</span><span class="stamp">2:14 pm</span>
+  </div>
+          <div class="koast-msg">
+            <span class="tool" role="button" tabindex="0">
+              <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12l4-4 4 4 4-4 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="tool-name">read_comp_set</span>
+              <span class="sep">·</span>
+              <span class="tool-arg">0.5mi · weekend</span>
+              <span class="tool-dur">240ms</span>
+              <span class="tool-chev">▸</span>
+            </span>
+            <p>$184 is <em>1.8% under</em> last year's clear for the same Fri-Sat. There's a Padres home game Friday — I'd push to <code>$199</code>.</p>
+            <div class="proposal">
+              <div class="proposal-head">Push to $199 · expires Tue 12 pm</div>
+              <div class="proposal-actions">
+                <button class="btn btn-primary">Approve →</button>
+                <button class="btn btn-secondary">Hold</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea class="composer-input" rows="1" placeholder="Ask Koast…"></textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <button class="send-btn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+</body>
+</html>

@@ -6,6 +6,27 @@
  */
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1&display=swap');
 
+/* JetBrains Mono — self-hosted (M5 D-F5) for the chat shell.
+ * Plus Jakarta Sans is loaded via @fontsource-variable
+ * (src/app/layout.tsx) so we don't duplicate it here — --font-sans
+ * resolves to that family for visual continuity. */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/koast/JetBrainsMono-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/koast/JetBrainsMono-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/koast/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/koast/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -163,6 +184,64 @@
   --transition-fast: 120ms ease;
   --transition-base: 200ms ease;
   --transition-slow: 300ms ease;
+}
+
+/* ============================================================
+   M5 — Koast brand palette + type + motion tokens
+   (Phase 1 STOP D-13a; from design/m5-handoff/colors_and_type.css).
+   Net-new at :root — verified no name collisions with the block above.
+   The semantic layer (--bg/--surface/--fg/--accent/--rule etc.) is
+   scoped to .shell inside ChatShell.module.css, NOT global.
+   ============================================================ */
+:root {
+  /* Palette */
+  --koast-shore:        #f7f3ec;
+  --koast-deep-sea:     #132e20;
+  --koast-ink:          #0f1815;
+  --koast-shore-mist:   #d4eef0;
+  --koast-shoal:        #a8e0e3;
+  --koast-tide:         #4cc4cc;
+  --koast-reef:         #2ba2ad;
+  --koast-trench:       #0e7a8a;
+  --koast-shoal-dark:   #8ad9dc;
+  --koast-reef-dark:    #3aa3aa;
+  --koast-trench-dark:  #2e8c95;
+  --koast-ink-2:        #4a5552;
+  --koast-ink-3:        #6e7976;
+  --koast-rule:         #e7e2d6;
+  --koast-bg:           #fafaf7;
+  --koast-good:         #2a7a4a;
+  --koast-warn:         #b34141;
+
+  /* Type families. --font-sans points at the family already loaded
+   * via @fontsource-variable/plus-jakarta-sans (D-F5 visual continuity). */
+  --font-sans:  'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display:  var(--font-sans);
+  --font-body:     var(--font-sans);
+  --font-code:     var(--font-mono);
+  --font-wordmark: var(--font-sans);
+
+  /* Type scale (bundle naming preserved) */
+  --fs-display:   44px;
+  --fs-h1:        32px;
+  --fs-h2:        26px;
+  --fs-h3:        13px;
+  --fs-lede:      16px;
+  --fs-body:      14px;
+  --fs-small:     13px;
+  --fs-xs:        12px;
+  --fs-eyebrow:   11px;
+
+  /* Spacing — net-new (existing :root has --space-1..--space-16; add --space-24). */
+  --space-24:  96px;
+
+  /* Motion vocabulary */
+  --ease-default:  cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-settle:   cubic-bezier(0.4, 0, 0.6, 1);
+  --dur-fast:      120ms;
+  --dur-base:      200ms;
+  --dur-slow:      320ms;
 }
 
 html, body {
@@ -380,4 +459,83 @@ body {
   box-shadow:
     0 1px 2px rgba(201,169,110,0.2),
     inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ============================================================
+   M5 — Koast Mark motion vocabulary (Phase 1 STOP D-13a;
+   from design/m5-handoff/koast-mark.css verbatim).
+   Global because <KoastMark> renders in multiple surfaces
+   and the .b1-.b5 SVG bands are matched globally.
+   The hero state is intentionally excluded from the KoastMark
+   TypeScript prop union per conventions §7 — keyframes still ship
+   here for any non-product (marketing) consumer.
+   ============================================================ */
+.k-mark {
+  display: inline-block;
+  line-height: 0;
+}
+.k-mark svg {
+  display: block;
+}
+
+/* IDLE — static, no animation. Default state. */
+.k-mark[data-state="idle"] .b1,
+.k-mark[data-state="idle"] .b2,
+.k-mark[data-state="idle"] .b3,
+.k-mark[data-state="idle"] .b4,
+.k-mark[data-state="idle"] .b5,
+.k-mark[data-state="idle"] .bands { animation: none; }
+
+/* ACTIVE — cascade. Top-down opacity wave. >=32px. */
+@keyframes k-cascade-pulse {
+  0%, 40%, 65%, 100% { opacity: 1; }
+  50%, 55%           { opacity: 0.55; }
+}
+.k-mark[data-state="active"] .b1 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+.k-mark[data-state="active"] .b2 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.13s; }
+.k-mark[data-state="active"] .b3 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.26s; }
+.k-mark[data-state="active"] .b4 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.39s; }
+.k-mark[data-state="active"] .b5 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.52s; }
+
+/* ACTIVE small fallback — pulse. 16-31px. */
+@keyframes k-brightness-pulse {
+  0%, 100% { filter: brightness(1)    saturate(1);   }
+  50%      { filter: brightness(1.12) saturate(1.1); }
+}
+.k-mark[data-state="active"][data-size="small"] .bands {
+  animation: k-brightness-pulse 1.6s infinite ease-in-out;
+}
+
+/* MILESTONE — deposit. One-shot. .ghost/.stack groups intentionally
+ * not in the basic 5-band SVG used by KoastMark.tsx; the data-state
+ * still flips for any downstream consumers, but the deposit visual
+ * is M6 polish (carry-forward §10). */
+@keyframes k-milestone-ghost {
+  0%        { transform: translateY(0);     opacity: 0; }
+  35%, 70%  { transform: translateY(23px);  opacity: 1; }
+  100%      { transform: translateY(23px);  opacity: 1; }
+}
+@keyframes k-milestone-stack {
+  0%        { transform: translateY(0); }
+  35%, 100% { transform: translateY(18px); }
+}
+.k-mark[data-state="milestone"] .ghost { animation: k-milestone-ghost 2s ease-out forwards; }
+.k-mark[data-state="milestone"] .stack { animation: k-milestone-stack 2s ease-out forwards; }
+
+/* MARKETING HERO — continuous cascade, no rest. Public landing only. */
+@keyframes k-cascade-hero {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.k-mark[data-state="hero"] .b1 { animation: k-cascade-hero 2.4s infinite ease-in-out; }
+.k-mark[data-state="hero"] .b2 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.10s; }
+.k-mark[data-state="hero"] .b3 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.20s; }
+.k-mark[data-state="hero"] .b4 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.30s; }
+.k-mark[data-state="hero"] .b5 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.40s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-mark .b1, .k-mark .b2, .k-mark .b3, .k-mark .b4, .k-mark .b5,
+  .k-mark .ghost, .k-mark .stack, .k-mark .bands {
+    animation: none !important;
+  }
 }

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koast · error state</title>
+<link rel="icon" href="../../assets/favicons/favicon.ico">
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="stylesheet" href="../../koast-mark.css">
+<link rel="stylesheet" href="../chat-shell.css">
+</head>
+<body>
+
+<div class="shell">
+  <aside class="rail" aria-label="Conversations">
+    <div class="rail-head">
+      <span class="k-mark" data-state="idle">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Koast">
+  <defs><clipPath id="rail-s10"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+  <g clip-path="url(#rail-s10)" class="bands">
+    <rect class="b1" x="0" y="4"  width="100" height="23" fill="#d4eef0"/>
+    <rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/>
+    <rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/>
+    <rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/>
+    <rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/>
+  </g>
+</svg>
+</span>
+      <span class="wm">Koast</span>
+      <button class="new-btn" title="New conversation" aria-label="New conversation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="rail-list">
+      <div class="rail-section-label">Today</div>
+      <button class="conv active"><span class="conv-name">Seabreeze Loft</span><span class="conv-meta">draft pricing for Padres weekend · <span class="conv-time">2:14 pm</span></span></button>
+      <button class="conv"><span class="conv-name">Cypress House</span><span class="conv-meta">late checkout request · <span class="conv-time">11:42 am</span></span></button>
+      <div class="rail-section-label">Yesterday</div>
+      <button class="conv"><span class="conv-name">Pier 9 Studio</span><span class="conv-meta">turnover ran 23 min long · <span class="conv-time">7:18 pm</span></span></button>
+      <button class="conv"><span class="conv-name">North Bay Cabin</span><span class="conv-meta">approved $215 · saved $12 vs floor · <span class="conv-time">5:04 pm</span></span></button>
+      <button class="conv"><span class="conv-name">Old Mill A</span><span class="conv-meta">routed to handyman · <span class="conv-time">11:51 am</span></span></button>
+    </div>
+    <div class="rail-foot">
+      <div class="av-me">JR</div>
+      <span class="who">Jordan R.</span>
+      <span class="org">staycommand</span>
+    </div>
+  </aside>
+
+  <main class="surface">
+    <header class="topbar">
+      <button class="ctx" aria-haspopup="true">
+        <span class="ctx-pill"></span>
+        <span class="ctx-name">Seabreeze Loft</span>
+        <span class="ctx-meta">· Pacific Beach · 2 br</span>
+        <span class="ctx-chev">▾</span>
+      </button>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Audit log" aria-label="Audit log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg></button>
+        <button class="icon-btn" title="New" aria-label="New"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button>
+      </div>
+    </header>
+
+    <div class="scroll">
+      <div class="col">
+        <div class="day">today · 2:14 pm</div>
+
+        <div class="turn user">
+          <div class="meta"><span class="who">You</span><span>·</span><span class="stamp">2:14 pm</span><div class="av-me">JR</div></div>
+          <div class="user-msg">why is next weekend $184? feels low</div>
+        </div>
+
+        <div class="turn koast">
+          <div class="meta">
+    <div class="av"><span class="k-mark" data-state="idle">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Koast">
+  <defs><clipPath id="m-s10"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+  <g clip-path="url(#m-s10)" class="bands">
+    <rect class="b1" x="0" y="4"  width="100" height="23" fill="#d4eef0"/>
+    <rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/>
+    <rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/>
+    <rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/>
+    <rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/>
+  </g>
+</svg>
+</span></div>
+    <span class="who">Koast</span><span>·</span><span class="stamp">2:14 pm</span>
+  </div>
+          <div class="koast-msg">
+            <span class="tool" role="button" tabindex="0">
+              <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12l4-4 4 4 4-4 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="tool-name">read_comp_set</span>
+              <span class="sep">·</span>
+              <span class="tool-arg">radius=0.5mi · weekend</span>
+              <span class="tool-dur">240ms</span>
+              <span class="tool-chev">▸</span>
+            </span>
+            <p>$184 is <em>1.8% under</em> last year's clear price for the same Fri-Sat. There's a Padres home game Friday and</p>
+            <span class="err" role="status">
+              <span class="dot"></span>
+              <span>Lost connection mid-response.</span>
+              <span class="err-actions">
+                <button class="btn btn-warn">Retry</button>
+                <button class="btn btn-ghost">Dismiss</button>
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea class="composer-input" rows="1" placeholder="Ask Koast about a guest, a price, a turnover…"></textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5L12 4l9 7.5M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <span class="composer-hint">⌘↵ to send</span>
+            <button class="send-btn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Spacing & Radii</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .row-spec { display: flex; align-items: flex-end; gap: 16px; }
+  .bar { background: var(--koast-shore-mist); border-radius: 4px; height: 32px; }
+  .radius { background: #fff; border: 0.5px solid var(--koast-rule); width: 80px; height: 80px; display:flex; align-items:flex-end; justify-content:center; padding: 8px; }
+</style>
+</head><body>
+<div class="card" style="flex-direction: column; gap: 22px; padding: 36px 40px;">
+  <div>
+    <div class="label" style="margin-bottom: 12px;">spacing · 4px base</div>
+    <div class="row-spec">
+      <div class="bar" style="width: 4px;"></div>
+      <div class="bar" style="width: 8px;"></div>
+      <div class="bar" style="width: 12px;"></div>
+      <div class="bar" style="width: 16px;"></div>
+      <div class="bar" style="width: 24px;"></div>
+      <div class="bar" style="width: 32px;"></div>
+      <div class="bar" style="width: 48px;"></div>
+      <div class="bar" style="width: 64px;"></div>
+      <div class="bar" style="width: 96px;"></div>
+    </div>
+    <div class="mono" style="margin-top: 8px;">4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96</div>
+  </div>
+  <div style="height:1px; background:#e7e2d6;"></div>
+  <div>
+    <div class="label" style="margin-bottom: 12px;">radii · restrained</div>
+    <div class="row-spec" style="align-items: stretch; gap: 16px;">
+      <div class="radius" style="border-radius: 6px;"><span class="mono">6</span></div>
+      <div class="radius" style="border-radius: 10px;"><span class="mono">10</span></div>
+      <div class="radius" style="border-radius: 12px;"><span class="mono">12</span></div>
+      <div class="radius" style="border-radius: 14px;"><span class="mono">14</span></div>
+      <div class="radius" style="border-radius: 999px; width: 120px;"><span class="mono">pill · tags only</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -276,3 +276,319 @@ export async function reconstructHistory(
 
   return messages;
 }
+
+/* ============================================================
+   M5 — UI-side reads (D-Q8 + D-F2)
+   ============================================================
+   These two functions back the chat shell's server components. They
+   live alongside the existing server-side conversation primitives so
+   the read path is one module, not split between server and route.
+
+   Both are server-only (touch service-role Supabase) and require the
+   caller to pass the authenticated host's id explicitly.
+*/
+
+/**
+ * Property summary shape for the chat shell's property dropdown (D18).
+ * The chat shell uses the selection to populate `ui_context.active_property_id`
+ * on submit, which the agent loop forwards to read_memory and other tools.
+ *
+ * v1: surfaces id + name + a short meta line (city · bedrooms) for the
+ * dropdown trigger pill. The full property record stays server-side.
+ */
+export interface ChatPropertyOption {
+  id: string;
+  name: string;
+  /** "Tampa · 2 br" — short meta line. Empty when no city/bedrooms persisted. */
+  meta: string;
+}
+
+function formatPropertyMeta(
+  city: string | null | undefined,
+  bedrooms: number | null | undefined,
+): string {
+  const parts: string[] = [];
+  if (city) parts.push(city);
+  if (typeof bedrooms === "number" && bedrooms > 0) parts.push(`${bedrooms} br`);
+  return parts.join(" · ");
+}
+
+/**
+ * List the host's properties for the chat shell dropdown (D18).
+ *
+ * Reads `properties` filtered by `user_id = hostId` (the column is named
+ * `user_id` even though the agent loop calls the principal "host" — same
+ * person, different vocabulary across modules). Ordered alphabetically by
+ * name so the dropdown is stable across sessions.
+ */
+export async function listProperties(
+  hostId: string,
+): Promise<ChatPropertyOption[]> {
+  const supabase = createServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fromBuilder = supabase.from("properties") as any;
+  const { data, error } = await fromBuilder
+    .select("id, name, city, bedrooms")
+    .eq("user_id", hostId)
+    .order("name", { ascending: true });
+  if (error) {
+    throw new Error(`[conversation] listProperties failed: ${error.message}`);
+  }
+  const rows = (data ?? []) as Array<{
+    id: string;
+    name: string;
+    city: string | null;
+    bedrooms: number | null;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    meta: formatPropertyMeta(r.city, r.bedrooms),
+  }));
+}
+
+/**
+ * Item shape for the conversation rail. Field semantics per D-F2:
+ *   - preview     — derived from the first user turn's content_text,
+ *                   truncated to PREVIEW_MAX_CHARS (≈50). Empty when
+ *                   the conversation has no user turns yet.
+ *   - propertyName — resolved from the first user turn's
+ *                   `ui_context.active_property_id`. Today the agent
+ *                   loop does NOT persist ui_context on agent_turns
+ *                   (only the request body carries it), so the
+ *                   fallback "All properties" is the universal path
+ *                   until the M6 schema migration adds the column.
+ *                   Listed in the CF§10 carry-forwards.
+ *   - timeLabel    — raw ISO timestamp from agent_conversations.
+ *                   last_turn_at; the rail formats per locale.
+ */
+export interface ConversationListItem {
+  id: string;
+  status: AgentConversationStatus;
+  started_at: string;
+  last_turn_at: string;
+  preview: string;
+  propertyName: string;
+  timeLabel: string;
+}
+
+/** D-F2 preview truncation budget. */
+const PREVIEW_MAX_CHARS = 50;
+/** D-F2 fallback when no property can be resolved. */
+const PROPERTY_FALLBACK = "All properties";
+
+function truncatePreview(text: string | null | undefined): string {
+  if (!text) return "";
+  const trimmed = text.replace(/\s+/g, " ").trim();
+  if (trimmed.length <= PREVIEW_MAX_CHARS) return trimmed;
+  return trimmed.slice(0, PREVIEW_MAX_CHARS - 1).trimEnd() + "…";
+}
+
+/**
+ * List conversations for a host, ordered most-recent-first. Returns
+ * UI-ready items with the D-F2 derived fields filled in.
+ *
+ * One round-trip for the conversation list, one for the
+ * first-user-turn preview lookup. Property resolution would be a
+ * third when ui_context persistence lands; today it always falls
+ * back to "All properties" so we skip the join.
+ */
+export async function listConversations(
+  hostId: string,
+): Promise<ConversationListItem[]> {
+  const supabase = createServiceClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const convBuilder = supabase.from("agent_conversations") as any;
+  const { data: convRows, error: convError } = await convBuilder
+    .select("id, status, started_at, last_turn_at")
+    .eq("host_id", hostId)
+    .order("last_turn_at", { ascending: false });
+
+  if (convError) {
+    throw new Error(`[conversation] listConversations failed: ${convError.message}`);
+  }
+
+  const conversations = (convRows ?? []) as Array<{
+    id: string;
+    status: AgentConversationStatus;
+    started_at: string;
+    last_turn_at: string;
+  }>;
+  if (conversations.length === 0) return [];
+
+  // Fetch the first (turn_index=0) user turn per conversation in one shot.
+  const ids = conversations.map((c) => c.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const turnBuilder = supabase.from("agent_turns") as any;
+  const { data: turnRows, error: turnError } = await turnBuilder
+    .select("conversation_id, content_text")
+    .in("conversation_id", ids)
+    .eq("turn_index", 0)
+    .eq("role", "user");
+
+  if (turnError) {
+    throw new Error(
+      `[conversation] listConversations preview lookup failed: ${turnError.message}`,
+    );
+  }
+
+  const previewByConv = new Map<string, string>();
+  for (const row of (turnRows ?? []) as Array<{
+    conversation_id: string;
+    content_text: string | null;
+  }>) {
+    previewByConv.set(row.conversation_id, truncatePreview(row.content_text));
+  }
+
+  return conversations.map((c) => ({
+    id: c.id,
+    status: c.status,
+    started_at: c.started_at,
+    last_turn_at: c.last_turn_at,
+    preview: previewByConv.get(c.id) ?? "",
+    propertyName: PROPERTY_FALLBACK,
+    timeLabel: c.last_turn_at,
+  }));
+}
+
+/**
+ * UI-ready turn shape. Mirrors HistoryTurn in
+ * src/lib/agent-client/types.ts — kept as a separate server-side
+ * declaration on purpose so this module doesn't import from the
+ * client-side types module (avoids accidental coupling and respects
+ * the §4 server/client boundary).
+ */
+export interface UITurn {
+  id: string;
+  role: "user" | "koast";
+  created_at: string;
+  text: string | null;
+  tool_calls: Array<{
+    tool_use_id: string;
+    tool_name: string;
+    input_summary: string;
+    success: boolean;
+    result_summary: string;
+  }>;
+  refusal: { reason: string; suggested_next_step: string | null } | null;
+}
+
+/**
+ * D-F2 input-summary derivation. Tools persist their full input as
+ * JSONB; the rail/transcript surfaces summarize as "key=value · key=value".
+ * Booleans/numbers stringified directly; strings used verbatim; objects
+ * compacted to JSON for visibility (rare path).
+ */
+function summarizeToolInput(input: Record<string, unknown> | null | undefined): string {
+  if (!input || Object.keys(input).length === 0) return "";
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(input)) {
+    if (v == null) continue;
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      parts.push(`${k}=${String(v)}`);
+    } else {
+      parts.push(`${k}=${JSON.stringify(v)}`);
+    }
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * Truncated tool-result preview — full result is server-only.
+ * v1 budget mirrors the design's "result_summary" blurb (~120 chars).
+ */
+const RESULT_SUMMARY_MAX_CHARS = 120;
+
+function summarizeToolResult(content: string, isError: boolean): string {
+  const flat = content.replace(/\s+/g, " ").trim();
+  const head = flat.length <= RESULT_SUMMARY_MAX_CHARS
+    ? flat
+    : flat.slice(0, RESULT_SUMMARY_MAX_CHARS - 1).trimEnd() + "…";
+  return isError ? `error: ${head}` : head;
+}
+
+/**
+ * Load all turns for a conversation, parsed into the UI shape.
+ *
+ * Performs a host-ownership check up front — caller passes the
+ * authenticated host id, and a foreign conversation_id throws.
+ *
+ * `tool_calls` JSONB on assistant turns is normalized: each persisted
+ * record becomes a flat row of { tool_use_id, tool_name, input_summary,
+ * success, result_summary }. Inputs are summarized as "key=value" pairs;
+ * results are truncated. Refusal payload is parsed into the structured
+ * shape the rail/transcript expects.
+ */
+export async function loadTurnsForConversation(
+  conversationId: string,
+  hostId: string,
+): Promise<UITurn[]> {
+  const supabase = createServiceClient();
+
+  // Ownership check — same shape as getOrCreateConversation.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ownerBuilder = supabase.from("agent_conversations") as any;
+  const { data: convRow, error: convError } = await ownerBuilder
+    .select("id, host_id")
+    .eq("id", conversationId)
+    .single();
+  if (convError || !convRow) {
+    throw new Error(
+      `[conversation] loadTurnsForConversation: cannot fetch ${conversationId}: ${convError?.message ?? "no row"}`,
+    );
+  }
+  if ((convRow as { host_id: string }).host_id !== hostId) {
+    throw new Error(
+      `[conversation] loadTurnsForConversation: conversation ${conversationId} does not belong to host ${hostId}.`,
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const turnBuilder = supabase.from("agent_turns") as any;
+  const { data, error } = await turnBuilder
+    .select("id, turn_index, role, content_text, tool_calls, refusal, created_at")
+    .eq("conversation_id", conversationId)
+    .order("turn_index", { ascending: true });
+  if (error) {
+    throw new Error(`[conversation] loadTurnsForConversation failed: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    turn_index: number;
+    role: AgentTurnRole;
+    content_text: string | null;
+    tool_calls: ToolCallRecord[] | null;
+    refusal: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+
+  return rows.map((t): UITurn => {
+    const role: "user" | "koast" = t.role === "user" ? "user" : "koast";
+    const tool_calls = (t.tool_calls ?? []).map((tc) => ({
+      tool_use_id: tc.tool_use_id,
+      tool_name: tc.tool_name,
+      input_summary: summarizeToolInput(tc.input),
+      success: !tc.result.is_error,
+      result_summary: summarizeToolResult(tc.result.content, tc.result.is_error),
+    }));
+    const refusal = t.refusal
+      ? {
+          reason: String((t.refusal as { reason?: unknown }).reason ?? ""),
+          suggested_next_step:
+            ((t.refusal as { next_step?: unknown }).next_step as string | undefined) ??
+            ((t.refusal as { suggested_next_step?: unknown }).suggested_next_step as string | undefined) ??
+            null,
+        }
+      : null;
+    return {
+      id: t.id,
+      role,
+      created_at: t.created_at,
+      text: t.content_text,
+      tool_calls,
+      refusal,
+    };
+  });
+}

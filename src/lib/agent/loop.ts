@@ -44,6 +44,7 @@ import {
 } from "./dispatcher";
 import type { AgentStreamEvent } from "./sse";
 import type { ToolHandlerContext } from "./types";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const MODEL_ID = "claude-sonnet-4-5-20250929";
 const MAX_TOKENS = 4096;
@@ -54,6 +55,13 @@ export interface RunAgentTurnInput {
   /** null to start a new conversation. */
   conversation_id: string | null;
   user_message_text: string;
+  /**
+   * D19 — ui_context hints from the chat shell. Only `active_property_id`
+   * is consumed in M5; future hints (active_route, etc.) extend this shape.
+   * Server-side ownership is verified before any context is injected; an
+   * unauthorized id is logged at warn and silently dropped from the turn.
+   */
+  ui_context?: { active_property_id?: string };
 }
 
 function getAnthropicClient(): Anthropic {
@@ -69,6 +77,90 @@ function getAnthropicClient(): Anthropic {
  * the chat as a transient indicator (e.g., "Looking up wifi for
  * Villa Jamaica..."). v1 keeps it generic per tool name.
  */
+/**
+ * D19 — build the active-context preamble that gets prepended to the
+ * latest user message at SDK-call time. Wording is locked in the
+ * conventions doc and tested for shape — do not edit casually; the
+ * model's tool-call behavior is sensitive to the framing.
+ */
+export function buildActivePropertyPreamble(args: {
+  name: string;
+  id: string;
+}): string {
+  return `[active context — provided by the host's UI]
+active_property = "${args.name}"
+active_property_id = ${args.id}
+use this id for read_memory tool calls.
+if the host's message references a different property by name, ask them to select that property in the UI rather than guessing its id.
+
+`;
+}
+
+/**
+ * D19 — server-side resolution of `ui_context.active_property_id` to a
+ * property record owned by the host. Returns the (name, id) tuple on
+ * success, null when the id is missing/unowned/not found. The null
+ * path triggers a single warn log and a silent drop from the turn —
+ * permissive on UX (stale sessionStorage, deleted property) while
+ * giving an audit signal for genuine spoof attempts.
+ */
+export async function resolveActiveProperty(
+  hostId: string,
+  ui_context?: RunAgentTurnInput["ui_context"],
+): Promise<{ id: string; name: string } | null> {
+  const id = ui_context?.active_property_id;
+  if (!id) return null;
+
+  const supabase = createServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fromBuilder = supabase.from("properties") as any;
+  const { data, error } = await fromBuilder
+    .select("id, name, user_id")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    console.warn(
+      `[loop] unauthorized active_property_id attempted: host=${hostId} requested=${id} (lookup_failed: ${error?.message ?? "no row"})`,
+    );
+    return null;
+  }
+  if (data.user_id !== hostId) {
+    console.warn(
+      `[loop] unauthorized active_property_id attempted: host=${hostId} requested=${id}`,
+    );
+    return null;
+  }
+  return { id: data.id, name: data.name };
+}
+
+/**
+ * D19 — return a copy of `messages` with the preamble prepended to the
+ * LAST user message's text content. Synthetic tool_result user messages
+ * (content is a ContentBlockParam[]) are skipped; only the most recent
+ * plain-text user message receives the preamble. The original array is
+ * not mutated; this output is consumed only by the SDK call, never
+ * persisted, never re-read by `reconstructHistory`.
+ */
+export function prependActiveContextToLastUserMessage(
+  messages: Anthropic.MessageParam[],
+  preamble: string,
+): Anthropic.MessageParam[] {
+  if (preamble.length === 0) return messages;
+  const out = [...messages];
+  for (let i = out.length - 1; i >= 0; i--) {
+    const m = out[i];
+    if (m.role !== "user") continue;
+    if (typeof m.content === "string") {
+      out[i] = { role: "user", content: preamble + m.content };
+      return out;
+    }
+    // Synthetic tool_result message — skip and look further back for
+    // the actual host-typed user message.
+  }
+  return out;
+}
+
 function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
   if (toolName === "read_memory") {
     const sub = input.sub_entity_type as string | undefined;
@@ -234,6 +326,19 @@ export async function* runAgentTurn(
   // Step 3: reconstruct full history (includes the user turn just persisted).
   const history = await reconstructHistory(conversation.id);
 
+  // Step 3.5 (D19): resolve ui_context.active_property_id server-side and
+  // prepend the active-context preamble to the LAST user message in the
+  // SDK-call messages array. The preamble is NEVER persisted — agent_turns
+  // keeps the host's verbatim text. Unauthorized ids log warn and drop
+  // silently (permissive on UX, audit-friendly for spoof attempts).
+  const activeProperty = await resolveActiveProperty(input.host.id, input.ui_context);
+  const seedMessages: Anthropic.MessageParam[] = activeProperty
+    ? prependActiveContextToLastUserMessage(
+        history,
+        buildActivePropertyPreamble({ name: activeProperty.name, id: activeProperty.id }),
+      )
+    : history;
+
   // Step 4: system prompt + tools.
   const systemPrompt = buildSystemPrompt({ host: input.host });
   const tools = getToolsForAnthropicSDK();
@@ -247,7 +352,7 @@ export async function* runAgentTurn(
   let turnError: { code: string; message: string; recoverable: boolean } | null = null;
   let refusalReason: { reason: string; suggested_next_step: string | null } | null = null;
 
-  let history_with_results: Anthropic.MessageParam[] = history;
+  let history_with_results: Anthropic.MessageParam[] = seedMessages;
 
   while (round < ROUND_CAP) {
     round += 1;

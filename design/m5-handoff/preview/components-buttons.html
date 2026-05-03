@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Components · Buttons</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .btn {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: -0.005em;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--dur-base) var(--ease-default), color var(--dur-base) var(--ease-default), border-color var(--dur-base) var(--ease-default);
+    display: inline-flex; align-items: center; gap: 8px; line-height: 1;
+  }
+  .btn-primary { background: var(--koast-trench); color: #fff; }
+  .btn-primary:hover { background: var(--koast-reef); }
+  .btn-secondary { background: #fff; color: var(--koast-ink); border-color: var(--koast-rule); }
+  .btn-secondary:hover { border-color: var(--koast-tide); color: var(--koast-trench); }
+  .btn-ghost { background: transparent; color: var(--koast-trench); padding: 10px 4px; }
+  .btn-ghost:hover { color: var(--koast-tide); }
+  .btn-tinted { background: var(--koast-shore-mist); color: var(--koast-trench); }
+  .btn-tinted:hover { background: #c5e8eb; }
+</style>
+</head><body>
+<div class="card" style="flex-direction: column; gap: 18px; padding: 36px 40px;">
+  <div class="label">primary actions</div>
+  <div class="row" style="gap: 12px; flex: 0;">
+    <button class="btn btn-primary">Connect Airbnb account →</button>
+    <button class="btn btn-secondary">Cancel</button>
+    <button class="btn btn-tinted">Reply with Koast</button>
+    <button class="btn btn-ghost">View details →</button>
+  </div>
+  <div style="height:1px; background:#e7e2d6;"></div>
+  <div class="label">10px radius · 200ms ease · trench-fill primary, hairline-secondary</div>
+</div>
+</body></html>

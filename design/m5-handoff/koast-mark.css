@@ -1,0 +1,72 @@
+/* ============================================================
+   Koast Mark — motion vocabulary CSS
+   Verbatim from brand/motion-vocabulary.html.
+   Apply the .k-mark[data-state] pattern documented in README.
+   ============================================================ */
+
+.k-mark {
+  display: inline-block;
+  line-height: 0;
+}
+.k-mark svg {
+  display: block;
+}
+
+/* IDLE — static, no animation. Default state. */
+.k-mark[data-state="idle"] .b1,
+.k-mark[data-state="idle"] .b2,
+.k-mark[data-state="idle"] .b3,
+.k-mark[data-state="idle"] .b4,
+.k-mark[data-state="idle"] .b5,
+.k-mark[data-state="idle"] .bands { animation: none; }
+
+/* ACTIVE — cascade. Top-down opacity wave. ≥32px. */
+@keyframes k-cascade-pulse {
+  0%, 40%, 65%, 100% { opacity: 1; }
+  50%, 55%           { opacity: 0.55; }
+}
+.k-mark[data-state="active"] .b1 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+.k-mark[data-state="active"] .b2 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.13s; }
+.k-mark[data-state="active"] .b3 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.26s; }
+.k-mark[data-state="active"] .b4 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.39s; }
+.k-mark[data-state="active"] .b5 { animation: k-cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.52s; }
+
+/* ACTIVE small fallback — pulse. 16-31px. */
+@keyframes k-brightness-pulse {
+  0%, 100% { filter: brightness(1)    saturate(1);   }
+  50%      { filter: brightness(1.12) saturate(1.1); }
+}
+.k-mark[data-state="active"][data-size="small"] .bands {
+  animation: k-brightness-pulse 1.6s infinite ease-in-out;
+}
+
+/* MILESTONE — deposit. One-shot in production. */
+@keyframes k-milestone-ghost {
+  0%   { transform: translateY(0);    opacity: 0; }
+  35%, 70%  { transform: translateY(23px); opacity: 1; }
+  100% { transform: translateY(23px); opacity: 1; }
+}
+@keyframes k-milestone-stack {
+  0%   { transform: translateY(0); }
+  35%, 100% { transform: translateY(18px); }
+}
+.k-mark[data-state="milestone"] .ghost { animation: k-milestone-ghost 2s ease-out forwards; }
+.k-mark[data-state="milestone"] .stack { animation: k-milestone-stack 2s ease-out forwards; }
+
+/* MARKETING HERO — continuous cascade, no rest. Public landing only. */
+@keyframes k-cascade-hero {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.k-mark[data-state="hero"] .b1 { animation: k-cascade-hero 2.4s infinite ease-in-out; }
+.k-mark[data-state="hero"] .b2 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.10s; }
+.k-mark[data-state="hero"] .b3 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.20s; }
+.k-mark[data-state="hero"] .b4 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.30s; }
+.k-mark[data-state="hero"] .b5 { animation: k-cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.40s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-mark .b1, .k-mark .b2, .k-mark .b3, .k-mark .b4, .k-mark .b5,
+  .k-mark .ghost, .k-mark .stack, .k-mark .bands {
+    animation: none !important;
+  }
+}

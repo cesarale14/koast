@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Components · Card</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .k-card {
+    background: #fff;
+    border: 0.5px solid var(--koast-rule);
+    border-radius: 14px;
+    padding: 22px 24px;
+    display: flex; flex-direction: column; gap: 10px;
+    flex: 1;
+  }
+  .k-card .head { display: flex; align-items: center; justify-content: space-between; }
+  .k-card .ts { font-family: var(--font-mono); font-size: 11px; color: var(--koast-ink-3); letter-spacing: 0.04em; }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px;
+    background: rgba(76, 196, 204, 0.16); color: var(--koast-trench);
+  }
+</style>
+</head><body>
+<div class="card" style="padding: 36px 40px; gap: 18px;">
+  <div class="k-card">
+    <div class="head">
+      <div class="k-eyebrow" style="color:#6e7976;">milestone · seabreeze loft</div>
+      <div class="badge">deposited</div>
+    </div>
+    <div class="k-h2" style="font-size: 22px;">Pricing model learned for Seabreeze Loft.</div>
+    <div class="k-small">After 28 bookings, Koast holds a confident pricing curve for weekdays, weekends, and holidays. You can ask for explanations or override any night.</div>
+    <div class="head" style="margin-top: 6px;">
+      <div class="ts">today · 2:14 PM</div>
+      <a class="k-mono" style="color: var(--koast-trench); text-decoration: none;" href="#">explain how →</a>
+    </div>
+  </div>
+</div>
+</body></html>

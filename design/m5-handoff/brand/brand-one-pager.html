@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koast — Brand Guidelines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf7; --shore: #f7f3ec; --deep-sea: #132e20;
+    --ink: #0f1815; --ink-2: #4a5552; --ink-3: #6e7976;
+    --rule: #e7e2d6;
+    --teal-light: #d4eef0; --teal-2: #a8e0e3; --teal-3: #4cc4cc;
+    --teal-4: #2ba2ad; --teal-deep: #0e7a8a;
+    --warn: #b34141;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 64px 32px 96px; }
+
+  /* Section primitives */
+  section { margin: 0 0 56px; padding: 0 0 40px; border-bottom: 0.5px solid var(--rule); }
+  section:last-of-type { border-bottom: none; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 6px; }
+  h1 { font-size: 44px; font-weight: 500; letter-spacing: -0.025em; margin: 0 0 14px; line-height: 1.05; }
+  h2 { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; line-height: 1.2; }
+  h3 { font-size: 13px; font-weight: 500; color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; margin: 24px 0 12px; font-family: 'JetBrains Mono', monospace; }
+  p { margin: 0 0 12px; max-width: 70ch; }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end; padding: 0 0 32px; margin: 0 0 48px; border-bottom: 0.5px solid var(--rule); }
+  .hero-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin: 16px 0 0; letter-spacing: 0.06em; }
+  .hero-mark { display: flex; align-items: center; justify-content: flex-end; }
+
+  /* Wordmark live */
+  .wm { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: 1; color: var(--ink); display: inline-flex; align-items: center; }
+  .wm.dark { color: var(--shore); }
+  .o-mark { display: inline-block; vertical-align: middle; margin: 0 -0.02em; }
+
+  /* Tile primitives */
+  .tile { border-radius: 14px; padding: 24px; display: flex; align-items: center; justify-content: center; }
+  .tile.light { background: var(--shore); }
+  .tile.dark { background: var(--deep-sea); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  /* Color swatches */
+  .swatch { border-radius: 10px; padding: 22px 18px; min-height: 110px; display: flex; flex-direction: column; justify-content: flex-end; color: var(--ink); }
+  .swatch.dark-text { color: var(--ink); }
+  .swatch.light-text { color: var(--shore); }
+  .swatch-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; }
+  .swatch-name { font-size: 13px; font-weight: 500; margin: 2px 0 0; }
+  .swatch-role { font-size: 11px; color: inherit; opacity: 0.7; margin: 6px 0 0; line-height: 1.4; }
+
+  /* Rule cards */
+  .rule { border: 0.5px solid var(--rule); border-radius: 12px; padding: 20px 22px; background: #fff; }
+  .rule h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .rule p { font-size: 13px; color: var(--ink-2); margin: 0 0 6px; }
+  .rule .small { font-size: 11.5px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+
+  /* Spec table */
+  .spec { width: 100%; border-collapse: collapse; }
+  .spec th, .spec td { text-align: left; padding: 12px 16px; border-bottom: 0.5px solid var(--rule); font-size: 13px; }
+  .spec th { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .spec td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-2); }
+
+  /* DO / DONT */
+  .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .dd-card { border-radius: 12px; padding: 22px; }
+  .dd-card.do { background: rgba(42, 122, 74, 0.06); border-left: 3px solid #2a7a4a; }
+  .dd-card.dont { background: rgba(179, 65, 65, 0.06); border-left: 3px solid var(--warn); }
+  .dd-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; margin: 0 0 10px; }
+  .dd-card.do .dd-label { color: #2a7a4a; }
+  .dd-card.dont .dd-label { color: var(--warn); }
+  .dd-list { list-style: none; padding: 0; margin: 0; }
+  .dd-list li { padding: 6px 0; font-size: 13px; line-height: 1.55; }
+
+  /* === MOTION VOCABULARY v1.0 === */
+  /* Active state — cascade soft (production "thinking") */
+  @keyframes cascade-pulse {
+    0%, 40%, 65%, 100% { opacity: 1; }
+    50%, 55%           { opacity: 0.55; }
+  }
+  .anim-active .b1 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+  .anim-active .b2 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.13s; }
+  .anim-active .b3 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.26s; }
+  .anim-active .b4 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.39s; }
+  .anim-active .b5 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.52s; }
+
+  /* Marketing hero — cascade continuous (no rest) */
+  @keyframes cascade-hero {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+  .anim-hero .b1 { animation: cascade-hero 2.4s infinite ease-in-out; }
+  .anim-hero .b2 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.10s; }
+  .anim-hero .b3 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.20s; }
+  .anim-hero .b4 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.30s; }
+  .anim-hero .b5 { animation: cascade-hero 2.4s infinite ease-in-out; animation-delay: -0.40s; }
+
+  /* Milestone — deposit (looped here for preview, one-shot in production) */
+  @keyframes ms-ghost {
+    0%, 50%, 100% { transform: translateY(0); opacity: 0; }
+    68%, 82%      { transform: translateY(23px); opacity: 1; }
+  }
+  @keyframes ms-stack {
+    0%, 50%, 100% { transform: translateY(0); }
+    68%, 82%      { transform: translateY(18px); }
+  }
+  .anim-milestone .ghost { animation: ms-ghost 5s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+  .anim-milestone .stack { animation: ms-stack 5s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+
+  /* Small-size active fallback — brightness pulse */
+  @keyframes brightness-pulse {
+    0%, 100% { filter: brightness(1) saturate(1); }
+    50%      { filter: brightness(1.12) saturate(1.1); }
+  }
+  .anim-pulse .bands { animation: brightness-pulse 1.6s infinite ease-in-out; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim-active .b1, .anim-active .b2, .anim-active .b3, .anim-active .b4, .anim-active .b5,
+    .anim-hero .b1, .anim-hero .b2, .anim-hero .b3, .anim-hero .b4, .anim-hero .b5,
+    .anim-milestone .ghost, .anim-milestone .stack,
+    .anim-pulse .bands { animation: none; }
+  }
+
+  /* Code blocks */
+  pre { background: var(--shore); border-radius: 10px; padding: 18px 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; color: var(--ink); overflow-x: auto; margin: 12px 0; }
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--shore); padding: 1px 5px; border-radius: 3px; }
+
+  /* Mark for size rule */
+  .clearspace-demo { position: relative; padding: 64px; background: var(--shore); border-radius: 14px; }
+  .clearspace-demo .annot { position: absolute; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); letter-spacing: 0.06em; }
+  .clearspace-demo .annot.top { top: 22px; left: 50%; transform: translateX(-50%); }
+  .clearspace-demo .annot.bottom { bottom: 22px; left: 50%; transform: translateX(-50%); }
+  .clearspace-demo .annot.left { left: 16px; top: 50%; transform: translateY(-50%) rotate(-90deg); transform-origin: center; }
+  .clearspace-demo .annot.right { right: 16px; top: 50%; transform: translateY(-50%) rotate(90deg); transform-origin: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ========== HERO ========== -->
+<header class="hero">
+  <div>
+    <div class="eyebrow">brand guidelines · v1.0</div>
+    <h1>Koast brand system.</h1>
+    <p style="font-size: 16px; color: var(--ink-2); max-width: 56ch;">A living rule-set for how the Koast mark, wordmark, color, and motion are deployed. Single source of truth — when in doubt, this document wins.</p>
+    <div class="hero-meta">last updated · 2026.04.30 · v1.0 · brand-final</div>
+  </div>
+  <div class="hero-mark">
+    <span class="wm anim-hero" style="font-size: 88px;">K<svg class="o-mark" width="0.55em" height="0.55em" viewBox="0 0 100 100"><defs><clipPath id="hL"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#hL)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg>ast</span>
+  </div>
+</header>
+
+<!-- ========== 01 LOGO ========== -->
+<section>
+  <div class="eyebrow">01 · the mark</div>
+  <h2>One symbol, three forms.</h2>
+  <p>The Koast mark is a banded circle representing accumulated geological strata — the visual metaphor for the AI co-host accumulating context, memory, and learning. The mark functions as the <em>o</em> in the wordmark "Koast", and stands alone as a symbol. Three forms cover all sizes:</p>
+
+  <div class="grid-3" style="margin: 24px 0 16px;">
+    <div>
+      <div class="tile light" style="min-height: 140px;"><svg width="96" height="96" viewBox="0 0 100 100"><defs><clipPath id="m5l"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#m5l)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg></div>
+      <h3 style="margin-top:14px;">5-band — primary</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">Use at <code>≥48px</code>. Five strata, geological proportions, full gradient.</p>
+    </div>
+    <div>
+      <div class="tile light" style="min-height: 140px;"><svg width="96" height="96" viewBox="0 0 100 100"><defs><clipPath id="m3l"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#m3l)"><rect x="0" y="4" width="100" height="32" fill="#d4eef0"/><rect x="0" y="36" width="100" height="30" fill="#4cc4cc"/><rect x="0" y="66" width="100" height="30" fill="#0e7a8a"/></g></svg></div>
+      <h3 style="margin-top:14px;">3-band — favicon</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">Use at <code>&lt;48px</code>. Three strata, full structural integrity at small sizes.</p>
+    </div>
+    <div>
+      <div class="tile light" style="min-height: 140px;"><span class="wm" style="font-size: 32px;">K<svg class="o-mark" width="0.55em" height="0.55em" viewBox="0 0 100 100"><defs><clipPath id="m0l"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#m0l)"></g></svg>ast</span></div>
+      <h3 style="margin-top:14px;">Wordmark-only</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">Use at <code>&lt;16px</code> or in single-color contexts where the gradient can't survive.</p>
+    </div>
+  </div>
+
+  <h3>The size rule</h3>
+  <p style="margin:0 0 14px;">A single rule governs which form to use:</p>
+  <table class="spec">
+    <tr><th>context</th><th>form</th><th>why</th></tr>
+    <tr><td class="mono">font-size ≥ 48px</td><td>wordmark + 5-band o</td><td>Bands are clearly distinguishable</td></tr>
+    <tr><td class="mono">16px ≤ font-size &lt; 48px</td><td>wordmark + 3-band o</td><td>5-band collapses to "circle with gradient" at this scale</td></tr>
+    <tr><td class="mono">font-size &lt; 16px</td><td>wordmark-only</td><td>Even 3-band can't hold structure; the typographic mark survives alone</td></tr>
+    <tr><td class="mono">single-color print / fax</td><td>wordmark-only</td><td>Gradient can't reproduce in monochrome; flat-fill the mark only as last resort</td></tr>
+  </table>
+</section>
+
+<!-- ========== 02 WORDMARK + STANDALONE ========== -->
+<section>
+  <div class="eyebrow">02 · usage contexts</div>
+  <h2>When to use what.</h2>
+  <div class="grid-2" style="margin: 16px 0;">
+    <div class="rule">
+      <h4>Wordmark + banded o (default)</h4>
+      <p><strong>Use almost everywhere.</strong> Marketing site, app header, dashboard chrome, email signatures, presentations, business cards. Anywhere the brand needs to communicate identity AND name.</p>
+      <p class="small">Most contexts → this option.</p>
+    </div>
+    <div class="rule">
+      <h4>Banded circle alone</h4>
+      <p><strong>Use only when context labels itself.</strong> Favicon, app icon, in-app Koast avatar (chat bubble), social profile photo. The surrounding context (URL bar, app drawer, profile name) tells the user this is Koast.</p>
+      <p class="small">Standalone → only with self-labeling context.</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="rule">
+      <h4>Wordmark-only fallback</h4>
+      <p><strong>Use at sub-16px or single-color contexts.</strong> Footer fine-print, terms of service, fax-grade print, stamps, embroidery. Anywhere the banded structure cannot reproduce.</p>
+      <p class="small">Edge cases only. Default to the banded form whenever possible.</p>
+    </div>
+    <div class="rule">
+      <h4>Animated mark</h4>
+      <p><strong>Three motion registers, each with a job.</strong> <em>Active</em> (cascade) while AI is processing. <em>Milestone</em> (deposit) on positive completion events. <em>Marketing hero</em> (continuous cascade) on the public landing page only.</p>
+      <p class="small">Static is the default. Animate intentionally, not constantly. Full vocabulary in Section 05.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 03 COLORS ========== -->
+<section>
+  <div class="eyebrow">03 · color</div>
+  <h2>Cool teal, anchored.</h2>
+  <p>The palette is built around a single hue — cool teal — graded across five strata to encode time, depth, and accumulation. Light and dark substrate provide anchor points; deep teal carries primary brand voltage.</p>
+
+  <h3>Substrate</h3>
+  <div class="grid-2" style="margin-bottom:24px;">
+    <div class="swatch dark-text" style="background: #f7f3ec; border: 0.5px solid var(--rule);">
+      <div class="swatch-label">#f7f3ec</div>
+      <div class="swatch-name">Shore</div>
+      <div class="swatch-role">light bg · default surface · text on dark</div>
+    </div>
+    <div class="swatch light-text" style="background: #132e20;">
+      <div class="swatch-label">#132e20</div>
+      <div class="swatch-name">Deep Sea</div>
+      <div class="swatch-role">dark bg · primary dark surface · text on light</div>
+    </div>
+  </div>
+
+  <h3>Cool teal — gradient strata (light bg)</h3>
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="swatch dark-text" style="background: #d4eef0;">
+      <div class="swatch-label">#d4eef0</div>
+      <div class="swatch-name">Shore Mist</div>
+      <div class="swatch-role">band 1 · top · "newest deposit"</div>
+    </div>
+    <div class="swatch dark-text" style="background: #a8e0e3;">
+      <div class="swatch-label">#a8e0e3</div>
+      <div class="swatch-name">Shoal</div>
+      <div class="swatch-role">band 2</div>
+    </div>
+    <div class="swatch dark-text" style="background: #4cc4cc;">
+      <div class="swatch-label">#4cc4cc</div>
+      <div class="swatch-name">Tide</div>
+      <div class="swatch-role">band 3 · primary teal · BRAND</div>
+    </div>
+    <div class="swatch light-text" style="background: #2ba2ad;">
+      <div class="swatch-label">#2ba2ad</div>
+      <div class="swatch-name">Reef</div>
+      <div class="swatch-role">band 4</div>
+    </div>
+  </div>
+  <div class="grid-4">
+    <div class="swatch light-text" style="background: #0e7a8a;">
+      <div class="swatch-label">#0e7a8a</div>
+      <div class="swatch-name">Trench</div>
+      <div class="swatch-role">band 5 · bottom · "oldest sediment"</div>
+    </div>
+    <div></div><div></div><div></div>
+  </div>
+
+  <h3>Cool teal — gradient strata (dark bg, lightened bottom)</h3>
+  <div class="grid-4">
+    <div class="swatch dark-text" style="background: #d4eef0;"><div class="swatch-label">#d4eef0</div><div class="swatch-name">Shore Mist</div></div>
+    <div class="swatch dark-text" style="background: #8ad9dc;"><div class="swatch-label">#8ad9dc</div><div class="swatch-name">Shoal · DARK</div></div>
+    <div class="swatch dark-text" style="background: #4cc4cc;"><div class="swatch-label">#4cc4cc</div><div class="swatch-name">Tide</div></div>
+    <div class="swatch light-text" style="background: #3aa3aa;"><div class="swatch-label">#3aa3aa</div><div class="swatch-name">Reef · DARK</div></div>
+  </div>
+  <div class="grid-4" style="margin-top:12px;">
+    <div class="swatch light-text" style="background: #2e8c95;"><div class="swatch-label">#2e8c95</div><div class="swatch-name">Trench · DARK</div></div>
+    <div></div><div></div><div></div>
+  </div>
+
+  <h3>Color usage rules</h3>
+  <ul style="margin:0 0 16px; padding:0 0 0 18px;">
+    <li><strong>Tide #4cc4cc</strong> is the primary brand teal. Use for accent, hover, focus, primary CTAs, active states.</li>
+    <li><strong>Trench #0e7a8a</strong> is the deep contrast variant. Use for filled buttons on light bg, active emphasis, brand-darkmark accents.</li>
+    <li><strong>Shore Mist #d4eef0</strong> is the lightest variant. Use for tinted surfaces, subtle backgrounds, hover-state fills, success states.</li>
+    <li><strong>Avoid</strong> introducing teals outside this five-stop ramp. The gradient sequence is the brand's tonal signature.</li>
+  </ul>
+</section>
+
+<!-- ========== 04 TYPOGRAPHY ========== -->
+<section>
+  <div class="eyebrow">04 · typography</div>
+  <h2>Plus Jakarta Sans, locked.</h2>
+  <p>Plus Jakarta Sans is the brand typeface across all properties. Sourced from Google Fonts (open-source, SIL Open Font License). Available weights as needed; brand voice anchors on weight 800 for the wordmark and 500 for body.</p>
+  <h3>Specifications</h3>
+  <table class="spec">
+    <tr><th>property</th><th>spec</th><th>use</th></tr>
+    <tr><td>family</td><td class="mono">Plus Jakarta Sans, system-ui, sans-serif</td><td>all rendered text</td></tr>
+    <tr><td>weight 800</td><td class="mono">font-weight: 800; letter-spacing: -0.045em</td><td>wordmark, display headlines, hero titles</td></tr>
+    <tr><td>weight 500</td><td class="mono">font-weight: 500; letter-spacing: -0.01em</td><td>section headers, button labels</td></tr>
+    <tr><td>weight 400</td><td class="mono">font-weight: 400; letter-spacing: 0</td><td>body text, descriptions</td></tr>
+    <tr><td>monospace</td><td class="mono">JetBrains Mono, ui-monospace, monospace</td><td>code, hex tokens, labels, technical metadata</td></tr>
+  </table>
+  <h3>Wordmark composition</h3>
+  <pre>Koast wordmark = "K" + banded-circle + "ast"
+  font: Plus Jakarta Sans 800
+  letter-spacing: -0.045em
+  o size: 0.55em (matches lowercase o optical width)
+  vertical-align of o: middle (centered with x-height)</pre>
+</section>
+
+<!-- ========== 05 MOTION ========== -->
+<section>
+  <div class="eyebrow">05 · motion</div>
+  <h2>A layered motion vocabulary.</h2>
+  <p>Three registers, each with a distinct gesture and trigger condition. <strong>Idle</strong> is static — the default. <strong>Active</strong> is the cascade — bands fade through in sequence while Koast is processing. <strong>Milestone</strong> is the deposit — a one-shot celebration on specific completion events. The motion does real work: it tells the user what Koast is doing, when something happens, and when it's at rest.</p>
+
+  <div class="grid-3" style="margin: 24px 0 16px;">
+    <!-- IDLE -->
+    <div>
+      <div class="tile light" style="min-height: 200px;">
+        <svg width="120" height="120" viewBox="0 0 100 100"><defs><clipPath id="midle"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#midle)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg>
+      </div>
+      <h3 style="margin-top:14px;">Idle — static</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">No motion. The default state. Used in app chrome, favicons, email signatures, anywhere the brand mark just exists.</p>
+    </div>
+    <!-- ACTIVE — CASCADE -->
+    <div>
+      <div class="tile light" style="min-height: 200px;">
+        <svg width="120" height="120" viewBox="0 0 100 100" class="anim-active"><defs><clipPath id="mactive"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#mactive)"><rect class="b1" x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg>
+      </div>
+      <h3 style="margin-top:14px;">Active — cascade</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">3s cycle · 130ms stagger · opacity 1→0.55. Bands fade top-down sequentially. Reads as <em>consulting layers</em>. Triggered while AI is processing.</p>
+    </div>
+    <!-- MILESTONE — DEPOSIT -->
+    <div>
+      <div class="tile light" style="min-height: 200px;">
+        <svg width="120" height="120" viewBox="0 0 100 100" class="anim-milestone"><defs><clipPath id="mmilestone"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#mmilestone)"><rect class="ghost" x="0" y="-23" width="100" height="23" fill="#d4eef0"/><g class="stack"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></g></svg>
+      </div>
+      <h3 style="margin-top:14px;">Milestone — deposit</h3>
+      <p style="font-size:12.5px; color:var(--ink-2); margin:0;">2s event, one-shot · 18px stack shift · ghost band drops in. Reads as <em>memory just stored</em>. Fires on positive completion events.</p>
+    </div>
+  </div>
+
+  <h3>Trigger conditions</h3>
+  <table class="spec">
+    <tr><th>register</th><th>fires for</th></tr>
+    <tr><td><strong>Active</strong> (cascade)</td><td>AI generating reply · pricing engine recalc · booking sync in flight · channel manager re-sync · iCal poll · onboarding analysis</td></tr>
+    <tr><td><strong>Milestone</strong> (deposit)</td><td>Onboarding complete · first listing synced · first AI message handled · first booking received · daily pricing sync done · weekly review sent · 30-day anniversary</td></tr>
+    <tr><td><strong>Silent</strong> (idle)</td><td>Routine API calls · page navigation · UI interactions · errors (use different visual) · background polling without user impact</td></tr>
+  </table>
+
+  <h3>Small-size active fallback</h3>
+  <p>At 16-31px, cascade's per-band opacity changes are too subtle to perceive. Use the <strong>pulse</strong> fallback: a whole-mark CSS filter (brightness 1.0 → 1.12, saturation 1.0 → 1.10) over a 1.6s ease-in-out cycle. The mark "lights up" while thinking — visible at any pixel resolution. Below 16px, omit active state entirely; favicons should not animate.</p>
+
+  <h3>Marketing hero variant</h3>
+  <p>For one specific surface — the public marketing landing hero — the cascade runs continuously without rest periods. 2.4s cycle, negative stagger delays for immediate desync. Same gesture as active, no quiet phase. <strong>Single context only:</strong> never propagated to body, pricing, blog, or any in-app surface.</p>
+
+  <h3>Where motion does not live</h3>
+  <p>Active state with motion is for <strong>live web/app contexts only</strong>. The following surfaces are <strong>locked as pure static</strong> — all bands at full opacity, evenly stacked, no motion implied: OG / social cards · app icons (iOS, Android, Windows) · all favicon sizes · print / PDF brand assets · email signatures. The motion vocabulary does its work on the actual site, not on share previews or app launchers. A first-time viewer seeing the brand on a Twitter or LinkedIn share card needs the cleanest read, not a degraded mid-fade frame.</p>
+
+  <h3>CSS reference (production)</h3>
+<pre>/* ACTIVE — cascade soft */
+@keyframes cascade-pulse {
+  0%, 40%, 65%, 100% { opacity: 1; }
+  50%, 55%           { opacity: 0.55; }
+}
+.koast-mark[data-state="active"] .b1 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); }
+.koast-mark[data-state="active"] .b2 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.13s; }
+.koast-mark[data-state="active"] .b3 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.26s; }
+.koast-mark[data-state="active"] .b4 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.39s; }
+.koast-mark[data-state="active"] .b5 { animation: cascade-pulse 3s infinite cubic-bezier(0.45, 0, 0.55, 1); animation-delay: 0.52s; }
+
+/* MILESTONE — deposit (one-shot in production) */
+@keyframes milestone-ghost {
+  0%, 50%, 100% { transform: translateY(0);    opacity: 0; }
+  68%, 82%      { transform: translateY(23px); opacity: 1; }
+}
+@keyframes milestone-stack {
+  0%, 50%, 100% { transform: translateY(0);    }
+  68%, 82%      { transform: translateY(18px); }
+}
+.koast-mark[data-state="milestone"] .ghost { animation: milestone-ghost 2s ease-out forwards; }
+.koast-mark[data-state="milestone"] .stack { animation: milestone-stack 2s ease-out forwards; }
+
+/* SMALL-SIZE PULSE — 16-31px */
+@keyframes brightness-pulse {
+  0%, 100% { filter: brightness(1)    saturate(1);   }
+  50%      { filter: brightness(1.12) saturate(1.1); }
+}
+.koast-mark[data-state="active"][data-size="small"] .bands {
+  animation: brightness-pulse 1.6s infinite ease-in-out;
+}</pre>
+
+  <h3>Reduced-motion compliance</h3>
+<pre>@media (prefers-reduced-motion: reduce) {
+  .koast-mark .b1, .b2, .b3, .b4, .b5,
+  .koast-mark .ghost, .stack, .bands {
+    animation: none !important;
+  }
+}</pre>
+  <p style="font-size:12.5px; color:var(--ink-2);">For the full vocabulary spec — state transitions, implementation pattern, complete trigger taxonomy — see <code>../motion-exploration/motion-vocabulary.html</code>.</p>
+</section>
+
+<!-- ========== 06 CLEAR SPACE + SIZING ========== -->
+<section>
+  <div class="eyebrow">06 · clear space + minimum sizes</div>
+  <h2>Give the mark room.</h2>
+
+  <h3>Clear space rule</h3>
+  <p>Maintain a clear-space margin around the mark equal to <strong>half the diameter of the banded circle (½× o-height)</strong> on all sides. No other graphic, text, or interactive element may enter this zone.</p>
+
+  <div class="clearspace-demo" style="margin: 16px 0;">
+    <div class="annot top">½ × o-height</div>
+    <div class="annot bottom">½ × o-height</div>
+    <div class="annot left">½ × o-height</div>
+    <div class="annot right">½ × o-height</div>
+    <div style="text-align:center;">
+      <span class="wm" style="font-size: 80px;">K<svg class="o-mark" width="0.55em" height="0.55em" viewBox="0 0 100 100"><defs><clipPath id="cs"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#cs)"><rect x="0" y="4" width="100" height="23" fill="#d4eef0"/><rect x="0" y="27" width="100" height="20" fill="#a8e0e3"/><rect x="0" y="47" width="100" height="18" fill="#4cc4cc"/><rect x="0" y="65" width="100" height="17" fill="#2ba2ad"/><rect x="0" y="82" width="100" height="14" fill="#0e7a8a"/></g></svg>ast</span>
+    </div>
+  </div>
+
+  <h3>Minimum sizes</h3>
+  <table class="spec">
+    <tr><th>form</th><th>min size</th><th>note</th></tr>
+    <tr><td>Wordmark + 5-band o</td><td class="mono">≥ 48px font-size</td><td>Hero, header, marketing</td></tr>
+    <tr><td>Wordmark + 3-band o</td><td class="mono">16–48px font-size</td><td>App chrome, dashboards</td></tr>
+    <tr><td>Wordmark-only</td><td class="mono">≥ 12px font-size</td><td>Below this, use the URL bar / app drawer text instead</td></tr>
+    <tr><td>Banded circle (standalone)</td><td class="mono">5-band: 48px · 3-band: 16px</td><td>Pair with self-labeling context</td></tr>
+  </table>
+</section>
+
+<!-- ========== 07 DO / DONT ========== -->
+<section>
+  <div class="eyebrow">07 · forbidden modifications</div>
+  <h2>Hands off the system.</h2>
+  <div class="do-dont">
+    <div class="dd-card do">
+      <div class="dd-label">do</div>
+      <ul class="dd-list">
+        <li>Use the 5-band variant at ≥ 48px font-size.</li>
+        <li>Use the 3-band variant at < 48px font-size.</li>
+        <li>Use the wordmark-only fallback at < 16px or in single-color contexts.</li>
+        <li>Maintain the locked color palette across all assets.</li>
+        <li>Animate sparingly — cascade for active, deposit for milestone, hero-cascade only on marketing landing.</li>
+        <li>Respect the clear-space rule.</li>
+        <li>Render text in Plus Jakarta Sans, weight 800 for the wordmark.</li>
+      </ul>
+    </div>
+    <div class="dd-card dont">
+      <div class="dd-label">don't</div>
+      <ul class="dd-list">
+        <li>Don't rotate the banded o (band orientation is brand-meaningful).</li>
+        <li>Don't change the band count — only 5 or 3, per the size rule.</li>
+        <li>Don't recolor outside the cool teal palette.</li>
+        <li>Don't add a stroke, glow, drop shadow, or other effect to the mark.</li>
+        <li>Don't change letter-spacing on the wordmark.</li>
+        <li>Don't substitute a different typeface for the wordmark.</li>
+        <li>Don't use continuous downward motion (creates barber-pole register).</li>
+        <li>Don't use the snappy 3s animation tempo (reserved as forbidden).</li>
+        <li>Don't place the mark on photographic / patterned backgrounds — always solid.</li>
+        <li>Don't enclose the mark in a box, badge, or container shape.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 08 ASSET INDEX ========== -->
+<section>
+  <div class="eyebrow">08 · production assets</div>
+  <h2>What's where.</h2>
+  <table class="spec">
+    <tr><th>folder</th><th>contents</th></tr>
+    <tr><td class="mono">/masters/</td><td>Static (5-band, 3-band) + active cascade + small-size pulse + milestone deposit + wordmark — all light/dark, plus 1024px raster previews</td></tr>
+    <tr><td class="mono">/favicons/</td><td>16 / 24 / 32 / 48 / 180 / 192 / 512 px PNGs + multi-size favicon.ico</td></tr>
+    <tr><td class="mono">/social/</td><td>OG card 1200×630 (light + dark) + square 1080×1080 (light + dark)</td></tr>
+    <tr><td class="mono">/app-icons/</td><td>iOS 1024 (rounded square) + Android adaptive (foreground + background) + Windows tile 310</td></tr>
+    <tr><td class="mono">/fallback/</td><td>Wordmark-only SVG (regular o, no banded) for sub-16px contexts</td></tr>
+    <tr><td class="mono">/motion-exploration/</td><td><strong>motion-vocabulary.html</strong> — canonical motion reference with state transitions, trigger taxonomy, implementation pattern</td></tr>
+    <tr><td class="mono">/guidelines/</td><td>This document</td></tr>
+    <tr><td class="mono">rasterize.py</td><td>Python pipeline for regenerating PNG outputs from spec</td></tr>
+    <tr><td class="mono">make-motion-gifs.py</td><td>Generates animated GIF previews from motion specs</td></tr>
+  </table>
+
+  <p style="margin-top:24px; padding:16px 20px; background:rgba(179,65,65,0.05); border-radius:10px; border-left:3px solid var(--warn); font-size: 12.5px; color: var(--ink-2);"><strong>Production note on PNG outputs:</strong> rasterized assets (favicons, social, app-icons) were generated with Poppins Bold as a fallback typeface in the build environment. To regenerate with Plus Jakarta Sans 800 baked in, install the font locally and re-run <code>python3 rasterize.py</code>. Vector masters (SVG) reference the proper font and render correctly anywhere PJ Sans is loaded.</p>
+</section>
+
+</div>
+</body>
+</html>

@@ -55,3 +55,17 @@ __pycache__/
 *.pyc
 .env.staging
 .env.staging
+
+# Per-milestone Phase 1 STOP working files + recovery files (D-F4 / D-GITIGNORE).
+# Format: .{milestone}-phase1-stop.md / .{milestone}-recovery.md.
+# Authored during the milestone-1 STOP discipline, removed before commit.
+.m*-phase1-stop.md
+.m*-recovery.md
+
+# M5 design archive — scratch / iteration / ui_kits exports kept
+# locally for reference but not load-bearing for the chat shell.
+# The handoff/, brand/, assets/, fonts/, screenshots/, and root
+# CSS files in design/m5-handoff/ ARE tracked.
+design/m5-handoff/uploads/
+design/m5-handoff/scratch/
+design/m5-handoff/ui_kits/

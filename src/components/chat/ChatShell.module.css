@@ -1,0 +1,769 @@
+/* ============================================================
+   M5 — Koast Chat Shell · CSS Module
+   Ported from design/m5-handoff/handoff/chat-shell.css.
+   Scoped via CSS Modules + .shell wrapper per Phase 1 STOP D-13a:
+   - Semantic layer (--bg/--surface/--fg/--accent/--rule etc.) declared on .shell
+   - Shadow + radius value collisions scoped to .shell (M5 values, not Koast app values)
+   - Body-equivalent styles (background, color, font-family, font-feature-settings,
+     overflow: hidden) live on .shell, NOT on body — body keeps its existing app rules
+   - Combined selectors involving the global .k-mark class use :global(.k-mark)
+   The bundle's tokens (--koast-shore, --koast-tide, --font-sans, --font-mono,
+   --ease-default, --dur-base, etc.) are defined at :root in src/app/globals.css.
+   ============================================================ */
+
+/* ===========================================================
+   APP SHELL — two columns
+     1) 240px conversation list (slim rail)
+     2) chat surface, single dominant column max-w 720px
+   At <960px the rail collapses behind a drawer (mobile state).
+   =========================================================== */
+.shell {
+  /* Semantic layer (D-13a: NOT at :root, scoped here so children
+     consume via natural CSS variable inheritance) */
+  --bg:                 var(--koast-bg);
+  --bg-substrate:       var(--koast-shore);
+  --bg-tinted:          var(--koast-shore-mist);
+  --surface:            #ffffff;
+  --surface-muted:      var(--koast-shore);
+  --fg:                 var(--koast-ink);
+  --fg-2:               var(--koast-ink-2);
+  --fg-3:               var(--koast-ink-3);
+  --fg-on-dark:         var(--koast-shore);
+  --rule:               var(--koast-rule);
+  --rule-strong:        rgba(15, 24, 21, 0.16);
+  --accent:             var(--koast-tide);
+  --accent-deep:        var(--koast-trench);
+  --accent-tint:        var(--koast-shore-mist);
+  --focus-ring:         rgba(76, 196, 204, 0.45);
+
+  /* Shadow + radius collisions (D-13a: scoped, M5 values, no global override) */
+  --shadow-none:        none;
+  --shadow-sm:          0 1px 2px rgba(15, 24, 21, 0.04);
+  --shadow-md:          0 6px 24px -8px rgba(15, 24, 21, 0.10);
+  --shadow-pop:         0 12px 40px -12px rgba(15, 24, 21, 0.18);
+  --radius-md:          10px;
+  --radius-xl:          14px;
+  --radius-pill:        999px;
+  --border-hairline:    0.5px solid var(--rule);
+  --border-default:     1px solid var(--rule);
+
+  /* Body-equivalent styles (scoped, never on global body) */
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'ss01', 'cv11';
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+/* Box-sizing reset, scoped to chat shell only */
+.shell *,
+.shell *::before,
+.shell *::after {
+  box-sizing: border-box;
+}
+
+.shell button { font-family: inherit; }
+
+/* Optional dark theme on the chat-shell wrapper */
+.shell[data-theme='dark'] {
+  --bg:            var(--koast-deep-sea);
+  --bg-substrate:  var(--koast-deep-sea);
+  --bg-tinted:     #1a3a2a;
+  --surface:       #1a3a2a;
+  --surface-muted: #16332450;
+  --fg:            var(--koast-shore);
+  --fg-2:          #b8c4c0;
+  --fg-3:          #8a9692;
+  --fg-on-dark:    var(--koast-shore);
+  --rule:          rgba(212, 238, 240, 0.12);
+  --rule-strong:   rgba(212, 238, 240, 0.22);
+  --accent:        var(--koast-tide);
+  --accent-deep:   var(--koast-shoal-dark);
+  --accent-tint:   rgba(76, 196, 204, 0.14);
+  --shadow-md:     0 6px 24px -8px rgba(0, 0, 0, 0.45);
+  --shadow-pop:    0 12px 40px -12px rgba(0, 0, 0, 0.65);
+}
+
+/* ---------- 1. Conversation list rail ---------- */
+.rail {
+  background: var(--bg);
+  border-right: 0.5px solid var(--rule);
+  display: flex; flex-direction: column;
+  min-width: 0;
+}
+.rail-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 16px 16px 14px;
+  border-bottom: 0.5px solid var(--rule);
+  flex-shrink: 0;
+}
+.rail-head :global(.k-mark) { width: 22px; height: 22px; }
+.rail-head :global(.k-mark) svg { width: 22px; height: 22px; }
+.rail-head .wm {
+  font-family: var(--font-sans); font-weight: 600; font-size: 14.5px;
+  letter-spacing: -0.022em; color: var(--fg);
+}
+.rail-head .new-btn {
+  margin-left: auto;
+  width: 26px; height: 26px;
+  border: 0.5px solid var(--rule); background: var(--surface);
+  border-radius: 7px; cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--fg-2);
+  transition:
+    background var(--dur-base) var(--ease-default),
+    color var(--dur-base) var(--ease-default),
+    border-color var(--dur-base) var(--ease-default);
+}
+.rail-head .new-btn:hover {
+  background: var(--koast-shore); color: var(--fg); border-color: var(--fg-3);
+}
+.rail-head .new-btn svg { width: 12px; height: 12px; stroke-width: 1.8; }
+
+.rail-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px 10px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.rail-list::-webkit-scrollbar { width: 6px; }
+.rail-list::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 6px; }
+
+.conv {
+  display: block;
+  padding: 9px 10px;
+  border: none; background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-base) var(--ease-default);
+}
+.conv:hover { background: var(--koast-shore); }
+.conv.active { background: var(--koast-shore); }
+.conv-name {
+  font-size: 13px; font-weight: 500; color: var(--fg);
+  letter-spacing: -0.005em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block;
+}
+.conv-meta {
+  margin-top: 2px;
+  font-size: 11.5px; color: var(--fg-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block;
+}
+.conv .conv-time {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3);
+  letter-spacing: 0.04em;
+}
+
+.rail-section-label {
+  padding: 12px 12px 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.rail-foot {
+  border-top: 0.5px solid var(--rule);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.av-me {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--koast-shoal-dark), var(--koast-reef));
+  color: #fff; display: grid; place-items: center;
+  font-family: var(--font-mono); font-weight: 500; font-size: 9.5px;
+  flex-shrink: 0;
+}
+.rail-foot .who { font-size: 12.5px; color: var(--fg); }
+.rail-foot .org {
+  font-size: 11px; color: var(--fg-3); margin-left: auto;
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+
+/* ---------- 2. Chat surface ---------- */
+.surface {
+  display: flex; flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+  background: var(--bg);
+}
+
+/* topbar — property context only. no model name, no AI badge. */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 0.5px solid var(--rule);
+  flex-shrink: 0;
+}
+.ctx {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; color: var(--fg);
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px;
+  transition: background var(--dur-base) var(--ease-default);
+}
+.ctx:hover { background: var(--koast-shore); }
+.ctx-pill {
+  width: 14px; height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #d4eef0 0%, #a8e0e3 28%, #4cc4cc 50%, #2ba2ad 72%, #0e7a8a 100%);
+  flex-shrink: 0;
+}
+.ctx-name { font-weight: 500; letter-spacing: -0.005em; }
+.ctx-meta { color: var(--fg-3); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; }
+.ctx-chev { color: var(--fg-3); font-size: 10px; }
+
+/* Property context dropdown panel (D18 — list of host's properties).
+   Quiet, hairline-bordered, no shadow-elevated card per anti-patterns §14. */
+.ctx-wrap { position: relative; }
+.ctx-panel {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  min-width: 240px; max-width: 360px;
+  background: var(--surface);
+  border: 0.5px solid var(--rule);
+  border-radius: 9px;
+  padding: 4px;
+  z-index: 10;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.ctx-panel-empty {
+  padding: 10px 12px;
+  font-size: 12.5px; color: var(--fg-3);
+}
+.ctx-option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 7px 10px;
+  background: transparent; border: none; cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  font-family: var(--font-sans);
+  transition: background var(--dur-base) var(--ease-default);
+}
+.ctx-option:hover { background: var(--koast-shore); }
+.ctx-option[data-active="true"] { background: var(--koast-shore); }
+.ctx-option-name {
+  font-size: 13px; font-weight: 500; color: var(--fg);
+  letter-spacing: -0.003em;
+}
+.ctx-option-meta {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--fg-3); letter-spacing: 0.04em;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 4px; }
+.icon-btn {
+  width: 30px; height: 30px;
+  border: none; background: transparent;
+  border-radius: 7px; cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--fg-3);
+  transition:
+    background var(--dur-base) var(--ease-default),
+    color var(--dur-base) var(--ease-default);
+}
+.icon-btn:hover { background: var(--koast-shore); color: var(--fg); }
+.icon-btn svg { width: 15px; height: 15px; stroke-width: 1.6; }
+
+/* status dot — never a chip, never a pill */
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot.live { background: var(--koast-good); }
+.dot.warn { background: var(--koast-warn); }
+.dot.idle { background: var(--fg-3); }
+
+/* scroll region — narrow content column, generous padding */
+.scroll {
+  flex: 1; overflow-y: auto;
+  padding: 28px 0 8px;
+}
+.scroll::-webkit-scrollbar { width: 10px; }
+.scroll::-webkit-scrollbar-thumb {
+  background: var(--rule); border-radius: 8px; border: 3px solid var(--bg);
+}
+
+.col {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex; flex-direction: column;
+  gap: 26px;
+}
+
+/* day divider */
+.day {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-3); letter-spacing: 0.18em; text-transform: uppercase;
+  margin: 4px 0 -4px;
+}
+.day::before, .day::after {
+  content: ''; flex: 1; height: 0.5px; background: var(--rule);
+}
+
+/* ============================================================
+   TURN — message envelope
+   user:  right-aligned, soft shore-mist bubble
+   koast: left-aligned, no bubble — prose with avatar
+   ============================================================ */
+.turn { display: flex; flex-direction: column; gap: 8px; }
+.turn.user { align-items: flex-end; }
+.turn.koast { align-items: flex-start; }
+
+.meta {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.06em; color: var(--fg-3);
+}
+.turn.user .meta { flex-direction: row-reverse; }
+.meta .who { color: var(--fg-2); }
+.meta .av { width: 16px; height: 16px; display: grid; place-items: center; }
+.meta .av :global(.k-mark) { width: 16px; height: 16px; }
+.meta .av :global(.k-mark) svg { width: 16px; height: 16px; }
+.meta .av-me {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--koast-shoal-dark), var(--koast-reef));
+  color: #fff; display: grid; place-items: center;
+  font-family: var(--font-mono); font-weight: 500; font-size: 8.5px;
+}
+.meta .stamp { font-variant-numeric: tabular-nums; }
+
+/* user bubble */
+.user-msg {
+  background: var(--koast-shore-mist);
+  color: var(--fg);
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px;
+  font-size: 14px; line-height: 1.55;
+  max-width: 84%;
+  letter-spacing: -0.003em;
+}
+
+/* koast prose — flat, no bubble, tools live INSIDE */
+.koast-msg {
+  font-size: 14px; line-height: 1.62;
+  color: var(--fg);
+  max-width: 100%;
+  letter-spacing: -0.003em;
+}
+.koast-msg p { margin: 0 0 12px; text-wrap: pretty; }
+.koast-msg p:last-child { margin-bottom: 0; }
+.koast-msg em { color: var(--accent-deep); font-style: italic; }
+.koast-msg code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--koast-shore); padding: 1px 6px; border-radius: 5px;
+  color: var(--accent-deep);
+  font-feature-settings: 'ss01';
+}
+.koast-msg strong { font-weight: 500; color: var(--fg); }
+
+/* progressive reveal — used for streaming */
+@keyframes k-reveal {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  animation: k-reveal 360ms var(--ease-default) backwards;
+}
+.reveal.s1 { animation-delay: 0ms; }
+.reveal.s2 { animation-delay: 120ms; }
+.reveal.s3 { animation-delay: 240ms; }
+.reveal.s4 { animation-delay: 360ms; }
+.reveal.s5 { animation-delay: 480ms; }
+
+/* streaming caret — a single subtle dot, not a typewriter cursor */
+.stream-tail {
+  display: inline-block;
+  width: 6px; height: 14px;
+  margin-left: 3px; vertical-align: -2px;
+  background: var(--accent-deep);
+  border-radius: 1.5px;
+  opacity: 0.55;
+  animation: k-tail 1.1s infinite ease-in-out;
+}
+@keyframes k-tail {
+  0%, 100% { opacity: 0.18; transform: scaleY(0.85); }
+  50%      { opacity: 0.7;  transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stream-tail { animation: none; opacity: 0.55; }
+}
+
+/* ============================================================
+   INLINE TOOL CALL
+   Single line. Mono name + dim params + latency.
+   ============================================================ */
+.tool {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 0 0 12px;
+  padding: 5px 9px 5px 8px;
+  background: transparent;
+  border: 0.5px solid var(--rule);
+  border-radius: 7px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-base) var(--ease-default),
+    border-color var(--dur-base) var(--ease-default);
+  max-width: 100%;
+  letter-spacing: 0.01em;
+  font-feature-settings: 'ss01';
+}
+.tool:hover { background: var(--koast-shore); border-color: var(--fg-3); }
+.tool .tool-icon {
+  width: 12px; height: 12px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  color: var(--accent-deep);
+}
+.tool .tool-icon svg { width: 11px; height: 11px; stroke-width: 1.7; }
+.tool .tool-name { color: var(--fg); }
+.tool .tool-arg { color: var(--fg-3); }
+.tool .sep { color: var(--fg-3); opacity: 0.55; }
+.tool .tool-dur {
+  color: var(--fg-3); margin-left: 4px; padding-left: 8px;
+  border-left: 0.5px solid var(--rule); font-variant-numeric: tabular-nums;
+}
+.tool .tool-chev { color: var(--fg-3); font-size: 9px; margin-left: 1px; }
+
+/* in-flight tool — quiet pulse on the icon, no bg flash */
+.tool.in-flight .tool-icon { color: var(--accent); }
+.tool.in-flight .tool-icon svg { animation: k-tool-spin 0.9s linear infinite; }
+@keyframes k-tool-spin { to { transform: rotate(360deg); } }
+.tool.in-flight .tool-dur { color: var(--accent); border-left-color: var(--accent-tint); }
+.tool.in-flight .pulse {
+  display: inline-block;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent);
+  margin-left: 4px;
+  animation: k-tool-pulse 1.1s infinite ease-in-out;
+}
+@keyframes k-tool-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool.in-flight .tool-icon svg { animation: none; }
+  .tool.in-flight .pulse { animation: none; opacity: 0.85; }
+}
+
+/* expanded tool */
+.tool-expanded {
+  margin: 0 0 12px;
+  border: 0.5px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.tool-expanded-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 11px;
+  background: var(--koast-shore);
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--fg-2);
+  border-bottom: 0.5px solid var(--rule);
+}
+.tool-expanded-head .tool-icon { color: var(--accent-deep); }
+.tool-expanded-head .tool-icon svg { width: 11px; height: 11px; stroke-width: 1.7; }
+.tool-expanded-body {
+  padding: 11px 13px;
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65;
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  font-feature-settings: 'ss01';
+}
+.tool-expanded-body .k { color: var(--accent-deep); }
+.tool-expanded-body .n { color: var(--fg); font-weight: 500; }
+.tool-expanded-body .dim { color: var(--fg-3); }
+
+/* ============================================================
+   ACTION PROPOSAL — a quiet block, NOT a card.
+   Left tide-color stripe carries the affordance.
+   ============================================================ */
+.proposal {
+  display: flex;
+  margin: 4px 0 12px;
+  padding-left: 14px;
+  border-left: 2px solid var(--accent);
+  flex-direction: column;
+  gap: 10px;
+}
+.proposal-head {
+  font-size: 13.5px; font-weight: 500; color: var(--fg);
+  letter-spacing: -0.005em;
+}
+.proposal-why {
+  font-size: 13px; color: var(--fg-2); line-height: 1.55;
+  max-width: 56ch;
+}
+.proposal-why .label {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--fg-3);
+  margin-right: 6px;
+}
+.proposal-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* Buttons — text + small icon. NEVER icon-only for primary. */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; cursor: pointer;
+  font-family: var(--font-sans); font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 7px;
+  letter-spacing: -0.003em;
+  transition:
+    background var(--dur-base) var(--ease-default),
+    color var(--dur-base) var(--ease-default),
+    border-color var(--dur-base) var(--ease-default),
+    transform 80ms ease-out;
+}
+.btn:active { transform: scale(0.98); }
+.btn svg { width: 12px; height: 12px; stroke-width: 1.8; }
+.btn-primary { background: var(--accent-deep); color: #fff; }
+.btn-primary:hover { background: var(--koast-reef); }
+.btn-secondary { background: transparent; color: var(--fg); border: 0.5px solid var(--rule); }
+.btn-secondary:hover { background: var(--koast-shore); border-color: var(--fg-3); }
+.btn-ghost {
+  background: transparent; color: var(--fg-2);
+  border: 0.5px solid transparent;
+  padding-left: 8px; padding-right: 8px;
+}
+.btn-ghost:hover { color: var(--fg); }
+.btn-warn {
+  background: transparent; color: var(--koast-warn);
+  border: 0.5px solid transparent;
+}
+.btn-warn:hover { background: rgba(179, 65, 65, 0.06); }
+
+/* ============================================================
+   MEMORY ARTIFACT — quiet inline confirmation, distinct from a tool call.
+   Slight shore-mist tint to signal "this is becoming Koast's memory".
+   ============================================================ */
+.memory {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  padding: 11px 14px 12px;
+  background: rgba(76, 196, 204, 0.07);
+  border: 0.5px solid rgba(14, 122, 138, 0.20);
+  border-radius: 9px;
+  margin: 0 0 12px;
+  max-width: 560px;
+}
+.memory-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--accent-deep);
+}
+.memory-label :global(.k-mark) { width: 11px; height: 11px; }
+.memory-label :global(.k-mark) svg { width: 11px; height: 11px; }
+.memory-fact {
+  font-size: 13.5px; line-height: 1.55; color: var(--fg);
+  letter-spacing: -0.003em;
+}
+.memory-fact .key { color: var(--fg-2); }
+.memory-fact .val {
+  color: var(--accent-deep); font-family: var(--font-mono); font-size: 12.5px;
+  padding: 0 4px; background: var(--surface); border-radius: 4px;
+  border: 0.5px solid rgba(14, 122, 138, 0.16);
+}
+.memory-actions { display: flex; gap: 6px; align-items: center; }
+.memory-saved {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.06em; color: var(--accent-deep);
+}
+.memory-saved .check {
+  width: 12px; height: 12px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--accent-deep); color: #fff;
+}
+.memory-saved .check svg { width: 8px; height: 8px; stroke-width: 2.5; }
+
+/* ============================================================
+   ERROR / REFUSAL — both quiet, distinct.
+   ============================================================ */
+.err {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--koast-warn);
+  padding: 7px 11px;
+  border: 0.5px solid rgba(179, 65, 65, 0.32);
+  border-radius: 7px;
+  background: rgba(179, 65, 65, 0.04);
+  margin: 0;
+}
+.err .dot { background: var(--koast-warn); }
+.err-actions {
+  display: flex; gap: 6px; margin-left: auto; padding-left: 10px;
+  border-left: 0.5px solid rgba(179, 65, 65, 0.20);
+}
+.err-actions .btn { padding: 4px 9px; font-size: 11.5px; }
+.err-actions .btn-warn { color: var(--koast-warn); }
+
+/* refusal needs no chrome — the agent says it itself.
+   Just a subtle tag at the top so eyes know to read it as scoped. */
+.refusal-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--fg-3);
+  margin: 0 0 8px;
+}
+
+/* ============================================================
+   COMPOSER — input bar
+   ============================================================ */
+.composer-wrap {
+  flex-shrink: 0;
+  padding: 10px 32px 16px;
+  background: var(--bg);
+}
+.composer {
+  max-width: 720px; margin: 0 auto;
+  border: 0.5px solid var(--rule);
+  background: var(--surface);
+  border-radius: 12px;
+  transition:
+    border-color var(--dur-base) var(--ease-default),
+    box-shadow var(--dur-base) var(--ease-default),
+    opacity var(--dur-base) var(--ease-default);
+}
+.composer.is-focus,
+.composer:focus-within {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px rgba(14, 122, 138, 0.10);
+}
+.composer.is-disabled { opacity: 0.62; pointer-events: none; }
+.composer-input {
+  width: 100%;
+  border: none; outline: none; resize: none;
+  background: transparent;
+  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+  color: var(--fg);
+  padding: 12px 14px 4px;
+  min-height: 40px;
+  letter-spacing: -0.003em;
+}
+.composer-input::placeholder { color: var(--fg-3); }
+.composer-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 7px 7px 9px;
+}
+.composer-tools { display: flex; gap: 1px; }
+.composer-tools .icon-btn { width: 26px; height: 26px; border-radius: 6px; }
+.composer-tools .icon-btn svg { width: 13px; height: 13px; }
+.composer-send { display: flex; align-items: center; gap: 9px; }
+.composer-hint {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-3); letter-spacing: 0.06em;
+}
+.send-btn {
+  background: var(--accent-deep); color: #fff;
+  border: none; cursor: pointer;
+  width: 28px; height: 28px; border-radius: 7px;
+  display: grid; place-items: center;
+  transition:
+    background var(--dur-base) var(--ease-default),
+    transform 80ms ease-out,
+    opacity var(--dur-base) var(--ease-default);
+}
+.send-btn:hover { background: var(--koast-reef); }
+.send-btn:active { transform: scale(0.94); }
+.send-btn svg { width: 13px; height: 13px; stroke-width: 2; }
+.send-btn[disabled] {
+  background: var(--rule); cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* When agent is streaming — composer dims, says "responding…" */
+.responding-row {
+  max-width: 720px; margin: 6px auto 0;
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.06em; color: var(--accent-deep);
+}
+.responding-row :global(.k-mark) { width: 12px; height: 12px; }
+.responding-row :global(.k-mark) svg { width: 12px; height: 12px; }
+.responding-row .stop-btn {
+  margin-left: auto; padding: 3px 9px; border-radius: 6px;
+  background: transparent; border: 0.5px solid var(--rule);
+  color: var(--fg-2); font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.06em; cursor: pointer;
+  transition:
+    background var(--dur-base) var(--ease-default),
+    color var(--dur-base) var(--ease-default);
+}
+.responding-row .stop-btn:hover { background: var(--koast-shore); color: var(--fg); }
+
+/* footnote strip beneath input */
+.footnote {
+  max-width: 720px; margin: 8px auto 0;
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-3); letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   EMPTY STATE — austere. One input, one hint.
+   ============================================================ */
+.empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0 32px;
+  gap: 18px;
+}
+.empty :global(.k-mark) { width: 28px; height: 28px; opacity: 0.45; }
+.empty :global(.k-mark) svg { width: 28px; height: 28px; }
+.empty-prompt {
+  font-family: var(--font-sans); font-weight: 400;
+  font-size: 17px; color: var(--fg-3);
+  letter-spacing: -0.012em;
+  max-width: 32ch; text-align: center;
+  text-wrap: balance;
+}
+
+/* ============================================================
+   MOBILE — under 640px (D-15 mobile drawer interaction is M5 stub;
+   carry-forward §10 item 3 covers the slide motion + scrim).
+   The breakpoint applies via the .m-mobile class on the .shell wrapper.
+   ============================================================ */
+.shell.m-mobile { grid-template-columns: 1fr; }
+.shell.m-mobile .rail { display: none; }
+.shell.m-mobile .topbar { padding: 0 14px; height: 48px; }
+.shell.m-mobile .topbar .ctx-meta { display: none; }
+.shell.m-mobile .col { padding: 0 16px; }
+.shell.m-mobile .composer-wrap { padding: 8px 14px 12px; }
+.shell.m-mobile .scroll { padding: 18px 0 6px; }
+.shell.m-mobile .menu-btn { display: grid; }
+.menu-btn {
+  display: none;
+  width: 30px; height: 30px;
+  border: none; background: transparent;
+  border-radius: 7px; cursor: pointer;
+  place-items: center;
+  color: var(--fg-2);
+  margin-right: 6px;
+}
+.menu-btn svg { width: 16px; height: 16px; stroke-width: 1.7; }

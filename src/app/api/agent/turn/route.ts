@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const { conversation_id, message } = parsed.data;
+  const { conversation_id, message, ui_context } = parsed.data;
 
   // 3-5. Stream the agent turn as SSE
   const encoder = new TextEncoder();
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
           host: { id: user.id },
           conversation_id,
           user_message_text: message,
+          ui_context,
         })) {
           if (request.signal.aborted) {
             // Client disconnected; stop emitting (loop's in-flight

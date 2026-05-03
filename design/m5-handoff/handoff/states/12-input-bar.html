@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koast · input bar states</title>
+<link rel="icon" href="../../assets/favicons/favicon.ico">
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="stylesheet" href="../../koast-mark.css">
+<link rel="stylesheet" href="../chat-shell.css">
+<style>
+  body { background: var(--bg); overflow: auto; }
+  .stack { max-width: 720px; margin: 0 auto; padding: 40px 32px 48px; display: flex; flex-direction: column; gap: 32px; }
+  .stack section { display: flex; flex-direction: column; gap: 8px; }
+  .stack section header {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  .stack section header .num { color: var(--accent-deep); font-weight: 500; }
+  .stack section header .desc { color: var(--fg-2); letter-spacing: 0.06em; text-transform: none; }
+  .composer-wrap-inline {
+    background: var(--bg);
+    padding: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="stack">
+
+  <section>
+    <header><span class="num">12·1</span><span>empty</span><span class="desc">— placeholder visible, send disabled</span></header>
+    <div class="composer-wrap-inline">
+      <div class="composer">
+        <textarea class="composer-input" rows="1" placeholder="Ask Koast about a guest, a price, a turnover…"></textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5L12 4l9 7.5M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <span class="composer-hint">⌘↵ to send</span>
+            <button class="send-btn" disabled aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <header><span class="num">12·2</span><span>typing</span><span class="desc">— text in field, send active</span></header>
+    <div class="composer-wrap-inline">
+      <div class="composer is-focus">
+        <textarea class="composer-input" rows="1">Draft the handyman message — keep it short, mention the pattern</textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5L12 4l9 7.5M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <span class="composer-hint">⌘↵ to send</span>
+            <button class="send-btn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <header><span class="num">12·3</span><span>sending</span><span class="desc">— dispatched, briefly disabled</span></header>
+    <div class="composer-wrap-inline">
+      <div class="composer is-disabled">
+        <textarea class="composer-input" rows="1" disabled>Draft the handyman message — keep it short, mention the pattern</textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5L12 4l9 7.5M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <span class="composer-hint">sending…</span>
+            <button class="send-btn" disabled aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 1 1-3-6.7" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <header><span class="num">12·4</span><span>blocked</span><span class="desc">— agent streaming, input disabled</span></header>
+    <div class="composer-wrap-inline">
+      <div class="composer is-disabled">
+        <textarea class="composer-input" rows="1" disabled placeholder="Ask Koast about a guest, a price, a turnover…"></textarea>
+        <div class="composer-foot">
+          <div class="composer-tools">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7.1-7.1L13 5.4a3.5 3.5 0 1 1 5 5L9.4 19" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5L12 4l9 7.5M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="composer-send">
+            <span class="composer-hint">⌘↵ to send</span>
+            <button class="send-btn" disabled aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="responding-row">
+        <span class="k-mark" data-state="active" data-size="small">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Koast">
+  <defs><clipPath id="rr-s12"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+  <g clip-path="url(#rr-s12)" class="bands">
+    <rect class="b1" x="0" y="4"  width="100" height="23" fill="#d4eef0"/>
+    <rect class="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3"/>
+    <rect class="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc"/>
+    <rect class="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad"/>
+    <rect class="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a"/>
+  </g>
+</svg>
+</span>
+        <span>Koast is responding…</span>
+        <button class="stop-btn">stop</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

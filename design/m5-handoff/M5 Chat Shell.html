@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koast · M5 chat shell · 14 states</title>
+<link rel="icon" href="assets/favicons/favicon.ico">
+<link rel="stylesheet" href="colors_and_type.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #efebe0; font-family: var(--font-sans); }
+  #root { width: 100%; height: 100vh; }
+  iframe.state-frame {
+    border: 0; display: block;
+    background: var(--bg);
+  }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+// shorthand — render a state file inside an iframe at the artboard size
+function StateFrame({ src, w, h }) {
+  return (
+    <iframe
+      className="state-frame"
+      src={src}
+      width={w}
+      height={h}
+      title={src}
+      loading="eager"
+      scrolling="no"
+    />
+  );
+}
+
+// each artboard = a chat shell at desktop dims; mobile gets its own size
+const SHELL_W = 1100;
+const SHELL_H = 720;
+const PHONE_W = 410;
+const PHONE_H = 760;
+const BAR_W   = 820;
+const BAR_H   = 720;
+
+const sections = [
+  {
+    id: 'baseline',
+    title: 'Baseline',
+    subtitle: 'Empty + populated. The container before the conversation.',
+    boards: [
+      { id: '01-empty',     label: '01 · Empty state',        src: 'handoff/states/01-empty.html',              w: SHELL_W, h: SHELL_H, screen: '01 Empty' },
+      { id: '02-list',      label: '02 · Conversation list',  src: 'handoff/states/02-conversation-list.html',  w: SHELL_W, h: SHELL_H, screen: '02 Conversation list' },
+      { id: '03-stream',    label: '03 · Message stream',     src: 'handoff/states/03-message-stream.html',     w: SHELL_W, h: SHELL_H, screen: '03 Message stream' },
+    ],
+  },
+  {
+    id: 'streaming',
+    title: 'In-flight',
+    subtitle: 'States the agent passes through during a turn.',
+    boards: [
+      { id: '04-streaming', label: '04 · Streaming text',       src: 'handoff/states/04-streaming.html',          w: SHELL_W, h: SHELL_H, screen: '04 Streaming' },
+      { id: '06-tool-fl',   label: '06 · Tool call · in-flight',src: 'handoff/states/06-tool-call-in-flight.html',w: SHELL_W, h: SHELL_H, screen: '06 Tool in-flight' },
+      { id: '09-done',      label: '09 · Completed turn',       src: 'handoff/states/09-completed-turn.html',     w: SHELL_W, h: SHELL_H, screen: '09 Completed' },
+    ],
+  },
+  {
+    id: 'tools',
+    title: 'Tool calls',
+    subtitle: 'Inline within the message — never a card above.',
+    boards: [
+      { id: '05-tool',      label: '05 · Inline tool call',     src: 'handoff/states/05-inline-tool-call.html',   w: SHELL_W, h: SHELL_H, screen: '05 Inline tool' },
+      { id: '07-tool-done', label: '07 · Tool call · completed',src: 'handoff/states/07-tool-call-completed.html',w: SHELL_W, h: SHELL_H, screen: '07 Tool done' },
+    ],
+  },
+  {
+    id: 'agent-output',
+    title: 'Agent acts',
+    subtitle: 'Proposals, refusals, errors, and memory writes.',
+    boards: [
+      { id: '08-proposal',  label: '08 · Action proposal',      src: 'handoff/states/08-action-proposal.html',    w: SHELL_W, h: SHELL_H, screen: '08 Proposal' },
+      { id: '14-memory',    label: '14 · Memory artifact',      src: 'handoff/states/14-memory-artifact.html',    w: SHELL_W, h: SHELL_H + 220, screen: '14 Memory' },
+      { id: '11-refusal',   label: '11 · Refusal',              src: 'handoff/states/11-refusal.html',            w: SHELL_W, h: SHELL_H, screen: '11 Refusal' },
+      { id: '10-error',     label: '10 · Error · mid-stream',   src: 'handoff/states/10-error.html',              w: SHELL_W, h: SHELL_H, screen: '10 Error' },
+    ],
+  },
+  {
+    id: 'composer',
+    title: 'Input bar',
+    subtitle: 'Four states stacked. Empty / typing / sending / blocked.',
+    boards: [
+      { id: '12-input', label: '12 · Input bar', src: 'handoff/states/12-input-bar.html', w: BAR_W, h: BAR_H, screen: '12 Input bar' },
+    ],
+  },
+  {
+    id: 'mobile',
+    title: 'Mobile',
+    subtitle: '375px. Rail collapses, composer pinned to bottom.',
+    boards: [
+      { id: '13-mobile', label: '13 · Mobile (375)', src: 'handoff/states/13-mobile.html', w: PHONE_W, h: PHONE_H, screen: '13 Mobile' },
+    ],
+  },
+];
+
+function App() {
+  return (
+    <DesignCanvas>
+      {sections.map((s) => (
+        <DCSection key={s.id} id={s.id} title={s.title} subtitle={s.subtitle}>
+          {s.boards.map((b) => (
+            <DCArtboard
+              key={b.id}
+              id={b.id}
+              label={b.label}
+              width={b.w}
+              height={b.h}
+            >
+              <div data-screen-label={b.screen} style={{ width: b.w, height: b.h }}>
+                <StateFrame src={b.src} w={b.w} h={b.h} />
+              </div>
+            </DCArtboard>
+          ))}
+        </DCSection>
+      ))}
+    </DesignCanvas>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+
+</body>
+</html>

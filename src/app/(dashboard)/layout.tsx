@@ -307,6 +307,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [conflictCount, setConflictCount] = useState(0);
 
+  // M5 D15 / D-Q5 — chat surface owns its own full-bleed layout
+  // (Rail + Surface). Skip the dashboard sidebar/topbar/CommandPalette
+  // chrome entirely so the chat shell renders edge to edge. Auth scope
+  // is preserved (still inside the (dashboard) route group).
+  if (pathname?.startsWith("/chat") || pathname?.startsWith("/_preview/m5-states")) {
+    return <>{children}</>;
+  }
+
   // Persist sidebar preference
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-expanded");
