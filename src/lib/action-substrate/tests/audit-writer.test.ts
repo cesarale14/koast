@@ -62,7 +62,7 @@ describe("writeAuditLog", () => {
 
     const result = await writeAuditLog({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: { fact_attribute: "wifi_password" },
       source: "agent_artifact",
       actor_kind: "agent",
@@ -82,7 +82,7 @@ describe("writeAuditLog", () => {
 
     const inserted = insertBuilder.insert.mock.calls[0][0];
     expect(inserted.host_id).toBe(HOST_ID);
-    expect(inserted.action_type).toBe("memory_fact_write");
+    expect(inserted.action_type).toBe("write_memory_fact");
     expect(inserted.source).toBe("agent_artifact");
     expect(inserted.outcome).toBe("pending");
     expect(inserted.autonomy_level).toBe("confirmed");
@@ -100,7 +100,7 @@ describe("writeAuditLog", () => {
 
     await writeAuditLog({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "frontend_api",
       actor_kind: "host",
@@ -125,7 +125,7 @@ describe("writeAuditLog", () => {
     await expect(
       writeAuditLog({
         host_id: HOST_ID,
-        action_type: "memory_fact_write",
+        action_type: "write_memory_fact",
         payload: {},
         source: "frontend_api",
         actor_kind: "host",

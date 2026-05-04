@@ -12,14 +12,25 @@
  * fetch + ReadableStream reader). Both ends Zod-validate; mismatches
  * are caught at parse time on the frontend.
  *
- * v1 event types (per design doc §3.2, minus 'artifact' which M7 adds):
+ * v1 event types (per design doc §3.2):
  *   turn_started        — first event, signals new assistant turn beginning
  *   token               — text delta from the model
  *   tool_call_started   — tool invocation began (with host-readable summary)
  *   tool_call_completed — tool returned (success + result summary)
+ *   tool_call_failed    — tool failed; carries the structured error taxonomy (M6 D28)
+ *   memory_write_pending — a write_memory_fact proposal landed; agent_artifacts
+ *                          row is in state='emitted' (M6 D35 fork)
+ *   memory_write_saved  — host approved a memory_write proposal; the
+ *                          memory_facts row is committed (M6 post-approval)
  *   done                — assistant turn finished cleanly (end_turn or max_tokens)
- *   error               — recoverable or fatal error; client decides retry
+ *   error               — turn-level fatal error reserved for unrecoverable
+ *                          failures (network, malformed model response).
+ *                          Per-tool failures use tool_call_failed instead.
  *   refusal             — model declined to ground; structured fallback
+ *
+ * The 4th forward-looking event from M5 — `action_proposed` — stays
+ * deferred to M7 (non-memory action types). Reducer's exhaustive
+ * check still fails for it, forcing M7 to address.
  */
 
 import { z } from "zod";
@@ -44,6 +55,53 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     tool_use_id: z.string(),
     success: z.boolean(),
     result_summary: z.string(),
+  }),
+  z.object({
+    type: z.literal("tool_call_failed"),
+    tool_use_id: z.string(),
+    tool_name: z.string(),
+    error: z.object({
+      kind: z.enum([
+        "validation",
+        "authorization",
+        "constraint",
+        "conflict",
+        "transient",
+        "unknown",
+      ]),
+      message: z.string(),
+      retryable: z.boolean(),
+    }),
+    latency_ms: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("memory_write_pending"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    proposed_payload: z.object({
+      property_id: z.string(),
+      sub_entity_type: z.string(),
+      attribute: z.string(),
+      fact_value: z.unknown(),
+      confidence: z.number().optional(),
+      source: z.string(),
+      supersedes: z.string().optional(),
+      supersedes_memory_fact_id: z.string().optional(),
+      citation: z
+        .object({
+          source_text: z.string().optional(),
+          reasoning: z.string().optional(),
+        })
+        .optional(),
+    }),
+    supersedes: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("memory_write_saved"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    memory_fact_id: z.string(),
+    superseded_memory_fact_id: z.string().nullable().optional(),
   }),
   z.object({
     type: z.literal("done"),

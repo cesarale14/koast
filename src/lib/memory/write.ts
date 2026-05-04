@@ -100,7 +100,7 @@ export async function writeMemoryFact(
   // with outcome='pending' which we resolve at the end.
   const gate = await requestAction({
     host_id: input.host.id,
-    action_type: "memory_fact_write",
+    action_type: "write_memory_fact",
     payload: {
       entity_type: input.fact.entity_type,
       entity_id: input.fact.entity_id,

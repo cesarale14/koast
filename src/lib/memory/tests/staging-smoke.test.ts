@@ -69,7 +69,7 @@ const SMOKE_ATTRIBUTE = `smoke_test_${Date.now()}`;
 
     expect(writeResult.audit_metadata.autonomy_level).toBe("confirmed");
     expect(writeResult.audit_metadata.actor_kind).toBe("agent");
-    expect(writeResult.audit_metadata.stakes_class).toBe("low");
+    expect(writeResult.audit_metadata.stakes_class).toBe("medium");
 
     // ----- READ -----
     const readResult = await readMemory({
@@ -112,11 +112,11 @@ const SMOKE_ATTRIBUTE = `smoke_test_${Date.now()}`;
 
     expect(auditErr).toBeNull();
     expect(auditRow.outcome).toBe("succeeded");
-    expect(auditRow.action_type).toBe("memory_fact_write");
+    expect(auditRow.action_type).toBe("write_memory_fact");
     expect(auditRow.autonomy_level).toBe("confirmed");
     expect(auditRow.source).toBe("agent_artifact");
     expect(auditRow.actor_kind).toBe("agent");
     expect(typeof auditRow.latency_ms).toBe("number");
-    expect(auditRow.context.stakes_class).toBe("low");
+    expect(auditRow.context.stakes_class).toBe("medium");
   }, 30_000);
 });

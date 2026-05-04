@@ -19,7 +19,7 @@ function audit_metadata(overrides: Partial<{ autonomy_level: "silent" | "confirm
     audit_log_id: FAKE_LOG_ID,
     autonomy_level: overrides.autonomy_level ?? ("confirmed" as const),
     actor_kind: "agent" as const,
-    stakes_class: "low" as const,
+    stakes_class: "medium" as const,
     created_at: FAKE_CREATED_AT,
   };
 }
@@ -75,7 +75,7 @@ describe("writeMemoryFact — happy path (committed)", () => {
     // Substrate consulted with the right shape
     expect(requestAction).toHaveBeenCalledTimes(1);
     const reqArg = (requestAction as jest.Mock).mock.calls[0][0];
-    expect(reqArg.action_type).toBe("memory_fact_write");
+    expect(reqArg.action_type).toBe("write_memory_fact");
     expect(reqArg.source).toBe("agent_artifact");
     expect(reqArg.context).toEqual({ artifact_id: "art-1" });
     expect(reqArg.host_id).toBe(HOST_ID);
@@ -149,7 +149,7 @@ describe("writeMemoryFact — blocked path", () => {
   test("when substrate returns mode='require_confirmation', returns mode='blocked' and resolves audit to 'failed' with gate_blocked reason", async () => {
     (requestAction as jest.Mock).mockResolvedValue({
       mode: "require_confirmation",
-      reason: "Action 'memory_fact_write' is medium-stakes; ...",
+      reason: "Action 'write_memory_fact' is medium-stakes; ...",
       audit_metadata: audit_metadata({ autonomy_level: "blocked" }),
     });
     (updateAuditOutcome as jest.Mock).mockResolvedValue(undefined);

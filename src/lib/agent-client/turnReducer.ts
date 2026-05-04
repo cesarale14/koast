@@ -1,13 +1,13 @@
 /**
  * Turn reducer — pure function (state, event) => state.
  *
- * Handles the 7 M4-emitted SSE events. Forward-looking events
- * (tool_call_failed, action_proposed, memory_write_pending,
- * memory_write_saved) are intentionally not in the switch (D-FORWARD-EVENTS):
- * if/when the substrate adds them to AgentStreamEventSchema, the
- * `_exhaustive: never` assignment in the default branch will fail
- * TypeScript compilation, forcing the paired implementation. Dead
- * branches are worse than no branches.
+ * Handles the M4-emitted events PLUS the M6 promotions
+ * (tool_call_failed, memory_write_pending, memory_write_saved). The
+ * remaining forward-looking event — `action_proposed` — is intentionally
+ * NOT in the switch: if/when the substrate adds it to
+ * AgentStreamEventSchema, the `_exhaustive: never` assignment in the
+ * default branch will fail TypeScript compilation, forcing the paired
+ * implementation. Dead branches are worse than no branches.
  *
  * All transitions are immutable — no mutation of the input state.
  */
@@ -50,6 +50,15 @@ export function turnReducer(
 
     case "tool_call_completed":
       return mutateToolCompleted(state, event);
+
+    case "tool_call_failed":
+      return mutateToolFailed(state, event);
+
+    case "memory_write_pending":
+      return appendMemoryArtifactPending(state, event);
+
+    case "memory_write_saved":
+      return mutateMemoryArtifactSaved(state, event);
 
     case "done":
       return {
@@ -163,6 +172,138 @@ function mutateToolCompleted(
       result_summary: event.result_summary,
       started_at: now,
       duration_ms: 0,
+    };
+    return { ...state, content: [...state.content, block] };
+  }
+  return { ...state, content };
+}
+
+/* ============================================================
+   M6 promotions: tool_call_failed, memory_write_pending, memory_write_saved
+   ============================================================ */
+
+function mutateToolFailed(
+  state: TurnState,
+  event: Extract<AgentStreamEvent, { type: "tool_call_failed" }>,
+): TurnState {
+  const now = nowFn();
+  let mutated = false;
+  const content = state.content.map((block): ContentBlock => {
+    if (
+      block.kind === "tool" &&
+      block.tool_use_id === event.tool_use_id &&
+      block.status === "in-flight"
+    ) {
+      mutated = true;
+      return {
+        ...block,
+        status: "failed",
+        error: { ...event.error },
+        duration_ms: event.latency_ms ?? Math.max(0, now - block.started_at),
+      };
+    }
+    return block;
+  });
+  if (!mutated) {
+    // Defensive: failed event without a matching started block.
+    const block: ContentBlock = {
+      kind: "tool",
+      tool_use_id: event.tool_use_id,
+      tool_name: event.tool_name,
+      input_summary: "",
+      status: "failed",
+      error: { ...event.error },
+      started_at: now,
+      duration_ms: event.latency_ms ?? 0,
+    };
+    return { ...state, content: [...state.content, block] };
+  }
+  return { ...state, content };
+}
+
+function appendMemoryArtifactPending(
+  state: TurnState,
+  event: Extract<AgentStreamEvent, { type: "memory_write_pending" }>,
+): TurnState {
+  const now = nowFn();
+
+  // Supersession cascade — if this proposal corrects a prior pending
+  // artifact, mark the prior block in current state's content array
+  // as state='superseded' and link the new artifact_id. Optimistic UI;
+  // the substrate's cascade also writes agent_artifacts.state in DB.
+  const cascadedContent =
+    typeof event.supersedes === "string" && event.supersedes.length > 0
+      ? state.content.map((block): ContentBlock => {
+          if (
+            block.kind === "memory_artifact" &&
+            block.artifact_id === event.supersedes
+          ) {
+            return {
+              ...block,
+              state: "superseded",
+              superseded_by_artifact_id: event.artifact_id,
+            };
+          }
+          return block;
+        })
+      : state.content;
+
+  const newBlock: ContentBlock = {
+    kind: "memory_artifact",
+    artifact_id: event.artifact_id,
+    audit_log_id: event.audit_log_id,
+    state: "pending",
+    payload: event.proposed_payload,
+    started_at: now,
+  };
+
+  return { ...state, content: [...cascadedContent, newBlock] };
+}
+
+function mutateMemoryArtifactSaved(
+  state: TurnState,
+  event: Extract<AgentStreamEvent, { type: "memory_write_saved" }>,
+): TurnState {
+  let mutated = false;
+  const content = state.content.map((block): ContentBlock => {
+    if (
+      block.kind === "memory_artifact" &&
+      block.artifact_id === event.artifact_id &&
+      block.state === "pending"
+    ) {
+      mutated = true;
+      return {
+        ...block,
+        state: "saved",
+        memory_fact_id: event.memory_fact_id,
+      };
+    }
+    return block;
+  });
+  if (!mutated) {
+    // Defensive: a saved event for an unknown artifact_id. The
+    // conversation-reads extension (step 13) re-attaches pending
+    // artifacts on reload from server; if the saved event arrives
+    // before the pending artifact lands in the in-memory state, it
+    // would normally be dropped. Append as a synthetic saved-only
+    // block to preserve the visual ack; the milestone animation
+    // still fires because state='saved' is set.
+    const now = nowFn();
+    const block: ContentBlock = {
+      kind: "memory_artifact",
+      artifact_id: event.artifact_id,
+      audit_log_id: event.audit_log_id,
+      state: "saved",
+      // Empty payload — this branch only fires on out-of-order delivery.
+      payload: {
+        property_id: "",
+        sub_entity_type: "",
+        attribute: "",
+        fact_value: null,
+        source: "",
+      },
+      memory_fact_id: event.memory_fact_id,
+      started_at: now,
     };
     return { ...state, content: [...state.content, block] };
   }

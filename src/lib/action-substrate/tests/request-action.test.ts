@@ -25,7 +25,7 @@ describe("requestAction — agent_artifact bypass", () => {
   test("source='agent_artifact' with valid artifact_id → mode='allow' / autonomy='confirmed'", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: { fact_attribute: "wifi_password" },
       source: "agent_artifact",
       actor_id: null,
@@ -35,38 +35,38 @@ describe("requestAction — agent_artifact bypass", () => {
     expect(result.mode).toBe("allow");
     expect(result.audit_metadata.autonomy_level).toBe("confirmed");
     expect(result.audit_metadata.actor_kind).toBe("agent");
-    expect(result.audit_metadata.stakes_class).toBe("low");
+    expect(result.audit_metadata.stakes_class).toBe("medium");
     expect(result.audit_metadata.audit_log_id).toBe(FAKE_LOG_ID);
     expect(result.reason).toMatch(/Host confirmation routed through artifact art-123/);
   });
 
-  test("source='agent_artifact' WITHOUT artifact_id → falls through to stakes-based logic", async () => {
+  test("source='agent_artifact' WITHOUT artifact_id → falls through to stakes-based logic (medium → require_confirmation)", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "agent_artifact",
       actor_id: null,
       context: null,
     });
 
-    // Without bypass: low stakes → allow / silent
-    expect(result.mode).toBe("allow");
-    expect(result.audit_metadata.autonomy_level).toBe("silent");
+    // Without bypass: medium stakes → require_confirmation / blocked
+    expect(result.mode).toBe("require_confirmation");
+    expect(result.audit_metadata.autonomy_level).toBe("blocked");
     expect(result.audit_metadata.actor_kind).toBe("agent");
   });
 
-  test("source='agent_artifact' with empty-string artifact_id → no bypass", async () => {
+  test("source='agent_artifact' with empty-string artifact_id → no bypass (medium → blocked)", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "agent_artifact",
       actor_id: null,
       context: { artifact_id: "" },
     });
 
-    expect(result.audit_metadata.autonomy_level).toBe("silent");
+    expect(result.audit_metadata.autonomy_level).toBe("blocked");
   });
 });
 
@@ -79,46 +79,48 @@ describe("requestAction — stakes-based logic", () => {
     });
   });
 
-  test("low stakes (memory_fact_write) from frontend_api → allow / silent", async () => {
+  test("medium stakes (write_memory_fact) from frontend_api → require_confirmation / blocked", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "frontend_api",
       actor_id: HOST_ID,
       context: null,
     });
 
-    expect(result.mode).toBe("allow");
-    expect(result.audit_metadata.autonomy_level).toBe("silent");
+    expect(result.mode).toBe("require_confirmation");
+    expect(result.audit_metadata.autonomy_level).toBe("blocked");
     expect(result.audit_metadata.actor_kind).toBe("host");
+    expect(result.audit_metadata.stakes_class).toBe("medium");
   });
 
-  test("low stakes from worker → allow / silent / actor_kind='worker'", async () => {
+  test("medium stakes from worker → require_confirmation / blocked / actor_kind='worker'", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "worker",
       actor_id: null,
       context: null,
     });
 
-    expect(result.mode).toBe("allow");
-    expect(result.audit_metadata.autonomy_level).toBe("silent");
+    expect(result.mode).toBe("require_confirmation");
+    expect(result.audit_metadata.autonomy_level).toBe("blocked");
     expect(result.audit_metadata.actor_kind).toBe("worker");
   });
 
-  test("low stakes from agent_tool → allow / silent / actor_kind='agent'", async () => {
+  test("medium stakes from agent_tool → require_confirmation (D35 fork in dispatcher handles constructive success) / actor_kind='agent'", async () => {
     const result = await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: {},
       source: "agent_tool",
       actor_id: null,
       context: null,
     });
 
+    expect(result.mode).toBe("require_confirmation");
     expect(result.audit_metadata.actor_kind).toBe("agent");
   });
 });
@@ -135,7 +137,7 @@ describe("requestAction — audit row written with correct shape", () => {
   test("writes one audit row per call with outcome='pending'", async () => {
     await requestAction({
       host_id: HOST_ID,
-      action_type: "memory_fact_write",
+      action_type: "write_memory_fact",
       payload: { foo: "bar" },
       source: "agent_artifact",
       actor_id: null,
@@ -146,11 +148,11 @@ describe("requestAction — audit row written with correct shape", () => {
     const arg = (writeAuditLog as jest.Mock).mock.calls[0][0];
     expect(arg.outcome).toBe("pending");
     expect(arg.host_id).toBe(HOST_ID);
-    expect(arg.action_type).toBe("memory_fact_write");
+    expect(arg.action_type).toBe("write_memory_fact");
     expect(arg.source).toBe("agent_artifact");
     expect(arg.actor_kind).toBe("agent");
     expect(arg.autonomy_level).toBe("confirmed");
-    expect(arg.stakes_class).toBe("low");
+    expect(arg.stakes_class).toBe("medium");
     expect(arg.payload).toEqual({ foo: "bar" });
     expect(arg.context).toEqual({ artifact_id: "art-123" });
   });
@@ -161,7 +163,7 @@ describe("requestAction — audit row written with correct shape", () => {
     await expect(
       requestAction({
         host_id: HOST_ID,
-        action_type: "memory_fact_write",
+        action_type: "write_memory_fact",
         payload: {},
         source: "frontend_api",
         actor_id: HOST_ID,

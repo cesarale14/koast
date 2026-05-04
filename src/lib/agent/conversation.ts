@@ -58,6 +58,8 @@ export interface PersistTurnInput {
   input_tokens?: number | null;
   output_tokens?: number | null;
   cache_read_tokens?: number | null;
+  /** M6 M6.3: per-turn property scope (closes M5 CF D-F2). Resolved at the loop layer from ui_context.active_property_id; null when the user hasn't selected a property. */
+  active_property_id?: string | null;
 }
 
 export interface PersistedTurn {
@@ -131,59 +133,218 @@ export async function getOrCreateConversation(
  * scenario (one host, one streaming request), but the unique
  * constraint will catch it loudly if it ever happens.
  */
+/**
+ * M6 turn_id-ordering fix: insertTurn writes a stub row at the start
+ * of a turn (before SDK call + tool dispatches), returning a real
+ * UUID the dispatcher can pass through to writeArtifact's
+ * agent_artifacts.turn_id NOT NULL FK. Race-protected via the
+ * pre-existing unique index on (conversation_id, turn_index): two
+ * concurrent inserts at the same index — one wins, one gets a
+ * Postgres '23505' unique_violation. Caller catches and retries
+ * with the next index. (At v1 single-host scale this is rare; the
+ * retry guarantees correctness if it ever happens.)
+ *
+ * After the SDK + dispatch resolve, the loop calls finalizeTurn to
+ * UPDATE the stub with content_text / tool_calls / refusal / token
+ * counts. SDK errors leave the stub alive (per A1 — discoverable
+ * via "content/tool_calls/refusal all NULL"; loadTurnsForConversation
+ * filters them out of the chat shell).
+ */
+export interface InsertTurnInput {
+  conversation_id: string;
+  role: AgentTurnRole;
+  active_property_id?: string | null;
+  /** model_id stamped at insert time (M6+); finalize doesn't change it. */
+  model_id?: string | null;
+}
+
+export interface FinalizeTurnInput {
+  turn_id: string;
+  content_text?: string | null;
+  tool_calls?: ToolCallRecord[] | null;
+  refusal?: Record<string, unknown> | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_tokens?: number | null;
+}
+
+const TURN_INSERT_RACE_RETRIES = 5;
+
+async function computeNextTurnIndex(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  conversationId: string,
+): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fromBuilder = supabase.from("agent_turns") as any;
+  const { count, error } = await fromBuilder
+    .select("*", { count: "exact", head: true })
+    .eq("conversation_id", conversationId);
+
+  if (error) {
+    throw new Error(`[conversation] Failed to compute next turn_index: ${error.message}`);
+  }
+  return (count ?? 0) as number;
+}
+
+/**
+ * Insert a stub agent_turns row. Returns the new row's id + index +
+ * created_at. Retries on the unique-constraint race.
+ */
+export async function insertTurn(input: InsertTurnInput): Promise<PersistedTurn> {
+  const supabase = createServiceClient();
+
+  for (let attempt = 0; attempt < TURN_INSERT_RACE_RETRIES; attempt++) {
+    const nextIndex = await computeNextTurnIndex(supabase, input.conversation_id);
+
+    const row: Record<string, unknown> = {
+      conversation_id: input.conversation_id,
+      turn_index: nextIndex,
+      role: input.role,
+      // Content fields stay NULL until finalizeTurn lands.
+      content_text: null,
+      tool_calls: null,
+      refusal: null,
+      model_id: input.model_id ?? null,
+      input_tokens: null,
+      output_tokens: null,
+      cache_read_tokens: null,
+      active_property_id: input.active_property_id ?? null,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const insertBuilder = supabase.from("agent_turns") as any;
+    const { data, error } = await insertBuilder
+      .insert(row)
+      .select("id, turn_index, created_at")
+      .single();
+
+    if (!error && data) {
+      // Bump conversation's last_turn_at so list views can sort recency.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const convBuilder = supabase.from("agent_conversations") as any;
+      await convBuilder
+        .update({ last_turn_at: new Date().toISOString() })
+        .eq("id", input.conversation_id);
+
+      return {
+        id: data.id as string,
+        turn_index: data.turn_index as number,
+        created_at: data.created_at as string,
+      };
+    }
+
+    // Detect Postgres unique_violation (23505) on the
+    // (conversation_id, turn_index) constraint and retry.
+    const code =
+      typeof (error as { code?: unknown })?.code === "string"
+        ? ((error as { code?: string }).code as string)
+        : "";
+    if (code === "23505") {
+      // Race lost — recompute next index and retry.
+      continue;
+    }
+
+    throw new Error(
+      `[conversation] insertTurn failed for conversation ${input.conversation_id}: ${error?.message ?? "no row"}`,
+    );
+  }
+
+  throw new Error(
+    `[conversation] insertTurn exhausted ${TURN_INSERT_RACE_RETRIES} retries on the (conversation_id, turn_index) race for conversation ${input.conversation_id}.`,
+  );
+}
+
+/**
+ * Finalize a stub turn with the loop's outputs. UPDATE-only; the row
+ * already exists from insertTurn. Idempotent in shape: re-running with
+ * the same payload writes the same values.
+ */
+export async function finalizeTurn(input: FinalizeTurnInput): Promise<void> {
+  const supabase = createServiceClient();
+
+  const update: Record<string, unknown> = {};
+  if (input.content_text !== undefined) update.content_text = input.content_text;
+  if (input.tool_calls !== undefined) update.tool_calls = input.tool_calls;
+  if (input.refusal !== undefined) update.refusal = input.refusal;
+  if (input.input_tokens !== undefined) update.input_tokens = input.input_tokens;
+  if (input.output_tokens !== undefined) update.output_tokens = input.output_tokens;
+  if (input.cache_read_tokens !== undefined) update.cache_read_tokens = input.cache_read_tokens;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateBuilder = supabase.from("agent_turns") as any;
+  const { error } = await updateBuilder
+    .update(update)
+    .eq("id", input.turn_id);
+
+  if (error) {
+    throw new Error(
+      `[conversation] finalizeTurn failed for turn ${input.turn_id}: ${error.message}`,
+    );
+  }
+}
+
+/**
+ * Single-shot turn write: INSERT with all fields filled in. Used for
+ * turn writes where content is fully known at write time (user
+ * messages; carry-over from M3-M5). Assistant turns now use
+ * insertTurn + finalizeTurn (M6 turn_id-ordering fix).
+ */
 export async function persistTurn(input: PersistTurnInput): Promise<PersistedTurn> {
   const supabase = createServiceClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fromBuilder = supabase.from("agent_turns") as any;
-  const { count, error: countError } = await fromBuilder
-    .select("*", { count: "exact", head: true })
-    .eq("conversation_id", input.conversation_id);
+  for (let attempt = 0; attempt < TURN_INSERT_RACE_RETRIES; attempt++) {
+    const nextIndex = await computeNextTurnIndex(supabase, input.conversation_id);
 
-  if (countError) {
-    throw new Error(`[conversation] Failed to compute next turn_index: ${countError.message}`);
-  }
+    const row: Record<string, unknown> = {
+      conversation_id: input.conversation_id,
+      turn_index: nextIndex,
+      role: input.role,
+      content_text: input.content_text ?? null,
+      tool_calls: input.tool_calls ?? null,
+      refusal: input.refusal ?? null,
+      model_id: input.model_id ?? null,
+      input_tokens: input.input_tokens ?? null,
+      output_tokens: input.output_tokens ?? null,
+      cache_read_tokens: input.cache_read_tokens ?? null,
+      active_property_id: input.active_property_id ?? null,
+    };
 
-  const nextIndex = (count ?? 0) as number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const insertBuilder = supabase.from("agent_turns") as any;
+    const { data, error } = await insertBuilder
+      .insert(row)
+      .select("id, turn_index, created_at")
+      .single();
 
-  const row: Record<string, unknown> = {
-    conversation_id: input.conversation_id,
-    turn_index: nextIndex,
-    role: input.role,
-    content_text: input.content_text ?? null,
-    tool_calls: input.tool_calls ?? null,
-    refusal: input.refusal ?? null,
-    model_id: input.model_id ?? null,
-    input_tokens: input.input_tokens ?? null,
-    output_tokens: input.output_tokens ?? null,
-    cache_read_tokens: input.cache_read_tokens ?? null,
-  };
+    if (!error && data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const convBuilder = supabase.from("agent_conversations") as any;
+      await convBuilder
+        .update({ last_turn_at: new Date().toISOString() })
+        .eq("id", input.conversation_id);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const insertBuilder = supabase.from("agent_turns") as any;
-  const { data, error } = await insertBuilder
-    .insert(row)
-    .select("id, turn_index, created_at")
-    .single();
+      return {
+        id: data.id as string,
+        turn_index: data.turn_index as number,
+        created_at: data.created_at as string,
+      };
+    }
 
-  if (error || !data) {
+    const code =
+      typeof (error as { code?: unknown })?.code === "string"
+        ? ((error as { code?: string }).code as string)
+        : "";
+    if (code === "23505") continue;
+
     throw new Error(
       `[conversation] Failed to persist turn for conversation ${input.conversation_id}: ${error?.message ?? "no row"}`,
     );
   }
 
-  // Bump conversation's last_turn_at so list views can sort recency.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const convBuilder = supabase.from("agent_conversations") as any;
-  await convBuilder
-    .update({ last_turn_at: new Date().toISOString() })
-    .eq("id", input.conversation_id);
-
-  return {
-    id: data.id as string,
-    turn_index: data.turn_index as number,
-    created_at: data.created_at as string,
-  };
+  throw new Error(
+    `[conversation] persistTurn exhausted ${TURN_INSERT_RACE_RETRIES} retries on the (conversation_id, turn_index) race for conversation ${input.conversation_id}.`,
+  );
 }
 
 interface AgentTurnRow {
@@ -472,6 +633,46 @@ export interface UITurn {
     result_summary: string;
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
+  /**
+   * M6 D23 — artifacts attached to this turn. Loads agent_artifacts
+   * rows for the conversation in lifecycle states that are visible in
+   * history scrollback: 'emitted' (host hasn't acted yet — Save/Discard
+   * still actionable), 'superseded' (correction-chain history per D25
+   * — renders dimmed), and 'confirmed' (post-approval saved artifact
+   * — renders the saved variant). 'dismissed' is intentionally excluded;
+   * the host's discard is the explicit signal to stop showing it.
+   *
+   * Despite the name, this array carries non-pending lifecycle states
+   * too — preserved for backwards compat with M6 step 13 callers.
+   */
+  pendingArtifacts: PendingArtifact[];
+}
+
+/**
+ * Artifact attached to a UITurn (M6 D23 + D21). Sourced from
+ * agent_artifacts; the audit_log_id paired ref is the FK added in
+ * M6.2 migration. The chat shell renders these inline on conversation
+ * reload — same visual as the live memory_write_pending event for
+ * state='emitted', dimmed for state='superseded', saved-variant for
+ * state='confirmed'.
+ */
+export interface PendingArtifact {
+  artifact_id: string;
+  audit_log_id: string;
+  kind: string;
+  /** Shape varies by kind; M6's first kind is property_knowledge_confirmation. */
+  payload: Record<string, unknown>;
+  created_at: string;
+  /** Prior artifact_id this proposal corrects (if any). */
+  supersedes: string | null;
+  /**
+   * Lifecycle state from agent_artifacts.state. Values surfaced to the
+   * chat shell: 'emitted' | 'confirmed' | 'superseded'. (Edited and
+   * dismissed states are filtered out at the query level.)
+   */
+  state: "emitted" | "confirmed" | "superseded";
+  /** When state='confirmed' or 'superseded', resolved metadata from agent_artifacts.commit_metadata. */
+  commit_metadata: Record<string, unknown> | null;
 }
 
 /**
@@ -544,17 +745,40 @@ export async function loadTurnsForConversation(
     );
   }
 
+  // M6 D23: load turns and history-visible artifacts in parallel;
+  // stitch in memory by turn_id. Each turn gets its `pendingArtifacts`
+  // array (despite the name, includes confirmed + superseded too —
+  // see PendingArtifact docstring). 'emitted' renders pending,
+  // 'superseded' renders dim per D25's correction-chain visual,
+  // 'confirmed' renders the saved variant. 'dismissed' is excluded
+  // — host's discard is the explicit signal to stop showing it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const turnBuilder = supabase.from("agent_turns") as any;
-  const { data, error } = await turnBuilder
-    .select("id, turn_index, role, content_text, tool_calls, refusal, created_at")
-    .eq("conversation_id", conversationId)
-    .order("turn_index", { ascending: true });
-  if (error) {
-    throw new Error(`[conversation] loadTurnsForConversation failed: ${error.message}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const artifactBuilder = supabase.from("agent_artifacts") as any;
+
+  const [turnsResult, artifactsResult] = await Promise.all([
+    turnBuilder
+      .select("id, turn_index, role, content_text, tool_calls, refusal, created_at")
+      .eq("conversation_id", conversationId)
+      .order("turn_index", { ascending: true }),
+    artifactBuilder
+      .select("id, turn_id, audit_log_id, kind, payload, supersedes, created_at, state, commit_metadata")
+      .eq("conversation_id", conversationId)
+      .in("state", ["emitted", "confirmed", "superseded"])
+      .order("created_at", { ascending: true }),
+  ]);
+
+  if (turnsResult.error) {
+    throw new Error(`[conversation] loadTurnsForConversation failed: ${turnsResult.error.message}`);
+  }
+  if (artifactsResult.error) {
+    throw new Error(
+      `[conversation] loadTurnsForConversation pending-artifacts query failed: ${artifactsResult.error.message}`,
+    );
   }
 
-  const rows = (data ?? []) as Array<{
+  const allRows = (turnsResult.data ?? []) as Array<{
     id: string;
     turn_index: number;
     role: AgentTurnRole;
@@ -563,6 +787,69 @@ export async function loadTurnsForConversation(
     refusal: Record<string, unknown> | null;
     created_at: string;
   }>;
+
+  // M6 stub-turn filter (per A1 cleanup-on-error decision).
+  // insertTurn writes a stub row at turn_started; the loop calls
+  // finalizeTurn with content/tool_calls/refusal at completion. SDK
+  // errors mid-stream leave the assistant stub alive — we filter
+  // those out of the chat shell here. User-role stubs would never
+  // survive (the user message is finalized synchronously); guard
+  // anyway. Stub turns remain queryable in DB for diagnosis.
+  const rows = allRows.filter((t) => {
+    if (t.role === "user") return true;
+    const isStub =
+      t.content_text === null &&
+      (t.tool_calls === null ||
+        (Array.isArray(t.tool_calls) && t.tool_calls.length === 0)) &&
+      t.refusal === null;
+    return !isStub;
+  });
+
+  const artifactRows = (artifactsResult.data ?? []) as Array<{
+    id: string;
+    turn_id: string;
+    audit_log_id: string | null;
+    kind: string;
+    payload: Record<string, unknown>;
+    supersedes: string | null;
+    created_at: string;
+    state: string;
+    commit_metadata: Record<string, unknown> | null;
+  }>;
+
+  // Group artifacts by turn_id for O(1) attach during the map.
+  const artifactsByTurnId = new Map<string, PendingArtifact[]>();
+  for (const a of artifactRows) {
+    if (!a.audit_log_id) {
+      // Defensive: pre-M6 artifacts (legacy rows from the M5
+      // experimental phase) don't have audit_log_id paired refs.
+      // Skip them — the chat shell can't action them without an
+      // audit_log_id to dispatch through /api/agent/artifact.
+      continue;
+    }
+    // Normalize state to the visible-in-history union; defensive
+    // skip on unexpected values (would only happen if a future
+    // migration adds a state we forgot to handle here).
+    if (
+      a.state !== "emitted" &&
+      a.state !== "confirmed" &&
+      a.state !== "superseded"
+    ) {
+      continue;
+    }
+    const list = artifactsByTurnId.get(a.turn_id) ?? [];
+    list.push({
+      artifact_id: a.id,
+      audit_log_id: a.audit_log_id,
+      kind: a.kind,
+      payload: a.payload,
+      created_at: a.created_at,
+      supersedes: a.supersedes,
+      state: a.state,
+      commit_metadata: a.commit_metadata,
+    });
+    artifactsByTurnId.set(a.turn_id, list);
+  }
 
   return rows.map((t): UITurn => {
     const role: "user" | "koast" = t.role === "user" ? "user" : "koast";
@@ -589,6 +876,7 @@ export async function loadTurnsForConversation(
       text: t.content_text,
       tool_calls,
       refusal,
+      pendingArtifacts: artifactsByTurnId.get(t.id) ?? [],
     };
   });
 }

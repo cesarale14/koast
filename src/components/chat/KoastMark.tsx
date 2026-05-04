@@ -12,11 +12,18 @@
  * marketing-only per brand spec and runs continuously, which feels restless
  * inside a tool. TypeScript prevents accidental product use.
  *
- * Note on the milestone state: the deposit visual (k-milestone-ghost +
- * k-milestone-stack keyframes) targets .ghost / .stack groups that are NOT
- * in the basic 5-band markup. The data-state="milestone" still flips for
- * one shot (~2s) so consumers can react, but the visual fallback is the
- * idle mark — full deposit visual is M6 polish (carry-forward §10).
+ * Note on the milestone state (M6 D33 — CF15 visual completion):
+ *   - .ghost group renders an incoming "deposit" band that animates in
+ *     from above the 5 existing bands.
+ *   - .stack group wraps the existing 5 bands so a y-offset translation
+ *     can shift them down ~18px to make room for the new band.
+ *   - The k-milestone-ghost / k-milestone-stack keyframes in globals.css
+ *     drive both, single-shot ~2s, ease-out.
+ *   - prefers-reduced-motion: the keyframes themselves can be guarded;
+ *     the data-state flip still fires so non-visual consumers (e.g.
+ *     analytics) observe the transition.
+ *   - ChatClient triggers the milestone state for ~2s when a
+ *     memory_write_saved event lands on the most recent agent turn.
  */
 
 import { useId } from "react";
@@ -65,11 +72,23 @@ export function KoastMark({
           </clipPath>
         </defs>
         <g clipPath={`url(#${clipId})`} className="bands">
-          <rect className="b1" x="0" y="4" width="100" height="23" fill="#d4eef0" />
-          <rect className="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3" />
-          <rect className="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc" />
-          <rect className="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad" />
-          <rect className="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a" />
+          {/* M6 D33: milestone deposit incoming band. CSS keyframes
+              (k-milestone-ghost) animate this in from above when
+              data-state='milestone' fires; idle otherwise opacity:0
+              + transform: translateY(-100). */}
+          <g className="ghost">
+            <rect x="0" y="-18" width="100" height="22" fill="#e8f7f8" />
+          </g>
+          {/* The stack of existing bands shifts down ~18px when
+              data-state='milestone' so the ghost lands on top.
+              CSS keyframe k-milestone-stack drives the translation. */}
+          <g className="stack">
+            <rect className="b1" x="0" y="4" width="100" height="23" fill="#d4eef0" />
+            <rect className="b2" x="0" y="27" width="100" height="20" fill="#a8e0e3" />
+            <rect className="b3" x="0" y="47" width="100" height="18" fill="#4cc4cc" />
+            <rect className="b4" x="0" y="65" width="100" height="17" fill="#2ba2ad" />
+            <rect className="b5" x="0" y="82" width="100" height="14" fill="#0e7a8a" />
+          </g>
         </g>
       </svg>
     </span>

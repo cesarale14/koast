@@ -11,12 +11,15 @@ import type { Tool, ToolHandlerContext } from "../types";
 
 jest.mock("@/lib/action-substrate/audit-writer");
 jest.mock("@/lib/action-substrate/request-action");
+jest.mock("@/lib/action-substrate/artifact-writer");
 
 import { writeAuditLog, updateAuditOutcome } from "@/lib/action-substrate/audit-writer";
 import { requestAction } from "@/lib/action-substrate/request-action";
+import { writeArtifact } from "@/lib/action-substrate/artifact-writer";
 
 const HOST_ID = "00000000-0000-0000-0000-000000000aaa";
 const FAKE_LOG_ID = "11111111-1111-1111-1111-111111111111";
+const FAKE_ARTIFACT_ID = "22222222-2222-2222-2222-222222222222";
 const FAKE_CREATED_AT = "2026-05-02T07:30:00+00:00";
 
 const ctx: ToolHandlerContext = {
@@ -50,7 +53,45 @@ beforeEach(() => {
     created_at: FAKE_CREATED_AT,
   });
   (updateAuditOutcome as jest.Mock).mockResolvedValue(undefined);
+  (writeArtifact as jest.Mock).mockResolvedValue({
+    artifact_id: FAKE_ARTIFACT_ID,
+    created_at: FAKE_CREATED_AT,
+  });
 });
+
+const proposalOutputSchema = z.object({
+  artifact_id: z.string(),
+  audit_log_id: z.string(),
+  outcome: z.literal("pending"),
+});
+
+function makeFakeGatedTool<TIn = { q: string }>(overrides: {
+  name?: string;
+  stakesClass?: "low" | "medium" | "high";
+  artifactKind?: string;
+  inputSchema?: z.ZodType<TIn>;
+  outputSchema?: z.ZodType<unknown>;
+  buildProposalOutput?: Tool<TIn, unknown>["buildProposalOutput"];
+  handler?: (i: TIn, c: ToolHandlerContext) => Promise<unknown>;
+} = {}): Tool<TIn, unknown> {
+  return {
+    name: overrides.name ?? "fake_gated",
+    description: "Fake gated tool for testing.",
+    inputSchema: (overrides.inputSchema ?? z.object({ q: z.string() })) as z.ZodType<TIn>,
+    outputSchema: (overrides.outputSchema ?? proposalOutputSchema) as z.ZodType<unknown>,
+    requiresGate: true,
+    stakesClass: overrides.stakesClass ?? "medium",
+    artifactKind: overrides.artifactKind ?? "fake_kind",
+    buildProposalOutput:
+      overrides.buildProposalOutput ??
+      ((_input, _ctx, refs) => ({
+        artifact_id: refs.artifact_id,
+        audit_log_id: refs.audit_log_id,
+        outcome: "pending" as const,
+      })),
+    handler: overrides.handler ?? (async () => ({ unused: true })),
+  };
+}
 
 describe("registerTool", () => {
   test("registers a fresh tool", () => {
@@ -74,12 +115,32 @@ describe("registerTool", () => {
     ).toThrow(/no stakesClass/);
   });
 
+  test("throws when requiresGate=true but buildProposalOutput is missing (M6 D35)", () => {
+    expect(() =>
+      registerTool({
+        ...makeFakeReadTool({ name: "missing_proposal_builder" }),
+        requiresGate: true,
+        stakesClass: "medium",
+        artifactKind: "fake_kind",
+        // buildProposalOutput intentionally omitted
+      }),
+    ).toThrow(/no buildProposalOutput/);
+  });
+
+  test("throws when requiresGate=true but artifactKind is missing (M6 D35)", () => {
+    expect(() =>
+      registerTool({
+        ...makeFakeReadTool({ name: "missing_artifact_kind" }),
+        requiresGate: true,
+        stakesClass: "medium",
+        buildProposalOutput: () => ({}),
+        // artifactKind intentionally omitted
+      }),
+    ).toThrow(/no artifactKind/);
+  });
+
   test("self-registers stakes entry for gated tools", () => {
-    registerTool({
-      ...makeFakeReadTool({ name: "gated_tool" }),
-      requiresGate: true,
-      stakesClass: "low",
-    });
+    registerTool(makeFakeGatedTool({ name: "gated_tool", stakesClass: "low" }));
     // Verified indirectly by calling dispatchToolCall and observing
     // requestAction being invoked (covered in gate tests below).
     expect(getRegisteredTools().map((t) => t.name)).toContain("gated_tool");
@@ -224,17 +285,18 @@ describe("dispatchToolCall — gated tool path", () => {
       },
     });
 
-    const handler = jest.fn().mockResolvedValue({ result: "via gate" });
-    registerTool({
-      ...makeFakeReadTool({
+    const handler = jest.fn().mockResolvedValue({
+      artifact_id: FAKE_ARTIFACT_ID,
+      audit_log_id: FAKE_LOG_ID,
+      outcome: "pending" as const,
+    });
+    registerTool(
+      makeFakeGatedTool({
         name: "gated_low",
-        inputSchema: z.object({ q: z.string() }),
-        outputSchema: z.object({ result: z.string() }),
+        stakesClass: "low",
         handler,
       }),
-      requiresGate: true,
-      stakesClass: "low",
-    });
+    );
 
     const out = await dispatchToolCall("gated_low", { q: "go" }, ctx);
 
@@ -249,7 +311,50 @@ describe("dispatchToolCall — gated tool path", () => {
     );
   });
 
-  test("substrate returns mode='require_confirmation' → no handler, audit resolved to failed, error kind 'confirmation_required'", async () => {
+  test("substrate returns mode='block' → no handler, audit resolved to failed, error kind 'gate_blocked'", async () => {
+    (requestAction as jest.Mock).mockResolvedValue({
+      mode: "block",
+      reason: "policy_block: example reason",
+      audit_metadata: {
+        audit_log_id: FAKE_LOG_ID,
+        autonomy_level: "blocked",
+        actor_kind: "agent",
+        stakes_class: "high",
+        created_at: FAKE_CREATED_AT,
+      },
+    });
+
+    const handler = jest.fn();
+    const buildProposalOutput = jest.fn();
+    registerTool(
+      makeFakeGatedTool({
+        name: "gated_blocked",
+        stakesClass: "high",
+        handler,
+        buildProposalOutput,
+      }),
+    );
+
+    const out = await dispatchToolCall("gated_blocked", { q: "go" }, ctx);
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(buildProposalOutput).not.toHaveBeenCalled();
+    expect(writeArtifact).not.toHaveBeenCalled();
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error.kind).toBe("gate_blocked");
+      expect(out.error.message).toMatch(/policy_block/);
+    }
+    expect(updateAuditOutcome).toHaveBeenCalledWith(
+      FAKE_LOG_ID,
+      "failed",
+      expect.objectContaining({
+        error_message: expect.stringMatching(/^gate_blocked/),
+      }),
+    );
+  });
+
+  test("substrate returns mode='require_confirmation' (D35 fork) → ok=true, agent_artifacts row written, audit row STAYS pending, handler NOT invoked", async () => {
     (requestAction as jest.Mock).mockResolvedValue({
       mode: "require_confirmation",
       reason: "Action 'gated_med' is medium-stakes; substrate requires explicit host confirmation.",
@@ -263,29 +368,152 @@ describe("dispatchToolCall — gated tool path", () => {
     });
 
     const handler = jest.fn();
-    registerTool({
-      ...makeFakeReadTool({
+    const buildProposalOutput = jest.fn((_input, _ctx, refs) => ({
+      artifact_id: refs.artifact_id,
+      audit_log_id: refs.audit_log_id,
+      outcome: "pending" as const,
+    }));
+
+    registerTool(
+      makeFakeGatedTool({
         name: "gated_med",
+        stakesClass: "medium",
+        artifactKind: "fake_kind",
         handler,
+        buildProposalOutput,
       }),
-      requiresGate: true,
-      stakesClass: "medium",
-    });
+    );
 
     const out = await dispatchToolCall("gated_med", { q: "go" }, ctx);
 
+    // Handler stays untouched at proposal time.
     expect(handler).not.toHaveBeenCalled();
+    // Artifact row written with the substrate's audit_log_id paired ref.
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
+    const writeCall = (writeArtifact as jest.Mock).mock.calls[0][0];
+    expect(writeCall.audit_log_id).toBe(FAKE_LOG_ID);
+    expect(writeCall.kind).toBe("fake_kind");
+    expect(writeCall.conversation_id).toBe("conv-1");
+    expect(writeCall.turn_id).toBe("turn-1");
+    expect(writeCall.payload).toEqual({ q: "go" });
+    expect(writeCall.supersedes).toBeUndefined();
+    // Proposal output synthesized.
+    expect(buildProposalOutput).toHaveBeenCalledWith(
+      { q: "go" },
+      ctx,
+      { artifact_id: FAKE_ARTIFACT_ID, audit_log_id: FAKE_LOG_ID },
+    );
+    // Constructive success.
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value).toEqual({
+        artifact_id: FAKE_ARTIFACT_ID,
+        audit_log_id: FAKE_LOG_ID,
+        outcome: "pending",
+      });
+      expect(out.audit_log_id).toBe(FAKE_LOG_ID);
+    }
+    // CRITICAL: audit row stays 'pending'. Post-approval flow flips it.
+    expect(updateAuditOutcome).not.toHaveBeenCalled();
+  });
+
+  test("require_confirmation propagates supersedes from input to writeArtifact", async () => {
+    (requestAction as jest.Mock).mockResolvedValue({
+      mode: "require_confirmation",
+      reason: "medium-stakes",
+      audit_metadata: {
+        audit_log_id: FAKE_LOG_ID,
+        autonomy_level: "blocked",
+        actor_kind: "agent",
+        stakes_class: "medium",
+        created_at: FAKE_CREATED_AT,
+      },
+    });
+
+    const PRIOR_ARTIFACT_ID = "33333333-3333-3333-3333-333333333333";
+
+    registerTool(
+      makeFakeGatedTool({
+        name: "gated_supersede",
+        inputSchema: z.object({ q: z.string(), supersedes: z.string().optional() }),
+      }),
+    );
+
+    await dispatchToolCall(
+      "gated_supersede",
+      { q: "corrected", supersedes: PRIOR_ARTIFACT_ID },
+      ctx,
+    );
+
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
+    const writeCall = (writeArtifact as jest.Mock).mock.calls[0][0];
+    expect(writeCall.supersedes).toBe(PRIOR_ARTIFACT_ID);
+  });
+
+  test("require_confirmation: writeArtifact throws → audit resolved failed, ToolError returned", async () => {
+    (requestAction as jest.Mock).mockResolvedValue({
+      mode: "require_confirmation",
+      reason: "medium-stakes",
+      audit_metadata: {
+        audit_log_id: FAKE_LOG_ID,
+        autonomy_level: "blocked",
+        actor_kind: "agent",
+        stakes_class: "medium",
+        created_at: FAKE_CREATED_AT,
+      },
+    });
+    (writeArtifact as jest.Mock).mockRejectedValue(new Error("artifact insert failed"));
+
+    registerTool(makeFakeGatedTool({ name: "gated_artifact_fail" }));
+
+    const out = await dispatchToolCall("gated_artifact_fail", { q: "go" }, ctx);
+
     expect(out.ok).toBe(false);
     if (!out.ok) {
-      expect(out.error.kind).toBe("confirmation_required");
-      expect(out.error.message).toMatch(/medium-stakes/);
+      expect(out.error.kind).toBe("handler_threw");
+      expect(out.error.message).toMatch(/artifact insert failed/);
     }
-    expect(out.audit_log_id).toBe(FAKE_LOG_ID);
     expect(updateAuditOutcome).toHaveBeenCalledWith(
       FAKE_LOG_ID,
       "failed",
       expect.objectContaining({
-        error_message: expect.stringMatching(/^gate_confirmation_required/),
+        error_message: expect.stringMatching(/^artifact_write_failed/),
+      }),
+    );
+  });
+
+  test("require_confirmation: buildProposalOutput returns invalid output → audit resolved failed, ToolError 'output_validation_failed'", async () => {
+    (requestAction as jest.Mock).mockResolvedValue({
+      mode: "require_confirmation",
+      reason: "medium-stakes",
+      audit_metadata: {
+        audit_log_id: FAKE_LOG_ID,
+        autonomy_level: "blocked",
+        actor_kind: "agent",
+        stakes_class: "medium",
+        created_at: FAKE_CREATED_AT,
+      },
+    });
+
+    registerTool(
+      makeFakeGatedTool({
+        name: "gated_bad_proposal",
+        // Returns wrong shape — fails the proposalOutputSchema parse.
+        buildProposalOutput: () => ({ wrong: "shape" }) as unknown as Record<string, unknown>,
+      }),
+    );
+
+    const out = await dispatchToolCall("gated_bad_proposal", { q: "go" }, ctx);
+
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error.kind).toBe("output_validation_failed");
+    }
+    expect(updateAuditOutcome).toHaveBeenCalledWith(
+      FAKE_LOG_ID,
+      "failed",
+      expect.objectContaining({
+        error_message: expect.stringMatching(/^proposal_output_invalid/),
       }),
     );
   });

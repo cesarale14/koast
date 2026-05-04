@@ -506,10 +506,9 @@ body {
   animation: k-brightness-pulse 1.6s infinite ease-in-out;
 }
 
-/* MILESTONE — deposit. One-shot. .ghost/.stack groups intentionally
- * not in the basic 5-band SVG used by KoastMark.tsx; the data-state
- * still flips for any downstream consumers, but the deposit visual
- * is M6 polish (carry-forward §10). */
+/* MILESTONE — deposit. One-shot. M6 D33 (CF15 visual completion):
+ * .ghost / .stack groups now exist in KoastMark.tsx; this animation
+ * fires when data-state='milestone' so the deposit visual lands. */
 @keyframes k-milestone-ghost {
   0%        { transform: translateY(0);     opacity: 0; }
   35%, 70%  { transform: translateY(23px);  opacity: 1; }

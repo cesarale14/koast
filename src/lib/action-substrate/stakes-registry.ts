@@ -18,11 +18,10 @@
  *                Substrate requires confirmation; future milestones
  *                may add additional gates (env flags, two-step etc.).
  *
- * Naming carry-forward (M3): the seed entry is `memory_fact_write`.
- * For consistency with future tool-naming (verb_object, lowercase
- * snake_case), this should be renamed to `write_memory_fact` in a
- * future migration session. v1 doesn't ship the rename to avoid
- * touching M2 code paths.
+ * Naming convention (M6 D20 + M6.1 migration 20260504010000): seed
+ * entry is `write_memory_fact`. Earlier names (`memory_fact_write`,
+ * `memory.write`) were renamed in the M6.1 data migration. New tools
+ * follow the verb_noun, lowercase snake_case shape.
  */
 
 export type StakesClass = "low" | "medium" | "high";
@@ -32,13 +31,19 @@ export type StakesClass = "low" | "medium" | "high";
  * the type alias is `string` because tools register dynamically and
  * full compile-time enumeration isn't possible without code
  * generation. Callers pass a known-registered name (e.g.,
- * 'memory_fact_write' from M2, 'read_memory' from M3 read tool's
+ * 'write_memory_fact' from M6, 'read_memory' from M3 read tool's
  * audit path).
  */
 export type ActionType = string;
 
 const stakesMap: Map<ActionType, StakesClass> = new Map([
-  ["memory_fact_write", "low"],
+  // Stakes raised from 'low' to 'medium' in M6 D35 — memory writes are
+  // reversible (host can discard / supersede) but they shape the agent's
+  // behavior across future conversations. Substrate gates them to
+  // require_confirmation; D35 dispatcher fork handles that mode
+  // constructively (writes the agent_artifacts row, returns proposal
+  // output to the model).
+  ["write_memory_fact", "medium"],
 ]);
 
 /**
@@ -92,5 +97,5 @@ export function getRegisteredStakesEntries(): ReadonlyMap<ActionType, StakesClas
  */
 export function _resetStakesRegistryForTests(): void {
   stakesMap.clear();
-  stakesMap.set("memory_fact_write", "low");
+  stakesMap.set("write_memory_fact", "medium");
 }

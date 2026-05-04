@@ -8,6 +8,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   getOrCreateConversation,
   persistTurn,
+  insertTurn,
+  finalizeTurn,
   reconstructHistory,
 } from "../conversation";
 import {
@@ -36,6 +38,14 @@ beforeEach(() => {
     turn_index: 1,
     created_at: "2026-05-02T08:00:01Z",
   });
+  // M6 turn_id-ordering fix: assistant turn pre-inserted as a stub
+  // via insertTurn; finalized via finalizeTurn at loop end.
+  (insertTurn as jest.Mock).mockResolvedValue({
+    id: ASSISTANT_TURN_ID,
+    turn_index: 1,
+    created_at: "2026-05-02T08:00:01Z",
+  });
+  (finalizeTurn as jest.Mock).mockResolvedValue(undefined);
   (reconstructHistory as jest.Mock).mockResolvedValue([
     { role: "user", content: "what's the wifi password?" },
   ]);
@@ -147,19 +157,26 @@ describe("runAgentTurn — happy path (text-only response)", () => {
     expect(done.turn_id).toBe(ASSISTANT_TURN_ID);
     expect(done.audit_ids).toEqual([]);
 
-    // User turn persisted, then assistant turn persisted (2 calls total)
-    expect(persistTurn).toHaveBeenCalledTimes(2);
+    // M6 turn_id-ordering fix: user turn → persistTurn (single-shot);
+    // assistant turn → insertTurn at start (stub), finalizeTurn at end.
+    expect(persistTurn).toHaveBeenCalledTimes(1);
     const userCall = (persistTurn as jest.Mock).mock.calls[0][0];
     expect(userCall.role).toBe("user");
     expect(userCall.content_text).toBe("hi");
 
-    const assistantCall = (persistTurn as jest.Mock).mock.calls[1][0];
-    expect(assistantCall.role).toBe("assistant");
-    expect(assistantCall.content_text).toBe("Hello, how can I help?");
-    expect(assistantCall.tool_calls).toBeNull();
-    expect(assistantCall.input_tokens).toBe(100);
-    expect(assistantCall.output_tokens).toBe(50);
-    expect(assistantCall.cache_read_tokens).toBe(80);
+    expect(insertTurn).toHaveBeenCalledTimes(1);
+    const assistantInsert = (insertTurn as jest.Mock).mock.calls[0][0];
+    expect(assistantInsert.role).toBe("assistant");
+    expect(assistantInsert.conversation_id).toBe(CONV_ID);
+
+    expect(finalizeTurn).toHaveBeenCalledTimes(1);
+    const finalizeCall = (finalizeTurn as jest.Mock).mock.calls[0][0];
+    expect(finalizeCall.turn_id).toBe(ASSISTANT_TURN_ID);
+    expect(finalizeCall.content_text).toBe("Hello, how can I help?");
+    expect(finalizeCall.tool_calls).toBeNull();
+    expect(finalizeCall.input_tokens).toBe(100);
+    expect(finalizeCall.output_tokens).toBe(50);
+    expect(finalizeCall.cache_read_tokens).toBe(80);
   });
 });
 
@@ -234,12 +251,12 @@ describe("runAgentTurn — tool path", () => {
     // dispatchToolCall called once
     expect(dispatchToolCall).toHaveBeenCalledTimes(1);
 
-    // Assistant turn persisted with tool_calls JSONB
-    const assistantCall = (persistTurn as jest.Mock).mock.calls[1][0];
-    expect(assistantCall.tool_calls).toHaveLength(1);
-    expect(assistantCall.tool_calls[0].tool_use_id).toBe(toolUseId);
-    expect(assistantCall.tool_calls[0].audit_log_id).toBe(AUDIT_ID);
-    expect(assistantCall.content_text).toBe("Let me check. The password is hunter2.");
+    // M6 turn_id-ordering fix: assistant turn finalized with tool_calls JSONB
+    const finalizeCall = (finalizeTurn as jest.Mock).mock.calls[0][0];
+    expect(finalizeCall.tool_calls).toHaveLength(1);
+    expect(finalizeCall.tool_calls[0].tool_use_id).toBe(toolUseId);
+    expect(finalizeCall.tool_calls[0].audit_log_id).toBe(AUDIT_ID);
+    expect(finalizeCall.content_text).toBe("Let me check. The password is hunter2.");
 
     // done event includes the audit id
     const done = events[5] as { type: "done"; audit_ids: string[] };
@@ -283,9 +300,10 @@ describe("runAgentTurn — round cap", () => {
     expect(errorEvent).toBeDefined();
     expect((errorEvent as { type: "error"; code: string }).code).toBe("round_cap_exceeded");
 
-    // Assistant turn STILL persisted (per loop.ts: round-cap is a kind
-    // of completion, not an SDK error)
-    expect(persistTurn).toHaveBeenCalledWith(expect.objectContaining({ role: "assistant" }));
+    // M6 turn_id-ordering fix: assistant stub inserted at start;
+    // round-cap is a completion path so finalizeTurn STILL fires.
+    expect(insertTurn).toHaveBeenCalledWith(expect.objectContaining({ role: "assistant" }));
+    expect(finalizeTurn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -310,9 +328,17 @@ describe("runAgentTurn — SDK error mid-stream", () => {
     expect((errorEvent as { type: "error"; code: string; message: string }).code).toBe("anthropic_sdk_error");
     expect((errorEvent as { type: "error"; message: string }).message).toMatch(/503/);
 
-    // User turn persisted (1 call), assistant turn NOT persisted (no second call)
+    // M6 turn_id-ordering fix: user turn → persistTurn (single-shot);
+    // assistant stub IS pre-inserted (insertTurn fires) but
+    // finalizeTurn does NOT — SDK error short-circuits before
+    // finalize. Stub turn remains in DB per A1 cleanup-on-error
+    // policy; loadTurnsForConversation filters it out of the chat
+    // shell.
     expect(persistTurn).toHaveBeenCalledTimes(1);
     expect((persistTurn as jest.Mock).mock.calls[0][0].role).toBe("user");
+    expect(insertTurn).toHaveBeenCalledTimes(1);
+    expect((insertTurn as jest.Mock).mock.calls[0][0].role).toBe("assistant");
+    expect(finalizeTurn).not.toHaveBeenCalled();
   });
 });
 
@@ -333,11 +359,11 @@ describe("runAgentTurn — refusal", () => {
     const refusal = events[events.length - 1];
     expect(refusal.type).toBe("refusal");
 
-    // Assistant turn IS persisted with refusal metadata
-    expect(persistTurn).toHaveBeenCalledTimes(2);
-    const assistantCall = (persistTurn as jest.Mock).mock.calls[1][0];
-    expect(assistantCall.role).toBe("assistant");
-    expect(assistantCall.refusal).toBeTruthy();
+    // M6 turn_id-ordering fix: assistant turn finalized with refusal metadata
+    expect(persistTurn).toHaveBeenCalledTimes(1); // user turn only
+    expect(finalizeTurn).toHaveBeenCalledTimes(1);
+    const finalizeCall = (finalizeTurn as jest.Mock).mock.calls[0][0];
+    expect(finalizeCall.refusal).toBeTruthy();
   });
 });
 

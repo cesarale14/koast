@@ -8,14 +8,14 @@ import {
 describe("stakesRegistry — seed state", () => {
   beforeEach(() => _resetStakesRegistryForTests());
 
-  test("seed: contains exactly memory_fact_write → 'low'", () => {
+  test("seed: contains exactly write_memory_fact → 'medium' (M6 D35 raise)", () => {
     const entries = getRegisteredStakesEntries();
-    expect(Array.from(entries.keys())).toEqual(["memory_fact_write"]);
-    expect(entries.get("memory_fact_write")).toBe("low");
+    expect(Array.from(entries.keys())).toEqual(["write_memory_fact"]);
+    expect(entries.get("write_memory_fact")).toBe("medium");
   });
 
-  test("getStakesClass returns 'low' for memory_fact_write", () => {
-    expect(getStakesClass("memory_fact_write")).toBe("low");
+  test("getStakesClass returns 'medium' for write_memory_fact", () => {
+    expect(getStakesClass("write_memory_fact")).toBe("medium");
   });
 
   test("getStakesClass throws for unknown action_type", () => {
@@ -48,7 +48,7 @@ describe("registerStakesEntry — duplicate detection", () => {
     registerStakesEntry("read_memory", "low");
     registerStakesEntry("future_high_stakes_action", "high");
     const entries = getRegisteredStakesEntries();
-    expect(entries.size).toBe(3);  // memory_fact_write seed + 2 new
+    expect(entries.size).toBe(3);  // write_memory_fact seed + 2 new
     expect(entries.get("read_memory")).toBe("low");
     expect(entries.get("future_high_stakes_action")).toBe("high");
   });
@@ -61,6 +61,6 @@ describe("_resetStakesRegistryForTests — isolation between tests", () => {
     registerStakesEntry("transient_entry", "high");
     expect(getRegisteredStakesEntries().size).toBe(2);
     _resetStakesRegistryForTests();
-    expect(Array.from(getRegisteredStakesEntries().keys())).toEqual(["memory_fact_write"]);
+    expect(Array.from(getRegisteredStakesEntries().keys())).toEqual(["write_memory_fact"]);
   });
 });

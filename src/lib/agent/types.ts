@@ -58,11 +58,52 @@ export interface Tool<TInput, TOutput> {
    * If true, the tool's dispatch goes through the action substrate's
    * gating logic (requestAction). If false, the dispatcher allows
    * the call and writes its own audit row directly.
+   *
+   * When the substrate returns mode='require_confirmation' for a gated
+   * tool (M6 dispatcher fork, D35), the dispatcher writes an
+   * agent_artifacts row + invokes `buildProposalOutput` to synthesize
+   * the tool result; the tool's `handler` is NOT invoked at proposal
+   * time. The handler is reserved for the post-approval execution
+   * path (host clicks Save → action handler registry routes by
+   * action_type → handler runs).
    */
   requiresGate: boolean;
   /** Required when requiresGate=true; ignored otherwise. */
   stakesClass?: StakesClass;
+  /**
+   * Required when requiresGate=true; ignored otherwise. Matches an
+   * entry in the artifact registry; written into agent_artifacts.kind
+   * when the dispatcher fork creates the proposal artifact. M6's first
+   * gated tool emits 'property_knowledge_confirmation'.
+   */
+  artifactKind?: string;
+  /**
+   * Required when requiresGate=true; ignored otherwise. Synthesizes
+   * the tool result the model sees when the substrate gates the call
+   * and the dispatcher writes the agent_artifacts row in lieu of
+   * invoking the handler. Implementations should return a payload that
+   * matches the tool's `outputSchema` so the dispatcher's output
+   * validation step passes.
+   */
+  buildProposalOutput?: (
+    input: TInput,
+    context: ToolHandlerContext,
+    proposalRefs: ProposalRefs,
+  ) => TOutput;
   handler: (input: TInput, context: ToolHandlerContext) => Promise<TOutput>;
+}
+
+/**
+ * References produced by the dispatcher fork when the substrate gates
+ * a tool call and the proposal-time path runs (D35). Passed to the
+ * tool's `buildProposalOutput` so the tool can mirror them into its
+ * tool-result payload (the model needs the artifact_id/audit_log_id
+ * for downstream correlation; the chat shell reads pending artifacts
+ * independently and doesn't depend on the model receiving them).
+ */
+export interface ProposalRefs {
+  artifact_id: string;
+  audit_log_id: string;
 }
 
 export type ToolErrorKind =

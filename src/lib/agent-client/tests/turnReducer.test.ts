@@ -243,3 +243,158 @@ describe("turnReducer — edge cases", () => {
     expect(blockB.duration_ms).toBe(100);
   });
 });
+
+describe("turnReducer — M6 promotions: tool_call_failed", () => {
+  test("transitions in-flight tool block to status='failed' with structured error", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "tool_call_started",
+      tool_use_id: "tu-fail",
+      tool_name: "write_memory_fact",
+      input_summary: "x",
+    });
+    tick(50);
+    s = turnReducer(s, {
+      type: "tool_call_failed",
+      tool_use_id: "tu-fail",
+      tool_name: "write_memory_fact",
+      error: { kind: "constraint", message: "violates check constraint", retryable: true },
+      latency_ms: 50,
+    });
+    const block = s.content[0];
+    if (block.kind !== "tool") throw new Error("expected tool block");
+    expect(block.status).toBe("failed");
+    expect(block.error).toEqual({
+      kind: "constraint",
+      message: "violates check constraint",
+      retryable: true,
+    });
+    expect(block.duration_ms).toBe(50);
+  });
+
+  test("out-of-order tool_call_failed (no matching in-flight) appends a defensive failed block", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "tool_call_failed",
+      tool_use_id: "tu-orphan",
+      tool_name: "read_memory",
+      error: { kind: "transient", message: "timeout", retryable: true },
+      latency_ms: 200,
+    });
+    expect(s.content).toHaveLength(1);
+    const block = s.content[0];
+    if (block.kind !== "tool") throw new Error("expected tool block");
+    expect(block.status).toBe("failed");
+    expect(block.tool_name).toBe("read_memory");
+  });
+});
+
+describe("turnReducer — M6 promotions: memory_write_pending", () => {
+  test("appends a memory_artifact block in state='pending' with the proposed payload", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "memory_write_pending",
+      artifact_id: "art-1",
+      audit_log_id: "audit-1",
+      proposed_payload: {
+        property_id: "11111111-1111-4111-8111-111111111111",
+        sub_entity_type: "front_door",
+        attribute: "code",
+        fact_value: "4827",
+        source: "host_taught",
+      },
+    });
+    expect(s.content).toHaveLength(1);
+    const block = s.content[0];
+    if (block.kind !== "memory_artifact") throw new Error("expected memory_artifact");
+    expect(block.artifact_id).toBe("art-1");
+    expect(block.audit_log_id).toBe("audit-1");
+    expect(block.state).toBe("pending");
+    expect(block.payload.attribute).toBe("code");
+    expect(block.memory_fact_id).toBeUndefined();
+  });
+
+  test("supersession cascade: when supersedes is set, prior pending artifact in current content flips to state='superseded'", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    // First proposal lands.
+    s = turnReducer(s, {
+      type: "memory_write_pending",
+      artifact_id: "art-original",
+      audit_log_id: "audit-1",
+      proposed_payload: {
+        property_id: "p",
+        sub_entity_type: "front_door",
+        attribute: "code",
+        fact_value: "1234",
+        source: "host_taught",
+      },
+    });
+    // Corrected proposal supersedes the first.
+    s = turnReducer(s, {
+      type: "memory_write_pending",
+      artifact_id: "art-correction",
+      audit_log_id: "audit-2",
+      proposed_payload: {
+        property_id: "p",
+        sub_entity_type: "front_door",
+        attribute: "code",
+        fact_value: "4827",
+        source: "host_taught",
+      },
+      supersedes: "art-original",
+    });
+
+    expect(s.content).toHaveLength(2);
+    const original = s.content[0];
+    const correction = s.content[1];
+    if (original.kind !== "memory_artifact" || correction.kind !== "memory_artifact") {
+      throw new Error("expected both blocks to be memory_artifact");
+    }
+    expect(original.state).toBe("superseded");
+    expect(original.superseded_by_artifact_id).toBe("art-correction");
+    expect(correction.state).toBe("pending");
+  });
+});
+
+describe("turnReducer — M6 promotions: memory_write_saved", () => {
+  test("flips matching pending artifact to state='saved' and stamps memory_fact_id", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "memory_write_pending",
+      artifact_id: "art-1",
+      audit_log_id: "audit-1",
+      proposed_payload: {
+        property_id: "p",
+        sub_entity_type: "wifi",
+        attribute: "password",
+        fact_value: "MyP@ssword",
+        source: "host_taught",
+      },
+    });
+    s = turnReducer(s, {
+      type: "memory_write_saved",
+      artifact_id: "art-1",
+      audit_log_id: "audit-1",
+      memory_fact_id: "fact-1",
+    });
+    const block = s.content[0];
+    if (block.kind !== "memory_artifact") throw new Error("expected memory_artifact");
+    expect(block.state).toBe("saved");
+    expect(block.memory_fact_id).toBe("fact-1");
+  });
+
+  test("out-of-order memory_write_saved (no matching pending) appends a synthetic saved block", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "memory_write_saved",
+      artifact_id: "art-orphan",
+      audit_log_id: "audit-x",
+      memory_fact_id: "fact-x",
+    });
+    expect(s.content).toHaveLength(1);
+    const block = s.content[0];
+    if (block.kind !== "memory_artifact") throw new Error("expected memory_artifact");
+    expect(block.state).toBe("saved");
+    expect(block.memory_fact_id).toBe("fact-x");
+  });
+});

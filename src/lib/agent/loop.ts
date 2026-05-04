@@ -33,6 +33,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   getOrCreateConversation,
   persistTurn,
+  insertTurn,
+  finalizeTurn,
   reconstructHistory,
   type AgentHost,
   type ToolCallRecord,
@@ -44,11 +46,30 @@ import {
 } from "./dispatcher";
 import type { AgentStreamEvent } from "./sse";
 import type { ToolHandlerContext } from "./types";
+import { classifyError } from "./error-classifier";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const MODEL_ID = "claude-sonnet-4-5-20250929";
 const MAX_TOKENS = 4096;
 const ROUND_CAP = 5;
+
+/**
+ * Type guard for the write_memory_fact tool's proposal-time output
+ * (D35 fork). Used in the loop to gate emission of memory_write_pending
+ * SSE events. Defensive: guards against future schema drift; the
+ * dispatcher's outputSchema validation already ran before we get here.
+ */
+function isProposalOutput(
+  value: unknown,
+): value is { artifact_id: string; audit_log_id: string; outcome: "pending" } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { artifact_id?: unknown }).artifact_id === "string" &&
+    typeof (value as { audit_log_id?: unknown }).audit_log_id === "string" &&
+    (value as { outcome?: unknown }).outcome === "pending"
+  );
+}
 
 export interface RunAgentTurnInput {
   host: AgentHost;
@@ -249,6 +270,7 @@ async function* runOneRound(
       if (block.type !== "tool_use") continue;
 
       const inputObj = (block.input ?? {}) as Record<string, unknown>;
+      const dispatchStart = Date.now();
       yield {
         type: "tool_call_started",
         tool_use_id: block.id,
@@ -257,20 +279,69 @@ async function* runOneRound(
       };
 
       const result = await dispatchToolCall(block.name, inputObj, toolContext);
+      const latencyMs = Date.now() - dispatchStart;
 
       const success = result.ok;
-      const summary = summarizeToolResult(block.name, {
-        ok: success,
-        value: success ? result.value : undefined,
-        errorMessage: success ? undefined : result.error.message,
-      });
 
-      yield {
-        type: "tool_call_completed",
-        tool_use_id: block.id,
-        success,
-        result_summary: summary,
-      };
+      if (success) {
+        const summary = summarizeToolResult(block.name, {
+          ok: true,
+          value: result.value,
+          errorMessage: undefined,
+        });
+        yield {
+          type: "tool_call_completed",
+          tool_use_id: block.id,
+          success: true,
+          result_summary: summary,
+        };
+
+        // M6 D35 fork side-channel: when write_memory_fact's proposal
+        // returns successfully, the dispatcher already wrote the
+        // agent_artifacts row. Emit memory_write_pending so the chat
+        // shell can render the inline MemoryArtifact.
+        if (block.name === "write_memory_fact" && isProposalOutput(result.value)) {
+          yield {
+            type: "memory_write_pending",
+            artifact_id: result.value.artifact_id,
+            audit_log_id: result.value.audit_log_id,
+            proposed_payload: inputObj as {
+              property_id: string;
+              sub_entity_type: string;
+              attribute: string;
+              fact_value: unknown;
+              confidence?: number;
+              source: string;
+              supersedes?: string;
+              supersedes_memory_fact_id?: string;
+              citation?: { source_text?: string; reasoning?: string };
+            },
+            supersedes:
+              typeof (inputObj as { supersedes?: unknown }).supersedes === "string"
+                ? ((inputObj as { supersedes?: string }).supersedes as string)
+                : undefined,
+          };
+        }
+      } else {
+        // M6 D28: emit tool_call_failed with structured error taxonomy.
+        // The dispatcher's ToolError already classifies certain kinds
+        // (gate_blocked, input_validation_failed, etc.); the
+        // error-classifier widens via message-pattern matching for
+        // anything else (handler_threw → classifier inspects the
+        // underlying error message).
+        const classified = classifyError(new Error(result.error.message));
+        yield {
+          type: "tool_call_failed",
+          tool_use_id: block.id,
+          tool_name: block.name,
+          error: {
+            kind: classified.kind,
+            message: result.error.message,
+            retryable: classified.retryable,
+          },
+          latency_ms: latencyMs,
+        };
+      }
 
       // Build the tool_result content (JSON serialized for the model)
       const toolResultContent = success
@@ -312,13 +383,36 @@ export async function* runAgentTurn(
 ): AsyncGenerator<AgentStreamEvent, void, void> {
   const client = getAnthropicClient();
 
-  // Step 1+2: get/create conversation, persist user turn.
+  // Step 1+2: get/create conversation, persist user turn, pre-insert
+  // assistant stub so dispatcher's writeArtifact has a real turn_id
+  // to FK-reference at agent_artifacts.turn_id (M6 turn_id-ordering
+  // fix; per Cesar's "lock Option A" in the smoke-failure post).
+
   const conversation = await getOrCreateConversation(input.host, input.conversation_id);
 
+  // M6 M6.3: resolve property scope ONCE per turn. Used for both
+  // active_property_id persistence on every agent_turns row (closes
+  // M5 CF D-F2) and the D19 active-context preamble injection.
+  const activeProperty = await resolveActiveProperty(input.host.id, input.ui_context);
+  const activePropertyId = activeProperty?.id ?? null;
+
+  // User turn: single-shot persist (content is fully known at request time).
   await persistTurn({
     conversation_id: conversation.id,
     role: "user",
     content_text: input.user_message_text,
+    active_property_id: activePropertyId,
+  });
+
+  // Assistant stub: insert NOW so the dispatcher can pass a real
+  // turn_id through ToolHandlerContext to writeArtifact during the
+  // SDK roundtrip. finalizeTurn lands at the end with content +
+  // tool_calls + refusal + tokens.
+  const assistantTurn = await insertTurn({
+    conversation_id: conversation.id,
+    role: "assistant",
+    active_property_id: activePropertyId,
+    model_id: MODEL_ID,
   });
 
   yield { type: "turn_started", conversation_id: conversation.id };
@@ -326,12 +420,11 @@ export async function* runAgentTurn(
   // Step 3: reconstruct full history (includes the user turn just persisted).
   const history = await reconstructHistory(conversation.id);
 
-  // Step 3.5 (D19): resolve ui_context.active_property_id server-side and
-  // prepend the active-context preamble to the LAST user message in the
+  // Step 3.5 (D19): use the property resolved at step 1+2 to inject
+  // the active-context preamble into the LAST user message in the
   // SDK-call messages array. The preamble is NEVER persisted — agent_turns
-  // keeps the host's verbatim text. Unauthorized ids log warn and drop
-  // silently (permissive on UX, audit-friendly for spoof attempts).
-  const activeProperty = await resolveActiveProperty(input.host.id, input.ui_context);
+  // keeps the host's verbatim text. Unauthorized ids logged at warn
+  // when resolveActiveProperty returned null for a non-empty input.
   const seedMessages: Anthropic.MessageParam[] = activeProperty
     ? prependActiveContextToLastUserMessage(
         history,
@@ -367,7 +460,10 @@ export async function* runAgentTurn(
         {
           host: input.host,
           conversation_id: conversation.id,
-          turn_id: "", // filled by dispatcher; tool context doesn't yet have a turn id pre-persist
+          turn_id: assistantTurn.id, // M6 fix: real UUID from the
+          // pre-inserted assistant stub. Used by dispatcher's D35
+          // require_confirmation fork → writeArtifact's
+          // agent_artifacts.turn_id NOT NULL FK.
         },
       );
 
@@ -449,19 +545,18 @@ export async function* runAgentTurn(
     return;
   }
 
-  // Persist the assistant turn (combined text + tool_calls).
+  // Finalize the pre-inserted assistant stub with the loop's outputs.
   const finalText = accumulatedText.join("");
-  const persistedAssistant = await persistTurn({
-    conversation_id: conversation.id,
-    role: "assistant",
+  await finalizeTurn({
+    turn_id: assistantTurn.id,
     content_text: finalText.length > 0 ? finalText : null,
     tool_calls: collectedToolCalls.length > 0 ? collectedToolCalls : null,
     refusal: refusalReason ? { reason: refusalReason.reason } : null,
-    model_id: MODEL_ID,
     input_tokens: lastFinalMessage?.usage.input_tokens ?? null,
     output_tokens: lastFinalMessage?.usage.output_tokens ?? null,
     cache_read_tokens: lastFinalMessage?.usage.cache_read_input_tokens ?? null,
   });
+  const persistedAssistant = assistantTurn;
 
   if (refusalReason) {
     yield {

@@ -11,9 +11,7 @@
 
 import { registerTool } from "../dispatcher";
 import { readMemoryTool } from "./read-memory";
+import { writeMemoryFactTool } from "./write-memory-fact";
 
 registerTool(readMemoryTool);
-
-// Future tools registered here:
-//   import { writeMemoryFactTool } from "./write-memory-fact";
-//   registerTool(writeMemoryFactTool);
+registerTool(writeMemoryFactTool);

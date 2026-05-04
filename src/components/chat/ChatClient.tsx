@@ -38,6 +38,7 @@ import { RespondingRow } from "./RespondingRow";
 import { EmptyState } from "./EmptyState";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
+import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
 import { useAgentTurn } from "@/lib/agent-client/useAgentTurn";
 import type { PropertyOption } from "./PropertyContext";
 
@@ -54,6 +55,20 @@ type UITurnLite = {
     result_summary: string;
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
+  /**
+   * M6 D23 — artifacts attached to this turn (history-visible states only:
+   * emitted | confirmed | superseded). 'dismissed' is filtered server-side.
+   */
+  pendingArtifacts?: Array<{
+    artifact_id: string;
+    audit_log_id: string;
+    kind: string;
+    payload: Record<string, unknown>;
+    created_at: string;
+    supersedes: string | null;
+    state: "emitted" | "confirmed" | "superseded";
+    commit_metadata: Record<string, unknown> | null;
+  }>;
 };
 
 type ConvListItem = {
@@ -161,6 +176,35 @@ function formatTurnStamp(iso: string): string {
     .toLowerCase();
 }
 
+/**
+ * Map a write_memory_fact payload to the alternating key/val FactSpan
+ * shape MemoryArtifact renders. v1's only artifact kind is
+ * property_knowledge_confirmation (M6 §5); future kinds get their own
+ * branches when they land.
+ */
+function payloadToFactSpans(payload: Record<string, unknown> | { sub_entity_type?: string; attribute?: string; fact_value?: unknown }): FactSpan[] {
+  const subEntityType = (payload as { sub_entity_type?: unknown }).sub_entity_type;
+  const attribute = (payload as { attribute?: unknown }).attribute;
+  const factValue = (payload as { fact_value?: unknown }).fact_value;
+  const valueText =
+    typeof factValue === "string"
+      ? factValue
+      : factValue === null || factValue === undefined
+        ? ""
+        : JSON.stringify(factValue);
+  const spans: FactSpan[] = [];
+  if (typeof subEntityType === "string" && subEntityType.length > 0) {
+    spans.push({ kind: "key", text: subEntityType });
+  }
+  if (typeof attribute === "string" && attribute.length > 0) {
+    spans.push({ kind: "key", text: attribute });
+  }
+  if (valueText.length > 0) {
+    spans.push({ kind: "val", text: valueText });
+  }
+  return spans;
+}
+
 /** Key for the per-host last-selected property (sessionStorage). */
 const PROPERTY_PREF_KEY = "koast.chat.activePropertyId";
 
@@ -190,6 +234,45 @@ export function ChatClient({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef<boolean>(true);
 
+  /**
+   * M6 Issue C — interactive tool-call expansion. ToolCall.tsx's
+   * component spec includes expanded/onToggleExpand/resultBody props
+   * (chevron renders, isInteractive when state='completed'), but M5's
+   * ChatClient never wired them. Cesar's CP4 observation: tool-call
+   * rows render with chevrons but clicks did nothing. Wiring it here
+   * with a Set<tool_use_id> of currently-expanded rows + a toggle
+   * handler. Live + history paths both consume.
+   */
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const toggleToolExpanded = useCallback((toolUseId: string) => {
+    setExpandedTools((prev) => {
+      const next = new Set(prev);
+      if (next.has(toolUseId)) next.delete(toolUseId);
+      else next.add(toolUseId);
+      return next;
+    });
+  }, []);
+
+  /**
+   * M6 D33 — KoastMark milestone trigger. When the host approves a
+   * memory write, we receive memory_write_saved via the artifact
+   * endpoint's SSE response and flip the most-recent koast turn's
+   * avatar to 'milestone' for ~2s (matches k-milestone-* keyframe
+   * duration). prefers-reduced-motion suppresses the trigger entirely
+   * (data-state stays idle) so reduced-motion users get the saved-
+   * state semantic transition without the visual celebration.
+   */
+  const [milestoneActive, setMilestoneActive] = useState(false);
+  const fireMilestone = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+    setMilestoneActive(true);
+    window.setTimeout(() => setMilestoneActive(false), 2000);
+  }, []);
+
   // Restore last-selected property from sessionStorage on mount
   // (preserves selection across /chat → /chat/[id] navigation).
   useEffect(() => {
@@ -214,6 +297,78 @@ export function ChatClient({
     }
   }, []);
 
+  /**
+   * M6 D35 — host-action handler for MemoryArtifact Save/Discard.
+   * POST /api/agent/artifact; on approve, consumes the SSE stream
+   * (memory_write_saved + done); on discard, consumes the JSON ack.
+   * For step 18 the resulting state isn't fed back into the reducer
+   * directly — page refresh re-reads the substrate via
+   * loadTurnsForConversation. Future iteration: consume the saved
+   * event back into useAgentTurn or a sibling hook so the in-memory
+   * state stays live without refresh.
+   */
+  const handleArtifactAction = useCallback(
+    async (auditLogId: string, action: "approve" | "discard") => {
+      try {
+        const res = await fetch("/api/agent/artifact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audit_id: auditLogId, action }),
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({ error: res.statusText }));
+          console.error("[chat-client] artifact action failed", action, errBody);
+          return;
+        }
+        if (action === "approve") {
+          // SSE response — drain the stream and watch for the
+          // memory_write_saved event so we can fire the milestone
+          // animation before refreshing. Each SSE record is
+          // `data: <json>\n\n` per the protocol.
+          const reader = res.body?.getReader();
+          if (reader) {
+            const decoder = new TextDecoder();
+            let buf = "";
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              // Process any complete event records (terminated by \n\n).
+              let sep = buf.indexOf("\n\n");
+              while (sep !== -1) {
+                const record = buf.slice(0, sep).trim();
+                buf = buf.slice(sep + 2);
+                if (record.startsWith("data: ")) {
+                  try {
+                    const event = JSON.parse(record.slice(6));
+                    if (event && event.type === "memory_write_saved") {
+                      fireMilestone();
+                    }
+                  } catch {
+                    /* malformed; ignore */
+                  }
+                }
+                sep = buf.indexOf("\n\n");
+              }
+            }
+          }
+          // Defer refresh past the milestone animation so the
+          // animation visibly completes before the page re-renders
+          // (the new render comes from the substrate state, not
+          // the optimistic in-memory state).
+          window.setTimeout(() => router.refresh(), 2000);
+          return;
+        }
+        // Discard path: refresh immediately — no animation to honor.
+        router.refresh();
+      } catch (err) {
+        console.error("[chat-client] artifact action threw", err);
+      }
+    },
+    [router],
+  );
+
   // Group rail data; recompute when the list changes.
   const groups = useMemo(
     () => groupConversations(conversations, new Date()),
@@ -237,6 +392,41 @@ export function ChatClient({
         refusal: null,
       });
     }
+    // M6 fix (Issue A — propose-flow harvest gap): preserve
+    // memory_artifact ContentBlocks that landed via memory_write_pending
+    // events during streaming. Without this, the artifact disappears
+    // post-stream until a router.refresh, which only fires on Save/
+    // Discard — propose-only turns would lose the artifact visually.
+    const liveArtifacts = state.content
+      .filter((b) => b.kind === "memory_artifact")
+      .map((b) => {
+        const a = b as Extract<typeof b, { kind: "memory_artifact" }>;
+        // Map reducer's MemoryArtifactState → agent_artifacts.state
+        // shape used by HistoryTurnView. Live blocks coming out of
+        // memory_write_pending are 'pending' → 'emitted'; mid-stream
+        // saved/superseded transitions follow.
+        const dbState =
+          a.state === "pending"
+            ? "emitted"
+            : a.state === "saved"
+              ? "confirmed"
+              : a.state === "superseded"
+                ? "superseded"
+                : null; // 'failed' shouldn't reach harvest; skip
+        if (dbState === null) return null;
+        return {
+          artifact_id: a.artifact_id,
+          audit_log_id: a.audit_log_id,
+          kind: "property_knowledge_confirmation" as const,
+          payload: a.payload as Record<string, unknown>,
+          created_at: stamp,
+          supersedes: null as string | null,
+          state: dbState as "emitted" | "confirmed" | "superseded",
+          commit_metadata: null as Record<string, unknown> | null,
+        };
+      })
+      .filter((a): a is NonNullable<typeof a> => a !== null);
+
     const koastTurn: UITurnLite = {
       id: state.turn_id ?? `live-koast-${stamp}`,
       role: "koast",
@@ -259,6 +449,7 @@ export function ChatClient({
           };
         }),
       refusal: state.refusal,
+      pendingArtifacts: liveArtifacts.length > 0 ? liveArtifacts : undefined,
     };
     harvested.push(koastTurn);
     setSessionHarvest((prev) => [...prev, ...harvested]);
@@ -383,12 +574,30 @@ export function ChatClient({
           <EmptyState />
         ) : (
           <>
-            {history.map((t) => (
-              <HistoryTurnView key={t.id} turn={t} userInitials={user.initials} />
-            ))}
-            {sessionHarvest.map((t) => (
-              <HistoryTurnView key={t.id} turn={t} userInitials={user.initials} />
-            ))}
+            {(() => {
+              // Compute the index of the most-recent koast turn so the
+              // milestone animation fires on the right avatar (last
+              // koast turn across history + sessionHarvest combined).
+              const all = [...history, ...sessionHarvest];
+              let lastKoastIdx = -1;
+              for (let i = all.length - 1; i >= 0; i--) {
+                if (all[i].role === "koast") {
+                  lastKoastIdx = i;
+                  break;
+                }
+              }
+              return all.map((t, idx) => (
+                <HistoryTurnView
+                  key={t.id}
+                  turn={t}
+                  userInitials={user.initials}
+                  onArtifactAction={handleArtifactAction}
+                  avatarMilestone={milestoneActive && idx === lastKoastIdx}
+                  expandedTools={expandedTools}
+                  onToggleToolExpanded={toggleToolExpanded}
+                />
+              ));
+            })()}
             {pendingUserText !== null && (
               <Turn
                 role="user"
@@ -422,20 +631,54 @@ export function ChatClient({
                       // Streaming paragraphs render as plain text; final harvest will normalize.
                       return <p key={i}>{block.text}</p>;
                     }
-                    const failed = block.status === "completed" && block.success === false;
-                    const tcState =
-                      block.status === "completed"
-                        ? failed
-                          ? "failed"
-                          : "completed"
-                        : "in-flight";
+                    if (block.kind === "tool") {
+                      const failed =
+                        block.status === "failed" ||
+                        (block.status === "completed" && block.success === false);
+                      const tcState =
+                        block.status === "in-flight"
+                          ? "in-flight"
+                          : failed
+                            ? "failed"
+                            : "completed";
+                      return (
+                        <ToolCall
+                          key={block.tool_use_id}
+                          name={block.tool_name}
+                          params={parseParams(block.input_summary)}
+                          state={tcState}
+                          durationMs={block.duration_ms}
+                          expanded={expandedTools.has(block.tool_use_id)}
+                          onToggleExpand={() => toggleToolExpanded(block.tool_use_id)}
+                          resultBody={
+                            block.result_summary ? (
+                              <pre className="whitespace-pre-wrap">{block.result_summary}</pre>
+                            ) : undefined
+                          }
+                        />
+                      );
+                    }
+                    // M6 D35: live memory_artifact block from the
+                    // turnReducer. Save/Discard fire POST /api/agent/artifact;
+                    // the response stream's memory_write_saved event is
+                    // consumed back into the same reducer (or the saved
+                    // state lands directly via fetch ack on the saved ack).
                     return (
-                      <ToolCall
-                        key={block.tool_use_id}
-                        name={block.tool_name}
-                        params={parseParams(block.input_summary)}
-                        state={tcState}
-                        durationMs={block.duration_ms}
+                      <MemoryArtifact
+                        key={`memory-${block.artifact_id}`}
+                        state={block.state}
+                        fact={payloadToFactSpans(block.payload)}
+                        onSave={
+                          block.state === "pending"
+                            ? () => handleArtifactAction(block.audit_log_id, "approve")
+                            : undefined
+                        }
+                        onDiscard={
+                          block.state === "pending"
+                            ? () => handleArtifactAction(block.audit_log_id, "discard")
+                            : undefined
+                        }
+                        errorMessage={block.error?.message}
                       />
                     );
                   })}
@@ -459,9 +702,20 @@ export function ChatClient({
 function HistoryTurnView({
   turn,
   userInitials,
+  onArtifactAction,
+  avatarMilestone = false,
+  expandedTools,
+  onToggleToolExpanded,
 }: {
   turn: UITurnLite;
   userInitials: string;
+  onArtifactAction?: (auditLogId: string, action: "approve" | "discard") => void;
+  /** When true and turn.role='koast', flips the avatar to data-state='milestone'. */
+  avatarMilestone?: boolean;
+  /** M6 Issue C — set of currently-expanded tool_use_ids. */
+  expandedTools?: Set<string>;
+  /** M6 Issue C — toggle expansion for a tool_use_id. */
+  onToggleToolExpanded?: (toolUseId: string) => void;
 }) {
   if (turn.role === "user") {
     return (
@@ -488,6 +742,7 @@ function HistoryTurnView({
           role="koast"
           who="Koast"
           time={formatTurnStamp(turn.created_at)}
+          avatarState={avatarMilestone ? "milestone" : "idle"}
         />
       }
     >
@@ -498,9 +753,46 @@ function HistoryTurnView({
             name={tc.tool_name}
             params={parseParams(tc.input_summary)}
             state={tc.success ? "completed" : "failed"}
+            expanded={expandedTools?.has(tc.tool_use_id) ?? false}
+            onToggleExpand={
+              onToggleToolExpanded
+                ? () => onToggleToolExpanded(tc.tool_use_id)
+                : undefined
+            }
+            resultBody={
+              tc.result_summary ? (
+                <pre className="whitespace-pre-wrap">{tc.result_summary}</pre>
+              ) : undefined
+            }
           />
         ))}
         {turn.text && <p>{turn.text}</p>}
+        {(turn.pendingArtifacts ?? []).map((a) => {
+          // Map agent_artifacts.state → MemoryArtifact's state union.
+          const memState =
+            a.state === "emitted"
+              ? "pending"
+              : a.state === "confirmed"
+                ? "saved"
+                : "superseded";
+          return (
+            <MemoryArtifact
+              key={`history-memory-${a.artifact_id}`}
+              state={memState}
+              fact={payloadToFactSpans(a.payload)}
+              onSave={
+                memState === "pending" && onArtifactAction
+                  ? () => onArtifactAction(a.audit_log_id, "approve")
+                  : undefined
+              }
+              onDiscard={
+                memState === "pending" && onArtifactAction
+                  ? () => onArtifactAction(a.audit_log_id, "discard")
+                  : undefined
+              }
+            />
+          );
+        })}
         {turn.refusal && <RefusalTag scope={[]} />}
       </KoastMessage>
     </Turn>

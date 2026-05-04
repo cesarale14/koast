@@ -1,6 +1,8 @@
 import {
   getOrCreateConversation,
   persistTurn,
+  insertTurn,
+  finalizeTurn,
   reconstructHistory,
   type ToolCallRecord,
 } from "../conversation";
@@ -168,6 +170,128 @@ describe("persistTurn", () => {
     await expect(
       persistTurn({ conversation_id: CONV_ID, role: "user", content_text: "x" }),
     ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe("insertTurn — M6 turn_id-ordering fix", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test("writes a stub row with NULL content + tool_calls + refusal", async () => {
+    const { insert } = setSupabaseMock({
+      countResult: { count: 0, error: null },
+      insertSingleResult: {
+        data: { id: TURN_ID, turn_index: 0, created_at: "2026-05-04T07:00:00Z" },
+        error: null,
+      },
+    });
+
+    const result = await insertTurn({
+      conversation_id: CONV_ID,
+      role: "assistant",
+      active_property_id: "prop-1",
+      model_id: "claude-sonnet-4-5-20250929",
+    });
+
+    expect(result.id).toBe(TURN_ID);
+    expect(result.turn_index).toBe(0);
+    const row = insert.mock.calls[0][0];
+    expect(row.role).toBe("assistant");
+    expect(row.active_property_id).toBe("prop-1");
+    expect(row.model_id).toBe("claude-sonnet-4-5-20250929");
+    expect(row.content_text).toBeNull();
+    expect(row.tool_calls).toBeNull();
+    expect(row.refusal).toBeNull();
+    expect(row.input_tokens).toBeNull();
+  });
+
+  test("retries on Postgres unique_violation (23505) on the (conversation_id, turn_index) race", async () => {
+    // First insert raises 23505; second succeeds. Implemented via a
+    // mock that flips state across calls.
+    const single = jest
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { code: "23505", message: "duplicate" } })
+      .mockResolvedValueOnce({
+        data: { id: TURN_ID, turn_index: 1, created_at: "2026-05-04T07:00:01Z" },
+        error: null,
+      });
+    const select = jest.fn().mockImplementation((_cols: string, opts?: { count?: string; head?: boolean }) => {
+      if (opts?.count === "exact" && opts.head) {
+        return { eq: jest.fn().mockResolvedValue({ count: 1, error: null }) };
+      }
+      return { single };
+    });
+    const insert = jest.fn().mockReturnValue({ select });
+    const update = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
+    const supabase = { from: jest.fn().mockReturnValue({ select, insert, update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    const result = await insertTurn({ conversation_id: CONV_ID, role: "assistant" });
+    expect(result.id).toBe(TURN_ID);
+    expect(insert).toHaveBeenCalledTimes(2);
+  });
+
+  test("propagates non-retryable insert errors", async () => {
+    setSupabaseMock({
+      countResult: { count: 0, error: null },
+      insertSingleResult: { data: null, error: { message: "permission denied" } },
+    });
+    await expect(insertTurn({ conversation_id: CONV_ID, role: "user" })).rejects.toThrow(
+      /permission denied/,
+    );
+  });
+});
+
+describe("finalizeTurn — M6 turn_id-ordering fix", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test("UPDATE the stub with content_text + tool_calls + tokens", async () => {
+    const eq = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq });
+    const supabase = { from: jest.fn().mockReturnValue({ update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    await finalizeTurn({
+      turn_id: TURN_ID,
+      content_text: "Hi.",
+      tool_calls: null,
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_read_tokens: 80,
+    });
+
+    const updateRow = update.mock.calls[0][0];
+    expect(updateRow.content_text).toBe("Hi.");
+    expect(updateRow.tool_calls).toBeNull();
+    expect(updateRow.input_tokens).toBe(100);
+    expect(eq).toHaveBeenCalledWith("id", TURN_ID);
+  });
+
+  test("only updates fields present in input (omits undefined to allow stub-empty assertions in tests)", async () => {
+    const eq = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq });
+    const supabase = { from: jest.fn().mockReturnValue({ update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    await finalizeTurn({
+      turn_id: TURN_ID,
+      content_text: "foo",
+    });
+
+    const updateRow = update.mock.calls[0][0];
+    expect(updateRow.content_text).toBe("foo");
+    expect(updateRow).not.toHaveProperty("tool_calls");
+    expect(updateRow).not.toHaveProperty("input_tokens");
+  });
+
+  test("propagates UPDATE errors", async () => {
+    const eq = jest.fn().mockResolvedValue({ error: { message: "row not found" } });
+    const update = jest.fn().mockReturnValue({ eq });
+    const supabase = { from: jest.fn().mockReturnValue({ update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    await expect(
+      finalizeTurn({ turn_id: TURN_ID, content_text: "x" }),
+    ).rejects.toThrow(/row not found/);
   });
 });
 
