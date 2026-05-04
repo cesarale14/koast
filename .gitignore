@@ -54,13 +54,21 @@ Thumbs.db
 __pycache__/
 *.pyc
 .env.staging
-.env.staging
 
-# Per-milestone Phase 1 STOP working files + recovery files (D-F4 / D-GITIGNORE).
-# Format: .{milestone}-phase1-stop.md / .{milestone}-recovery.md.
-# Authored during the milestone-1 STOP discipline, removed before commit.
+# Per-milestone working files (D-F4 / D-GITIGNORE).
+# Authored during STOP discipline + commit construction; removed before/after commit.
 .m*-phase1-stop.md
 .m*-recovery.md
+.m*-cp5-draft.txt
+.m*-checkpoint*.md
+
+# Intentionally untracked (project-specific, do NOT stage):
+# - KOAST_METHOD.md           method document, integrated separately
+# - KOAST_METHOD_IN_CODE.md   method-in-code document, integrated separately
+# - design/logo-concepts*/    unfinished brand exploration; archived when one wins
+# These items are NOT pattern-ignored below — they appear in `git status` so
+# they remain visible as working files. Listed here to document intent and
+# warn against `git add -A` that would sweep them into a commit.
 
 # M5 design archive — scratch / iteration / ui_kits exports kept
 # locally for reference but not load-bearing for the chat shell.

@@ -17,7 +17,7 @@ Every prompt to Claude Code should start with:
 
 Before authoring code on any non-trivial change (multi-file architecture, new
 subsystems, schema changes, anything beyond a 1-3 file fix), Claude Code
-performs a Phase 1 STOP:
+performs Phase 1 STOP rounds:
 
 1. Read the relevant design/conventions docs in full
 2. Run repomix and review
@@ -26,8 +26,26 @@ performs a Phase 1 STOP:
 5. STOP and surface a summary
 6. Wait for explicit approval before proceeding to authoring
 
-This pattern was used in M2, M3, M4 and is the project standard. The working
-file is gitignored or removed before commit.
+Phase 1 STOP is not a single pass. Architectural divergences may surface in
+waves: Round 1 pre-authoring (against the conventions doc); Round 2 during
+migration drafting (against actual schema state); Round 3 during smoke
+(against runtime behavior); Round 4 during recall/integration validation
+(against agent-observed behavior). Each round is its own checkpoint —
+surface findings before proceeding through any one of them. M6 ran four
+rounds; each produced a real architectural correction.
+
+This pattern was used in M2, M3, M4, M5, M6 and is the project standard. The
+working file is gitignored or removed before commit.
+
+### Enforcement-locus discipline
+
+Safety/correctness controls declare their enforcement locus explicitly:
+schema (DB constraints, FK, CHECK), substrate (code-level checks in
+dispatcher/handlers), prompt (system-prompt instructions to the model), or
+review (host-approval gates). Multiple layers can stack; each should be
+named in the conventions doc. M6's D27 (call read_memory before
+write_memory_fact) lives at the prompt locus with substrate enforcement
+deferred to CF #30 — that locus designation is itself a decision.
 
 ## Planning Mode
 - Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API + UI + DB changes).
@@ -44,12 +62,34 @@ file is gitignored or removed before commit.
 - **Never use default Tailwind grays, shadows, or generic border-radius** — see DESIGN_SYSTEM.md.
 - **No emojis anywhere** — UI, AI-generated content, or user-visible SMS bodies.
 - **No pulsing/glowing animated dots.** Status indicators are solid colored dots.
+- **Pre-flight `git status` before any commit.** Verify intentionally-untracked
+  items remain untracked. Never `git add -A` if there are intentionally-
+  untracked items in the working tree. (Comment block in `.gitignore`
+  documents which items are untracked-by-design.)
+- **No new dependencies without explicit justification.** M4-M6 each shipped
+  at 0 added deps by design — substrate work didn't need them, and adding
+  deps without surfacing the choice creates supply-chain debt. New deps
+  require: (a) Phase 1 STOP surfacing, (b) explicit decision in conventions
+  doc, (c) cost/benefit named (what does this dep give us? what's the
+  alternative without it?).
 
 ## Commit format
 
 Commits never include Co-Authored-By trailers. Claude Code is the executor;
 attribution is to Cesar as the author. This applies even when Claude Code
 authored the entire change — no Co-Authored-By: Claude trailer.
+
+Long commit messages: draft to `.m<N>-cp5-draft.txt` (gitignored sentinel
+pattern) and commit via `git commit -F <file>`. Avoid heredoc and shell-string
+escaping for `$`, backticks, or special characters — they leak into committed
+text (M5 shipped with a `$` artifact from heredoc escaping). Sentinel removed
+only AFTER push succeeds — preserves recovery if push fails.
+
+Pre-commit body scrub: search the draft for invented step numbers ("step 17",
+"step 18.5") that escaped from implementation prompts. The implementation
+order is internal scaffolding; commit bodies describe what shipped, not which
+numbered step it shipped under. M6's commit body shipped with both — a
+fix-pass for one number missed the other.
 
 ---
 
@@ -379,7 +419,10 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 ## Development Workflow
 1. Make changes in `~/koast`.
 2. `npx tsc --noEmit 2>&1 | head -20`.
-3. If clean: `git add -A && git commit -m "message" && git push`.
+3. If clean: `git status` (pre-flight verify), then `git add <explicit paths>`
+   (or `git add -A` ONLY if no intentionally-untracked items present),
+   `git commit -m "message"` (or `-F .m<N>-cp5-draft.txt` for long bodies),
+   `git push`.
 4. Vercel auto-builds (~30s).
 5. Never run `npm run build` on the VPS.
 
@@ -396,6 +439,9 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - Events from Ticketmaster, weather from Weather.gov
 - ChannelPopover interactive platform badges (desktop hover + mobile bottom sheet)
 - Pricing engine daily validation runs (Virginia VPS timer)
+- Agent chat shell at `/chat` — property dropdown, SSE streaming, full chat surface (M5, 2026-05-03)
+- Memory recall via `read_memory` tool — agent reads property facts in-conversation (M3, 2026-05-02)
+- Memory writing via `write_memory_fact` gated tool — host-approved property facts persist with full supersession cascade across `agent_artifacts` (lifecycle) and `memory_facts` (data) layers (M6, 2026-05-04, validated end-to-end in production)
 
 ## Known Gaps — Direct Booking Flag
 - **No canonical flag for "direct booking enabled."** `propertyCards[].connectedPlatforms` (Dashboard) should include `'direct'` when a property accepts direct bookings, but the schema has no `direct_booking_enabled` column on `properties` (nor a counterpart on `property_channels`). Session 4 derives `'direct'` only when the legacy `platforms` list already contains `'direct'` — which happens today only via an obscure Channex mapping path. Real implementation: add a boolean column (`properties.direct_booking_enabled`), surface a toggle in Property Settings, and update the Dashboard derivation to read it.
@@ -424,6 +470,15 @@ echo "$SUPABASE_PROJECT_REF"                  # verify which one is active
 Both `.env.local` and `.env.staging` are gitignored (in `koast/` and `koast-workers/`). Vercel deployment uses Vercel's per-environment values; the local files are for shell sessions and worker invocations.
 
 **Migration discipline (post-Session 2)**: every new migration runs against staging first, gets verified, then runs against production. Both environments record applies in the `koast_migration_history` table (created Session 2; populated with all 50 prior migrations). Once a migration is applied to either environment, the file is locked — corrections ship as new migrations. See `docs/architecture/staging-environment.md` for the full pattern + the asymmetric-migration exception (migrations that apply to staging but not production).
+
+**Smoke discipline (post-Session 3, refined post-M6)**: staging smoke is
+architectural validation, not a checkbox. M6 demonstrated that smokes catch
+ordering bugs invisible to unit tests (the `turn_id=""` FK violation was
+unreachable through M3-M5 because no tool wrote artifacts at dispatch time)
+and agent-behavior issues (D27 violation, wrong `supersedes` field). Treat
+smoke findings as load-bearing — surface bugs, fix, resmoke, repeat until
+end-to-end flow validates clean. Do not commit until the smoke passes; do
+not interpret a single failed pass as "good enough with caveats."
 
 Open carry-forwards:
 - ~~13 RLS-disabled tables on staging~~ — closed Session 3 (2026-05-02) via `20260502000000_recovery_rls_enables_late_tables.sql`. Staging and production now have identical RLS coverage (100% of public tables RLS-enabled in both). Going-forward discipline below prevents recurrence.
