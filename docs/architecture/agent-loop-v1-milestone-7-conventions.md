@@ -225,6 +225,17 @@ export async function proposeGuestMessageHandler(
 - Specific Channex error codes mapped via error-classifier (existing M6 module)
 - Idempotency: if same artifact is re-attempted (Try-again click), check if Channex already received this attempt via channex_message_id absence in commit_metadata. Channex itself may have idempotency; verify in Phase 1 STOP.
 
+### §6 amendment (post-CP4 smoke)
+
+The pre-authoring §6 draft above said "Substrate transitions artifact to state='failed', audit to outcome='failed' with error_message" on Channex failure. This conflicted with §17's anti-pattern about adding 'sent' as a new state ("sent is a display concept; substrate only tracks 'confirmed'"). The same pull applies to 'failed': failure is also a display concept. The shipped implementation resolves the tension as follows:
+
+- On `ChannexSendError`: artifact stays `state='emitted'`. The paired `agent_audit_log.outcome` flips to `'failed'`, and `agent_artifacts.commit_metadata.last_error = { message, channex_status, attempted_at }` carries the signal for downstream UI rendering.
+- On `ColdSendUnsupportedError` (M7 cold-send pre-flight gates G1-G4): artifact also stays `state='emitted'`. `last_error.channex_status: null` (Channex was never reached; the handler refused at a local gate) and `last_error.gate: <ColdSendGate>` captures the constraint identifier. SSE error code is `'cold_send_unsupported'` (distinct from `'channex_send_failed'`) so the chat shell can differentiate.
+- Try-again re-POSTs `action='approve'` and re-runs the handler. The route's pre-execute audit flip resets `outcome='failed' → 'pending'` per attempt; the lifecycle stays clean. The artifact remains actionable.
+- Truly unrecoverable failures (ownership, booking missing, post-Channex-200 db hiccup) re-throw past the inner catch into the outer catch, which applies M6's `state='dismissed'` pattern.
+
+The `agent_artifacts.state` enum keeps its M2 / M6.2 shape — `emitted | edited | confirmed | dismissed | superseded`. No new value added.
+
 ---
 
 ## 7. Inline edit affordance (D38)
@@ -376,9 +387,22 @@ States (paralleling MemoryArtifact's 4 states + edit):
 - **`pending`**: shows the drafted message text. Approve / Edit / Discard buttons.
 - **`edited`**: shows edited message text with subtle "edited by host" subtitle. Approve / Discard buttons (no Edit; one edit per artifact).
 - **`sent`**: shows the sent message text. "Sent · [channel]" check pill. No actions. Channex message_id linked if useful.
-- **`failed`**: shows the (drafted or edited) message text. Error details. Try-again button.
+- **`failed`**: shows the (drafted or edited) message text. Error details. Try-again button. Discard button also rendered (post-CP4 refinement) — non-transient failures (Channex 422 for character limits, OTA-policy rejections, ColdSendUnsupportedError gates) re-fail on retry, so the host needs an exit path that doesn't require page refresh.
 
 Visual treatment: TBD via Phase A design exploration if desired, OR simpler shape — text-block with action footer. Free-text artifact is visually different from MemoryArtifact's structured-record form.
+
+### §11 amendment (post-CP4 smoke)
+
+The pre-authoring §11 above lists 4 component states; substrate state is `agent_artifacts.state ∈ {emitted | edited | confirmed | superseded | dismissed}`. The mapping between them is asymmetric because of the §6 amendment's failure encoding:
+
+- `pending` ← `state='emitted'` AND no `commit_metadata.last_error`
+- `edited`  ← `state='edited'` AND no `commit_metadata.last_error`
+- `sent`    ← `state='confirmed'`
+- `failed`  ← `state='emitted'` (or `'edited'`) AND `commit_metadata.last_error` is present
+
+The chat shell derives the `failed` visual from `commit_metadata.last_error` presence, NOT a substrate state value. Audit outcome is canonical lifecycle truth (`succeeded` / `failed` / `pending`); `last_error` presence is the reliable proxy the rendering layer reads. This holds for both `ChannexSendError` failures (via Channex) and `ColdSendUnsupportedError` failures (via local pre-flight gates) — both write `last_error` to `commit_metadata` and both leave `state='emitted'`.
+
+The component's `channel` prop is resolved per D51 (commit_metadata.channel canonical → message_threads join fallback → undefined for fresh-booking edge). Channel display in eyebrow + sent pill conditionally renders only when channel is known; `channelLabel` returns null for missing channel rather than a generic 'guest' fallback.
 
 ---
 
@@ -405,6 +429,16 @@ D46 — Bundled scope: read_guest_thread + propose_guest_message together (M7 sp
 D47 — No supersession in M7 (M7 specific) — Guest messages don't supersede each other; each message is an independent send. M6's supersession columns inherited but unused. Future tools may use them.
 
 D48 — Channel context flow (PE) — Booking's channel surfaces from `read_guest_thread` output → into agent's reasoning context → into `propose_guest_message` input via the message_text (agent crafts channel-appropriate text) → into post-approval handler for routing → into Channex API. Channel awareness is per-tool input, not a separate global state.
+
+### Decisions added during authoring (post-Phase-1-STOP)
+
+D49 — Cold-send via `POST /bookings/:channex_booking_id/messages` (M7 specific) — When the local `message_threads` row is missing, the post-approval handler calls Channex's `POST /bookings/:id/messages` endpoint instead of the thread-keyed sibling. Probed 2026-05-05 against a live Villa Jamaica BDC booking; HTTP 200 in 1.68s, response symmetric to the existing `POST /message_threads/:id/messages` plus `relationships.message_thread.data.id` carrying the auto-created thread id. Channex maintains a thread shell from booking-creation time even before any messages exist; the cold-send endpoint attaches the new message to that latent shell, so we get both the message id AND the thread id in one round-trip with no separate fetch. The handler materializes the local `message_threads` row from the response (`onConflict: 'channex_thread_id', ignoreDuplicates: true`; webhook is canonical for thread state, our handler is canonical for the just-sent message).
+
+D50 — `ColdSendUnsupportedError` class for cold-send pre-flight gates (PE for future capability constraints) — When the cold-send branch can't dispatch (no `channex_booking_id`, no `property_channels` row, iCal-import sentinel, ABB pending CF #45), throw `ColdSendUnsupportedError` with a `gate: ColdSendGate` discriminator instead of a plain `Error`. The route's inner catch handles `ColdSendUnsupportedError` alongside `ChannexSendError` — both route through M7 §6 amendment encoding (`state='emitted'`, `commit_metadata.last_error`, audit `outcome='failed'`) but with distinct SSE error codes (`cold_send_unsupported` vs `channex_send_failed`) and `last_error.channex_status: null` for unsupported (Channex never reached) vs `<HTTP code>` for Channex failures. Adding new gates: extend `ColdSendGate` union + throw with new identifier; route handling Just Works.
+
+D51 — Asymmetric channel resolution for guest_message_proposal artifacts (PE) — Three-source precedence in `loadTurnsForConversation`: (1) `commit_metadata.channel` written by the post-approval handler at confirm time (canonical post-fix); (2) `message_threads` join via `payload.booking_id` for emitted/edited artifacts + legacy confirmed artifacts written before the fix; (3) `undefined` for the rare fresh-booking-no-thread edge — the `GuestMessageProposal` component degrades to a channel-less eyebrow. Surfaced as `derived_channel?: string` on `PendingArtifact`. Documents the explicit precedence inline so future readers can extend without re-deriving.
+
+D52 — `[history, sessionHarvest]` dedup by `turn_id` with history first (M7 specific / regression-pin) — Latent in M6, masked by the milestone deposit animation; surfaced via M7's no-motion guest_message flow (the smoke's Phase C bug). After router.refresh, the same turn appears in BOTH `history` (refreshed substrate) AND `sessionHarvest` (stale local). Duplicate `key={t.id}` produces undefined React reconciliation. Fix: explicit `Set<string>`-based dedup at the composition layer with history iterated first; sessionHarvest entries with already-seen turn ids are filtered. History wins because the substrate is canonical post-refresh.
 
 ---
 
@@ -504,10 +538,11 @@ M7-specific anti-patterns:
 - ❌ Sending to Channex without host approval (every guest message goes through propose-then-approve)
 - ❌ Auto-retry loops on Channex failure (host-driven retry only via Try-again button; idempotency guard at endpoint protects)
 - ❌ Multi-message proposals in one artifact (one message per artifact)
-- ❌ Drafting messages for guests Koast doesn't have a thread for (always read_guest_thread first)
+- ❌ Drafting messages for guests Koast doesn't have a thread for — call `read_guest_thread` first; it returns `thread:[]` + booking context for thread-less bookings (cold-send path materializes the local thread row at handler time when supported)
 - ❌ Hardcoded channel logic in component code (channel routing happens at handler level via Channex API; component just displays the result)
 - ❌ Persisting Channex message_id-related data outside agent_artifacts.commit_metadata (Channex is source of truth for sent-message data)
-- ❌ Adding `'sent'` as a new state to agent_artifacts.state CHECK (sent is a *display* concept; substrate only tracks `'confirmed'`. UI maps `state='confirmed' && action_kind='guest_message'` → "sent" visual treatment)
+- ❌ Adding `'sent'` or `'failed'` as new states to agent_artifacts.state CHECK — both are *display* concepts. Substrate only tracks `'emitted' | 'edited' | 'confirmed' | 'superseded' | 'dismissed'`. The UI derives `'sent'` from `state='confirmed' && action_kind='guest_message'`; `'failed'` from `state='emitted'/'edited' && commit_metadata.last_error` presence (per §6 + §11 amendments).
+- ❌ Attempting to message iCal-import properties via Channex — handler returns `ColdSendUnsupportedError(gate='ical-import')` with host-actionable copy ("[Property] is connected via iCal only on [Platform]; messaging requires channel-managed integration through Channex"). Not a Koast gap; iCal is calendar-only by design and the iCal feed doesn't expose outbound messaging.
 
 ---
 
@@ -528,6 +563,22 @@ Continued from M6's §18 (carry-forwards 20-31). M7 introduces:
 37. **Send-after-edit cycle** — M7 single-edit-then-approve. Future: edit-multiple-times-before-approving. Probably useful; real use will tell.
 
 38. **action_kind expansion guardrails** — as more action types land (M8+), `action_kind` discriminator grows. At what count does it become unwieldy? Worth visiting when 4-5 action_kind values exist.
+
+39. **Booking discovery tool** — agent has no `list_threads` / `list_bookings` tool today; v1 expects the host to name a booking explicitly in the prompt. Real use will tell whether a discovery tool ("show me unanswered guest threads") earns its keep. Surfaced during Phase 1 STOP; deferred from M7 scope.
+
+40. **In-place artifact mutation vs router.refresh** — `handleArtifactEdit` (M7 D38) currently calls `router.refresh()` after a successful edit POST instead of feeding the new state into the in-memory reducer. Cost: small visible flash between optimistic and refreshed render. Polish iteration would consume the artifact endpoint's edit JSON response back into a sibling reducer hook. M7's `[history, sessionHarvest]` dedup-by-turn-id (D52) makes the refresh-driven path safe; in-place mutation would be polish, not correctness.
+
+41. **Audit retry attempt history** — M7 reuses the same `agent_audit_log` row across retry attempts (pre-execute audit flip resets `outcome='failed' → 'pending'` per attempt). Lifecycle is clean per attempt but the log doesn't preserve a per-attempt history (timestamps, latency, error_message of prior failed attempts). Future audit-log surface may want to render attempt history; would need either a separate `agent_audit_attempts` table or JSONB array on the audit row. Not blocking; surfaced as the M7 cold-send retry surfaced multiple gate-error sequences in the Phase 3 smoke.
+
+42. **Failure UI derivation refinement** — chat shell currently derives the `'failed'` visual from `commit_metadata.last_error` presence. Works in practice but couples UI rendering to commit_metadata schema. Polish iteration: surface `audit_outcome` directly on the loaded artifact and derive failure from outcome='failed' + last_error presence (defense-in-depth) — protects against partial-write races where last_error is absent but the audit row already flipped.
+
+43. **Multi-channel bookings render all threads** — `read_guest_thread` v1 returns the most-recent thread only (`order by last_message_received_at desc limit 1`). Multi-channel bookings (rare today; a booking bridged across both ABB and BDC channels) would have multiple `message_threads` rows. Future enhancement: return all threads with channel discriminator. Surfaced inline in `read-guest-thread.ts` docstring.
+
+44. **First-message-in-thread support (cold-send) — ACTIVATED IN M7.** No longer carry-forward; folded into M7 substrate. BDC cold-send works end-to-end via channel-managed properties (Gretter probe 2026-05-05); ABB cold-send constraints surfaced and routed via CF #45.
+
+45. **channel_id resolution for ABB cold-send** — channel-managed Airbnb properties (real `channex_channel_id` in `property_channels`) require `channel_id` in the Channex `POST /bookings/:id/messages` request body (Channex returns 422 `{channel_id: ["can't be blank"]}` when omitted; auto-resolves for BDC since the booking's channel relationship is implicit at the Channex side). Currently routed to `ColdSendUnsupportedError(gate='abb-cold-send-cf45')` with host-actionable copy ("Send the first message via Airbnb directly; subsequent messages will work through Koast"). Implementation: small probe to confirm channel_id placement in the body shape (top-level vs `relationships.channel.data.id` vs nested) + resolve from local `property_channels.channex_channel_id` + ~25 LOC handler change + 2 tests. Body-shape probe is ~30 seconds against a Villa Jamaica thread-less ABB booking. The `recoverable: true` flag on `ColdSendUnsupportedError` flips when CF #45 ships.
+
+46. **Stakes-class refinement for explicit memory writes** — current `write_memory_fact` uniformly stakes='medium' / always D35-fork-gated. Real-use signal at M7 smoke: "remember the wifi password is X" type explicit instructions (Case 1 from system-prompt taxonomy) don't need propose-then-approve overhead; the host explicitly named the fact and value, gated review adds friction without protection. The propose card serves as interpretation verification (structured `sub_entity_type/attribute/fact_value` rendering catches interpretation errors), but at v1.x maturity hosts will trust the agent's interpretation enough to skip the click for explicit cases. Two real implementation shapes: (a) new non-gated `save_memory_fact` tool for Case 1 (write_memory_fact stays gated for Cases 2-5); (b) stakes-class polymorphism on `write_memory_fact` based on case identifier in input (dispatcher treats explicit cases as `mode='allow'`). Both preserve audit trail. Real-use telemetry needed before committing: count Case 1 vs Cases 2-5 proposals over 1-2 weeks of M7+ usage; if Case 1 is >70% of all proposes AND host approval rate on Case 1 is >95%, the stakes split is justified by signal. Pattern extends to future capabilities (explicit "send this exact message" in M8+ tools would justify lower-stakes mode similarly).
 
 ---
 

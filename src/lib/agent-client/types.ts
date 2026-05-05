@@ -9,19 +9,81 @@
  * The Zod schema below revalidates SSE payloads on the client so any
  * server/client drift is caught at parse time on this side.
  *
- * Phase 1 STOP D-F1 correction: M4 emitted 7 events. M6 promotes 3 of
- * the 4 forward-looking events from D-FORWARD-EVENTS into the active
- * schema (tool_call_failed, memory_write_pending, memory_write_saved).
- * The 4th forward-looking event — `action_proposed` — stays as a
- * type-only declaration, deferred to M7. The reducer's exhaustive
- * switch still fails TS for action_proposed, forcing M7 to address.
+ * D39 (M7): action-proposal events are canonicalized into
+ * `action_proposed` / `action_completed` with an `action_kind`
+ * discriminator (`'memory_write' | 'guest_message'`). The payload shape
+ * is itself discriminated by `action_kind`, so the reducer's switch
+ * branches get strongly-typed access to the correct payload per kind.
+ * No forward-looking events remain — `_exhaustive: never` holds across
+ * the full union.
  */
 
 import { z } from "zod";
 
 /* ============================================================
-   Active SSE events (M4 + M6 promotions)
+   Active SSE events (M4 + M6 + M7)
    ============================================================ */
+
+// Per-kind payload schemas. `MemoryWriteProposedPayloadSchema` preserves
+// the 8 fields M6 emitted on `memory_write_pending` verbatim — the rename
+// is wire-shape only. `GuestMessageProposedPayloadSchema` is M7 new.
+const MemoryWriteProposedPayloadSchema = z.object({
+  property_id: z.string(),
+  sub_entity_type: z.string(),
+  attribute: z.string(),
+  fact_value: z.unknown(),
+  confidence: z.number().optional(),
+  source: z.string(),
+  supersedes: z.string().optional(),
+  supersedes_memory_fact_id: z.string().optional(),
+  citation: z
+    .object({
+      source_text: z.string().optional(),
+      reasoning: z.string().optional(),
+    })
+    .optional(),
+});
+
+const GuestMessageProposedPayloadSchema = z.object({
+  booking_id: z.string(),
+  message_text: z.string(),
+});
+
+const ActionProposedSchema = z.discriminatedUnion("action_kind", [
+  z.object({
+    type: z.literal("action_proposed"),
+    action_kind: z.literal("memory_write"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    proposed_payload: MemoryWriteProposedPayloadSchema,
+    supersedes: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("action_proposed"),
+    action_kind: z.literal("guest_message"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    proposed_payload: GuestMessageProposedPayloadSchema,
+  }),
+]);
+
+const ActionCompletedSchema = z.discriminatedUnion("action_kind", [
+  z.object({
+    type: z.literal("action_completed"),
+    action_kind: z.literal("memory_write"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    memory_fact_id: z.string(),
+    superseded_memory_fact_id: z.string().nullable().optional(),
+  }),
+  z.object({
+    type: z.literal("action_completed"),
+    action_kind: z.literal("guest_message"),
+    artifact_id: z.string(),
+    audit_log_id: z.string(),
+    channex_message_id: z.string(),
+  }),
+]);
 
 export const AgentStreamEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -44,9 +106,7 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     success: z.boolean(),
     result_summary: z.string(),
   }),
-  // M6 D28: per-tool failure with structured taxonomy. Replaces the
-  // "tool returned with success=false" pattern; 'tool_call_completed'
-  // continues to mean genuine successful execution.
+  // M6 D28: per-tool failure with structured taxonomy.
   z.object({
     type: z.literal("tool_call_failed"),
     tool_use_id: z.string(),
@@ -65,43 +125,8 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     }),
     latency_ms: z.number().int().nonnegative(),
   }),
-  // M6 D35: write_memory_fact proposal landed; agent_artifacts row in
-  // state='emitted'. Reducer attaches a memory_artifact ContentBlock
-  // to the current turn; cascade marks any prior matching artifact
-  // state='superseded' optimistically.
-  z.object({
-    type: z.literal("memory_write_pending"),
-    artifact_id: z.string(),
-    audit_log_id: z.string(),
-    proposed_payload: z.object({
-      property_id: z.string(),
-      sub_entity_type: z.string(),
-      attribute: z.string(),
-      fact_value: z.unknown(),
-      confidence: z.number().optional(),
-      source: z.string(),
-      supersedes: z.string().optional(),
-      supersedes_memory_fact_id: z.string().optional(),
-      citation: z
-        .object({
-          source_text: z.string().optional(),
-          reasoning: z.string().optional(),
-        })
-        .optional(),
-    }),
-    supersedes: z.string().optional(),
-  }),
-  // M6 post-approval: host clicked Save → memory_facts row committed,
-  // agent_artifacts.state='confirmed'. Reducer flips the artifact's
-  // visual state and the parent turn's KoastMark fires the milestone
-  // deposit animation (CF15 visual completion).
-  z.object({
-    type: z.literal("memory_write_saved"),
-    artifact_id: z.string(),
-    audit_log_id: z.string(),
-    memory_fact_id: z.string(),
-    superseded_memory_fact_id: z.string().nullable().optional(),
-  }),
+  ActionProposedSchema,
+  ActionCompletedSchema,
   z.object({
     type: z.literal("done"),
     turn_id: z.string(),
@@ -123,40 +148,36 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
 export type AgentStreamEvent = z.infer<typeof AgentStreamEventSchema>;
 
 /* ============================================================
-   Forward-looking events — types only (D-FORWARD-EVENTS, M7)
-   ============================================================
-   M6 promoted tool_call_failed, memory_write_pending, and
-   memory_write_saved into the active schema above. The remaining
-   forward-looking event — action_proposed — stays as a type-only
-   declaration. The reducer's exhaustive switch deliberately fails
-   TS compilation for action_proposed; M7 lifts it into the active
-   schema and adds the matching reducer branch.
-*/
-
-// TODO M7
-export type ForwardLookingActionProposed = {
-  type: "action_proposed";
-  proposal_id: string;
-  /** Plain-language summary, e.g. "Push price to $199 on Airbnb · expires Tue 12:00 pm". */
-  head: string;
-  /** 1-3 sentence rationale. */
-  why: string;
-  /** Action variants — primary + secondaries + ghost. */
-  options: Array<{
-    id: string;
-    label: string;
-    kind: "primary" | "secondary" | "ghost";
-  }>;
-};
-
-/* ============================================================
    UI-side state shapes
    ============================================================ */
 
-/** Lifecycle state of a memory artifact rendered inline in a turn (M6). */
+/**
+ * Lifecycle state of a memory artifact rendered inline in a turn.
+ *
+ * - `pending`     — agent_artifacts.state='emitted', awaiting host action
+ * - `saved`       — host approved; memory_facts row committed
+ * - `superseded`  — a later proposal corrected this one
+ * - `failed`      — post-approval handler errored (rare; M6's write_memory_fact
+ *                   handler is local-DB only). For a memory artifact, failure
+ *                   is unrecoverable — Try-again is not surfaced.
+ */
 export type MemoryArtifactState = "pending" | "saved" | "superseded" | "failed";
 
-/** A block inside the current koast turn — prose text, an inline tool call, or an inline memory artifact. */
+/**
+ * Lifecycle state of a guest_message artifact (M7 D43).
+ *
+ * - `pending`  — agent_artifacts.state='emitted', no host edit yet
+ * - `edited`   — host clicked Edit and saved an `edited_text` (M7 D45 first
+ *                activator of agent_artifacts.state='edited')
+ * - `sent`     — host approved; Channex acknowledged the send
+ * - `failed`   — Channex rejected; substrate kept state='emitted' but the
+ *                paired audit row is outcome='failed' and
+ *                commit_metadata.last_error carries the detail (M7 §6
+ *                amendment). Try-again re-runs the post-approval handler.
+ */
+export type GuestMessageArtifactState = "pending" | "edited" | "sent" | "failed";
+
+/** A block inside the current koast turn — prose text, an inline tool call, an inline memory artifact, or an inline guest-message proposal. */
 export type ContentBlock =
   | {
       kind: "paragraph";
@@ -187,18 +208,17 @@ export type ContentBlock =
       started_at: number;
     }
   | {
-      // M6 D35: write_memory_fact proposal artifact, rendered inline
-      // in the turn that produced it. Lifecycle state mirrors
-      // agent_artifacts.state (mapped from M5's 4-value enum):
-      //   memory_write_pending  → 'pending'   (agent_artifacts.state='emitted')
-      //   memory_write_saved    → 'saved'     (agent_artifacts.state='confirmed')
-      //   supersession cascade  → 'superseded'
-      //   post-approval failure → 'failed'    (recoverable; see error field)
+      // M6 D35 + M7 D39: write_memory_fact proposal artifact, rendered inline
+      // in the turn that produced it. Lifecycle state mirrors agent_artifacts.state:
+      //   action_proposed{action_kind:'memory_write'}    → 'pending'   (state='emitted')
+      //   action_completed{action_kind:'memory_write'}   → 'saved'     (state='confirmed')
+      //   supersession cascade                           → 'superseded'
+      //   post-approval failure                          → 'failed'    (rare; non-retryable)
       kind: "memory_artifact";
       artifact_id: string;
       audit_log_id: string;
       state: MemoryArtifactState;
-      /** Original proposed payload (from memory_write_pending). */
+      /** Original proposed payload (from action_proposed). */
       payload: {
         property_id: string;
         sub_entity_type: string;
@@ -210,13 +230,37 @@ export type ContentBlock =
         supersedes_memory_fact_id?: string;
         citation?: { source_text?: string; reasoning?: string };
       };
-      /** Filled when state='saved' (memory_write_saved fired). */
+      /** Filled when state='saved' (action_completed fired). */
       memory_fact_id?: string;
       /** Filled when state='superseded' — the artifact_id that superseded this one. */
       superseded_by_artifact_id?: string;
       /** Filled when state='failed' (post-approval execution failed). */
       error?: { message: string; retryable: boolean };
-      /** Client-side timestamp at memory_write_pending; for ordering & duration. */
+      /** Client-side timestamp at action_proposed; for ordering & duration. */
+      started_at: number;
+    }
+  | {
+      // M7 D43: propose_guest_message proposal artifact. Free-text payload
+      // with inline edit affordance (D38 editable=true). Lifecycle state
+      // is derived from agent_artifacts.state + audit_outcome (D42 + §6
+      // amendment): substrate keeps state='emitted' on Channex failure
+      // and signals via audit outcome + commit_metadata.last_error so the
+      // UI can render 'failed' without polluting the lifecycle enum.
+      kind: "guest_message_artifact";
+      artifact_id: string;
+      audit_log_id: string;
+      state: GuestMessageArtifactState;
+      /** Original proposed payload (from action_proposed). edited_text is set after a host Edit. */
+      payload: {
+        booking_id: string;
+        message_text: string;
+        edited_text?: string;
+      };
+      /** Filled when state='sent' (action_completed fired with channex_message_id). */
+      channex_message_id?: string;
+      /** Filled when state='failed' (commit_metadata.last_error). Try-again clears. */
+      error?: { message: string };
+      /** Client-side timestamp at action_proposed; for ordering. */
       started_at: number;
     };
 

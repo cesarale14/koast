@@ -42,4 +42,9 @@ export {
   type MemoryArtifactProps,
   type FactSpan,
 } from "./MemoryArtifact";
+export {
+  GuestMessageProposal,
+  type GuestMessageProposalProps,
+  type GuestMessageProposalState,
+} from "./GuestMessageProposal";
 export { ChatClient, type ChatClientProps } from "./ChatClient";

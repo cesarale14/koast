@@ -1,9 +1,10 @@
 /**
- * M6 D33 — KoastMark milestone trigger logic.
+ * M6 D33 + M7 D39 — KoastMark milestone trigger logic.
  *
  * The trigger lives inside ChatClient as a small hook composed of:
  *   - parsing the SSE stream returned by /api/agent/artifact for the
- *     'memory_write_saved' event
+ *     `action_completed` event with `action_kind === 'memory_write'`
+ *     (M7 D39 rename — was `memory_write_saved` in M6)
  *   - a setState transition idle → milestone → idle (~2s)
  *   - a prefers-reduced-motion guard that skips the visual transition
  *     entirely when the user prefers reduced motion
@@ -43,19 +44,20 @@ function parseSseBuffer(buf: string): { remainder: string; events: ParsedSseEven
 }
 
 describe("milestone trigger — SSE parsing", () => {
-  test("extracts memory_write_saved from a clean two-event stream", () => {
+  test("extracts action_completed (memory_write) from a clean two-event stream", () => {
     const buf =
-      `data: {"type":"memory_write_saved","artifact_id":"a","audit_log_id":"x","memory_fact_id":"f"}\n\n` +
+      `data: {"type":"action_completed","action_kind":"memory_write","artifact_id":"a","audit_log_id":"x","memory_fact_id":"f"}\n\n` +
       `data: {"type":"done","turn_id":"t","audit_ids":["x"]}\n\n`;
     const { events, remainder } = parseSseBuffer(buf);
     expect(events).toHaveLength(2);
-    expect(events[0].type).toBe("memory_write_saved");
+    expect(events[0].type).toBe("action_completed");
+    expect(events[0].action_kind).toBe("memory_write");
     expect(events[1].type).toBe("done");
     expect(remainder).toBe("");
   });
 
   test("partial buffer leaves trailing data intact for the next chunk", () => {
-    const partial = `data: {"type":"memory_write_saved","artifact_id":"a"`;
+    const partial = `data: {"type":"action_completed","action_kind":"memory_write","artifact_id":"a"`;
     const { events, remainder } = parseSseBuffer(partial);
     expect(events).toEqual([]);
     expect(remainder).toBe(partial);
@@ -64,10 +66,43 @@ describe("milestone trigger — SSE parsing", () => {
   test("malformed JSON is skipped; subsequent valid events still parse", () => {
     const buf =
       `data: {malformed}\n\n` +
-      `data: {"type":"memory_write_saved","artifact_id":"a"}\n\n`;
+      `data: {"type":"action_completed","action_kind":"memory_write","artifact_id":"a"}\n\n`;
     const { events } = parseSseBuffer(buf);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("memory_write_saved");
+    expect(events[0].type).toBe("action_completed");
+    expect(events[0].action_kind).toBe("memory_write");
+  });
+});
+
+describe("milestone trigger — fires only on memory_write action_kind", () => {
+  test("memory_write branch triggers the milestone", () => {
+    let fired = 0;
+    const event: ParsedSseEvent = {
+      type: "action_completed",
+      action_kind: "memory_write",
+      artifact_id: "a",
+      audit_log_id: "x",
+      memory_fact_id: "f",
+    };
+    if (event.type === "action_completed" && event.action_kind === "memory_write") {
+      fired += 1;
+    }
+    expect(fired).toBe(1);
+  });
+
+  test("guest_message branch does NOT trigger the milestone (no deposit motion for sends)", () => {
+    let fired = 0;
+    const event: ParsedSseEvent = {
+      type: "action_completed",
+      action_kind: "guest_message",
+      artifact_id: "a",
+      audit_log_id: "x",
+      channex_message_id: "cx-1",
+    };
+    if (event.type === "action_completed" && event.action_kind === "memory_write") {
+      fired += 1;
+    }
+    expect(fired).toBe(0);
   });
 });
 

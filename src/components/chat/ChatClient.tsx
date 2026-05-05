@@ -39,6 +39,10 @@ import { EmptyState } from "./EmptyState";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
+import {
+  GuestMessageProposal,
+  type GuestMessageProposalState,
+} from "./GuestMessageProposal";
 import { useAgentTurn } from "@/lib/agent-client/useAgentTurn";
 import type { PropertyOption } from "./PropertyContext";
 
@@ -56,8 +60,11 @@ type UITurnLite = {
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
   /**
-   * M6 D23 — artifacts attached to this turn (history-visible states only:
-   * emitted | confirmed | superseded). 'dismissed' is filtered server-side.
+   * M6 D23 + M7 D45 — artifacts attached to this turn (history-visible
+   * states: emitted | edited | confirmed | superseded). 'dismissed' is
+   * filtered server-side. M7 §6 amendment: post-Channex-failure
+   * artifacts stay state='emitted' but carry commit_metadata.last_error
+   * — the UI derives 'failed' visual from that.
    */
   pendingArtifacts?: Array<{
     artifact_id: string;
@@ -66,8 +73,10 @@ type UITurnLite = {
     payload: Record<string, unknown>;
     created_at: string;
     supersedes: string | null;
-    state: "emitted" | "confirmed" | "superseded";
+    state: "emitted" | "edited" | "confirmed" | "superseded";
     commit_metadata: Record<string, unknown> | null;
+    /** M7 — derived canonical channel for guest_message_proposal. */
+    derived_channel?: string;
   }>;
 };
 
@@ -257,8 +266,9 @@ export function ChatClient({
 
   /**
    * M6 D33 — KoastMark milestone trigger. When the host approves a
-   * memory write, we receive memory_write_saved via the artifact
-   * endpoint's SSE response and flip the most-recent koast turn's
+   * memory write, we receive `action_completed` (action_kind=
+   * 'memory_write') via the artifact endpoint's SSE response (M7 D39
+   * rename of memory_write_saved) and flip the most-recent koast turn's
    * avatar to 'milestone' for ~2s (matches k-milestone-* keyframe
    * duration). prefers-reduced-motion suppresses the trigger entirely
    * (data-state stays idle) so reduced-motion users get the saved-
@@ -300,7 +310,7 @@ export function ChatClient({
   /**
    * M6 D35 — host-action handler for MemoryArtifact Save/Discard.
    * POST /api/agent/artifact; on approve, consumes the SSE stream
-   * (memory_write_saved + done); on discard, consumes the JSON ack.
+   * (action_completed + done); on discard, consumes the JSON ack.
    * For step 18 the resulting state isn't fed back into the reducer
    * directly — page refresh re-reads the substrate via
    * loadTurnsForConversation. Future iteration: consume the saved
@@ -322,7 +332,7 @@ export function ChatClient({
         }
         if (action === "approve") {
           // SSE response — drain the stream and watch for the
-          // memory_write_saved event so we can fire the milestone
+          // action_completed event so we can fire the milestone
           // animation before refreshing. Each SSE record is
           // `data: <json>\n\n` per the protocol.
           const reader = res.body?.getReader();
@@ -342,7 +352,15 @@ export function ChatClient({
                 if (record.startsWith("data: ")) {
                   try {
                     const event = JSON.parse(record.slice(6));
-                    if (event && event.type === "memory_write_saved") {
+                    // M7 D39: milestone fires only on the memory_write
+                    // branch of action_completed; guest_message uses no
+                    // motion (per conventions §11 — sent visual is the
+                    // signal, not a deposit animation).
+                    if (
+                      event &&
+                      event.type === "action_completed" &&
+                      event.action_kind === "memory_write"
+                    ) {
                       fireMilestone();
                     }
                   } catch {
@@ -364,6 +382,42 @@ export function ChatClient({
         router.refresh();
       } catch (err) {
         console.error("[chat-client] artifact action threw", err);
+      }
+    },
+    [router],
+  );
+
+  /**
+   * M7 D38 — host-action handler for GuestMessageProposal Edit-Save.
+   * POSTs action='edit' with edited_text; the route updates
+   * agent_artifacts.payload.edited_text + state='edited' (committed_at
+   * stays NULL — 'edited' is non-terminal). On success, router.refresh
+   * picks up the new state from the substrate (CF #40 — in-place
+   * mutation deferred). Errors logged to console; no toast (M5 anti-
+   * pattern: no toast errors).
+   */
+  const handleArtifactEdit = useCallback(
+    async (auditLogId: string, editedText: string) => {
+      try {
+        const res = await fetch("/api/agent/artifact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audit_id: auditLogId,
+            action: "edit",
+            edited_text: editedText,
+          }),
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({ error: res.statusText }));
+          console.error("[chat-client] artifact edit failed", errBody);
+          return;
+        }
+        // Edit returns JSON {ok, state, edited_text}; pull state into
+        // the substrate via router.refresh.
+        router.refresh();
+      } catch (err) {
+        console.error("[chat-client] artifact edit threw", err);
       }
     },
     [router],
@@ -393,39 +447,73 @@ export function ChatClient({
       });
     }
     // M6 fix (Issue A — propose-flow harvest gap): preserve
-    // memory_artifact ContentBlocks that landed via memory_write_pending
+    // memory_artifact ContentBlocks that landed via action_proposed
     // events during streaming. Without this, the artifact disappears
     // post-stream until a router.refresh, which only fires on Save/
     // Discard — propose-only turns would lose the artifact visually.
-    const liveArtifacts = state.content
-      .filter((b) => b.kind === "memory_artifact")
-      .map((b) => {
-        const a = b as Extract<typeof b, { kind: "memory_artifact" }>;
-        // Map reducer's MemoryArtifactState → agent_artifacts.state
-        // shape used by HistoryTurnView. Live blocks coming out of
-        // memory_write_pending are 'pending' → 'emitted'; mid-stream
-        // saved/superseded transitions follow.
+    // M7 extends the same harvest to guest_message_artifact blocks.
+    type LiveArtifact = {
+      artifact_id: string;
+      audit_log_id: string;
+      kind: string;
+      payload: Record<string, unknown>;
+      created_at: string;
+      supersedes: string | null;
+      state: "emitted" | "edited" | "confirmed" | "superseded";
+      commit_metadata: Record<string, unknown> | null;
+    };
+    const liveArtifacts: LiveArtifact[] = [];
+    for (const b of state.content) {
+      if (b.kind === "memory_artifact") {
         const dbState =
-          a.state === "pending"
+          b.state === "pending"
             ? "emitted"
-            : a.state === "saved"
+            : b.state === "saved"
               ? "confirmed"
-              : a.state === "superseded"
+              : b.state === "superseded"
                 ? "superseded"
                 : null; // 'failed' shouldn't reach harvest; skip
-        if (dbState === null) return null;
-        return {
-          artifact_id: a.artifact_id,
-          audit_log_id: a.audit_log_id,
-          kind: "property_knowledge_confirmation" as const,
-          payload: a.payload as Record<string, unknown>,
+        if (dbState === null) continue;
+        liveArtifacts.push({
+          artifact_id: b.artifact_id,
+          audit_log_id: b.audit_log_id,
+          kind: "property_knowledge_confirmation",
+          payload: b.payload as Record<string, unknown>,
           created_at: stamp,
-          supersedes: null as string | null,
-          state: dbState as "emitted" | "confirmed" | "superseded",
-          commit_metadata: null as Record<string, unknown> | null,
-        };
-      })
-      .filter((a): a is NonNullable<typeof a> => a !== null);
+          supersedes: null,
+          state: dbState,
+          commit_metadata: null,
+        });
+      } else if (b.kind === "guest_message_artifact") {
+        // Map reducer's GuestMessageArtifactState → agent_artifacts.state
+        // shape. M7 §6 amendment: 'failed' substrate state stays
+        // 'emitted' but commit_metadata.last_error carries the signal.
+        const dbState: "emitted" | "edited" | "confirmed" =
+          b.state === "sent"
+            ? "confirmed"
+            : b.state === "edited"
+              ? "edited"
+              : "emitted"; // pending OR failed → 'emitted'
+        const commitMetadata: Record<string, unknown> = {};
+        if (b.channex_message_id) {
+          commitMetadata.channex_message_id = b.channex_message_id;
+        }
+        if (b.error) {
+          commitMetadata.last_error = { message: b.error.message };
+        }
+        liveArtifacts.push({
+          artifact_id: b.artifact_id,
+          audit_log_id: b.audit_log_id,
+          kind: "guest_message_proposal",
+          payload: b.payload as Record<string, unknown>,
+          created_at: stamp,
+          supersedes: null,
+          state: dbState,
+          commit_metadata:
+            Object.keys(commitMetadata).length > 0 ? commitMetadata : null,
+        });
+      }
+    }
 
     const koastTurn: UITurnLite = {
       id: state.turn_id ?? `live-koast-${stamp}`,
@@ -578,7 +666,30 @@ export function ChatClient({
               // Compute the index of the most-recent koast turn so the
               // milestone animation fires on the right avatar (last
               // koast turn across history + sessionHarvest combined).
-              const all = [...history, ...sessionHarvest];
+              //
+              // M7 dedup (post-CP4 smoke fix): when router.refresh()
+              // re-loads history after a host action (Approve / Edit /
+              // Discard), the same turn can appear in BOTH `history`
+              // (refreshed substrate) AND `sessionHarvest` (stale local
+              // copy from the original stream). Duplicate `key={t.id}`
+              // produces undefined React reconciliation; the smoke
+              // surfaced sessionHarvest's stale 'pending' artifact
+              // winning over history's 'confirmed' state. Iterate
+              // history first, drop sessionHarvest entries whose turn
+              // id already appeared — history is the authoritative
+              // source post-refresh.
+              const seen = new Set<string>();
+              const all: UITurnLite[] = [];
+              for (const t of history) {
+                if (seen.has(t.id)) continue;
+                seen.add(t.id);
+                all.push(t);
+              }
+              for (const t of sessionHarvest) {
+                if (seen.has(t.id)) continue;
+                seen.add(t.id);
+                all.push(t);
+              }
               let lastKoastIdx = -1;
               for (let i = all.length - 1; i >= 0; i--) {
                 if (all[i].role === "koast") {
@@ -592,6 +703,7 @@ export function ChatClient({
                   turn={t}
                   userInitials={user.initials}
                   onArtifactAction={handleArtifactAction}
+                  onArtifactEdit={handleArtifactEdit}
                   avatarMilestone={milestoneActive && idx === lastKoastIdx}
                   expandedTools={expandedTools}
                   onToggleToolExpanded={toggleToolExpanded}
@@ -631,6 +743,67 @@ export function ChatClient({
                       // Streaming paragraphs render as plain text; final harvest will normalize.
                       return <p key={i}>{block.text}</p>;
                     }
+                    if (block.kind === "guest_message_artifact") {
+                      // M7 D43 — live GuestMessageProposal rendering
+                      // from the turnReducer's guest_message_artifact
+                      // block (built from action_proposed{action_kind:
+                      // 'guest_message'}). State maps directly: reducer
+                      // already uses pending|edited|sent|failed.
+                      const gm = block;
+                      return (
+                        <GuestMessageProposal
+                          key={`guest-msg-${gm.artifact_id}`}
+                          state={gm.state}
+                          messageText={gm.payload.message_text}
+                          editedText={gm.payload.edited_text}
+                          channexMessageId={gm.channex_message_id}
+                          errorMessage={gm.error?.message}
+                          onApprove={
+                            gm.state === "pending" || gm.state === "edited"
+                              ? () =>
+                                  handleArtifactAction(
+                                    gm.audit_log_id,
+                                    "approve",
+                                  )
+                              : undefined
+                          }
+                          onEdit={
+                            gm.state === "pending"
+                              ? () => {
+                                  /* component-local edit toggle; Save
+                                     fires onSaveEdit below */
+                                }
+                              : undefined
+                          }
+                          onDiscard={
+                            gm.state === "pending" ||
+                            gm.state === "edited" ||
+                            gm.state === "failed"
+                              ? () =>
+                                  handleArtifactAction(
+                                    gm.audit_log_id,
+                                    "discard",
+                                  )
+                              : undefined
+                          }
+                          onRetry={
+                            gm.state === "failed"
+                              ? () =>
+                                  handleArtifactAction(
+                                    gm.audit_log_id,
+                                    "approve",
+                                  )
+                              : undefined
+                          }
+                          onSaveEdit={
+                            gm.state === "pending"
+                              ? (newText) =>
+                                  handleArtifactEdit(gm.audit_log_id, newText)
+                              : undefined
+                          }
+                        />
+                      );
+                    }
                     if (block.kind === "tool") {
                       const failed =
                         block.status === "failed" ||
@@ -660,7 +833,7 @@ export function ChatClient({
                     }
                     // M6 D35: live memory_artifact block from the
                     // turnReducer. Save/Discard fire POST /api/agent/artifact;
-                    // the response stream's memory_write_saved event is
+                    // the response stream's action_completed event is
                     // consumed back into the same reducer (or the saved
                     // state lands directly via fetch ack on the saved ack).
                     return (
@@ -703,6 +876,7 @@ function HistoryTurnView({
   turn,
   userInitials,
   onArtifactAction,
+  onArtifactEdit,
   avatarMilestone = false,
   expandedTools,
   onToggleToolExpanded,
@@ -710,6 +884,8 @@ function HistoryTurnView({
   turn: UITurnLite;
   userInitials: string;
   onArtifactAction?: (auditLogId: string, action: "approve" | "discard") => void;
+  /** M7 D38 — host-edit handler for guest_message_proposal artifacts. */
+  onArtifactEdit?: (auditLogId: string, editedText: string) => void;
   /** When true and turn.role='koast', flips the avatar to data-state='milestone'. */
   avatarMilestone?: boolean;
   /** M6 Issue C — set of currently-expanded tool_use_ids. */
@@ -768,9 +944,81 @@ function HistoryTurnView({
         ))}
         {turn.text && <p>{turn.text}</p>}
         {(turn.pendingArtifacts ?? []).map((a) => {
+          // M7 D43 — kind-specific component routing. M6's only kind
+          // was 'property_knowledge_confirmation' (MemoryArtifact);
+          // M7 adds 'guest_message_proposal' (GuestMessageProposal).
+          if (a.kind === "guest_message_proposal") {
+            // M7 §11 amendment: derive 'failed' from
+            // commit_metadata.last_error presence (substrate state
+            // stays 'emitted' on Channex failure).
+            const lastError = (a.commit_metadata as { last_error?: { message?: string } } | null)
+              ?.last_error;
+            const channexMessageId = (a.commit_metadata as { channex_message_id?: string } | null)
+              ?.channex_message_id;
+            let gmState: GuestMessageProposalState;
+            if (a.state === "confirmed") {
+              gmState = "sent";
+            } else if (lastError) {
+              gmState = "failed";
+            } else if (a.state === "edited") {
+              gmState = "edited";
+            } else {
+              gmState = "pending";
+            }
+            const payload = a.payload as {
+              booking_id: string;
+              message_text: string;
+              edited_text?: string;
+            };
+            return (
+              <GuestMessageProposal
+                key={`history-guest-msg-${a.artifact_id}`}
+                state={gmState}
+                messageText={payload.message_text}
+                editedText={payload.edited_text}
+                channel={a.derived_channel}
+                channexMessageId={channexMessageId}
+                errorMessage={lastError?.message}
+                onApprove={
+                  (gmState === "pending" || gmState === "edited") && onArtifactAction
+                    ? () => onArtifactAction(a.audit_log_id, "approve")
+                    : undefined
+                }
+                onEdit={
+                  gmState === "pending" && onArtifactEdit
+                    ? () => {
+                        /* component-local edit toggle; Save fires onSaveEdit */
+                      }
+                    : undefined
+                }
+                onDiscard={
+                  (gmState === "pending" ||
+                    gmState === "edited" ||
+                    gmState === "failed") &&
+                  onArtifactAction
+                    ? () => onArtifactAction(a.audit_log_id, "discard")
+                    : undefined
+                }
+                onRetry={
+                  gmState === "failed" && onArtifactAction
+                    ? () => onArtifactAction(a.audit_log_id, "approve")
+                    : undefined
+                }
+                onSaveEdit={
+                  gmState === "pending" && onArtifactEdit
+                    ? (newText) => onArtifactEdit(a.audit_log_id, newText)
+                    : undefined
+                }
+              />
+            );
+          }
+          // Default branch: 'property_knowledge_confirmation' (M6).
           // Map agent_artifacts.state → MemoryArtifact's state union.
+          // M7 union widened to include 'edited', but memory artifacts
+          // are editable=false and shouldn't reach that state in
+          // practice; defensive fallback to 'pending' if it ever does.
           const memState =
-            a.state === "emitted"
+            a.state === "emitted" || a.state === "edited"
               ? "pending"
               : a.state === "confirmed"
                 ? "saved"

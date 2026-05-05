@@ -143,7 +143,16 @@ export async function updateArtifactState(
 
   const update: Record<string, unknown> = {
     state,
-    committed_at: state === "emitted" ? null : new Date().toISOString(),
+    // 'emitted' and 'edited' are non-terminal lifecycle states —
+    // committed_at stays NULL until the host approves/dismisses. M7
+    // §6 amendment: a guest_message artifact whose Channex send failed
+    // also stays state='emitted' (with commit_metadata.last_error set),
+    // so its committed_at must remain NULL too. Terminal states
+    // (confirmed, dismissed, superseded) stamp committed_at.
+    committed_at:
+      state === "emitted" || state === "edited"
+        ? null
+        : new Date().toISOString(),
   };
 
   if (options.commit_metadata !== undefined) {

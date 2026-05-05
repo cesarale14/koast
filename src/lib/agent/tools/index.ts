@@ -12,6 +12,13 @@
 import { registerTool } from "../dispatcher";
 import { readMemoryTool } from "./read-memory";
 import { writeMemoryFactTool } from "./write-memory-fact";
+import { readGuestThreadTool } from "./read-guest-thread";
+import { proposeGuestMessageTool } from "./propose-guest-message";
 
 registerTool(readMemoryTool);
 registerTool(writeMemoryFactTool);
+// M7: guest messaging — read_guest_thread returns thread + booking
+// context, propose_guest_message gates a draft for host approval and
+// (post-approval) Channex send.
+registerTool(readGuestThreadTool);
+registerTool(proposeGuestMessageTool);

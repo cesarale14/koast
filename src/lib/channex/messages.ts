@@ -399,6 +399,48 @@ export async function sendMessage(
 }
 
 /**
+ * POST /bookings/:channex_booking_id/messages
+ *
+ * Cold-send: send a message to a booking that doesn't have a local
+ * message_threads row yet. Channex maintains a thread shell from
+ * booking-creation time even for messageless bookings; this endpoint
+ * attaches the new message to that latent shell. The response carries
+ * BOTH the new message id AND the thread id under
+ * relationships.message_thread.data.id, so the caller can materialize
+ * the local message_threads row in one round-trip without a separate
+ * /message_threads fetch.
+ *
+ * Probed 2026-05-05 against Villa Jamaica BDC booking
+ * 2fa9468f-8448-408a-a87c-8eec85320ea0; HTTP 200 in ~1.7s, response
+ * shape symmetric to POST /message_threads/:id/messages plus the
+ * relationships.message_thread enrichment. M7 cold-send path.
+ *
+ * Same wrapper-singular pattern as the thread-keyed sibling. Same
+ * gating (channex_messages app required → 403 without; 422 for OTAs
+ * that don't expose messaging through the channel manager). Same
+ * ChannexSendError on failure carrying status + parsed body.
+ */
+export async function sendMessageOnBooking(
+  channexBookingId: string,
+  body: string,
+  cfg?: MessagingClientConfig,
+): Promise<ChannexMessageEntity> {
+  const res = await channexPost<{ data?: ChannexMessageEntity }>(
+    `/bookings/${channexBookingId}/messages`,
+    { message: { message: body } },
+    cfg,
+  );
+  if (!res.data) {
+    throw new ChannexSendError(
+      "Channex POST /bookings/:id/messages returned no data",
+      200,
+      res,
+    );
+  }
+  return res.data;
+}
+
+/**
  * Channex does not document a thread-level mark-read endpoint, and
  * messages don't have a server-side read state in the entity probe
  * (no `is_read` / `read_at` field). Read state is Koast-side

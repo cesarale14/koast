@@ -2,8 +2,8 @@
  * Preview routes for forward-looking M5 states (D-PREVIEW-ROUTES).
  *
  * Renders states 08 (ActionProposal) and 14 (MemoryArtifact) which the
- * substrate does not yet emit (action_proposed, memory_write_pending,
- * memory_write_saved are M6/M7 — D-FORWARD-EVENTS). Reachable only by
+ * substrate does not yet emit (action_proposed and action_completed
+ * are wired by M6/M7 — D-FORWARD-EVENTS). Reachable only by
  * direct URL — unlinked from product nav, no auth bypass, no env flag
  * gating. Auth comes from being inside (dashboard).
  *

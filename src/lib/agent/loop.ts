@@ -54,10 +54,11 @@ const MAX_TOKENS = 4096;
 const ROUND_CAP = 5;
 
 /**
- * Type guard for the write_memory_fact tool's proposal-time output
- * (D35 fork). Used in the loop to gate emission of memory_write_pending
- * SSE events. Defensive: guards against future schema drift; the
- * dispatcher's outputSchema validation already ran before we get here.
+ * Type guard for the dispatcher fork's proposal-time output (D35).
+ * Used in the loop to gate emission of `action_proposed` SSE events for
+ * gated tools (write_memory_fact in M6, propose_guest_message in M7+).
+ * Defensive: guards against future schema drift; the dispatcher's
+ * outputSchema validation already ran before we get here.
  */
 function isProposalOutput(
   value: unknown,
@@ -296,16 +297,14 @@ async function* runOneRound(
           result_summary: summary,
         };
 
-        // M6 D35 fork side-channel: when write_memory_fact's proposal
-        // returns successfully, the dispatcher already wrote the
-        // agent_artifacts row. Emit memory_write_pending so the chat
-        // shell can render the inline MemoryArtifact.
-        if (block.name === "write_memory_fact" && isProposalOutput(result.value)) {
-          yield {
-            type: "memory_write_pending",
-            artifact_id: result.value.artifact_id,
-            audit_log_id: result.value.audit_log_id,
-            proposed_payload: inputObj as {
+        // D35 fork side-channel (M6 + M7 D39): when a gated tool's
+        // proposal returns successfully, the dispatcher already wrote
+        // the agent_artifacts row. Emit `action_proposed` so the chat
+        // shell can render the inline artifact. The action_kind
+        // discriminator carries the tool's payload shape.
+        if (isProposalOutput(result.value)) {
+          if (block.name === "write_memory_fact") {
+            const memoryInput = inputObj as {
               property_id: string;
               sub_entity_type: string;
               attribute: string;
@@ -315,12 +314,34 @@ async function* runOneRound(
               supersedes?: string;
               supersedes_memory_fact_id?: string;
               citation?: { source_text?: string; reasoning?: string };
-            },
-            supersedes:
-              typeof (inputObj as { supersedes?: unknown }).supersedes === "string"
-                ? ((inputObj as { supersedes?: string }).supersedes as string)
-                : undefined,
-          };
+            };
+            yield {
+              type: "action_proposed",
+              action_kind: "memory_write",
+              artifact_id: result.value.artifact_id,
+              audit_log_id: result.value.audit_log_id,
+              proposed_payload: memoryInput,
+              supersedes:
+                typeof (inputObj as { supersedes?: unknown }).supersedes === "string"
+                  ? ((inputObj as { supersedes?: string }).supersedes as string)
+                  : undefined,
+            };
+          } else if (block.name === "propose_guest_message") {
+            const guestInput = inputObj as {
+              booking_id: string;
+              message_text: string;
+            };
+            yield {
+              type: "action_proposed",
+              action_kind: "guest_message",
+              artifact_id: result.value.artifact_id,
+              audit_log_id: result.value.audit_log_id,
+              proposed_payload: {
+                booking_id: guestInput.booking_id,
+                message_text: guestInput.message_text,
+              },
+            };
+          }
         }
       } else {
         // M6 D28: emit tool_call_failed with structured error taxonomy.

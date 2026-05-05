@@ -634,13 +634,21 @@ export interface UITurn {
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
   /**
-   * M6 D23 — artifacts attached to this turn. Loads agent_artifacts
-   * rows for the conversation in lifecycle states that are visible in
-   * history scrollback: 'emitted' (host hasn't acted yet — Save/Discard
-   * still actionable), 'superseded' (correction-chain history per D25
-   * — renders dimmed), and 'confirmed' (post-approval saved artifact
-   * — renders the saved variant). 'dismissed' is intentionally excluded;
-   * the host's discard is the explicit signal to stop showing it.
+   * M6 D23 + M7 D45 — artifacts attached to this turn. Loads
+   * agent_artifacts rows for the conversation in lifecycle states
+   * that are visible in history scrollback:
+   *   - 'emitted'    — host hasn't acted yet (Save/Discard actionable;
+   *                    M7: Approve/Edit/Discard for guest_message,
+   *                    Try-again/Discard if commit_metadata.last_error
+   *                    indicates a Channex failure per §6 amendment)
+   *   - 'edited'     — M7 D45: host edited a guest_message draft;
+   *                    Approve/Discard still actionable
+   *   - 'superseded' — correction-chain history per D25; renders dim
+   *   - 'confirmed'  — post-approval saved/sent; renders the
+   *                    saved/sent variant
+   *
+   * 'dismissed' is intentionally excluded; the host's discard is the
+   * explicit signal to stop showing it.
    *
    * Despite the name, this array carries non-pending lifecycle states
    * too — preserved for backwards compat with M6 step 13 callers.
@@ -652,7 +660,7 @@ export interface UITurn {
  * Artifact attached to a UITurn (M6 D23 + D21). Sourced from
  * agent_artifacts; the audit_log_id paired ref is the FK added in
  * M6.2 migration. The chat shell renders these inline on conversation
- * reload — same visual as the live memory_write_pending event for
+ * reload — same visual as the live action_proposed event for
  * state='emitted', dimmed for state='superseded', saved-variant for
  * state='confirmed'.
  */
@@ -667,12 +675,30 @@ export interface PendingArtifact {
   supersedes: string | null;
   /**
    * Lifecycle state from agent_artifacts.state. Values surfaced to the
-   * chat shell: 'emitted' | 'confirmed' | 'superseded'. (Edited and
-   * dismissed states are filtered out at the query level.)
+   * chat shell: 'emitted' | 'edited' | 'confirmed' | 'superseded'.
+   * 'dismissed' is filtered out at the query level (host's discard is
+   * the explicit signal to stop showing the artifact). M7 D45 added
+   * 'edited' for host-edited guest_message drafts awaiting approval.
+   *
+   * §11 amendment: 'failed' is NOT a state — substrate keeps state=
+   * 'emitted' on Channex failure, and the chat shell derives the
+   * 'failed' visual from commit_metadata.last_error presence. Read
+   * the metadata, don't expect a separate state value.
    */
-  state: "emitted" | "confirmed" | "superseded";
+  state: "emitted" | "edited" | "confirmed" | "superseded";
   /** When state='confirmed' or 'superseded', resolved metadata from agent_artifacts.commit_metadata. */
   commit_metadata: Record<string, unknown> | null;
+  /**
+   * M7 — derived canonical channel label ('airbnb' | 'booking_com' |
+   * 'vrbo' | 'direct') for guest_message_proposal artifacts, resolved
+   * via either commit_metadata.channel (post-approval handler writes it
+   * at confirm time) or a second-query lookup on message_threads keyed
+   * by payload.booking_id (covers emitted/edited states where the
+   * handler hasn't run). undefined for memory artifacts and for guest
+   * message artifacts whose booking has no thread on file (rare —
+   * a fresh booking before the guest writes in).
+   */
+  derived_channel?: string;
 }
 
 /**
@@ -765,7 +791,7 @@ export async function loadTurnsForConversation(
     artifactBuilder
       .select("id, turn_id, audit_log_id, kind, payload, supersedes, created_at, state, commit_metadata")
       .eq("conversation_id", conversationId)
-      .in("state", ["emitted", "confirmed", "superseded"])
+      .in("state", ["emitted", "edited", "confirmed", "superseded"])
       .order("created_at", { ascending: true }),
   ]);
 
@@ -817,6 +843,51 @@ export async function loadTurnsForConversation(
     commit_metadata: Record<string, unknown> | null;
   }>;
 
+  // M7 channel resolution: for guest_message_proposal artifacts, the
+  // chat shell needs the canonical channel label ('airbnb' /
+  // 'booking_com' / etc.) for the eyebrow + sent pill. For confirmed
+  // sends the post-approval handler writes commit_metadata.channel; for
+  // emitted/edited artifacts we derive it via a second query on
+  // message_threads keyed by the booking_id in payload. Single batched
+  // lookup — one query for all guest_message booking_ids on the page.
+  const guestMessageBookingIds = new Set<string>();
+  for (const a of artifactRows) {
+    if (a.kind === "guest_message_proposal") {
+      const bid = (a.payload as { booking_id?: unknown })?.booking_id;
+      if (typeof bid === "string" && bid.length > 0) {
+        guestMessageBookingIds.add(bid);
+      }
+    }
+  }
+  const bookingIdToChannel = new Map<string, string>();
+  if (guestMessageBookingIds.size > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const threadBuilder = supabase.from("message_threads") as any;
+    const { data: threadRows } = await threadBuilder
+      .select("booking_id, channel_code")
+      .in("booking_id", Array.from(guestMessageBookingIds));
+    for (const row of (threadRows ?? []) as Array<{ booking_id: string; channel_code: string | null }>) {
+      // Map channel_code → canonical label inline (mirrors
+      // canonicalChannel in tools/read-guest-thread + handlers/propose-
+      // guest-message; duplicated to avoid cross-package import).
+      const code = (row.channel_code ?? "").toLowerCase();
+      const canonical =
+        code === "abb" || code === "airbnb"
+          ? "airbnb"
+          : code === "bdc" || code === "booking" || code === "booking_com" || code === "booking.com"
+            ? "booking_com"
+            : code === "vrbo" || code === "hma"
+              ? "vrbo"
+              : code === "direct" || code === "koast" || code === ""
+                ? "direct"
+                : code;
+      // Last-write-wins for booking_ids with multiple threads (rare;
+      // multi-channel bookings — CF #43 surfaces them as a single
+      // canonical channel for the chat shell at v1).
+      bookingIdToChannel.set(row.booking_id, canonical);
+    }
+  }
+
   // Group artifacts by turn_id for O(1) attach during the map.
   const artifactsByTurnId = new Map<string, PendingArtifact[]>();
   for (const a of artifactRows) {
@@ -832,11 +903,29 @@ export async function loadTurnsForConversation(
     // migration adds a state we forgot to handle here).
     if (
       a.state !== "emitted" &&
+      a.state !== "edited" &&
       a.state !== "confirmed" &&
       a.state !== "superseded"
     ) {
       continue;
     }
+    // Channel resolution precedence (M7 D43 + post-CP4 fix):
+    //   1. commit_metadata.channel — canonical, written at confirm
+    //      time by the post-approval handler (post-fix path)
+    //   2. message_threads join via booking_id — covers emitted/
+    //      edited artifacts + legacy confirmed artifacts written
+    //      before the M7 commit landed
+    //   3. undefined — fresh booking edge case where no thread row
+    //      exists yet; component degrades to channel-less eyebrow
+    let derivedChannel: string | undefined;
+    if (a.kind === "guest_message_proposal") {
+      const cmChannel = (a.commit_metadata as { channel?: string } | null)?.channel;
+      const bid = (a.payload as { booking_id?: unknown })?.booking_id;
+      const joinedChannel =
+        typeof bid === "string" ? bookingIdToChannel.get(bid) : undefined;
+      derivedChannel = cmChannel ?? joinedChannel;
+    }
+
     const list = artifactsByTurnId.get(a.turn_id) ?? [];
     list.push({
       artifact_id: a.id,
@@ -847,6 +936,7 @@ export async function loadTurnsForConversation(
       supersedes: a.supersedes,
       state: a.state,
       commit_metadata: a.commit_metadata,
+      derived_channel: derivedChannel,
     });
     artifactsByTurnId.set(a.turn_id, list);
   }

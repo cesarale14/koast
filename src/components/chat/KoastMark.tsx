@@ -22,8 +22,9 @@
  *   - prefers-reduced-motion: the keyframes themselves can be guarded;
  *     the data-state flip still fires so non-visual consumers (e.g.
  *     analytics) observe the transition.
- *   - ChatClient triggers the milestone state for ~2s when a
- *     memory_write_saved event lands on the most recent agent turn.
+ *   - ChatClient triggers the milestone state for ~2s when an
+ *     action_completed event with action_kind='memory_write' lands on
+ *     the most recent agent turn (M7 D39 rename of memory_write_saved).
  */
 
 import { useId } from "react";

@@ -1,17 +1,30 @@
 /**
  * POST /api/agent/artifact
  *
- * Host-action endpoint for memory_artifact resolutions (and, in future
- * milestones, every other gated artifact kind). Two actions:
+ * Host-action endpoint for resolving gated artifacts. Three actions:
  *
  *   { audit_id, action: 'approve' } →
  *     Looks up agent_artifacts by audit_log_id, dispatches to the
- *     action handler registry by kind, runs the post-approval handler
- *     (which performs the actual side effect — INSERT into memory_facts
- *     for write_memory_fact). Returns SSE stream containing
- *     memory_write_saved (or analogous saved event for future kinds)
- *     plus 'done'. Substrate flips agent_audit_log.outcome='succeeded'
- *     and agent_artifacts.state='confirmed'.
+ *     post-approval handler by kind, runs the side effect:
+ *       - 'property_knowledge_confirmation' → INSERT into memory_facts
+ *         via writeMemoryFactHandler (M6)
+ *       - 'guest_message_proposal' → channexSendMessage + messages
+ *         upsert via proposeGuestMessageHandler (M7)
+ *     Returns SSE stream with `action_completed` (with action_kind=
+ *     'memory_write' for M6, or 'guest_message' for M7) plus 'done'.
+ *
+ *     M7 §6 failure encoding for guest_message: ChannexSendError keeps
+ *     artifact state='emitted', writes commit_metadata.last_error,
+ *     flips audit outcome→'failed', emits `error` SSE with code=
+ *     'channex_send_failed'. Try-again re-POSTs and re-runs the
+ *     handler from a clean audit-pending lifecycle.
+ *
+ *   { audit_id, action: 'edit', edited_text } →   M7 D38
+ *     State must be 'emitted' (single edit per artifact, CF #37).
+ *     Updates agent_artifacts.payload to add edited_text alongside
+ *     the original message_text (preserves the agent's draft for
+ *     audit), flips state to 'edited' (non-terminal — committed_at
+ *     stays NULL). Returns plain JSON.
  *
  *   { audit_id, action: 'discard' } →
  *     No side effect; updates agent_artifacts.state='dismissed' and
@@ -31,18 +44,27 @@ import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { writeMemoryFactHandler } from "@/lib/action-substrate/handlers/write-memory-fact";
+import { proposeGuestMessageHandler } from "@/lib/action-substrate/handlers/propose-guest-message";
 import { updateArtifactState } from "@/lib/action-substrate/artifact-writer";
 import { updateAuditOutcome } from "@/lib/action-substrate/audit-writer";
 import { makeSseResponse, serializeSseEvent } from "@/lib/agent/sse";
+import { ChannexSendError } from "@/lib/channex/messages";
+import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
 
 // Side-effect import: registers tools and stakes entries (M6 D24
-// raise: write_memory_fact stakes='medium').
+// raise: write_memory_fact stakes='medium'; M7 D38: propose_guest_message
+// stakes='medium', editable=true).
 import "@/lib/agent/tools";
 
-const RequestSchema = z.object({
-  audit_id: z.string().uuid(),
-  action: z.enum(["approve", "discard"]),
-});
+const RequestSchema = z.discriminatedUnion("action", [
+  z.object({ audit_id: z.string().uuid(), action: z.literal("approve") }),
+  z.object({ audit_id: z.string().uuid(), action: z.literal("discard") }),
+  z.object({
+    audit_id: z.string().uuid(),
+    action: z.literal("edit"),
+    edited_text: z.string().min(1).max(5000),
+  }),
+]);
 
 interface ArtifactRow {
   id: string;
@@ -52,13 +74,15 @@ interface ArtifactRow {
   state: string;
   conversation_id: string;
   turn_id: string;
+  commit_metadata: Record<string, unknown> | null;
 }
 
 /**
  * Look up the agent_artifacts row by its paired audit_log_id (M6.2 FK).
  * Verifies the artifact's conversation belongs to the authenticated
- * host, and that the artifact is still in state='emitted' (idempotency:
- * a dispatched artifact can't be re-resolved).
+ * host. Approve and edit paths accept state='emitted' OR 'edited'
+ * (M7 D38 — host edited the draft, then approves). Terminal states
+ * ('confirmed', 'dismissed', 'superseded') are refused with 409.
  */
 async function resolveArtifact(
   auditLogId: string,
@@ -69,7 +93,9 @@ async function resolveArtifact(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const artifactBuilder = supabase.from("agent_artifacts") as any;
   const { data: artifact, error } = await artifactBuilder
-    .select("id, audit_log_id, kind, payload, state, conversation_id, turn_id")
+    .select(
+      "id, audit_log_id, kind, payload, state, conversation_id, turn_id, commit_metadata",
+    )
     .eq("audit_log_id", auditLogId)
     .single();
 
@@ -100,9 +126,13 @@ async function resolveArtifact(
     );
   }
 
-  if (artifact.state !== "emitted") {
+  // Approve / edit paths both require an actionable state. M6 only
+  // accepted 'emitted'; M7 widens to also accept 'edited' so a host
+  // can approve a draft they've edited. The per-action state guards
+  // (edit-only-when-emitted, etc.) live at the call site below.
+  if (artifact.state !== "emitted" && artifact.state !== "edited") {
     throw new Error(
-      `[artifact] Artifact ${artifact.id} is in state='${artifact.state}', not 'emitted'. Cannot re-resolve.`,
+      `[artifact] Artifact ${artifact.id} is in state='${artifact.state}', not 'emitted' or 'edited'. Cannot re-resolve.`,
     );
   }
 
@@ -136,7 +166,8 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const { audit_id, action } = parsed.data;
+  const { audit_id } = parsed.data;
+  const action = parsed.data.action;
 
   // 3. Resolve the artifact + ownership check.
   let artifact: ArtifactRow;
@@ -145,7 +176,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Distinguish ownership/not-found from already-resolved.
-    const status = /not 'emitted'/.test(message) ? 409 : 404;
+    const status = /not 'emitted' or 'edited'/.test(message) ? 409 : 404;
     return NextResponse.json({ error: message }, { status });
   }
 
@@ -171,17 +202,67 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 4b. Approve path: dispatch via action handler registry, stream
-  // the saved event + done as SSE.
+  // 4b. Edit path (M7 D38): single edit per artifact for v1 (CF #37).
+  // State MUST be 'emitted' — re-editing an already-edited artifact is
+  // out of scope. Direct supabase update preserves committed_at=NULL
+  // (updateArtifactState would stamp it for any non-emitted state).
+  if (action === "edit") {
+    if (artifact.state !== "emitted") {
+      return NextResponse.json(
+        {
+          error: `Artifact ${artifact.id} is in state='${artifact.state}'; edit is only supported on state='emitted'.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    try {
+      const supabase = createServiceClient();
+      const updatedPayload = {
+        ...artifact.payload,
+        edited_text: parsed.data.edited_text,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: updateError } = await (supabase.from("agent_artifacts") as any)
+        .update({ state: "edited", payload: updatedPayload })
+        .eq("id", artifact.id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: `Edit failed: ${updateError.message}` },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        state: "edited",
+        edited_text: parsed.data.edited_text,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  // 4c. Approve path: dispatch via action handler registry, stream
+  // the completed event + done as SSE.
   const dispatchStart = Date.now();
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        // Pre-execute audit flip (M7): keeps the audit lifecycle clean
+        // per attempt. If a prior attempt left outcome='failed' (e.g.
+        // §6 ChannexSendError followed by host's Try-again), reset to
+        // 'pending' before the handler runs. Idempotent for already-
+        // pending rows. CF #41 — separate retry-attempts table is
+        // deferred; same audit row is reused across attempts for v1.
+        await updateAuditOutcome(audit_id, "pending");
+
         if (artifact.kind === "property_knowledge_confirmation") {
-          // Cast through the tool's input shape; the proposal-time
-          // dispatcher has already validated this against the tool's
-          // inputSchema, so the runtime shape is trustworthy.
+          // M6 path — unchanged. Memory write failures fall through to
+          // the outer catch and trigger the M6 dismissed pattern.
           const payload = artifact.payload as {
             property_id: string;
             sub_entity_type:
@@ -208,7 +289,6 @@ export async function POST(request: NextRequest) {
             payload,
           });
 
-          // Update lifecycle: artifact → confirmed; audit → succeeded.
           await updateArtifactState(artifact.id, "confirmed", {
             commit_metadata: {
               memory_fact_id: handlerResult.memory_fact_id,
@@ -219,11 +299,11 @@ export async function POST(request: NextRequest) {
             latency_ms: Date.now() - dispatchStart,
           });
 
-          // Emit the saved event.
           controller.enqueue(
             encoder.encode(
               serializeSseEvent({
-                type: "memory_write_saved",
+                type: "action_completed",
+                action_kind: "memory_write",
                 artifact_id: artifact.id,
                 audit_log_id: audit_id,
                 memory_fact_id: handlerResult.memory_fact_id,
@@ -231,9 +311,128 @@ export async function POST(request: NextRequest) {
               }),
             ),
           );
+        } else if (artifact.kind === "guest_message_proposal") {
+          // M7 path with §6 failure encoding for ChannexSendError.
+          const guestPayload = artifact.payload as {
+            booking_id: string;
+            message_text: string;
+            edited_text?: string;
+          };
+
+          try {
+            const handlerResult = await proposeGuestMessageHandler({
+              host_id: user.id,
+              conversation_id: artifact.conversation_id,
+              turn_id: artifact.turn_id,
+              artifact_id: artifact.id,
+              payload: guestPayload,
+              commit_metadata: artifact.commit_metadata as
+                | {
+                    channex_message_id?: string;
+                    message_id?: string;
+                    last_error?: { message: string; channex_status?: number };
+                  }
+                | undefined,
+            });
+
+            await updateArtifactState(artifact.id, "confirmed", {
+              commit_metadata: {
+                channex_message_id: handlerResult.channex_message_id,
+                message_id: handlerResult.message_id,
+                channel: handlerResult.channel,
+              },
+            });
+            await updateAuditOutcome(audit_id, "succeeded", {
+              latency_ms: Date.now() - dispatchStart,
+            });
+
+            controller.enqueue(
+              encoder.encode(
+                serializeSseEvent({
+                  type: "action_completed",
+                  action_kind: "guest_message",
+                  artifact_id: artifact.id,
+                  audit_log_id: audit_id,
+                  channex_message_id: handlerResult.channex_message_id,
+                }),
+              ),
+            );
+          } catch (guestErr) {
+            // §6 amendment: ChannexSendError AND ColdSendUnsupportedError
+            // both route through the same encoding (state stays 'emitted',
+            // audit outcome='failed', commit_metadata.last_error
+            // populated, error SSE) but with distinct SSE error codes
+            // so the chat shell can differentiate cause:
+            //   - ChannexSendError         → code='channex_send_failed'
+            //                                channex_status=<HTTP code>
+            //   - ColdSendUnsupportedError → code='cold_send_unsupported'
+            //                                channex_status=null (Channex
+            //                                wasn't reached) + gate
+            //                                identifier captured.
+            // Other errors (ownership, booking missing, db upsert hiccup
+            // post-Channex-200) re-throw to the outer catch — M6
+            // dismissed pattern.
+            const isChannexFailure = guestErr instanceof ChannexSendError;
+            const isColdSendUnsupported = guestErr instanceof ColdSendUnsupportedError;
+            if (isChannexFailure || isColdSendUnsupported) {
+              const supabase = createServiceClient();
+              const lastError: {
+                message: string;
+                channex_status: number | null;
+                attempted_at: string;
+                gate?: string;
+              } = {
+                message: (guestErr as Error).message,
+                channex_status: isChannexFailure ? guestErr.status : null,
+                attempted_at: new Date().toISOString(),
+              };
+              if (isColdSendUnsupported) {
+                lastError.gate = guestErr.gate;
+              }
+              const mergedMetadata = {
+                ...(artifact.commit_metadata ?? {}),
+                last_error: lastError,
+              };
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase.from("agent_artifacts") as any)
+                .update({ commit_metadata: mergedMetadata })
+                .eq("id", artifact.id)
+                .then((res: { error: { message: string } | null }) => {
+                  if (res.error) {
+                    console.warn(
+                      `[artifact] last_error update failed (non-fatal): ${res.error.message}`,
+                    );
+                  }
+                });
+
+              await updateAuditOutcome(audit_id, "failed", {
+                latency_ms: Date.now() - dispatchStart,
+                error_message: (guestErr as Error).message,
+              });
+
+              controller.enqueue(
+                encoder.encode(
+                  serializeSseEvent({
+                    type: "error",
+                    code: isChannexFailure
+                      ? "channex_send_failed"
+                      : "cold_send_unsupported",
+                    message: (guestErr as Error).message,
+                    recoverable: isChannexFailure
+                      ? true
+                      : (guestErr as ColdSendUnsupportedError).recoverable,
+                  }),
+                ),
+              );
+              // Skip done — the error event closes the visible flow.
+              return;
+            }
+            // Non-§6 errors re-throw to the outer catch — M6 dismissed.
+            throw guestErr;
+          }
         } else {
           throw new Error(
-            `[artifact] Unknown artifact kind: ${artifact.kind}. M6 supports only property_knowledge_confirmation.`,
+            `[artifact] Unknown artifact kind: ${artifact.kind}.`,
           );
         }
 
@@ -249,12 +448,13 @@ export async function POST(request: NextRequest) {
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // Mark the audit + artifact as failed; client receives error event.
+        // M6 outer-catch behavior: artifact dismissed (unrecoverable),
+        // audit failed. M7 §6 failure encoding for guest_message takes
+        // the inner-catch path above and never reaches here.
         await updateAuditOutcome(audit_id, "failed", {
           latency_ms: Date.now() - dispatchStart,
           error_message: `post_approval_failed: ${message}`,
         }).catch(() => {});
-        // Best-effort artifact state update; if it fails, log and continue.
         await updateArtifactState(artifact.id, "dismissed", {
           commit_metadata: { error_message: message },
         }).catch((e) => console.warn("[artifact] state update failed:", e));

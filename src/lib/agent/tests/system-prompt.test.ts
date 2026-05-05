@@ -90,4 +90,61 @@ describe("system prompt", () => {
       buildSystemPrompt({ host: { id: "00000000-0000-0000-0000-000000000aaa" } }),
     ).toBe(SYSTEM_PROMPT_TEXT);
   });
+
+  // --------- M7 D40 structural surface ---------
+
+  test("M7 D40: all 6 capability sections present (Identity / Tools available / Cross-capability rules / Memory tools / Guest messaging tools / Behavior boundaries)", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Identity/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Tools available/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Cross-capability rules/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Memory tools/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Guest messaging tools/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Behavior boundaries/);
+  });
+
+  test("M7 D40: catalog under 'Tools available' lists all 4 v1 tools", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/read_memory/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/write_memory_fact/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/read_guest_thread/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/propose_guest_message/);
+  });
+
+  test("M7 D27 cross-capability pre-write reads stated once, applied to both capabilities", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/## Pre-write reads/);
+    // Memory: ALWAYS read_memory before write_memory_fact
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/ALWAYS call read_memory FIRST/);
+    // Guest messaging: ALWAYS read_guest_thread before propose_guest_message
+    expect(SYSTEM_PROMPT_TEXT).toMatch(
+      /ALWAYS call read_guest_thread FIRST/,
+    );
+  });
+
+  test("M7 D41: channel calibration block names all 4 v1 OTA channels with tone guidance", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/## Channel calibration/);
+    // airbnb: conversational, first name, sparing emoji
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/airbnb:.*conversational/i);
+    // booking_com: formal, no emoji
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/booking_com:.*formal/i);
+    // vrbo: family-oriented
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/vrbo:.*(family|group)/i);
+    // direct: friendly-professional
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/direct:.*friendly[- ]professional/i);
+  });
+
+  test("M7 D47: propose_guest_message has no supersession (guest messages don't supersede each other)", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(
+      /Guest messages do NOT supersede each other/,
+    );
+    expect(SYSTEM_PROMPT_TEXT).toMatch(
+      /no supersedes field on propose_guest_message/,
+    );
+  });
+
+  test("M7 D46: one message per proposal (no multi-message drafting in v1)", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/One message per proposal/);
+  });
+
+  test("M7 D44: read_guest_thread teaches max_messages re-call when context insufficient", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/max_messages/);
+  });
 });

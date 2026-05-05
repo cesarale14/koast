@@ -289,11 +289,12 @@ describe("turnReducer — M6 promotions: tool_call_failed", () => {
   });
 });
 
-describe("turnReducer — M6 promotions: memory_write_pending", () => {
+describe("turnReducer — action_proposed (memory_write)", () => {
   test("appends a memory_artifact block in state='pending' with the proposed payload", () => {
     let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
     s = turnReducer(s, {
-      type: "memory_write_pending",
+      type: "action_proposed",
+      action_kind: "memory_write",
       artifact_id: "art-1",
       audit_log_id: "audit-1",
       proposed_payload: {
@@ -314,11 +315,65 @@ describe("turnReducer — M6 promotions: memory_write_pending", () => {
     expect(block.memory_fact_id).toBeUndefined();
   });
 
+  test("preserves ALL 8 memory_write payload fields verbatim (regression-pin against future SSE schema work)", () => {
+    // Mirrors what loop.ts emits at the action_proposed memory_write
+    // branch — every field the dispatcher pipes through from the
+    // tool's validated input. The reducer must carry them onto the
+    // memory_artifact block without drops or transformations.
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "action_proposed",
+      action_kind: "memory_write",
+      artifact_id: "art-full",
+      audit_log_id: "audit-full",
+      proposed_payload: {
+        property_id: "bfb0750e-9ae9-4ef4-a7de-988062f6a0ad",
+        sub_entity_type: "wifi",
+        attribute: "password",
+        fact_value: "Sandcastle!42",
+        confidence: 0.9,
+        source: "host_taught",
+        supersedes_memory_fact_id: "fact-prior-uuid",
+        citation: {
+          source_text: "host: 'the wifi password is Sandcastle!42'",
+          reasoning: "explicit host statement",
+        },
+      },
+      // top-level supersedes (artifact-id chain) intentionally omitted —
+      // exercised in the cascade test below.
+    });
+
+    const block = s.content[0];
+    if (block.kind !== "memory_artifact") throw new Error("expected memory_artifact");
+    // Top-level block fields
+    expect(block.artifact_id).toBe("art-full");
+    expect(block.audit_log_id).toBe("audit-full");
+    expect(block.state).toBe("pending");
+    expect(block.memory_fact_id).toBeUndefined();
+    expect(block.superseded_by_artifact_id).toBeUndefined();
+    expect(block.error).toBeUndefined();
+    // All 8 payload fields preserved verbatim
+    expect(block.payload.property_id).toBe("bfb0750e-9ae9-4ef4-a7de-988062f6a0ad");
+    expect(block.payload.sub_entity_type).toBe("wifi");
+    expect(block.payload.attribute).toBe("password");
+    expect(block.payload.fact_value).toBe("Sandcastle!42");
+    expect(block.payload.confidence).toBe(0.9);
+    expect(block.payload.source).toBe("host_taught");
+    expect(block.payload.supersedes_memory_fact_id).toBe("fact-prior-uuid");
+    expect(block.payload.citation).toEqual({
+      source_text: "host: 'the wifi password is Sandcastle!42'",
+      reasoning: "explicit host statement",
+    });
+    // No top-level artifact-chain supersedes was set
+    expect(block.payload.supersedes).toBeUndefined();
+  });
+
   test("supersession cascade: when supersedes is set, prior pending artifact in current content flips to state='superseded'", () => {
     let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
     // First proposal lands.
     s = turnReducer(s, {
-      type: "memory_write_pending",
+      type: "action_proposed",
+      action_kind: "memory_write",
       artifact_id: "art-original",
       audit_log_id: "audit-1",
       proposed_payload: {
@@ -331,7 +386,8 @@ describe("turnReducer — M6 promotions: memory_write_pending", () => {
     });
     // Corrected proposal supersedes the first.
     s = turnReducer(s, {
-      type: "memory_write_pending",
+      type: "action_proposed",
+      action_kind: "memory_write",
       artifact_id: "art-correction",
       audit_log_id: "audit-2",
       proposed_payload: {
@@ -356,11 +412,12 @@ describe("turnReducer — M6 promotions: memory_write_pending", () => {
   });
 });
 
-describe("turnReducer — M6 promotions: memory_write_saved", () => {
+describe("turnReducer — action_completed (memory_write)", () => {
   test("flips matching pending artifact to state='saved' and stamps memory_fact_id", () => {
     let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
     s = turnReducer(s, {
-      type: "memory_write_pending",
+      type: "action_proposed",
+      action_kind: "memory_write",
       artifact_id: "art-1",
       audit_log_id: "audit-1",
       proposed_payload: {
@@ -372,7 +429,8 @@ describe("turnReducer — M6 promotions: memory_write_saved", () => {
       },
     });
     s = turnReducer(s, {
-      type: "memory_write_saved",
+      type: "action_completed",
+      action_kind: "memory_write",
       artifact_id: "art-1",
       audit_log_id: "audit-1",
       memory_fact_id: "fact-1",
@@ -383,10 +441,95 @@ describe("turnReducer — M6 promotions: memory_write_saved", () => {
     expect(block.memory_fact_id).toBe("fact-1");
   });
 
-  test("out-of-order memory_write_saved (no matching pending) appends a synthetic saved block", () => {
+  test("guest_message branch: action_proposed appends guest_message_artifact block in state='pending'", () => {
     let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
     s = turnReducer(s, {
-      type: "memory_write_saved",
+      type: "action_proposed",
+      action_kind: "guest_message",
+      artifact_id: "art-gm-1",
+      audit_log_id: "audit-gm-1",
+      proposed_payload: {
+        booking_id: "44444444-4444-4444-8444-444444444444",
+        message_text: "Hi! 3pm check-in works great.",
+      },
+    });
+    expect(s.content).toHaveLength(1);
+    const block = s.content[0];
+    if (block.kind !== "guest_message_artifact") {
+      throw new Error("expected guest_message_artifact");
+    }
+    expect(block.state).toBe("pending");
+    expect(block.payload.message_text).toBe("Hi! 3pm check-in works great.");
+    expect(block.payload.booking_id).toBe("44444444-4444-4444-8444-444444444444");
+    expect(block.payload.edited_text).toBeUndefined();
+    expect(block.channex_message_id).toBeUndefined();
+  });
+
+  test("guest_message branch: action_completed flips matching block to state='sent' and stamps channex_message_id", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "action_proposed",
+      action_kind: "guest_message",
+      artifact_id: "art-gm-2",
+      audit_log_id: "audit-gm-2",
+      proposed_payload: {
+        booking_id: "44444444-4444-4444-8444-444444444444",
+        message_text: "draft",
+      },
+    });
+    s = turnReducer(s, {
+      type: "action_completed",
+      action_kind: "guest_message",
+      artifact_id: "art-gm-2",
+      audit_log_id: "audit-gm-2",
+      channex_message_id: "cx-msg-99",
+    });
+    const block = s.content[0];
+    if (block.kind !== "guest_message_artifact") {
+      throw new Error("expected guest_message_artifact");
+    }
+    expect(block.state).toBe("sent");
+    expect(block.channex_message_id).toBe("cx-msg-99");
+  });
+
+  test("guest_message branch: action_completed transitions 'edited' → 'sent' too (host edited then approved)", () => {
+    // Reducer doesn't track edits in-stream (those flow via the
+    // /api/agent/artifact JSON edit path → router.refresh, not SSE).
+    // But if a hypothetical 'edited' state is in the in-memory block
+    // when action_completed lands, the transition still works.
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "action_proposed",
+      action_kind: "guest_message",
+      artifact_id: "art-gm-3",
+      audit_log_id: "audit-gm-3",
+      proposed_payload: { booking_id: "44444444-4444-4444-8444-444444444444", message_text: "draft" },
+    });
+    // Simulate UI side mutation to 'edited' (would happen via reducer
+    // extension or external setter; here we just check the transition).
+    const baseContent = s.content[0];
+    if (baseContent.kind !== "guest_message_artifact") throw new Error("setup");
+    s = {
+      ...s,
+      content: [{ ...baseContent, state: "edited" as const }],
+    };
+    s = turnReducer(s, {
+      type: "action_completed",
+      action_kind: "guest_message",
+      artifact_id: "art-gm-3",
+      audit_log_id: "audit-gm-3",
+      channex_message_id: "cx-msg-100",
+    });
+    const block = s.content[0];
+    if (block.kind !== "guest_message_artifact") throw new Error("expected guest_message_artifact");
+    expect(block.state).toBe("sent");
+  });
+
+  test("out-of-order action_completed (no matching pending) appends a synthetic saved block", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, {
+      type: "action_completed",
+      action_kind: "memory_write",
       artifact_id: "art-orphan",
       audit_log_id: "audit-x",
       memory_fact_id: "fact-x",

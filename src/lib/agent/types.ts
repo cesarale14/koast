@@ -90,6 +90,20 @@ export interface Tool<TInput, TOutput> {
     context: ToolHandlerContext,
     proposalRefs: ProposalRefs,
   ) => TOutput;
+  /**
+   * Per-action-type edit affordance (M7 D38). When true, the chat shell
+   * renders an Edit button on the proposal artifact alongside Approve /
+   * Discard; an inline textarea opens to mutate the proposed payload
+   * before approval. Pure UI hint — the dispatcher does NOT branch on
+   * this flag. Defaults to false (M6 behavior preserved for
+   * write_memory_fact and any future tool that opts out).
+   *
+   * Tools whose proposed payloads are free-form text (M7's
+   * propose_guest_message) typically opt in. Tools whose payloads are
+   * structured-record forms (M6's write_memory_fact) opt out — for those,
+   * "edit" maps onto the supersession pattern via re-prompting.
+   */
+  editable?: boolean;
   handler: (input: TInput, context: ToolHandlerContext) => Promise<TOutput>;
 }
 

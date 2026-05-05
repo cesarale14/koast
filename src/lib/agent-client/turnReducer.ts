@@ -1,13 +1,18 @@
 /**
  * Turn reducer — pure function (state, event) => state.
  *
- * Handles the M4-emitted events PLUS the M6 promotions
- * (tool_call_failed, memory_write_pending, memory_write_saved). The
- * remaining forward-looking event — `action_proposed` — is intentionally
- * NOT in the switch: if/when the substrate adds it to
- * AgentStreamEventSchema, the `_exhaustive: never` assignment in the
- * default branch will fail TypeScript compilation, forcing the paired
- * implementation. Dead branches are worse than no branches.
+ * Handles M4-emitted events plus M6/M7 promotions:
+ *   - tool_call_failed (M6 D28)
+ *   - action_proposed   (M7 D39 — was memory_write_pending in M6; now
+ *                        discriminated on action_kind: 'memory_write' |
+ *                        'guest_message')
+ *   - action_completed  (M7 D39 — was memory_write_saved in M6; same
+ *                        action_kind discriminator)
+ *
+ * After M7 there are no remaining forward-looking events. The
+ * `_exhaustive: never` assignment in the default branch holds across
+ * the full union; M8+ tools introduce their own forward-looking
+ * placeholders following the same pattern.
  *
  * All transitions are immutable — no mutation of the input state.
  */
@@ -54,11 +59,32 @@ export function turnReducer(
     case "tool_call_failed":
       return mutateToolFailed(state, event);
 
-    case "memory_write_pending":
-      return appendMemoryArtifactPending(state, event);
+    case "action_proposed":
+      // Discriminator on action_kind narrows the proposed_payload shape.
+      switch (event.action_kind) {
+        case "memory_write":
+          return appendMemoryArtifactPending(state, event);
+        case "guest_message":
+          return appendGuestMessageArtifactPending(state, event);
+        default: {
+          const _exhaustive: never = event;
+          void _exhaustive;
+          return state;
+        }
+      }
 
-    case "memory_write_saved":
-      return mutateMemoryArtifactSaved(state, event);
+    case "action_completed":
+      switch (event.action_kind) {
+        case "memory_write":
+          return mutateMemoryArtifactSaved(state, event);
+        case "guest_message":
+          return mutateGuestMessageArtifactSent(state, event);
+        default: {
+          const _exhaustive: never = event;
+          void _exhaustive;
+          return state;
+        }
+      }
 
     case "done":
       return {
@@ -179,7 +205,7 @@ function mutateToolCompleted(
 }
 
 /* ============================================================
-   M6 promotions: tool_call_failed, memory_write_pending, memory_write_saved
+   M6 + M7 promotions: tool_call_failed, action_proposed, action_completed
    ============================================================ */
 
 function mutateToolFailed(
@@ -223,7 +249,10 @@ function mutateToolFailed(
 
 function appendMemoryArtifactPending(
   state: TurnState,
-  event: Extract<AgentStreamEvent, { type: "memory_write_pending" }>,
+  event: Extract<
+    AgentStreamEvent,
+    { type: "action_proposed"; action_kind: "memory_write" }
+  >,
 ): TurnState {
   const now = nowFn();
 
@@ -262,7 +291,10 @@ function appendMemoryArtifactPending(
 
 function mutateMemoryArtifactSaved(
   state: TurnState,
-  event: Extract<AgentStreamEvent, { type: "memory_write_saved" }>,
+  event: Extract<
+    AgentStreamEvent,
+    { type: "action_completed"; action_kind: "memory_write" }
+  >,
 ): TurnState {
   let mutated = false;
   const content = state.content.map((block): ContentBlock => {
@@ -282,12 +314,12 @@ function mutateMemoryArtifactSaved(
   });
   if (!mutated) {
     // Defensive: a saved event for an unknown artifact_id. The
-    // conversation-reads extension (step 13) re-attaches pending
-    // artifacts on reload from server; if the saved event arrives
-    // before the pending artifact lands in the in-memory state, it
-    // would normally be dropped. Append as a synthetic saved-only
-    // block to preserve the visual ack; the milestone animation
-    // still fires because state='saved' is set.
+    // conversation-reads extension re-attaches pending artifacts on
+    // reload from server; if the saved event arrives before the
+    // pending artifact lands in the in-memory state, it would
+    // normally be dropped. Append as a synthetic saved-only block to
+    // preserve the visual ack; the milestone animation still fires
+    // because state='saved' is set.
     const now = nowFn();
     const block: ContentBlock = {
       kind: "memory_artifact",
@@ -303,6 +335,69 @@ function mutateMemoryArtifactSaved(
         source: "",
       },
       memory_fact_id: event.memory_fact_id,
+      started_at: now,
+    };
+    return { ...state, content: [...state.content, block] };
+  }
+  return { ...state, content };
+}
+
+function appendGuestMessageArtifactPending(
+  state: TurnState,
+  event: Extract<
+    AgentStreamEvent,
+    { type: "action_proposed"; action_kind: "guest_message" }
+  >,
+): TurnState {
+  const now = nowFn();
+  const newBlock: ContentBlock = {
+    kind: "guest_message_artifact",
+    artifact_id: event.artifact_id,
+    audit_log_id: event.audit_log_id,
+    state: "pending",
+    payload: {
+      booking_id: event.proposed_payload.booking_id,
+      message_text: event.proposed_payload.message_text,
+    },
+    started_at: now,
+  };
+  return { ...state, content: [...state.content, newBlock] };
+}
+
+function mutateGuestMessageArtifactSent(
+  state: TurnState,
+  event: Extract<
+    AgentStreamEvent,
+    { type: "action_completed"; action_kind: "guest_message" }
+  >,
+): TurnState {
+  let mutated = false;
+  const content = state.content.map((block): ContentBlock => {
+    if (
+      block.kind === "guest_message_artifact" &&
+      block.artifact_id === event.artifact_id &&
+      (block.state === "pending" || block.state === "edited")
+    ) {
+      mutated = true;
+      return {
+        ...block,
+        state: "sent",
+        channex_message_id: event.channex_message_id,
+      };
+    }
+    return block;
+  });
+  if (!mutated) {
+    // Defensive: a sent event for an unknown artifact_id. Append as a
+    // synthetic sent-only block to preserve the visual ack.
+    const now = nowFn();
+    const block: ContentBlock = {
+      kind: "guest_message_artifact",
+      artifact_id: event.artifact_id,
+      audit_log_id: event.audit_log_id,
+      state: "sent",
+      payload: { booking_id: "", message_text: "" },
+      channex_message_id: event.channex_message_id,
       started_at: now,
     };
     return { ...state, content: [...state.content, block] };
