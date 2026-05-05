@@ -35,6 +35,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
+  // Match the chat-shell cream so iPhone Safari's translucent URL bar
+  // tint blends with the page background instead of sitting against
+  // a default gray.
+  themeColor: "#fafaf7",
 };
 
 export default function RootLayout({

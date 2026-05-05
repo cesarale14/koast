@@ -249,10 +249,17 @@ html, body {
   max-width: 100vw;
 }
 
+/* Explicit html bg so iPhone Safari with viewport-fit=cover paints
+ * the safe-area zones (under notch + home-indicator region) in the
+ * chat-shell cream rather than iOS's default system gray. */
+html {
+  background: var(--koast-bg);
+}
+
 body {
   font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif;
   color: var(--ink);
-  background: var(--linen);
+  background: var(--koast-bg);
   font-size: var(--text-base);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
