@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
 import "@fontsource-variable/plus-jakarta-sans";
 
@@ -23,6 +23,18 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
+};
+
+// Mobile viewport: cover the notch (`viewport-fit=cover` so
+// safe-area-inset-* env vars become non-zero on iPhone Safari) and let
+// iOS's interactive widgets resize the layout instead of shifting it
+// (`interactive-widget=resizes-content`, prevents the keyboard from
+// pushing fixed elements off-screen). Width follows the device.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

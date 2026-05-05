@@ -22,9 +22,10 @@
  * until done/error/refusal. We use `blocked` for both per the visual spec.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChatShell } from "./ChatShell";
+import styles from "./ChatShell.module.css";
 import { Rail, type ConversationGroup } from "./Rail";
 import { Surface } from "./Surface";
 import { Topbar } from "./Topbar";
@@ -239,6 +240,10 @@ export function ChatClient({
     initialPropertyId,
   );
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
+  // Mobile drawer state (visible only at <768px via media query). Closed
+  // by default; toggled via Topbar hamburger; auto-closes on conversation
+  // select / scrim tap / swipe-left-on-drawer.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   /** Auto-scroll anchor (CF§10.8) — refs the scroll container so we can stick to bottom while streaming. */
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef<boolean>(true);
@@ -579,14 +584,37 @@ export function ChatClient({
 
   const onSelectConversation = useCallback(
     (id: string) => {
+      // Auto-close mobile drawer on selection (no-op on desktop where
+      // the drawer state isn't visually expressed).
+      setDrawerOpen(false);
       router.push(`/chat/${id}`);
     },
     [router],
   );
 
   const onNewConversation = useCallback(() => {
+    setDrawerOpen(false);
     router.push("/chat");
   }, [router]);
+
+  // Swipe-left-on-drawer to close. Threshold = 60px leftward delta;
+  // disabled if user is mid-vertical-scroll (delta-y > delta-x).
+  const drawerTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const onDrawerTouchStart = useCallback((e: TouchEvent) => {
+    const t = e.touches[0];
+    drawerTouchStartRef.current = { x: t.clientX, y: t.clientY };
+  }, []);
+  const onDrawerTouchEnd = useCallback((e: TouchEvent) => {
+    const start = drawerTouchStartRef.current;
+    drawerTouchStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = Math.abs(t.clientY - start.y);
+    if (dx < -60 && Math.abs(dx) > dy) {
+      setDrawerOpen(false);
+    }
+  }, []);
 
   const composerState: ComposerState = (() => {
     if (isStreaming) return "blocked";
@@ -625,13 +653,27 @@ export function ChatClient({
 
   return (
     <ChatShell>
-      <Rail
-        groups={groups}
-        user={user}
-        activeConversationId={activeConversationId ?? undefined}
-        onSelectConversation={onSelectConversation}
-        onNewConversation={onNewConversation}
-      />
+      <div
+        className={`${styles["rail-wrap"]}${drawerOpen ? ` ${styles["is-open"]}` : ""}`}
+        onTouchStart={onDrawerTouchStart}
+        onTouchEnd={onDrawerTouchEnd}
+      >
+        <Rail
+          groups={groups}
+          user={user}
+          activeConversationId={activeConversationId ?? undefined}
+          onSelectConversation={onSelectConversation}
+          onNewConversation={onNewConversation}
+        />
+      </div>
+      {drawerOpen && (
+        <button
+          type="button"
+          aria-label="Close conversations"
+          className={styles.scrim}
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
       <Surface
         scrollRef={scrollRef}
         onScroll={onScroll}
@@ -645,6 +687,7 @@ export function ChatClient({
             onClosePropertyMenu={() => setPropertyMenuOpen(false)}
             onSelectProperty={(id) => persistActiveProperty(id)}
             onNewThread={onNewConversation}
+            onToggleDrawer={() => setDrawerOpen((v) => !v)}
           />
         }
         composer={

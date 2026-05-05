@@ -86,7 +86,9 @@ export function Composer({
           </button>
         </div>
         <div className={styles["composer-send"]}>
-          <span className={styles["composer-hint"]}>⌘↵ to send</span>
+          <span className={`${styles["composer-hint"]} ${styles["touch-hide"]}`}>
+            ⌘↵ to send
+          </span>
           <button
             type="button"
             className={styles["send-btn"]}

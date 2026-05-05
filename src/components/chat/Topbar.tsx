@@ -20,6 +20,8 @@ export type TopbarProps = {
   onSelectProperty?: (id: string) => void;
   onOpenAuditLog?: () => void;
   onNewThread?: () => void;
+  /** Mobile drawer toggle — hamburger button is visible only at <768px via @media. */
+  onToggleDrawer?: () => void;
 };
 
 export function Topbar({
@@ -32,9 +34,22 @@ export function Topbar({
   onSelectProperty,
   onOpenAuditLog,
   onNewThread,
+  onToggleDrawer,
 }: TopbarProps) {
   return (
     <header className={styles.topbar}>
+      {onToggleDrawer && (
+        <button
+          type="button"
+          className={styles["menu-btn"]}
+          aria-label="Open conversations"
+          onClick={onToggleDrawer}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       <PropertyContext
         property={property}
         options={propertyOptions}

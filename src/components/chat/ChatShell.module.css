@@ -51,6 +51,7 @@
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
@@ -195,6 +196,7 @@
 .surface {
   display: flex; flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   min-width: 0;
   background: var(--bg);
 }
@@ -805,18 +807,36 @@
 }
 
 /* ============================================================
-   MOBILE — under 640px (D-15 mobile drawer interaction is M5 stub;
-   carry-forward §10 item 3 covers the slide motion + scrim).
-   The breakpoint applies via the .m-mobile class on the .shell wrapper.
+   MOBILE — class-driven (designer canvas) AND media-driven (production).
+   The .m-mobile class flips the layout for design-canvas frames; the
+   @media block at the bottom of this section mirrors the same rules
+   for live <768px viewports. Drawer interaction (slide-in + scrim +
+   swipe-to-close) is iPhone-Safari-validated.
    ============================================================ */
-.shell.m-mobile { grid-template-columns: 1fr; }
-.shell.m-mobile .rail { display: none; }
-.shell.m-mobile .topbar { padding: 0 14px; height: 48px; }
-.shell.m-mobile .topbar .ctx-meta { display: none; }
-.shell.m-mobile .col { padding: 0 16px; }
-.shell.m-mobile .composer-wrap { padding: 8px 14px 12px; }
-.shell.m-mobile .scroll { padding: 18px 0 6px; }
-.shell.m-mobile .menu-btn { display: grid; }
+
+/* Rail wrapper — at desktop, transparent grid cell (Rail itself draws
+   the chrome). At mobile, becomes the slide-in drawer. */
+.rail-wrap {
+  display: contents;
+}
+
+/* Scrim overlay (mobile only — hidden by default; .is-open shows it).
+   Reset-styled <button> for a11y so tap-to-close gets focus + keyboard
+   semantics for free. */
+.scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 24, 21, 0.40);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hamburger menu button — hidden by default; visible on mobile via
+   .m-mobile class OR the <768px media query. */
 .menu-btn {
   display: none;
   width: 30px; height: 30px;
@@ -827,3 +847,69 @@
   margin-right: 6px;
 }
 .menu-btn svg { width: 16px; height: 16px; stroke-width: 1.7; }
+
+/* Class-driven mobile (designer canvases). */
+.shell.m-mobile { grid-template-columns: 1fr; }
+.shell.m-mobile .rail { display: none; }
+.shell.m-mobile .topbar { padding: 0 14px; height: 48px; }
+.shell.m-mobile .topbar .ctx-meta { display: none; }
+.shell.m-mobile .col { padding: 0 16px; }
+.shell.m-mobile .composer-wrap { padding: 8px 14px 12px; }
+.shell.m-mobile .scroll { padding: 18px 0 6px; }
+.shell.m-mobile .menu-btn { display: grid; }
+
+/* Media-driven mobile (production live viewport). At <768px the rail
+   becomes a fixed-position drawer that slides in from the left, and the
+   surface fills the full single-column grid. */
+@media (max-width: 767.98px) {
+  .shell { grid-template-columns: 1fr; }
+
+  /* Rail-wrap becomes the drawer container — fixed-positioned, slides
+     from translateX(-100%) to translateX(0) when .is-open is set. */
+  .rail-wrap {
+    display: block;
+    position: fixed;
+    top: 0; left: 0;
+    width: 85vw; max-width: 360px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease-default);
+    background: var(--bg);
+    border-right: 0.5px solid var(--rule);
+    /* Safe-area inset only when fully visible to avoid notches biasing
+       the off-screen position. */
+    padding-top: env(safe-area-inset-top, 0px);
+    will-change: transform;
+  }
+  .rail-wrap.is-open {
+    transform: translateX(0);
+  }
+
+  /* Rail fills the wrapper at mobile. */
+  .rail-wrap .rail {
+    height: 100%;
+    border-right: none;
+  }
+
+  .scrim { display: block; }
+
+  .topbar { padding: 0 14px; height: 48px; }
+  .topbar .ctx-meta { display: none; }
+  .col { padding: 0 16px; }
+  .composer-wrap {
+    padding: 8px 14px 12px;
+    /* Anchor above the iOS home indicator. */
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .scroll { padding: 18px 0 6px; }
+  .menu-btn { display: grid; }
+}
+
+/* Hide on touch / coarse-pointer devices (iPhone, Android, iPad
+   touch). Keeps desktop kbd hints visible without adding clutter on
+   touch where ⌘↵ is meaningless. */
+@media (hover: none) and (pointer: coarse) {
+  .touch-hide { display: none !important; }
+}
