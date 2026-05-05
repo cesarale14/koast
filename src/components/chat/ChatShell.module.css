@@ -865,22 +865,26 @@
   .shell { grid-template-columns: 1fr; }
 
   /* Rail-wrap becomes the drawer container — fixed-positioned, slides
-     from translateX(-100%) to translateX(0) when .is-open is set. */
+     from translateX(-100%) to translateX(0) when .is-open is set.
+     top:0 + bottom:0 (instead of height:100dvh) extends the drawer
+     past the dynamic-viewport boundary so it fills the FULL screen
+     including the iOS Safari URL-bar zone. Otherwise the area
+     between drawer-bottom and screen-bottom shows html bg + scrim
+     overlay = dimmed cream (reads as a gray band). */
   .rail-wrap {
     display: block;
     position: fixed;
-    top: 0; left: 0;
+    top: 0; left: 0; bottom: 0;
     width: 85vw; max-width: 360px;
-    height: 100vh;
-    height: 100dvh;
     z-index: 60;
     transform: translateX(-100%);
     transition: transform var(--dur-base) var(--ease-default);
     background: var(--bg);
     border-right: 0.5px solid var(--rule);
-    /* Safe-area inset only when fully visible to avoid notches biasing
-       the off-screen position. */
+    /* Safe-area inset as INNER padding so drawer bg fills the full
+       screen edge-to-edge while content respects notch / home indicator. */
     padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     will-change: transform;
   }
   .rail-wrap.is-open {
