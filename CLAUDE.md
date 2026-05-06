@@ -91,6 +91,98 @@ order is internal scaffolding; commit bodies describe what shipped, not which
 numbered step it shipped under. M6's commit body shipped with both — a
 fix-pass for one number missed the other.
 
+--
+
+## Working with the Koast vault (Obsidian via mcpvault)
+
+The vault is at `/home/ubuntu/koast-vault/` on this machine, mirrored to 
+the GitHub repo `cesarale14/koast-vault`. The vault is the canonical 
+home for the Method document, architectural decisions, session notes, 
+research synthesis, and the carry-forward backlog.
+
+### Hard rule: mcpvault is the only path for vault content operations
+
+**Reads:** vault content (notes, frontmatter, search results) must be 
+read via mcpvault tools (`mcpvault__read_note`, `mcpvault__search_vault`, 
+`mcpvault__list_files`, `mcpvault__get_note_metadata`, etc.). 
+Do NOT use Bash `cat`, `grep`, `find`, `ls`, or heredocs to inspect 
+vault content. The only exception is Git status/log operations on the 
+vault repo (`git status`, `git log`, `git diff`) — those are sync-layer, 
+not content-layer.
+
+**Writes:** vault content must be written via mcpvault tools 
+(`mcpvault__write_note`, `mcpvault__patch_note`, `mcpvault__append_to_note`, 
+`mcpvault__update_frontmatter`, etc.). Do NOT use Bash file redirection, 
+heredocs, `tee`, `sed -i`, `cat >`, or any other shell-level write to 
+paths under `/home/ubuntu/koast-vault/`. Git commit and push operations 
+on the vault repo are allowed and required after writes — those are 
+sync-layer, not content-layer.
+
+**If mcpvault is unavailable** (server failed, tools not loaded, 
+connection error): STOP. Surface the issue to the operator. Do NOT 
+fall back to direct filesystem operations. The correct response is 
+something like "mcpvault is not available in this session — vault 
+writes are blocked until it's restored. Run `claude mcp list` from 
+the host shell to verify the server status and reconnect via /mcp 
+in this session."
+
+The reason for this rule: mcpvault is the canonical interface for 
+vault operations. Direct filesystem writes produce the same byte-level 
+result for simple cases but bypass frontmatter handling, validation, 
+search index updates, and predictable observability. They also create 
+silent inconsistency between sessions that respect the policy and 
+sessions that don't.
+
+### Sync layer (Git)
+
+Sync operations on the vault repository at `~/koast-vault/` are 
+sync-layer, not content-layer. These are allowed and required:
+
+- `cd ~/koast-vault && git pull` — at session start before any vault 
+  read or write, syncs Windows-side updates
+- `cd ~/koast-vault && git add . && git commit -m "<message>" && git push` 
+  — after any session that wrote to the vault, pushes changes back so 
+  Windows-side Obsidian Git can pull them within 10 minutes
+
+Commit messages should be specific (e.g., "session note: M8 conventions 
+drafted" or "decision logged: D38 calibration substrate locked"). 
+Reserved: "vault auto-commit: <date>" is for the Windows-side Obsidian 
+Git plugin only — VPS-side commits should be substantive.
+
+### Vault structure (canonical)
+
+- `method/` — Method document, supporting drafts, foundational principles
+- `decisions/` — architectural and strategic decisions, one per file, 
+  named `YYYY-MM-DD-decision-slug.md`
+- `cf-backlog/` — carry-forward log, one note per CF, 
+  named `cf-NNNN-slug.md`
+- `sessions/` — session notes, one per significant work session, 
+  named `YYYY-MM-DD-topic-slug.md`
+- `milestones/` — one folder per milestone (M8/, M9/, etc.) with 
+  scope, item status, learnings
+- `research/` — research synthesis, references to NotebookLM notebooks
+- `daily/` — date-named scratch notes
+- `inbox/` — temporary holding for unfiled material
+- `templates/` — Templater templates (managed in Obsidian directly, 
+  do not edit via mcpvault)
+
+### Where the Method lives
+
+The Koast Method document is the source of truth for what Koast IS — 
+seven Beliefs plus the values commitment. The canonical copy lives at 
+`method/koast-method.md` in the vault, accessible via mcpvault from 
+this VPS.
+
+Before drafting milestone conventions, making architectural decisions 
+that touch product surface, or reasoning about whether a feature is 
+Method-honest, read the Method via mcpvault. Do NOT reason from chat 
+artifact copies, repomix snapshots, or any other transcribed version 
+— those are stale by definition.
+
+The companion document `method/koast-method-in-code.md` grounds Method 
+commitments in current code state and is updated alongside major 
+substrate changes.
+
 ---
 
 ## Polish Pass — Current State (as of 2026-04-20, commit 10950d1)
