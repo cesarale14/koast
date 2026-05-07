@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 8 Conventions
 
-**Status:** Locked, v1.3
+**Status:** Locked, v1.4
 **Drafted:** 2026-05-05
-**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision; Phase B sanity-check v1.3 D1 geometry lock)
+**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision; Phase B sanity-check v1.3 D1 geometry lock; Phase B C8 audit v1.4 catch-up)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-8-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-05-m8-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -16,6 +16,17 @@
 **Naming:** "Trust Surface Convergence" — the work that closes the asymmetry where Koast can DO things but the host cannot INSPECT what Koast knows or did.
 
 ## Changelog
+
+**v1.4 — 2026-05-07** (Phase B C8 audit catch-up)
+
+Phase B Step 3 C8 pre-implementation audit (vault `milestones/M8/items/c8-substrate-plan.md`, vault commit `80c4616`) surfaced four architectural items requiring conventions update before Step A implementation begins:
+
+- **D1** — state store convention reframed from "Zustand or equivalent" to Context (existing convention). Codebase has no Zustand dependency; `Toast.tsx` is the canonical Context-with-reducer pattern.
+- **D2** — substantive re-spec. v1.0 framing assumed persistent SSE connection; current code has per-turn streaming only (`useAgentTurn`: POST + ReadableStream + AbortController, no persistent connection). v1.4 reframes D2: per-turn streaming preserved as-is; between-turns lightweight polling for audit feed updates (F.ii path from substrate plan). Persistent SSE deferred to M9 or later.
+- **§6.4** — z-index convention added for bottom-fixed elements (resting=40, expanded=50; first bottom-fixed elements in codebase, establishing the pattern).
+- **§4.1** — Phase B effort estimate adjusted from ~1.5 days (3 days span) to ~2.5 days (5 days span). M8 close target adjusts from 23 working days to 25 working days. Reasons: state store + ChatBar component + SSE reframing not budgeted in Phase 1 STOP.
+
+No code changes. Documentation discipline only. C8 implementation (Step 4 of Phase B prompt) executes against locked v1.4 spec.
 
 **v1.3 — 2026-05-07** (Phase B sanity-check resolution)
 
@@ -62,7 +73,7 @@ Net scope impact: balanced. C9 simpler (3 atomic drops vs 4-with-refactor) offse
 
 M8 is the convergence milestone that takes the shipped product (M2-M7 substrate plus mobile pass) from "substrate solid, host inspection asymmetric" to "Method-honest at v1 launch." It closes 9 active contradictions identified by the convergence diagnostic and ships the foundation pieces for the trust inspection layer (memory + activity surfaces).
 
-The milestone is bounded: **2.5-3 weeks of focused work, 13 items in scope plus the M5 #11 fold-in.** No new substrate work beyond what items demand. No exploratory scope.
+The milestone is bounded: **~3 weeks of focused work, 13 items in scope plus the M5 #11 fold-in.** No new substrate work beyond what items demand. No exploratory scope. (Revised v1.4: was 2.5-3 weeks; Phase B duration adjustment per C8 audit.)
 
 ## 1.2 What M8 is not
 
@@ -132,8 +143,18 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 
 **Implications:**
 - Route renders into the sibling slot; chat panel is permanent
-- Conversation state lives in layout-level store (Zustand or equivalent)
+- Conversation state lives in layout-level store (see "State store convention" below)
 - Existing per-page ChatClient lifecycle assumptions must be audited at Phase 1 STOP and refactored if found
+
+### D1 — State store convention (revised v1.4, post-Phase-B-C8-audit)
+
+The codebase uses **React Context with reducer pattern** (`Toast.tsx` is the canonical example) — no Zustand, no Redux, no external state library. The chat state store follows this convention:
+
+- Context provider hosted at the dashboard layout (peer to the chat surfaces)
+- Reducer for state transitions (active conversation, expanded/collapsed bar, conversation history, harvested-this-session turns, property selection)
+- Hook (`useChatStore` or naming-convention-matched) for component subscription
+
+Zustand is not in dependencies. Introducing it for chat state would break the codebase's established state-store pattern and trigger a deps-decision per CLAUDE.md ("No new dependencies without explicit justification"). v1.4 reframing: original v1.0 spec said "Zustand or equivalent"; the audit revealed Context-with-reducer is the existing convention, and v1.4 locks that.
 
 ### D1 — Rendering geometry (added v1.3, post-Phase-B-sanity-check)
 
@@ -155,17 +176,23 @@ The chat panel renders as a bottom-anchored expandable bar across all viewports.
 
 **Anti-scope reminder:** orb-mode foregrounding (post-convergence per §6.2) is a different geometry pattern. M8 ships chat-default at all viewports; orb-mode is M-future. Bottom-anchored-bar resting state is distinct from orb-mode collapsed-state foregrounding — same Method-in-code-named concept space, but the bar is the always-present default; orb-mode is a future foregrounding mode that the persistent layout slot will support without re-architecting.
 
-## D2 — SSE lifecycle on persistent mount (C8)
+## D2 — Streaming and update lifecycle (revised v1.4)
 
-**Decision:** SSE persists during conversation activity, idle timeout closes the connection (5 min default), polling fallback for wakeup. Conversation state in layout-level store.
+**Decision:** Per-turn streaming preserved as-is. Between-turns lightweight polling for audit feed updates. Persistent SSE deferred.
 
-**Reasoning:** Always-on SSE accumulates server-side resources from idle hosts. Always-closed fails the "persistent mount" goal. Activity-based persistence with idle timeout balances the two. Polling fallback wakes the stream when there's something to push without requiring a separate lifecycle channel.
+**Per-turn streaming (existing, no change):** `useAgentTurn` opens a POST + ReadableStream + AbortController per turn, closes on `done|error|refusal`. This is correct streaming infrastructure for the in-conversation experience and ships unchanged.
 
-**Implications:**
-- Idle timeout: 5 minutes (Round-2 if user feedback shows it's wrong)
-- Polling interval during idle: lightweight `?any-updates` endpoint at modest frequency (Round-2)
-- Stream re-opens on host interaction or polled "something to push" signal
-- M9 may evolve toward dedicated lifecycle channel; M8 ships polling
+**Between-turns updates (new in M8):** When the chat panel is in resting state (bar not expanded, no active turn), the bar polls a lightweight endpoint (`/api/audit-feed/since?ts=<last-seen-timestamp>`) at a moderate interval (60-120s; Round-2 §3.4 #1 confirms). New audit events surface as a small indicator on the bar, signaling "Koast did something silently." The host can tap to expand and see what's new.
+
+**Persistent SSE (deferred):** A persistent server-push channel for between-turns updates would be richer (no polling latency, lower bandwidth in idle steady state) but requires substrate that doesn't exist today. M8 ships the polling version; M9 or later evaluates whether persistent SSE is needed based on real silent-activity volume.
+
+**Reasoning:** v1.0 D2 framing ("SSE persists during conversation activity, idle timeout closes the connection, polling fallback for wakeup") assumed a persistent connection model that doesn't exist in current code. The v1.4 reframing aligns conventions with reality: per-turn streaming is the in-conversation infrastructure; between-turns polling is the persistent-bar update infrastructure. Both are independently testable. Belief 4's silent-activity-visibility commitment is satisfied by polling at M8 (low-latency, sufficient for current activity volumes); persistent push becomes worth building when activity volume warrants it.
+
+**Implications for C8 substrate (Step F):**
+- New endpoint: `/api/audit-feed/since` returns audit feed rows since the given timestamp (uses `unified_audit_feed` VIEW from Phase A)
+- ChatBar component polls when in resting state; pauses polling when expanded (host is engaged; in-turn streaming covers updates)
+- Indicator on bar shows count of new events; clicking expands and clears the indicator (resets last-seen-timestamp)
+- Polling cancels on bar destroy (client unmount) and on tab visibility change (no polling when tab is backgrounded)
 
 ## D3 — Audit data architecture (C5, F9)
 
@@ -696,48 +723,51 @@ Each surfaces during Phase 1 STOP or early implementation. Human resolves before
 - Migration: index additions on audit feed sources (if Phase 1 STOP audit reveals gaps)
 - Database VIEW: `unified_audit_feed` (D3)
 
-**Phase B — Foundation surfaces (Days 3-5)**
-- C8: Persistent chat layout slot + SSE lifecycle (D1, D2)
-- C7: Frontdesk placeholder removal (D14)
+**Phase B — Foundation surfaces (Days 3-7, revised v1.4)**
+
+Phase B duration revised from 3 days to 5 days based on C8 audit findings (vault `milestones/M8/items/c8-substrate-plan.md`). ~2.5 days substrate work for C8 alone (state store, ChatBar component, ChatClient refactor, layout invert, route shells, SSE/polling lifecycle). Plus C7 (Frontdesk removal + route + API deletion) and C1 (sparkline removal). Phase B smoke gate runs at end.
+
+- C8: Persistent chat layout slot + state store + ChatBar + SSE/polling lifecycle (D1, D2 v1.4)
+- C7: Frontdesk placeholder removal (D14) — sidebar + route + API
 - C1: Sparkline removal or real-data sourcing (decision: remove for M8; track real-data implementation in CF backlog)
 
-**Phase C — Trust inspection foundation (Days 6-10)**
+**Phase C — Trust inspection foundation (Days 8-12)**
 - F9: Audit feed unification (D3 — VIEW already created in Phase A; this phase wires it to query helper)
 - C5: `/koast/inspect/activity` route, ActivityFeed component, filtering chips, inline-expand detail (D5, D17)
 - F1: `/koast/inspect/memory` route, MemoryBrowser component, edit affordances routing through agent loop (D5, D6, D7)
 
-**Phase D — Voice + refusal substrate (Days 11-12)**
+**Phase D — Voice + refusal substrate (Days 13-14)**
 - F4: RefusalEnvelope TypeScript spec, chat-surface rendering (D18)
 - P4: Content-aware refusal at propose_guest_message for Koast-as-publisher categories (D18)
 
-**Phase E — Hero and tabs (Days 13-15)**
+**Phase E — Hero and tabs (Days 15-17)**
 - C2: ConfidenceBandedRange component, dashboard integration (D8)
 - C6: ConditionalTabStrip with visibility predicates (D12)
 
-**Phase F — Onboarding (Days 16-18)**
+**Phase F — Onboarding (Days 18-20)**
 - C3: Conversational onboarding flow, opening prompt + starter generation (Tier 1 + Tier 2 if scope holds), sufficiency-signal completion + idle fallback (D9, D10, D11)
 
-**Phase G — Audit affordances (Day 19)**
+**Phase G — Audit affordances (Day 21)**
 - C4: AuditDrawer component, topbar icon wired, notification indicator (D16)
 - Migration: add `last_seen_inspect_at` column
 
-**Phase H — Guide (Days 20-21)**
+**Phase H — Guide (Days 22-23)**
 - `/koast/guide/` route layout
 - Sub-section: Capabilities (required)
 - Sub-section: How memory works (defer if scope tight)
 - Sub-section: How Koast works on your behalf (defer if scope tight)
 
-**Phase I — Honest scope language pass (Day 22)**
+**Phase I — Honest scope language pass (Day 24)**
 - F7: Audit empty states across all M8 surfaces, ensure D19 principle is honored
 - Doctrine compliance review on all new copy
 
-**Phase J — M8 close (Day 23)**
+**Phase J — M8 close (Day 25)**
 - CLAUDE.md updates: M8 conventions reference added
 - DESIGN_SYSTEM.md §15 updated to reference voice doctrine
 - M5 #11 closed in CF backlog (cleanup note)
 - M8 implementation report drafted
 
-Total: 23 working days = 4.5 weeks at single-track pace, 2.5-3 weeks at typical Cesar pace with sustained focus.
+Total: 25 working days = ~5 weeks at single-track pace, ~3 weeks at typical Cesar pace with sustained focus. (Revised v1.4: was 23 days; Phase B duration adjustment per C8 audit.)
 
 ## 4.2 Mid-milestone smoke gates
 
@@ -984,6 +1014,18 @@ These look like scope expansion but are the cost of doing the items right:
 - **`channex_outbound_log` property_id forward-fill (Phase C gate).** Production has 21 `channex_outbound_log` rows with NULL `property_id` today; `src/lib/channex/client.ts` `logOutbound()` does not set the column. The INNER JOIN against `properties` in `unified_audit_feed` drops these rows entirely, so rate-push history will not surface in `/koast/inspect/activity` despite Channex being the most active write surface. Phase C smoke gate verifies that `channex_outbound_log` rows surface in the feed for a real test host with real rate pushes. **If they don't, Phase C halts on the property_id forward-fill fix before continuing.** This is gating, not optional. Historical backfill of existing NULL rows is a separate (optional, lossy) follow-up.
 - **`pricing_apply` action_type seeding (CF, non-gating).** The VIEW maps `pricing_apply → rate_push` for forward-compat, but no current pricing tool emits that action_type. When `/api/pricing/apply` integrates with the agent loop in a future milestone, the tool emits `'pricing_apply'` and the existing VIEW mapping handles it without changes. Tracked in CF backlog; not gating any M8 phase.
 
+### Z-index convention for bottom-fixed elements (added v1.4, Phase B substrate)
+
+The C8 audit revealed no existing convention for bottom-fixed element stacking; current z-index usage in the codebase is ad-hoc (range 1-9999). The chat bar is the first bottom-fixed element to ship.
+
+**Locked convention:**
+- Bar resting state: `z-index 40`
+- Bar expanded state: `z-index 50`
+- Toast notifications (existing): `z-index 100` (above bar in both states)
+- Modals (existing patterns): `z-index 1000+` (above everything)
+
+This is M8-shipped substrate, not anti-scope. Future bottom-fixed elements (alert bars, action sheets, etc.) follow this convention or extend it explicitly. `DESIGN_SYSTEM.md` update at M8 close documents the convention in the canonical visual-design location.
+
 These are surfaced explicitly so Claude Code doesn't treat them as scope creep.
 
 ---
@@ -1133,4 +1175,4 @@ Final M8 session executes:
 
 ---
 
-*End conventions, v1.3.*
+*End conventions, v1.4.*
