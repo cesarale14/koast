@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 8 Conventions
 
-**Status:** Locked, v1.1
+**Status:** Locked, v1.2
 **Drafted:** 2026-05-05
-**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings)
+**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-8-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-05-m8-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -16,6 +16,21 @@
 **Naming:** "Trust Surface Convergence" — the work that closes the asymmetry where Koast can DO things but the host cannot INSPECT what Koast knows or did.
 
 ## Changelog
+
+**v1.2 — 2026-05-07** (post-Phase-A, doc-only)
+
+Phase A shipped (commits koast `a7fb6dc`, vault `984f638`) — all four migrations (010000–040000) applied to staging + production with 7/7 smoke gate green. The VIEW shipped at v1.3 SQL design (vs. v1.1 spec); two carry-forwards surfaced. v1.2 captures both into the locked conventions:
+
+- **D3** — three v1.3 design refinements documented as locked architecture:
+  - `raw_action_type` metadata payload pattern (every Source 1 row, not just `'other'`)
+  - read-class action_type filter (`WHERE action_type NOT ILIKE 'read_%'`)
+  - Source 4 applied-rows-only filter (`WHERE applied_at IS NOT NULL`)
+- **D17b** — chip naming corrected. M8 ships **"SMS"** chip (not "Notifications") because the notifications source is excluded at M8. M9 renames the chip back to "Notifications" when the notifications source joins the feed via host_id schema migration. Voice doctrine §1.6 extends to UI-label honesty.
+- **§6.4** — two substrate-enabling-work items added from Phase A carry-forwards:
+  - `channex_outbound_log` property_id forward-fill (Phase C gate)
+  - `pricing_apply` action_type seeding (non-gating CF)
+
+No code changes. Documentation discipline only.
 
 **v1.1 — 2026-05-07** (post-Phase-1-STOP)
 
@@ -158,6 +173,16 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 - VIEW filter clauses on each source restrict to host-action-relevant rows; system events excluded
 - Indexes on each source for `(host_id, occurred_at)` patterns required; Phase 1 STOP audits and adds if needed
 - Drill-down to source_table + source_id from inspect surface for technical detail
+
+### D3 — VIEW v1.3 design notes (post-implementation, locked v1.2)
+
+The `unified_audit_feed` VIEW shipped at v1.3 SQL design in production (migration `20260507040000`, see `~/koast/supabase/migrations/`). Three design refinements beyond v1.1's spec are now part of the locked architecture:
+
+**raw_action_type metadata pattern.** Source 1 (`agent_audit_log`) emits `metadata.raw_action_type` for every row, not just `'other'`-category rows. Drill-down on any audit entry preserves the source action_type even when category mapping changes later. Self-policing discipline: when a new agent tool ships an unmapped action_type, it surfaces under `category='other'` with the raw action_type visible in metadata, creating pressure to extend the canonical CASE or accept the visible `'other'` classification. Forces visible engineering decisions rather than silent miscategorization.
+
+**Read-class action_type filter.** Source 1 filters `WHERE action_type NOT ILIKE 'read_%'`. Read-class actions are agent-internal observability, not host-state changes. Convention codified: `read_*` is reads (filtered out); `write_*` / `propose_*` / `apply_*` are state changes (surfaced). Future agent tools must honor this naming.
+
+**Source 4 applied-rows-only filter.** `pricing_performance` source filters `WHERE applied_at IS NOT NULL`. The feed surfaces "what Koast did," and unapplied recommendations are consideration-but-not-action. Suggestions that weren't applied surface in the pricing tab, not the audit feed. `occurred_at` uses `applied_at` directly since the filter guarantees non-null. Cleaner feed semantics; honest `'completed'` outcome since the filter guarantees the action happened.
 
 ## D4 — Inspection surface tab scope (C5, F1)
 
@@ -408,7 +433,16 @@ DROP TABLE user_preferences;
 
 **Decision (D17a — feed):** Reverse chronological. Day separators inline ("Today" / "Yesterday" / "Wed Nov 13"). Pagination/infinite scroll after ~50 entries.
 
-**Decision (D17b — filtering):** Filtering chips at top of feed. Five categories: All / Memory / Messages / Pricing / Notifications. Active state visually clear; persistence across visits not required for M8.
+**Decision (D17b — filtering, revised v1.2):** Filtering chips at top of feed. Five chips: **All / Memory / Messages / Pricing / SMS**. Active state visually clear; persistence across visits not required for M8.
+
+**Chip-fold mapping** (granular VIEW categories fold at chip layer):
+- "All" → no filter
+- "Memory" → `category='memory_write'`
+- "Messages" → `category='guest_message'`
+- "Pricing" → `category IN ('rate_push', 'pricing_outcome')`
+- "SMS" → `category='sms'`
+
+**Chip naming rationale:** the "SMS" label is honest about what's in the chip at M8 — only `sms_log` rows surface, since the `notifications` source is excluded per the v1.1 D3 decision. M9 renames the chip back to "Notifications" when the notifications source joins the feed via the host_id schema migration. Voice doctrine §1.6 ("voice violations are bugs") extends to UI-label honesty: a chip label that overpromises content is the same shape of violation as voice copy that overpromises.
 
 **Decision (D17c — detail rendering):** Inline expand within feed. Click row → row expands to show full source detail. Click again → collapses.
 
@@ -917,6 +951,11 @@ These look like scope expansion but are the cost of doing the items right:
 - Pricing engine schema-export changes (if Phase 1 STOP reveals need)
 - ChatClient mount lifecycle refactor (if Phase 1 STOP reveals current code assumes per-page mount)
 
+**Added v1.2 (post-Phase-A carry-forwards):**
+
+- **`channex_outbound_log` property_id forward-fill (Phase C gate).** Production has 21 `channex_outbound_log` rows with NULL `property_id` today; `src/lib/channex/client.ts` `logOutbound()` does not set the column. The INNER JOIN against `properties` in `unified_audit_feed` drops these rows entirely, so rate-push history will not surface in `/koast/inspect/activity` despite Channex being the most active write surface. Phase C smoke gate verifies that `channex_outbound_log` rows surface in the feed for a real test host with real rate pushes. **If they don't, Phase C halts on the property_id forward-fill fix before continuing.** This is gating, not optional. Historical backfill of existing NULL rows is a separate (optional, lossy) follow-up.
+- **`pricing_apply` action_type seeding (CF, non-gating).** The VIEW maps `pricing_apply → rate_push` for forward-compat, but no current pricing tool emits that action_type. When `/api/pricing/apply` integrates with the agent loop in a future milestone, the tool emits `'pricing_apply'` and the existing VIEW mapping handles it without changes. Tracked in CF backlog; not gating any M8 phase.
+
 These are surfaced explicitly so Claude Code doesn't treat them as scope creep.
 
 ---
@@ -1066,4 +1105,4 @@ Final M8 session executes:
 
 ---
 
-*End conventions, v1.1.*
+*End conventions, v1.2.*
