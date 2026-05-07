@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 8 Conventions
 
-**Status:** Locked, v1.2
+**Status:** Locked, v1.3
 **Drafted:** 2026-05-05
-**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision)
+**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision; Phase B sanity-check v1.3 D1 geometry lock)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-8-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-05-m8-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -16,6 +16,14 @@
 **Naming:** "Trust Surface Convergence" — the work that closes the asymmetry where Koast can DO things but the host cannot INSPECT what Koast knows or did.
 
 ## Changelog
+
+**v1.3 — 2026-05-07** (Phase B sanity-check resolution)
+
+Phase B sanity check (vault `milestones/M8/items/phase-b-sanity-check.md`) surfaced a "specified at principle level but not at implementation-detail level" gap between Method-in-code and conventions D1. Method-in-code states "A bottom-anchored chat bar that expands to full surface on tap" verbatim; conventions D1 was silent on rendering geometry. Decision locked: bottom-anchored expandable bar across all viewports.
+
+- **D1** — geometry locked as bottom-anchored expandable bar across all viewports. Method-in-code specifies "bottom-anchored chat bar that expands to full surface on tap"; conventions v1.2 was silent on geometry. Phase B sanity check surfaced the gap; decision captured here so future sessions ground in the locked geometry without re-deriving.
+
+No code changes. Documentation discipline only. C8 substrate audit (Step 3 of Phase B prompt) now grounds in locked geometry rather than discovering it during implementation.
 
 **v1.2 — 2026-05-07** (post-Phase-A, doc-only)
 
@@ -126,6 +134,26 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 - Route renders into the sibling slot; chat panel is permanent
 - Conversation state lives in layout-level store (Zustand or equivalent)
 - Existing per-page ChatClient lifecycle assumptions must be audited at Phase 1 STOP and refactored if found
+
+### D1 — Rendering geometry (added v1.3, post-Phase-B-sanity-check)
+
+The chat panel renders as a bottom-anchored expandable bar across all viewports.
+
+**Resting state:** compact bar pinned to viewport bottom. Tap or click to expand. Bar shows enough affordance to indicate active conversation state (e.g., last message snippet, unread indicator) without dominating screen real estate.
+
+**Expanded state:** full-surface or large overlay (responsive to viewport). Conversation history visible; input live; proposal cards rendered inline. Dismissable to return to resting state.
+
+**Reasoning:**
+- Method-in-code grounding: Belief 2 specifies "bottom-anchored chat bar that expands to full surface on tap" verbatim. The geometry is part of the Method-faithful implementation.
+- Viewport portability: bottom-anchored works at all viewports (mobile Safari already validated through M5/M7); side-panel geometry doesn't translate to mobile.
+- Real estate respect: compact resting state honors the host's primary workspace (calendar, properties, etc.); expanded state is where conversation work happens.
+
+**Implications for C8 substrate:**
+- ChatClient renders within the bar's expanded state; bar resting state is a smaller component peer to ChatClient
+- State store tracks expanded/collapsed state alongside conversation state
+- Smoke gate CHECK 1 ("chat panel persists across all dashboard routes") verifies bar resting state is visible across all routes; expanded state on at least one route demonstrates continuity
+
+**Anti-scope reminder:** orb-mode foregrounding (post-convergence per §6.2) is a different geometry pattern. M8 ships chat-default at all viewports; orb-mode is M-future. Bottom-anchored-bar resting state is distinct from orb-mode collapsed-state foregrounding — same Method-in-code-named concept space, but the bar is the always-present default; orb-mode is a future foregrounding mode that the persistent layout slot will support without re-architecting.
 
 ## D2 — SSE lifecycle on persistent mount (C8)
 
@@ -1105,4 +1133,4 @@ Final M8 session executes:
 
 ---
 
-*End conventions, v1.2.*
+*End conventions, v1.3.*
