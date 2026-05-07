@@ -1,7 +1,8 @@
 # Agent Loop v1 — Milestone 8 Conventions
 
-**Status:** Locked, v1.0
+**Status:** Locked, v1.1
 **Drafted:** 2026-05-05
+**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-8-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-05-m8-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -13,6 +14,22 @@
 **Method grounding:** This milestone closes contradictions and absences against the seven Beliefs of `method/koast-method.md` to make Koast Method-honest at v1 launch (defined: external launch, first paying hosts).
 
 **Naming:** "Trust Surface Convergence" — the work that closes the asymmetry where Koast can DO things but the host cannot INSPECT what Koast knows or did.
+
+## Changelog
+
+**v1.1 — 2026-05-07** (post-Phase-1-STOP)
+
+Phase 1 STOP audit (vault `milestones/M8/phase-1-stop-report.md`, vault commit `0659e5b`) surfaced five ambiguities; all five resolved with sign-off. Revisions:
+
+- **D3 (audit data architecture)** — `unified_audit_feed` ships with 4 sources, not 5. `notifications` excluded; inclusion deferred to M9 with required schema migration (add `host_id` column).
+- **D8a (pricing engine output)** — Pricing engine produces point estimates today, not ranges. Range derived at render time from `pricing_recommendations.reason_signals` JSONB at the `usePricingTab` hook layer using signal-weight dispersion. Engine-native range computation deferred to CF backlog.
+- **D14 (Frontdesk removal)** — Sidebar entry already removed in current code. M8 expands to delete `src/app/(dashboard)/frontdesk/page.tsx` and `src/app/api/frontdesk/waitlist/route.ts`. Captured waitlist leads in the `leads` table preserved (not dropped or mutated).
+- **D15 (deprecated config tables)** — Split decision. M8 atomically drops three tables (`message_templates`, `user_preferences`, `message_automation_firings`) with FK-ordered drop. `review_rules` deferred to M9 with its own conventions because `src/app/api/reviews/generate/[bookingId]/route.ts` is a live functional caller.
+- **D17d (per-category reversibility)** — Rate pushes informational-only at M8 (not 30-min reversible). Reversibility substrate (`revert_rate_push` + audit-row-driven undo path) deferred to M9. Memory writes/supersessions remain reversible per M6 substrate.
+
+Net scope impact: balanced. C9 simpler (3 atomic drops vs 4-with-refactor) offsets D17d substrate work being deferred. M8 close target stays in 2.5-3 week window.
+
+**v1.0 — 2026-05-05** — Initial drafting.
 
 ---
 
@@ -109,14 +126,15 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 
 ## D3 — Audit data architecture (C5, F9)
 
-**Decision:** Postgres VIEW (`unified_audit_feed`) joining five sources with normalized envelope. Not materialized. Source table + source ID preserved for drill-down.
+**Decision:** Postgres VIEW (`unified_audit_feed`) joining four sources with normalized envelope. Not materialized. Source table + source ID preserved for drill-down.
 
 **Sources:**
-1. `agent_audit_log`
-2. `channex_outbound_log`
-3. `notifications`
-4. `sms_log`
-5. `pricing_performance`
+1. `agent_audit_log` — host_id direct
+2. `channex_outbound_log` — host_id derived via JOIN properties ON property_id
+3. `sms_log` — `user_id` aliased to `host_id` in VIEW projection
+4. `pricing_performance` — host_id derived via JOIN properties ON property_id
+
+**Excluded at M8 — `notifications`:** The table has no host scoping today (only `recipient` text — phone or email). Including it requires a schema migration (add `host_id` column, backfill via recipient match against host phone/email columns, forward-fill via `storeNotification()`). Migration + inclusion deferred to M9. M8 anti-scope §6.1 documents this; the M8 inspect surface explicitly notes "notifications coming in next release" via F7-compliant copy.
 
 **Envelope shape:**
 ```typescript
@@ -189,7 +207,9 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 
 ## D8 — Hero dollar amounts: range source and treatment (C2)
 
-**Decision (D8a — source):** Read existing range from pricing engine output. Don't recompute. Engine produces `{point_estimate, range_low, range_high, confidence, n_signals_contributing}`; dashboard reads all five.
+**Decision (D8a — source, revised v1.1):** Render-time derivation from existing `pricing_recommendations.reason_signals` JSONB. The pricing engine ships point estimates today, not ranges (verified Phase 1 STOP — no `range_low`/`range_high`/`confidence`/`n_signals_contributing` fields anywhere in engine output, recommendations table, or performance table). Rather than expand M8 to rewrite the engine output substrate, M8 derives a confidence interval at the `usePricingTab` hook layer using signal-weight dispersion from `reason_signals`. Engine-native range computation is added to the CF backlog as "proper-engine-output rewrite" for a future milestone.
+
+Implications: `ConfidenceBandedRange` consumes a derived `{range_low, range_high, n_signals_contributing, time_period}` object computed in the hook, not a stored range. The hook's derivation logic lives in `src/lib/pricing/range.ts` (new), unit-tested against representative `reason_signals` shapes in Phase E.
 
 **Decision (D8b — treatment):** Range as primary, source line below.
 
@@ -323,35 +343,48 @@ Topbar affordance: small "?" or "Guide" button next to inspect icon, opens `/koa
 - Sub-section 1 (Capabilities) is required for M8; sub-sections 2-3 are deferral candidates if scope tightens
 - Empty states across the product reference the guide for fuller explanation
 
-## D14 — Frontdesk placeholder removal (C7)
+## D14 — Frontdesk placeholder removal (C7, revised v1.1)
 
-**Decision:** Remove from sidebar entirely. No "Coming soon" replacement. Direct booking ships when the substrate exists, not before.
+**Decision (revised v1.1):** Sidebar entry already removed in current code (verified Phase 1 STOP — `navGroups` in `src/app/(dashboard)/layout.tsx` contains no Frontdesk item). M8 expands D14 to delete the live page route AND the live API endpoint that the diagnostic and v1.0 conventions did not surface:
 
-**Reasoning:** The Method commits to visible interface reflecting only what substrate actually does. "Coming soon" is the failure mode. Belief 6 implies surfaces appear when substrate justifies them — Frontdesk is anti-pattern as currently shipped.
+- Delete `src/app/(dashboard)/frontdesk/page.tsx` (live "we'll notify you" waitlist signup page).
+- Delete `src/app/api/frontdesk/waitlist/route.ts` (writes `source: "frontdesk_waitlist"` rows to `leads` table).
+- **Preserve captured waitlist leads** in the `leads` table — do NOT drop or mutate existing rows. The historical lead-capture data remains queryable for any future direct-booking outreach.
+
+**Reasoning:** The Method commits to visible interface reflecting only what substrate actually does. The waitlist surface advertised a feature the substrate doesn't have, which is the same Belief 6 anti-pattern as the sidebar entry. "Coming soon" is the failure mode whether it's a tab or a deep-linked page. Existing leads are accumulated host data and stay in place per the values commitment ("the host's accumulated knowledge is the host's asset").
 
 **Implications:**
-- Single sidebar config change
-- No data migration needed
-- If a host has a deep-link to a Frontdesk-related URL, it 404s gracefully (no redirect)
+- Two file deletions plus directory cleanup (the `frontdesk` directory under `(dashboard)` and under `api`).
+- Deep-linked URLs (`/frontdesk` and `/api/frontdesk/waitlist`) 404 gracefully — no redirect, no replacement page.
+- `leads` rows with `source = 'frontdesk_waitlist'` preserved indefinitely (no migration writes to that table).
 
-## D15 — Deprecated config tables migration (C9)
+## D15 — Deprecated config tables migration (C9, revised v1.1)
 
-**Decision:** Atomic drop in single migration after Phase 1 STOP audit returns clean.
+**Decision (revised v1.1):** Split. Atomic drop of three tables in M8; the fourth (`review_rules`) deferred to M9 with its own conventions.
 
-**Tables dropped:**
+**M8 atomic drop (Phase A):**
+- `message_automation_firings` (FK-ordered first — drops the FK to `message_templates`)
 - `message_templates`
-- `review_rules`
 - `user_preferences`
-- `message_automation_firings`
 
-**Phase 1 STOP audits (pre-migration):**
-- Code references in functional paths (expect zero)
-- Production data row counts (expect zero per Method-in-code)
-- FK constraints pointing into these tables (expect none)
+All three verified empty in production (0 rows each, Phase 1 STOP). No functional callers outside `schema.ts` itself.
 
-**If audit reveals work needed:** Drop migration scope expands to handle references/data/FKs. Possible escalations: rename tables to `_deprecated_<name>` for observation period, then drop later. M8 conventions doc notes the escalation path; default is atomic drop.
+**Deferred to M9 — `review_rules`:** Phase 1 STOP found `src/app/api/reviews/generate/[bookingId]/route.ts:3,75-91` is a live caller (queries tone, target keywords, autoPublish, publishDelayDays, badReviewDelay during AI review generation). Atomic drop today would 500 the route on every booking. M9 absorbs both the table drop AND the reviews-generate refactor (read review-tone preferences from `memory_facts` or hardcode the default register from voice doctrine + `DEFAULT_ONBOARDING_TEMPLATES`).
 
-**Reasoning:** Belief 1's narrow-exception-for-stable-infrastructure rejects the configure-templates-and-rules paradigm. Empty deprecated tables are configuration-creep paths of least resistance for future code. Atomic drop forces the discipline.
+**FK constraint handling:**
+```sql
+-- Single migration, statement order matters:
+DROP TABLE message_automation_firings;  -- drops the FK first
+DROP TABLE message_templates;
+DROP TABLE user_preferences;
+```
+
+**Phase 1 STOP outcome (recorded for milestone close):**
+- Production data row counts: 0/0/0/0 (review_rules also empty)
+- Code references audit: review_rules has 1 functional caller; other three only schema-level refs
+- FK constraints: 1 internal FK (`message_automation_firings → message_templates`); zero external FKs
+
+**Reasoning:** Belief 1's narrow-exception-for-stable-infrastructure rejects the configure-templates-and-rules paradigm. Three of four tables drop cleanly today. `review_rules` ships M9 with a real conventions document because the migration is non-trivial — review-tone preferences are real product behavior worth designing the memory-substrate replacement carefully, not field-of-origin.
 
 ## D16 — Audit icon behavior (C4)
 
@@ -386,12 +419,12 @@ Topbar affordance: small "?" or "Guide" button next to inspect icon, opens `/koa
 - For Channex pushes: collapsed-by-default request/response under "show technical detail"
 - For errors: error trace, what was attempted, what host can do
 
-**Decision (D17d — reversibility):** Yes for substrate-supported categories, with hardcoded per-category reversibility-window map for M8.
+**Decision (D17d — reversibility, revised v1.1):** Yes for substrate-supported categories. Rate pushes downgraded to informational-only at M8 because the revert substrate (`revert_rate_push` action + audit-row-driven undo path against `pricing/apply` writes) does not exist today and is ~1 day of net new infrastructure (verified Phase 1 STOP). Reversibility substrate for rate pushes deferred to M9.
 
-**Per-category reversibility:**
-- Memory writes: indefinite (via supersession)
-- Memory supersessions: indefinite (via un-supersede)
-- Rate pushes: 30 minutes (via revert-push)
+**Per-category reversibility (M8):**
+- Memory writes: indefinite (via supersession, M6 substrate)
+- Memory supersessions: indefinite (via un-supersede, M6 substrate)
+- Rate pushes: **informational only at M8** — the inline-expand surface shows what was pushed, when, and to which channel; no revert affordance. M9 adds the 30-minute revert substrate + UI.
 - Guest messages: not reversible Koast-side; recall is platform-side (Airbnb resolution center, etc.); surface "this can be recalled through Airbnb for the next 5 minutes" copy when applicable
 - Notifications, SMS: not reversible; informational only
 
@@ -582,7 +615,7 @@ Some decisions are deliberately deferred to surface during implementation. Conve
 2. **D8b** — Threshold for surface-vs-track on hero ranges (4 comparables provisional)
 3. **D11** — Idle threshold for onboarding completion fallback (24-hour provisional)
 4. **D16** — Notification indicator state model (when does dot appear/clear)
-5. **D17d** — Per-category reversibility window specifics
+5. ~~**D17d** — Per-category reversibility window specifics~~ (resolved v1.1: rate pushes informational-only at M8; no revert window applies)
 6. **D19** — Specific empty state copy strings (principle locked; exact wording not)
 7. **D3** — Index gaps on source tables (revealed by Phase 1 STOP audit)
 8. **D7** — Chat prompt templates for edit affordances (correct/supersede/mark-wrong)
@@ -658,15 +691,15 @@ After each Phase, brief verification before next Phase begins. Smoke gate is *ex
 - Chat panel persists across all dashboard routes
 - Conversation state survives navigation
 - SSE idle timeout triggers; polling reconnects when needed
-- Frontdesk tab gone from sidebar; deep-linked Frontdesk URLs 404 cleanly
-- Sparkline gone (or real-data version in if that's the path)
+- Frontdesk tab gone from sidebar; `src/app/(dashboard)/frontdesk/page.tsx` and `src/app/api/frontdesk/waitlist/route.ts` deleted; deep-linked `/frontdesk` and `/api/frontdesk/waitlist` URLs 404 cleanly; `leads` rows with `source = 'frontdesk_waitlist'` preserved (verify count unchanged pre/post)
+- Sparkline gone
 
 **Gate after Phase C (trust inspection foundation):**
 - `/koast/inspect/activity` renders feed for real test host
 - Filtering chips work; inline expand reveals source detail
 - `/koast/inspect/memory` renders entity-grouped facts for real test host
 - Edit affordances open chat with prepopulated prompt; agent loop runs the update; memory_facts row updated correctly with supersession_reason
-- All three reversibility affordances function (memory undo, rate push revert, supersede un-supersede)
+- Memory write reversibility affordances function (supersede + un-supersede). Rate-push entries render as informational only at M8 (no revert button) per D17d v1.1 — verify via inline-expand showing pushed values + channel + timestamp.
 
 **Gate after Phase D (refusal substrate):**
 - `propose_guest_message` with legal/regulatory/licensed-professional content returns RefusalEnvelope with kind='hard_refusal'
@@ -803,7 +836,7 @@ Required test coverage (target ~100-150 net new tests):
 - `MemoryBrowser` entity grouping + edit affordance interactions
 - `ConfidenceBandedRange` rendering with various data + threshold-fallback
 - `ConversationalOnboarding` flow: opening + starter rendering + sufficiency-completion + idle fallback + structured fallback for hard requirements
-- Audit VIEW query correctness across all five sources
+- Audit VIEW query correctness across all four M8 sources (notifications excluded per D3 v1.1)
 - `RefusalEnvelope` rendering for hard / soft / host_input_needed
 - Content-aware refusal at propose_guest_message for legal / regulatory / licensed-professional
 
@@ -845,6 +878,12 @@ Test count is a quality signal, not a quality gate. Aim for coverage that catche
 - **P1** — confidence metadata in agent outputs
 - **P2** — source attribution in agent text outputs
 - **P3** — data-sufficiency thresholds per agent tool
+
+**Added v1.1 (post-Phase-1-STOP):**
+
+- **`review_rules` table drop + reviews-generate refactor** — `src/app/api/reviews/generate/[bookingId]/route.ts` reads tone/target-keywords/autoPublish from the table. M9 ships its own conventions document for the migration (likely: review-tone preferences move to `memory_facts`, defaults sourced from voice doctrine + `DEFAULT_ONBOARDING_TEMPLATES`).
+- **`notifications` host scoping migration + inclusion in `unified_audit_feed`** — Add `host_id` column, backfill via recipient match against host phone/email columns, forward-fill via `storeNotification()`, then add `notifications` as the 5th source in the VIEW. M8 ships a 4-source feed; M9 closes the gap.
+- **Rate-push reversibility substrate** — `revert_rate_push` action, concurrency-lock pattern targeting the original push, audit-row-driven undo path for `pricing/apply` writes, 30-minute revert window. M8 surfaces rate pushes as informational; M9 adds the reversal affordance.
 
 ## 6.2 Deferred past convergence (M10+ or open-ended)
 
@@ -1027,4 +1066,4 @@ Final M8 session executes:
 
 ---
 
-*End conventions, v1.0.*
+*End conventions, v1.1.*
