@@ -29,9 +29,16 @@
 
 import { MessageCircle } from "lucide-react";
 import { useChatStore } from "./ChatStore";
+import { useAuditPoll } from "./useAuditPoll";
 
 export function ChatBar() {
   const { state, dispatch } = useChatStore();
+
+  // M8 C8 Step F — between-turns polling. Hook subscribes to the same
+  // store; pauses when state.expanded or tab is backgrounded; dispatches
+  // AUDIT_TICK on response with new events. Mounting the hook here keeps
+  // polling tied to the bar's lifecycle (cleanup on unmount).
+  useAuditPoll();
 
   // When expanded, ChatClient takes the surface; bar hides itself.
   if (state.expanded) {
