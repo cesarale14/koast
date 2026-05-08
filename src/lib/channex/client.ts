@@ -68,6 +68,49 @@ import type {
   SubmitGuestReviewResult,
 } from "./guest-review-types";
 
+/**
+ * Extract a Channex property UUID from a Channex API call's endpoint +
+ * parsed body. Pure function — no I/O, fully unit-testable.
+ *
+ * Coverage (M8 Phase C HARD GATE fix, path β + γ.1):
+ *   - rate/availability batches:     parsed.values[0].property_id
+ *   - createBooking/modify/cancel:   parsed.booking.property_id
+ *   - createChannel:                 parsed.channel.properties[0]
+ *   - createWebhook:                 parsed.webhook.property_id
+ *   - one_time_token + generic:      parsed.property_id
+ *   - URL-only DELETE/PUT:           /properties/{uuid} regex on endpoint
+ *
+ * Channels and rate_plans URL-only endpoints (e.g. /channels/{id} DELETE,
+ * /rate_plans/{id} DELETE, /channels/{id}/activate) intentionally return
+ * null — they're admin/setup ops, not host-state mutations the audit feed
+ * needs to surface. Resolving them would require joining
+ * channex_room_types / channex_rate_plans tables; deferred per sign-off.
+ */
+export function resolveChannexPropertyId(
+  endpoint: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  parsed: any,
+): string | null {
+  if (Array.isArray(parsed?.values) && parsed.values.length > 0) {
+    const first = parsed.values[0] ?? {};
+    if (first.property_id) return first.property_id;
+  }
+  const fromBody =
+    parsed?.booking?.property_id ??
+    parsed?.channel?.properties?.[0] ??
+    parsed?.webhook?.property_id ??
+    parsed?.property_id ??
+    null;
+  if (fromBody) return fromBody;
+
+  const propsUrlMatch = endpoint.match(
+    /^\/properties\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+  );
+  if (propsUrlMatch) return propsUrlMatch[1];
+
+  return null;
+}
+
 export class ChannexValidationError extends Error {
   details: unknown;
   constructor(message: string, details: unknown) {
@@ -203,14 +246,30 @@ class ChannexClient {
         dateFrom = first.date_from ?? null;
         dateTo = last.date_to ?? null;
         ratePlanId = first.rate_plan_id ?? null;
-        channexPropertyId = first.property_id ?? null;
       } else if (parsed) {
         sample = parsed;
       }
 
+      channexPropertyId = resolveChannexPropertyId(endpoint, parsed);
+
+      // Resolve internal koast property_id from channex_property_id
+      // (M8 Phase C gate fix, path β). The unified_audit_feed VIEW
+      // INNER JOINs on properties.id = channex_outbound_log.property_id;
+      // NULL property_id rows drop from the feed. Single lookup keeps
+      // logging decoupled from caller surface.
+      let resolvedPropertyId: string | null = null;
+      if (channexPropertyId) {
+        const { data: propRow } = await sb
+          .from("properties")
+          .select("id")
+          .eq("channex_property_id", channexPropertyId)
+          .maybeSingle();
+        resolvedPropertyId = (propRow?.id as string | undefined) ?? null;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (sb.from("channex_outbound_log") as any).insert({
-        property_id: null, // resolvable later via channex_property_id join
+        property_id: resolvedPropertyId,
         channex_property_id: channexPropertyId,
         rate_plan_id: ratePlanId,
         endpoint,
