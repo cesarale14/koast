@@ -702,22 +702,80 @@ export function ChatClient({
   const hasAnyTurns =
     history.length > 0 || sessionHarvest.length > 0 || pendingUserText !== null;
 
-  // M8 C8 Step D — visibility wrapper. When ChatStoreProvider is mounted
-  // (Step D layout invert) and the chat panel is collapsed, hide ChatClient
-  // via display:none. This preserves React state (Composer input,
-  // sessionHarvest, etc.) across collapse/expand. When no store is in tree
-  // (legacy /chat route mount, pre-Step-D), render normally.
+  // M8 C8 Step F.2 — visibility wrapper (fixes Step D's display:contents
+  // bug that leaked ChatShell's grid into the dashboard's outer row-flex,
+  // producing always-visible side-panel rendering). Now:
+  // - Collapsed (state.expanded === false): display:none — preserves React
+  //   state (Composer input, sessionHarvest, useAgentTurn) without rendering
+  // - Expanded (state.expanded === true): position:fixed inset:0 z-50
+  //   overlay — covers the viewport above the bar (z-40), below toasts (z-100)
+  //   and modals (z-1000+) per conventions v1.4 §6.4. Opaque background
+  //   prevents dashboard chrome from bleeding through.
+  // - No store mounted (legacy /chat route mount, pre-Step-D): renders
+  //   normally without the overlay (residual case; shouldn't trigger
+  //   post-Step-D since Provider is universal).
   const isHiddenByStore =
     chatStore !== null && chatStore.state.expanded === false;
+  const isExpandedOverlay =
+    chatStore !== null && chatStore.state.expanded === true;
+
+  const overlayDismissHandler = chatStoreDispatch
+    ? () => chatStoreDispatch({ type: "COLLAPSE" })
+    : undefined;
 
   return (
     <div
       style={
         isHiddenByStore
           ? { display: "none" }
-          : { display: "contents" }
+          : isExpandedOverlay
+            ? {
+                position: "fixed",
+                inset: 0,
+                zIndex: 50,
+                background: "var(--shore)",
+              }
+            : undefined
       }
     >
+      {isExpandedOverlay && overlayDismissHandler && (
+        <button
+          type="button"
+          onClick={overlayDismissHandler}
+          aria-label="Collapse Koast"
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            zIndex: 51,
+            width: "36px",
+            height: "36px",
+            borderRadius: "8px",
+            backgroundColor: "var(--deep-sea)",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+          }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      )}
     <ChatShell>
       <div
         className={`${styles["rail-wrap"]}${drawerOpen ? ` ${styles["is-open"]}` : ""}`}
