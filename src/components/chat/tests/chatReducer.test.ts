@@ -112,6 +112,18 @@ describe("chatReducer — turn state bridge", () => {
     });
     expect(next.turnState).toBe("idle");
   });
+
+  test("TURN_STATE_CHANGED dedup — same value returns same state object", () => {
+    // The bridge fires on every content[] change during streaming
+    // (every chunk); reducer-side dedup avoids cascading re-renders
+    // when the mapped enum value is unchanged.
+    const start: ChatState = { ...initialChatState, turnState: "streaming" };
+    const next = chatReducer(start, {
+      type: "TURN_STATE_CHANGED",
+      turnState: "streaming",
+    });
+    expect(next).toBe(start); // referential equality (skipped re-render)
+  });
 });
 
 describe("chatReducer — proposals", () => {

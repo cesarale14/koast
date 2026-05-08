@@ -98,6 +98,14 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case "HYDRATE_CONVERSATION":
       return { ...state, conversationHistory: action.turns };
     case "TURN_STATE_CHANGED":
+      // Dedup: if the bridged value matches the current store value,
+      // return the same state object so React skips re-renders. The
+      // useAgentTurn → store bridge fires on every content[] change
+      // during streaming (every chunk), but the mapped enum value
+      // changes much less often. Without dedup, every chunk would
+      // dispatch and trigger downstream re-renders. Lock per
+      // Cesar's Step B/C sign-off note.
+      if (state.turnState === action.turnState) return state;
       return { ...state, turnState: action.turnState };
     case "PROPOSAL_RECEIVED":
       // Idempotent on id — re-receiving the same proposal does not duplicate.

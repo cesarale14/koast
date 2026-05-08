@@ -110,3 +110,17 @@ export function useChatStore(): ChatStoreValue {
   }
   return ctx;
 }
+
+/**
+ * Optional variant for components that need to coexist with both
+ * pre-Provider mount (e.g., ChatClient at /chat route before Step D's
+ * layout invert lands) and post-Provider mount. Returns null when no
+ * Provider is in tree; consumer code branches gracefully.
+ *
+ * Removed once Step D lands — at that point Provider is always at
+ * layout scope and useChatStore (the throw-on-missing variant) is
+ * the only correct hook. Tracked as a transitional API.
+ */
+export function useChatStoreOptional(): ChatStoreValue | null {
+  return useContext(ChatStoreContext);
+}

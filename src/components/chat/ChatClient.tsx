@@ -46,6 +46,7 @@ import {
 } from "./GuestMessageProposal";
 import { useAgentTurn } from "@/lib/agent-client/useAgentTurn";
 import type { PropertyOption } from "./PropertyContext";
+import { useChatStoreOptional, type TurnState as ChatTurnState } from "./ChatStore";
 
 type UITurnLite = {
   id: string;
@@ -228,6 +229,38 @@ export function ChatClient({
 }: ChatClientProps) {
   const router = useRouter();
   const { state, isStreaming, submit, cancel, reset } = useAgentTurn();
+
+  // M8 C8 Step C — reflect useAgentTurn's TurnState into the chat store
+  // per (i) MAP DOWN locked mapping. The store's 3-state enum
+  // (idle | streaming | tool_call_pending) is fed from useAgentTurn's
+  // 5-state status: terminal states (done/error/refusal) and idle all
+  // collapse to "idle" from the store's perspective; "tool_call_pending"
+  // is derived by inspecting content[] for an in-flight tool block while
+  // status === "streaming".
+  //
+  // Optional store handles the pre-Step-D transitional state where
+  // ChatClient may be in a tree without ChatStoreProvider (e.g., the
+  // /chat route still mounts ChatClient directly until Step D inverts
+  // the dashboard layout). Null context → no-op.
+  //
+  // Reducer-side dedup on TURN_STATE_CHANGED prevents wasted dispatches
+  // when content[] changes (every chunk) but the mapped enum is unchanged.
+  const chatStore = useChatStoreOptional();
+  const chatStoreDispatch = chatStore?.dispatch;
+  useEffect(() => {
+    if (!chatStoreDispatch) return;
+    let mapped: ChatTurnState;
+    if (state.status === "streaming") {
+      const hasInFlightTool = state.content.some(
+        (b) => b.kind === "tool" && b.status === "in-flight",
+      );
+      mapped = hasInFlightTool ? "tool_call_pending" : "streaming";
+    } else {
+      mapped = "idle";
+    }
+    chatStoreDispatch({ type: "TURN_STATE_CHANGED", turnState: mapped });
+  }, [state.status, state.content, chatStoreDispatch]);
+
   const [draft, setDraft] = useState("");
   /** Turns harvested from the live stream during this session (in addition to server-loaded history). */
   const [sessionHarvest, setSessionHarvest] = useState<UITurnLite[]>([]);
