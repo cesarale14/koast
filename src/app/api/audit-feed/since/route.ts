@@ -1,20 +1,22 @@
 /**
  * GET /api/audit-feed/since — between-turns polling endpoint (M8 C8 Step F).
  *
- * Queries the unified_audit_feed VIEW (Phase A migration 20260507040000)
- * for events newer than the client-provided timestamp, scoped to the
- * authenticated host. Used by ChatBar's useAuditPoll hook to surface
- * a "Koast did something silently" indicator while the chat panel is in
- * resting state.
+ * Catch-up channel: returns events newer than the client-provided
+ * timestamp, scoped to the authenticated host. Used by ChatBar's
+ * useAuditPoll hook to surface a "Koast did something silently"
+ * indicator while the chat panel is in resting state.
  *
  * Per conventions v1.4 D2: per-turn streaming preserved as-is; this is
- * the between-turns lightweight polling channel. Persistent SSE deferred
- * to M9 or later.
+ * the between-turns lightweight polling channel. Persistent SSE deferred.
  *
- * Auth: createClient + supabase.auth.getUser() per existing API pattern.
- * host_id is derived from the authenticated session — never from query
- * params (security; would otherwise let a logged-in host poll anyone's
- * audit feed by URL manipulation).
+ * Phase C F9 refactor: query construction delegated to
+ * `listAuditFeedEvents` (src/lib/audit-feed.ts). Endpoint contract
+ * preserved (`{events, newest_ts, has_more}`); response shape adapted
+ * from F9's cursor-based result. Single source of truth for VIEW reads
+ * across `/since` (this endpoint), C5 Activity tab, F1 Memory tab.
+ *
+ * Auth: createClient + supabase.auth.getUser(). host_id derived from
+ * the authenticated session — never from query params.
  *
  * Contract:
  *   GET /api/audit-feed/since?ts=<ISO8601>&limit=<n>
@@ -35,6 +37,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { listAuditFeedEvents } from "@/lib/audit-feed";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -59,7 +62,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // Validate ts: parseable ISO8601 string
   const tsDate = new Date(tsParam);
   if (Number.isNaN(tsDate.getTime())) {
     return NextResponse.json(
@@ -68,7 +70,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // Parse and clamp limit
   let limit = DEFAULT_LIMIT;
   if (limitParam) {
     const n = parseInt(limitParam, 10);
@@ -77,31 +78,44 @@ export async function GET(request: Request) {
     }
   }
 
-  // Query unified_audit_feed VIEW with host_id from session.
-  // Fetch limit+1 to detect has_more without an extra COUNT query.
-  const { data, error } = await supabase
-    .from("unified_audit_feed")
-    .select("occurred_at, category, summary, source_table, source_id")
-    .eq("host_id", user.id)
-    .gt("occurred_at", tsDate.toISOString())
-    .order("occurred_at", { ascending: false })
-    .limit(limit + 1);
+  try {
+    const { events, next_cursor } = await listAuditFeedEvents(
+      supabase,
+      user.id,
+      {
+        since: tsDate.toISOString(),
+        limit,
+      },
+    );
 
-  if (error) {
+    // Adapt F9's cursor-based response to the legacy /since contract
+    // (ChatBar polling consumer doesn't need cursor — it polls forward
+    // from last-seen timestamp). has_more derives from next_cursor;
+    // newest_ts is the most recent event in this batch (events are
+    // ordered newest-first by F9).
+    const hasMore = next_cursor !== null;
+    const newestTs = events.length > 0 ? events[0].occurred_at : null;
+
+    // Project to the leaner /since envelope (keeps backwards-compat
+    // for the existing ChatBar consumer).
+    const projected = events.map((e) => ({
+      occurred_at: e.occurred_at,
+      category: e.category,
+      summary: e.summary,
+      source_table: e.source_table,
+      source_id: e.source_id,
+    }));
+
+    return NextResponse.json({
+      events: projected,
+      newest_ts: newestTs,
+      has_more: hasMore,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "query failed";
     return NextResponse.json(
-      { error: "Audit feed query failed", detail: error.message },
+      { error: "Audit feed query failed", detail: message },
       { status: 500 },
     );
   }
-
-  const rows = data ?? [];
-  const hasMore = rows.length > limit;
-  const events = hasMore ? rows.slice(0, limit) : rows;
-  const newestTs = events.length > 0 ? events[0].occurred_at : null;
-
-  return NextResponse.json({
-    events,
-    newest_ts: newestTs,
-    has_more: hasMore,
-  });
 }
