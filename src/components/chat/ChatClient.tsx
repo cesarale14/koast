@@ -225,8 +225,8 @@ const PROPERTY_PREF_KEY = "koast.chat.activePropertyId";
 
 export function ChatClient({
   conversations = [],
-  activeConversationId = null,
-  history = [],
+  activeConversationId: propsActiveConversationId = null,
+  history: propsHistory = [],
   user = { initials: "K", name: "Host", org: "koast" },
   properties = [],
   initialPropertyId = null,
@@ -251,6 +251,20 @@ export function ChatClient({
   // when content[] changes (every chunk) but the mapped enum is unchanged.
   const chatStore = useChatStoreOptional();
   const chatStoreDispatch = chatStore?.dispatch;
+
+  // M8 C8 Step E — effective conversation state. Prefer store-driven
+  // values (hydrated by /chat/[conversation_id] server-fetch +
+  // ConversationHydrator dispatches) when the store is mounted; fall
+  // back to props for the transitional state where ChatClient is in a
+  // tree without ChatStoreProvider. After Step D layout invert, store
+  // is always mounted at dashboard scope; props are residual.
+  const activeConversationId =
+    chatStore?.state.activeConversationId ?? propsActiveConversationId;
+  const history: UITurnLite[] =
+    chatStore && chatStore.state.conversationHistory.length > 0
+      ? (chatStore.state.conversationHistory as UITurnLite[])
+      : propsHistory;
+
   useEffect(() => {
     if (!chatStoreDispatch) return;
     let mapped: ChatTurnState;
