@@ -291,6 +291,93 @@ export function ChatClient({
     initialPropertyId,
   );
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
+
+  // M8 C8 Step F.3 — Bug 3 client-side fetches for property dropdown +
+  // conversations rail. Pre-Step-D, /chat routes server-fetched these
+  // and passed as props; post-Step-E thin shells stopped passing them,
+  // and layout-mounted ChatClient defaults to []. PropertyContext disables
+  // the dropdown when options.length === 0; rail renders empty. This
+  // restores both via lazy fetch on first mount when the store is in tree.
+  const [fetchedProperties, setFetchedProperties] = useState<
+    PropertyOption[] | null
+  >(null);
+  const [fetchedConversations, setFetchedConversations] = useState<
+    ConvListItem[] | null
+  >(null);
+  useEffect(() => {
+    if (!chatStore) return;
+    if (properties.length > 0 || fetchedProperties !== null) return;
+    void fetch("/api/properties/list")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.properties && Array.isArray(data.properties)) {
+          setFetchedProperties(
+            data.properties.map((p: { id: string; name: string }) => ({
+              id: p.id,
+              name: p.name,
+              meta: "",
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        /* silent fail — endpoint down or auth lost; degrade gracefully */
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatStore]);
+  useEffect(() => {
+    if (!chatStore) return;
+    if (conversations.length > 0 || fetchedConversations !== null) return;
+    void fetch("/api/agent/conversations")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.conversations && Array.isArray(data.conversations)) {
+          setFetchedConversations(
+            data.conversations.map(
+              (c: {
+                id: string;
+                last_turn_at: string;
+                preview: string;
+                propertyName?: string;
+              }) => ({
+                id: c.id,
+                last_turn_at: c.last_turn_at,
+                preview: c.preview,
+                propertyName: c.propertyName ?? "",
+              }),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        /* silent fail — endpoint down or auth lost; degrade gracefully */
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatStore]);
+  const effectiveProperties =
+    fetchedProperties !== null && fetchedProperties.length > properties.length
+      ? fetchedProperties
+      : properties;
+  const effectiveConversations =
+    fetchedConversations !== null &&
+    fetchedConversations.length > conversations.length
+      ? fetchedConversations
+      : conversations;
+
+  // M8 C8 Step F.3 — Bug 2 fix: reset sessionHarvest when activeConversationId
+  // changes (fresh-conversation creation transitions null → real-id, or host
+  // switches conversations). Without this, a fresh conversation's harvested
+  // user turn (with synthetic "live-user-${stamp}" id) survives the post-
+  // navigation HYDRATE_CONVERSATION dispatch — M7's id-keyed dedup at lines
+  // 853-864 fails to match the synthetic id against the server's DB-assigned
+  // id, so the user turn renders twice. Resetting on activeConversationId
+  // change clears the stale harvest just as the new server-fetched history
+  // lands. Doesn't fire on M7's router.refresh() path (host stays on same
+  // conversation; activeConversationId unchanged) so existing same-id dedup
+  // behavior is preserved.
+  useEffect(() => {
+    setSessionHarvest([]);
+  }, [activeConversationId]);
   // Mobile drawer state (visible only at <768px via media query). Closed
   // by default; toggled via Topbar hamburger; auto-closes on conversation
   // select / scrim tap / swipe-left-on-drawer.
@@ -481,8 +568,8 @@ export function ChatClient({
 
   // Group rail data; recompute when the list changes.
   const groups = useMemo(
-    () => groupConversations(conversations, new Date()),
-    [conversations],
+    () => groupConversations(effectiveConversations, new Date()),
+    [effectiveConversations],
   );
 
   // Harvest completed turns + auto-navigate when a fresh conversation is born.
@@ -694,7 +781,7 @@ export function ChatClient({
   }, [state.content, state.status, sessionHarvest.length, pendingUserText]);
 
   // Active property → topbar pill copy.
-  const activeProperty = properties.find((p) => p.id === activePropertyId);
+  const activeProperty = effectiveProperties.find((p) => p.id === activePropertyId);
   const propertyForTopbar = activeProperty
     ? { name: activeProperty.name, meta: activeProperty.meta || undefined }
     : undefined;
@@ -804,7 +891,7 @@ export function ChatClient({
         topbar={
           <Topbar
             property={propertyForTopbar}
-            propertyOptions={properties}
+            propertyOptions={effectiveProperties}
             selectedPropertyId={activePropertyId}
             propertyMenuOpen={propertyMenuOpen}
             onTogglePropertyMenu={() => setPropertyMenuOpen((v) => !v)}
