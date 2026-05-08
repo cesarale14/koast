@@ -90,16 +90,20 @@ type ConvListItem = {
 };
 
 export type ChatClientProps = {
-  /** Server-provided initial list (rail). */
-  conversations: ConvListItem[];
+  /** Server-provided initial list (rail). M8 C8 Step D: optional with default
+   * `[]` so layout-level mount works without server prefetching. Step E
+   * thin shells dispatch HYDRATE_CONVERSATION; rail data fetches lazily. */
+  conversations?: ConvListItem[];
   /** Currently-active conversation id; null on the landing /chat page. */
-  activeConversationId: string | null;
+  activeConversationId?: string | null;
   /** Server-provided history for the active conversation. Empty on landing. */
-  history: UITurnLite[];
-  /** Host display info for the rail foot + user-message avatars. */
-  user: { initials: string; name: string; org: string };
+  history?: UITurnLite[];
+  /** Host display info for the rail foot + user-message avatars. M8 C8
+   * Step D: optional. Layout-level mount uses a placeholder until session
+   * info is wired through (post-Step-E follow-up). */
+  user?: { initials: string; name: string; org: string };
   /** Server-provided list of host properties for the topbar dropdown (D18). */
-  properties: PropertyOption[];
+  properties?: PropertyOption[];
   /** Initial property selection id — typically null on landing; restored by sessionStorage hint. */
   initialPropertyId?: string | null;
 };
@@ -220,11 +224,11 @@ function payloadToFactSpans(payload: Record<string, unknown> | { sub_entity_type
 const PROPERTY_PREF_KEY = "koast.chat.activePropertyId";
 
 export function ChatClient({
-  conversations,
-  activeConversationId,
-  history,
-  user,
-  properties,
+  conversations = [],
+  activeConversationId = null,
+  history = [],
+  user = { initials: "K", name: "Host", org: "koast" },
+  properties = [],
   initialPropertyId = null,
 }: ChatClientProps) {
   const router = useRouter();
@@ -684,7 +688,22 @@ export function ChatClient({
   const hasAnyTurns =
     history.length > 0 || sessionHarvest.length > 0 || pendingUserText !== null;
 
+  // M8 C8 Step D — visibility wrapper. When ChatStoreProvider is mounted
+  // (Step D layout invert) and the chat panel is collapsed, hide ChatClient
+  // via display:none. This preserves React state (Composer input,
+  // sessionHarvest, etc.) across collapse/expand. When no store is in tree
+  // (legacy /chat route mount, pre-Step-D), render normally.
+  const isHiddenByStore =
+    chatStore !== null && chatStore.state.expanded === false;
+
   return (
+    <div
+      style={
+        isHiddenByStore
+          ? { display: "none" }
+          : { display: "contents" }
+      }
+    >
     <ChatShell>
       <div
         className={`${styles["rail-wrap"]}${drawerOpen ? ` ${styles["is-open"]}` : ""}`}
@@ -721,6 +740,11 @@ export function ChatClient({
             onSelectProperty={(id) => persistActiveProperty(id)}
             onNewThread={onNewConversation}
             onToggleDrawer={() => setDrawerOpen((v) => !v)}
+            onDismiss={
+              chatStoreDispatch
+                ? () => chatStoreDispatch({ type: "COLLAPSE" })
+                : undefined
+            }
           />
         }
         composer={
@@ -945,6 +969,7 @@ export function ChatClient({
         )}
       </Surface>
     </ChatShell>
+    </div>
   );
 }
 

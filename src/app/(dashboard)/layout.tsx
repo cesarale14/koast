@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import TopBarSearch from "@/components/polish/TopBarSearch";
 import CommandPalette from "@/components/polish/CommandPalette";
+import { ChatStoreProvider } from "@/components/chat/ChatStore";
+import { ChatBar } from "@/components/chat/ChatBar";
+import { ChatClient } from "@/components/chat/ChatClient";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
@@ -349,70 +352,82 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const closeMobile = useCallback(() => setMobileOpen(false), []);
   const sidebarWidth = sidebarExpanded ? 240 : 60;
 
-  // M5 D15 / D-Q5 — chat surface owns its own full-bleed layout (Rail +
-  // Surface). Skip the dashboard sidebar/topbar/CommandPalette chrome so
-  // the chat shell renders edge to edge. Auth scope preserved (still
-  // inside the (dashboard) route group). Placed AFTER all hook
-  // declarations to satisfy react-hooks/rules-of-hooks (Vercel build
-  // catches what local tsc doesn't).
-  if (pathname?.startsWith("/chat") || pathname?.startsWith("/_preview/m5-states")) {
+  // M8 C8 Step D — early-return preserved only for /_preview/m5-states.
+  // /chat routes now render alongside the persistent chat layout slot
+  // (ChatBar + ChatClient mounted below) instead of replacing the
+  // dashboard chrome. Per conventions v1.4 D1: chat is a layout slot,
+  // not a route.
+  if (pathname?.startsWith("/_preview/m5-states")) {
     return <>{children}</>;
   }
 
   return (
-    <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
-      <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} groups={dynamicNavGroups} />
+    <ChatStoreProvider
+      initialConversationId={null}
+      initialHistory={[]}
+      initialProposals={[]}
+    >
+      <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
+        <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} groups={dynamicNavGroups} />
 
-      {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} groups={dynamicNavGroups} />}
+        {mobileOpen && <MobileSidebar pathname={pathname} onClose={closeMobile} groups={dynamicNavGroups} />}
 
-      {/* Main content — smooth margin transition */}
-      <div
-        className="flex-1 flex flex-col min-h-screen w-full overflow-x-hidden transition-[margin-left] duration-200 ease-out"
-        style={{ marginLeft: undefined }}
-      >
-        <style>{`@media(min-width:768px){.main-offset{margin-left:${sidebarWidth}px}}`}</style>
-        <div className="main-offset flex-1 flex flex-col min-h-screen">
-          {/* Topbar */}
-          <header
-            className="h-14 flex-shrink-0 flex items-center justify-between gap-4 px-4 md:px-6 border-b bg-white"
-            style={{ borderColor: "var(--dry-sand)" }}
-          >
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <button
-                className="md:hidden transition-colors"
-                style={{ color: "var(--coastal)" }}
-                onClick={() => setMobileOpen(true)}
-              >
-                <Menu size={20} strokeWidth={1.5} />
-              </button>
-              <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
-                {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
-              </span>
-            </div>
-            <TopBarSearch />
-            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-              <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
-                <Bell size={20} strokeWidth={1.5} />
-              </button>
-            </div>
-          </header>
+        {/* Main content — smooth margin transition */}
+        <div
+          className="flex-1 flex flex-col min-h-screen w-full overflow-x-hidden transition-[margin-left] duration-200 ease-out"
+          style={{ marginLeft: undefined }}
+        >
+          <style>{`@media(min-width:768px){.main-offset{margin-left:${sidebarWidth}px}}`}</style>
+          <div className="main-offset flex-1 flex flex-col min-h-screen">
+            {/* Topbar */}
+            <header
+              className="h-14 flex-shrink-0 flex items-center justify-between gap-4 px-4 md:px-6 border-b bg-white"
+              style={{ borderColor: "var(--dry-sand)" }}
+            >
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button
+                  className="md:hidden transition-colors"
+                  style={{ color: "var(--coastal)" }}
+                  onClick={() => setMobileOpen(true)}
+                >
+                  <Menu size={20} strokeWidth={1.5} />
+                </button>
+                <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
+                  {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
+                </span>
+              </div>
+              <TopBarSearch />
+              <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
+                  <Bell size={20} strokeWidth={1.5} />
+                </button>
+              </div>
+            </header>
 
-          <main className="flex-1 overflow-auto">
-            <ToastProvider>
-              {pathname === "/calendar" || pathname === "/messages" ? (
-                <div className="h-full page-enter">{children}</div>
-              ) : /^\/properties\/[^/]+$/.test(pathname) ? (
-                // Property detail page handles its own layout (full-bleed
-                // hero + max-w content). Skip the wrapper padding.
-                <div className="page-enter">{children}</div>
-              ) : (
-                <div className="p-4 md:p-8 page-enter">{children}</div>
-              )}
-            </ToastProvider>
-          </main>
+            <main className="flex-1 overflow-auto" style={{ paddingBottom: "56px" }}>
+              <ToastProvider>
+                {pathname === "/calendar" || pathname === "/messages" ? (
+                  <div className="h-full page-enter">{children}</div>
+                ) : /^\/properties\/[^/]+$/.test(pathname) ? (
+                  // Property detail page handles its own layout (full-bleed
+                  // hero + max-w content). Skip the wrapper padding.
+                  <div className="page-enter">{children}</div>
+                ) : (
+                  <div className="p-4 md:p-8 page-enter">{children}</div>
+                )}
+              </ToastProvider>
+            </main>
+          </div>
         </div>
+        <CommandPalette />
+
+        {/* M8 C8 Step D — persistent chat layout slot (D1).
+            ChatBar: bottom-anchored resting state (z-40, hides when expanded).
+            ChatClient: expanded surface, store-driven visibility (display:none when collapsed).
+            Both mount unconditionally at layout scope so chat state survives navigation. */}
+        <ChatBar />
+        <ChatClient />
       </div>
-      <CommandPalette />
-    </div>
+    </ChatStoreProvider>
   );
 }

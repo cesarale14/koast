@@ -22,6 +22,8 @@ export type TopbarProps = {
   onNewThread?: () => void;
   /** Mobile drawer toggle — hamburger button is visible only at <768px via @media. */
   onToggleDrawer?: () => void;
+  /** M8 C8 Step D: collapse the chat panel back to the resting-state bar. */
+  onDismiss?: () => void;
 };
 
 export function Topbar({
@@ -35,6 +37,7 @@ export function Topbar({
   onOpenAuditLog,
   onNewThread,
   onToggleDrawer,
+  onDismiss,
 }: TopbarProps) {
   return (
     <header className={styles.topbar}>
@@ -83,6 +86,19 @@ export function Topbar({
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />
           </svg>
         </button>
+        {onDismiss && (
+          <button
+            type="button"
+            className={styles["icon-btn"]}
+            title="Collapse Koast"
+            aria-label="Collapse Koast"
+            onClick={onDismiss}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
       </div>
     </header>
   );
