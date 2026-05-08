@@ -176,7 +176,10 @@ describe("chatReducer — proposals", () => {
 });
 
 describe("chatReducer — audit feed", () => {
-  test("AUDIT_TICK sets count and latest ts", () => {
+  test("AUDIT_TICK sets count and latest ts (first tick from initial state)", () => {
+    // From initial state (unreadAuditCount=0), first AUDIT_TICK with
+    // newCount=3 produces unreadAuditCount=3 (0 + 3 — additive but
+    // identical result on the first tick).
     const next = chatReducer(initialChatState, {
       type: "AUDIT_TICK",
       newCount: 3,
@@ -184,6 +187,38 @@ describe("chatReducer — audit feed", () => {
     });
     expect(next.unreadAuditCount).toBe(3);
     expect(next.lastSeenAuditTs).toBe("2026-05-08T00:00:00Z");
+  });
+
+  test("AUDIT_TICK accumulates unreadAuditCount across multiple ticks (Step F.1)", () => {
+    // Bug 1 fix: AUDIT_TICK is additive, not overwrite. Hook dispatches
+    // per-poll deltas; reducer accumulates.
+    let s = chatReducer(initialChatState, {
+      type: "AUDIT_TICK",
+      newCount: 2,
+      latestTs: "t1",
+    });
+    expect(s.unreadAuditCount).toBe(2);
+    s = chatReducer(s, {
+      type: "AUDIT_TICK",
+      newCount: 3,
+      latestTs: "t2",
+    });
+    expect(s.unreadAuditCount).toBe(5);
+    expect(s.lastSeenAuditTs).toBe("t2");
+  });
+
+  test("AUDIT_TICK with newCount=0 baselines latestTs without changing count (Step F.1)", () => {
+    // Bug 2 fix: first-poll baseline. Hook dispatches AUDIT_TICK with
+    // newCount=0 to anchor lastSeenAuditTs to the page-load time, so
+    // subsequent polls accumulate from that baseline rather than always
+    // using NOW (which would miss events landing between polls).
+    const next = chatReducer(initialChatState, {
+      type: "AUDIT_TICK",
+      newCount: 0,
+      latestTs: "t0",
+    });
+    expect(next.unreadAuditCount).toBe(0);
+    expect(next.lastSeenAuditTs).toBe("t0");
   });
 
   test("AUDIT_SEEN clears count without resetting lastSeenAuditTs", () => {

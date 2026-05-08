@@ -124,9 +124,15 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ),
       };
     case "AUDIT_TICK":
+      // Additive — newCount is the count of new events from THIS poll,
+      // not the cumulative since-last-seen. The hook (useAuditPoll)
+      // dispatches the per-poll delta; the reducer accumulates across
+      // polls. lastSeenAuditTs always sets to the latest poll's ts so
+      // subsequent server queries (`occurred_at > lastSeenAuditTs`) only
+      // return strictly-newer events. (Step F.1 fix.)
       return {
         ...state,
-        unreadAuditCount: action.newCount,
+        unreadAuditCount: state.unreadAuditCount + action.newCount,
         lastSeenAuditTs: action.latestTs,
       };
     case "AUDIT_SEEN":

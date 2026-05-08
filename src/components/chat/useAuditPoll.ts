@@ -82,7 +82,9 @@ export function useAuditPoll() {
 
     const poll = async () => {
       // Baseline ts: stored last-seen, else NOW (first poll on fresh
-      // page load surfaces nothing; subsequent polls accumulate).
+      // page load uses NOW as the anchor; the empty-response branch
+      // below baselines lastSeenAuditTs to ts so subsequent polls
+      // accumulate from page-load forward).
       const ts =
         lastSeenAuditTsRef.current ?? new Date().toISOString();
       try {
@@ -97,6 +99,17 @@ export function useAuditPoll() {
             type: "AUDIT_TICK",
             newCount: data.events.length,
             latestTs: data.newest_ts,
+          });
+        } else if (lastSeenAuditTsRef.current === null) {
+          // Step F.1 first-poll baseline: anchor lastSeenAuditTs to the
+          // poll's ts even when no events landed. Without this, every
+          // subsequent poll uses NOW (still null in store), and events
+          // landing between polls get missed because the next poll's
+          // ts moves forward past them.
+          dispatch({
+            type: "AUDIT_TICK",
+            newCount: 0,
+            latestTs: ts,
           });
         }
       } catch {
