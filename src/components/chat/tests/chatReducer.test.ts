@@ -74,6 +74,24 @@ describe("chatReducer — conversation state", () => {
     expect(next.conversationHistory).toEqual([]);
   });
 
+  test("SET_ACTIVE_CONVERSATION with null clears active id and history (Step F.4)", () => {
+    // F.4 schema relaxation: conversationId accepts string | null. Used by
+    // onNewConversation to reset the layout-mounted chat panel back to a
+    // fresh-conversation state without remounting (post-Step-E thin shells
+    // don't trigger the remount that pre-Step-E /chat route fetch produced).
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: "old-conv",
+      conversationHistory: [{ id: "t1" }, { id: "t2" }],
+    };
+    const next = chatReducer(start, {
+      type: "SET_ACTIVE_CONVERSATION",
+      conversationId: null,
+    });
+    expect(next.activeConversationId).toBeNull();
+    expect(next.conversationHistory).toEqual([]);
+  });
+
   test("HYDRATE_CONVERSATION replaces history with payload", () => {
     const start: ChatState = {
       ...initialChatState,

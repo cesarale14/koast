@@ -54,7 +54,7 @@ export type ChatState = {
 export type ChatAction =
   | { type: "EXPAND" }
   | { type: "COLLAPSE" }
-  | { type: "SET_ACTIVE_CONVERSATION"; conversationId: string }
+  | { type: "SET_ACTIVE_CONVERSATION"; conversationId: string | null }
   | { type: "HYDRATE_CONVERSATION"; turns: ChatTurn[] }
   | { type: "TURN_STATE_CHANGED"; turnState: TurnState }
   | { type: "PROPOSAL_RECEIVED"; proposal: ChatProposal }

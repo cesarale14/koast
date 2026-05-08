@@ -732,8 +732,18 @@ export function ChatClient({
 
   const onNewConversation = useCallback(() => {
     setDrawerOpen(false);
+    // M8 C8 Step F.4 — Pre-Step-E, router.push('/chat') triggered a server-
+    // component remount that produced a fresh state. Post-Step-E thin shells
+    // don't reset state, so layout-mounted ChatClient retains the active
+    // conversation. Explicit dispatch resets store + local state. Bug 2's
+    // useEffect on activeConversationId handles sessionHarvest reset.
+    if (chatStoreDispatch) {
+      chatStoreDispatch({ type: "SET_ACTIVE_CONVERSATION", conversationId: null });
+      setPendingUserText(null);
+      navigatedRef.current = null;
+    }
     router.push("/chat");
-  }, [router]);
+  }, [router, chatStoreDispatch]);
 
   // Swipe-left-on-drawer to close. Threshold = 60px leftward delta;
   // disabled if user is mid-vertical-scroll (delta-y > delta-x).
