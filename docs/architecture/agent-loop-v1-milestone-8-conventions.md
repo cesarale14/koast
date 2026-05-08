@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 8 Conventions
 
-**Status:** Locked, v1.4
+**Status:** Locked, v1.5
 **Drafted:** 2026-05-05
-**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision; Phase B sanity-check v1.3 D1 geometry lock; Phase B C8 audit v1.4 catch-up)
+**Revised:** 2026-05-07 (post-Phase-1-STOP audit findings; post-Phase-A v1.2 doc-only revision; Phase B sanity-check v1.3 D1 geometry lock; Phase B C8 audit v1.4 catch-up; Phase B substrate close v1.5 lessons)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-8-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-05-m8-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -17,11 +17,22 @@
 
 ## Changelog
 
+**v1.5 — 2026-05-08** (Phase B substrate close)
+
+Phase B substrate functionally clean as of commit `c8fc201`. Steps A-F shipped clean; Steps F.1-F.4 surfaced four bug-fix cycles via smoke gate / browser testing. v1.5 captures three architectural lessons:
+
+- **D1 state-store framing corrected:** v1.0/v1.4 mischaracterized Toast.tsx as the canonical "Context with reducer pattern." Toast.tsx actually uses Context + useState + setter callbacks. ChatStore introduces a third pattern — Context + useReducer hybrid — composing Toast's Context discipline with useAgentTurn's reducer discipline. Documented as net-new substrate, not a deviation.
+- **D1 layout-mount-vs-route-remount pattern (new sub-decision):** persistent layout-mounted components do not auto-reset state on navigation the way route-mounted components do. M8's D1 commitment preserves React state across navigation by design; anywhere route-remount was load-bearing for cleanup, explicit dispatches must replace it. Pattern surfaced in F.2 (sessionHarvest reset on conversation switch) and F.4 (full state reset on new-thread).
+- **§6.4 substrate-enabling-work:** four Phase B F.x gaps documented (polling math, geometry rendering, hydration gap, state-reset gap). All M8-introduced; all surfaced via smoke gate / browser testing. CF backlog adds layout-scope hydration substrate, user identity wiring, component test infrastructure.
+- **§4.1 Phase B duration honest:** nominal 1.5d → actual ~5-7d due to F.x cycles. Substrate plan held architecturally; the bug-fixes were bounded follow-ups, not rework.
+
+No code changes. Documentation discipline only. Phase B close ships next (separate session).
+
 **v1.4 — 2026-05-07** (Phase B C8 audit catch-up)
 
 Phase B Step 3 C8 pre-implementation audit (vault `milestones/M8/items/c8-substrate-plan.md`, vault commit `80c4616`) surfaced four architectural items requiring conventions update before Step A implementation begins:
 
-- **D1** — state store convention reframed from "Zustand or equivalent" to Context (existing convention). Codebase has no Zustand dependency; `Toast.tsx` is the canonical Context-with-reducer pattern.
+- **D1** — state store convention reframed from "Zustand or equivalent" to Context (existing convention). Codebase has no Zustand dependency; `Toast.tsx` is the canonical Context-with-reducer pattern. *(Framing corrected in v1.5: Toast.tsx is Context+useState, not Context+useReducer; ChatStore introduces Context+useReducer as a new hybrid composition. See v1.5 changelog above.)*
 - **D2** — substantive re-spec. v1.0 framing assumed persistent SSE connection; current code has per-turn streaming only (`useAgentTurn`: POST + ReadableStream + AbortController, no persistent connection). v1.4 reframes D2: per-turn streaming preserved as-is; between-turns lightweight polling for audit feed updates (F.ii path from substrate plan). Persistent SSE deferred to M9 or later.
 - **§6.4** — z-index convention added for bottom-fixed elements (resting=40, expanded=50; first bottom-fixed elements in codebase, establishing the pattern).
 - **§4.1** — Phase B effort estimate adjusted from ~1.5 days (3 days span) to ~2.5 days (5 days span). M8 close target adjusts from 23 working days to 25 working days. Reasons: state store + ChatBar component + SSE reframing not budgeted in Phase 1 STOP.
@@ -146,15 +157,33 @@ This section is the architectural spine. Each decision is locked. Decisions refe
 - Conversation state lives in layout-level store (see "State store convention" below)
 - Existing per-page ChatClient lifecycle assumptions must be audited at Phase 1 STOP and refactored if found
 
-### D1 — State store convention (revised v1.4, post-Phase-B-C8-audit)
+### D1 — State store convention (revised v1.5, framing correction)
 
-The codebase uses **React Context with reducer pattern** (`Toast.tsx` is the canonical example) — no Zustand, no Redux, no external state library. The chat state store follows this convention:
+The codebase has two existing state-management patterns:
 
-- Context provider hosted at the dashboard layout (peer to the chat surfaces)
-- Reducer for state transitions (active conversation, expanded/collapsed bar, conversation history, harvested-this-session turns, property selection)
-- Hook (`useChatStore` or naming-convention-matched) for component subscription
+- **Context + useState + setter callbacks** (`Toast.tsx`). Used for collection-mutation state (toast queue). Provider exposes setter callbacks; consumer components subscribe to the array.
+- **useReducer alone, no Context** (`useAgentTurn.ts`). Used for state-machine turn lifecycle. Reducer logic captured in dedicated reducer file (`turnReducer.ts`); component holds state internally.
 
-Zustand is not in dependencies. Introducing it for chat state would break the codebase's established state-store pattern and trigger a deps-decision per CLAUDE.md ("No new dependencies without explicit justification"). v1.4 reframing: original v1.0 spec said "Zustand or equivalent"; the audit revealed Context-with-reducer is the existing convention, and v1.4 locks that.
+ChatStore introduces a third pattern: **Context + useReducer hybrid** (new in M8). Combines layout-level distribution (Context, from Toast pattern) with state-machine semantics (useReducer, from useAgentTurn pattern). Pure reducer + types in `chatReducer.ts`; Provider/hook in `ChatStore.tsx` re-exports from chatReducer. Mirrors useAgentTurn's file-split convention (`turnReducer.ts` + `useAgentTurn.ts`).
+
+The hybrid is a clean composition of existing primitives, not a deviation. v1.5 documents this explicitly because v1.0/v1.4 mischaracterized Toast.tsx as "Context + reducer canonical example" — that was wrong. Toast is Context+useState. v1.5 corrects the framing.
+
+Zustand is not in dependencies. Introducing it for chat state would break the codebase's established state-store pattern and trigger a deps-decision per CLAUDE.md ("No new dependencies without explicit justification"). The Context+useReducer hybrid uses only React primitives the codebase already depends on.
+
+(Round-2 #6 from Phase B Steps B-E carry-forward: `useChatStoreOptional` transitional API removal post-universal Provider mount. Not blocking; post-Phase-B cleanup.)
+
+### D1 — Layout-mount-vs-route-remount pattern (added v1.5, post-Phase-B-substrate)
+
+Persistent layout-mounted components do not auto-reset state on navigation the way route-mounted components do. M8's D1 persistent-mount commitment means React state survives navigation across dashboard routes by design.
+
+This commitment requires explicit state cleanup dispatches anywhere route-remount was previously load-bearing. The pre-M8 implicit cleanup patterns must be reproduced explicitly:
+
+- **Local component state reset on conversation switch** (e.g., `sessionHarvest`, optimistic-render staging) — replaced by `useEffect` on `activeConversationId` change. Surfaced in Step F.2 (first-message duplicate bug).
+- **Full conversation context reset on new-thread** (`activeConversationId`, `conversationHistory`, `pendingUserText`, navigation gates) — replaced by explicit dispatches in `onNewConversation` handler. Surfaced in Step F.4 (new-thread button non-functional bug).
+
+**Implications for future implementation:** anywhere a previous route-remount was relied upon for state cleanup (switching scoping context, clearing optimistic state, resetting navigation gates, logout flows), explicit reset dispatches are required. Phase 1 STOP audits in subsequent phases should look for handlers that trigger navigation but lack accompanying state-reset dispatches.
+
+**Future M9 substrate work** (deferred per §6.1) may evaluate whether a "navigation hook" pattern centralizes this discipline — e.g., a `useChatNavigate` hook that bundles `router.push` with context-appropriate dispatches — versus the current approach of dispatching per-handler. For M8, per-handler explicit dispatches are the locked pattern.
 
 ### D1 — Rendering geometry (added v1.3, post-Phase-B-sanity-check)
 
@@ -723,9 +752,11 @@ Each surfaces during Phase 1 STOP or early implementation. Human resolves before
 - Migration: index additions on audit feed sources (if Phase 1 STOP audit reveals gaps)
 - Database VIEW: `unified_audit_feed` (D3)
 
-**Phase B — Foundation surfaces (Days 3-7, revised v1.4)**
+**Phase B — Foundation surfaces (Days 3-7 per v1.4 spec; actual close ~5-7 days, revised v1.5)**
 
-Phase B duration revised from 3 days to 5 days based on C8 audit findings (vault `milestones/M8/items/c8-substrate-plan.md`). ~2.5 days substrate work for C8 alone (state store, ChatBar component, ChatClient refactor, layout invert, route shells, SSE/polling lifecycle). Plus C7 (Frontdesk removal + route + API deletion) and C1 (sparkline removal). Phase B smoke gate runs at end.
+Phase B substrate functionally clean as of commit `c8fc201` (2026-05-08). Original v1.4 estimate held nominally (Days 3-7) but the actual implementation arc surfaced four bug-fix cycles (F.1-F.4) before Phase B substrate verified clean. Each F.x cycle was bounded; cumulative effect was Phase B exceeding the optimistic estimate. Pattern noted for M9 retrospective: substrate-step visual verification at Hard Checkpoints (browser screenshot, audit-feed write/read interactive testing) would have caught some F.x bugs earlier.
+
+Original v1.4 substrate scope held architecturally; the F.x cycles were bounded follow-ups, not architectural rework. Plus C7 (Frontdesk removal + route + API deletion) and C1 (sparkline removal). Phase B smoke gate runs at end.
 
 - C8: Persistent chat layout slot + state store + ChatBar + SSE/polling lifecycle (D1, D2 v1.4)
 - C7: Frontdesk placeholder removal (D14) — sidebar + route + API
@@ -1026,6 +1057,25 @@ The C8 audit revealed no existing convention for bottom-fixed element stacking; 
 
 This is M8-shipped substrate, not anti-scope. Future bottom-fixed elements (alert bars, action sheets, etc.) follow this convention or extend it explicitly. `DESIGN_SYSTEM.md` update at M8 close documents the convention in the canonical visual-design location.
 
+### Phase B substrate gaps surfaced in F.x cycles (added v1.5)
+
+Phase B Steps F.1-F.4 surfaced four substrate gaps via smoke gate / browser testing:
+
+1. **Polling math** (F.1): `AUDIT_TICK` overwriting `unreadAuditCount` instead of accumulating; first-poll baseline missing. Fixed in `chatReducer` + `useAuditPoll`.
+
+2. **Geometry rendering** (F.2): `display: contents` wrapper leaked ChatShell into outer flex layout, producing always-visible side panel instead of bottom-anchored bar with tap-to-expand overlay. Fixed in `ChatClient.tsx` wrapper CSS (`position: fixed; inset: 0; z-index: 50` for expanded state).
+
+3. **Hydration gap** (F.3): Step E thin shells stopped performing server-side fetches that pre-M8 /chat routes loaded and passed via props (properties, conversations, user identity). Layout-mounted ChatClient receives no such props. Patched via client-side fetches for properties + conversations; user identity wiring deferred (Round-2 #4 carry-forward). Structural resolution (RSC parent fetcher, hydration substrate pattern) deferred to M9 per §6.1.
+
+4. **State-reset gap** (F.4): persistent layout-mount preserves state across navigation but requires explicit dispatches to reset state that pre-M8 route-remount cleared implicitly (new-thread, conversation switch). Patched via dispatches in `onNewConversation` handler + `useEffect` on `activeConversationId` change. Pattern documented in D1 layout-mount-vs-route-remount sub-decision (above).
+
+All four are M8-introduced; all surfaced via smoke gate or browser testing rather than at substrate-step Hard Checkpoints. M9 retrospective note: visual verification at substrate-step checkpoints (browser screenshot, describe-what-shipped, audit-feed write/read interactive testing) would have caught geometry at Step D close and polling math at Step F close. Worth tightening the discipline.
+
+**CF backlog entries surfaced by F.x cycles:**
+- "Layout-scope hydration substrate — RSC parent or context provider, replaces F.3 client-fetch patches"
+- "User identity wiring at layout scope — Round-2 #4 from Steps B-E carry-forward; Phase B close defers to dedicated session"
+- "Component test infrastructure — RTL/jsdom not in deps; Phase B substrate tests were reducer-only. Round-2 #1 carry-forward."
+
 These are surfaced explicitly so Claude Code doesn't treat them as scope creep.
 
 ---
@@ -1175,4 +1225,4 @@ Final M8 session executes:
 
 ---
 
-*End conventions, v1.4.*
+*End conventions, v1.5.*
