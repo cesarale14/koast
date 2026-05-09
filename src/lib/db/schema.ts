@@ -808,6 +808,14 @@ export const memoryFacts = pgTable("memory_facts", {
   // Self-FK for supersession history walk.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supersededBy: uuid("superseded_by").references((): any => memoryFacts.id, { onDelete: "set null" }),
+  // D7 supersession reason discriminator (Phase A migration
+  // 20260507010000). NULL for M6-era rows pre-D7; 'outdated' for facts
+  // replaced because they're no longer true; 'incorrect' for facts
+  // replaced because the prior extraction was wrong (M9 calibration
+  // substrate reads this as an extraction-error signal). DB-level
+  // CHECK enforces values; TS union exported below as
+  // MemorySupersessionReason.
+  supersessionReason: text("supersession_reason"),
   learnedAt: timestamp("learned_at", { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -854,6 +862,7 @@ export type MemoryFactSubEntityType =
 export type MemoryFactEntityType = "host" | "property" | "guest" | "vendor" | "booking";
 export type MemoryFactSource = "host_taught" | "inferred" | "observed";
 export type MemoryFactStatus = "active" | "superseded" | "deprecated";
+export type MemorySupersessionReason = "outdated" | "incorrect";
 
 // ==================== Agent Conversations ====================
 
