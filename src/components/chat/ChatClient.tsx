@@ -40,6 +40,7 @@ import { EmptyState } from "./EmptyState";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
+import { RefusalEnvelopeRenderer } from "./RefusalEnvelopeRenderer";
 import {
   GuestMessageProposal,
   type GuestMessageProposalState,
@@ -61,6 +62,14 @@ type UITurnLite = {
     result_summary: string;
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
+  /**
+   * M8 F4 — RefusalEnvelope per D18. Coexists with the M5/M7
+   * turn-level `refusal` field; F4 is the structured envelope for
+   * publisher-category refusals (P4 generates hard_refusal at
+   * propose_guest_message). Future surfaces produce soft_refusal /
+   * host_input_needed envelopes when M9 broadens generation.
+   */
+  refusalEnvelope?: import("@/lib/agent/refusal-envelope").RefusalEnvelope;
   /**
    * M6 D23 + M7 D45 — artifacts attached to this turn (history-visible
    * states: emitted | edited | confirmed | superseded). 'dismissed' is
@@ -1213,6 +1222,9 @@ function HistoryTurnView({
           />
         ))}
         {turn.text && <p>{turn.text}</p>}
+        {turn.refusalEnvelope && (
+          <RefusalEnvelopeRenderer envelope={turn.refusalEnvelope} />
+        )}
         {(turn.pendingArtifacts ?? []).map((a) => {
           // M7 D43 — kind-specific component routing. M6's only kind
           // was 'property_knowledge_confirmation' (MemoryArtifact);
