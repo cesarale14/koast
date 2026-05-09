@@ -143,6 +143,20 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     reason: z.string(),
     suggested_next_step: z.string().nullable(),
   }),
+  // M8 Phase D F4 + P4: structured refusal envelope. Mirrors the
+  // server-side SSE schema in src/lib/agent/sse.ts. Coexists with
+  // the M5 'refusal' event above per F4 Decision 4.
+  z.object({
+    type: z.literal("refusal_envelope"),
+    envelope: z.object({
+      kind: z.enum(["hard_refusal", "soft_refusal", "host_input_needed"]),
+      reason: z.string(),
+      alternative_path: z.string().optional(),
+      override_available: z.boolean().optional(),
+      missing_inputs: z.array(z.string()).optional(),
+      suggested_inputs: z.array(z.string()).optional(),
+    }),
+  }),
 ]);
 
 export type AgentStreamEvent = z.infer<typeof AgentStreamEventSchema>;
@@ -278,6 +292,14 @@ export type TurnState = {
   error: { code: string; message: string; recoverable: boolean } | null;
   /** Set when status='refusal'. */
   refusal: { reason: string; suggested_next_step: string | null } | null;
+  /**
+   * M8 Phase D F4 + P4 — structured refusal envelope. Set when a
+   * `refusal_envelope` SSE event arrives (e.g., propose_guest_message
+   * publisher-category classifier match). Coexists with `refusal`
+   * (M5 stop-reason path); turnReducer routes the SSE event types to
+   * the right field. UI rendering checks both.
+   */
+  refusalEnvelope?: import("../agent/refusal-envelope").RefusalEnvelope;
 };
 
 export const initialTurnState: TurnState = {

@@ -689,6 +689,7 @@ export function ChatClient({
           };
         }),
       refusal: state.refusal,
+      refusalEnvelope: state.refusalEnvelope,
       pendingArtifacts: liveArtifacts.length > 0 ? liveArtifacts : undefined,
     };
     harvested.push(koastTurn);

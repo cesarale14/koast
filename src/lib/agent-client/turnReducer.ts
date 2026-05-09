@@ -115,6 +115,18 @@ export function turnReducer(
         },
       };
 
+    case "refusal_envelope":
+      // M8 Phase D F4 + P4: structured refusal envelope arrived.
+      // Status stays 'streaming' until the subsequent 'done' event;
+      // the envelope sits on the turn alongside any prior content.
+      // ChatClient's harvester reads refusalEnvelope into UITurnLite
+      // when the turn finalizes, where RefusalEnvelopeRenderer picks
+      // it up.
+      return {
+        ...state,
+        refusalEnvelope: event.envelope,
+      };
+
     default: {
       // TS exhaustiveness — adding any forward-looking event to
       // AgentStreamEventSchema without a matching `case` will fail compile.

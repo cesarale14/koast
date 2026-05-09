@@ -225,6 +225,13 @@ interface RoundResult {
   toolCallRecords: ToolCallRecord[];
   /** Audit log IDs collected for the eventual 'done' event. */
   auditIds: string[];
+  /**
+   * M8 Phase D P4: when the pre-dispatch publisher-category classifier
+   * matches at propose_guest_message, the round emits a refusal_envelope
+   * event and skips dispatch. The envelope is surfaced here so the outer
+   * runAgentTurn() can persist it on the assistant turn and finalize.
+   */
+  refusalEnvelope?: import("./refusal-envelope").RefusalEnvelope;
 }
 
 /**
@@ -265,12 +272,59 @@ async function* runOneRound(
 
   const toolCallRecords: ToolCallRecord[] = [];
   const auditIds: string[] = [];
+  // P4: set when the pre-dispatch classifier matches; surfaced in
+  // RoundResult so runAgentTurn() can finalize the refusal-shaped turn.
+  let roundRefusalEnvelope:
+    | import("./refusal-envelope").RefusalEnvelope
+    | undefined;
 
   if (finalMessage.stop_reason === "tool_use") {
     for (const block of finalMessage.content) {
       if (block.type !== "tool_use") continue;
 
       const inputObj = (block.input ?? {}) as Record<string, unknown>;
+
+      // M8 Phase D P4: pre-dispatch publisher-category classifier at
+      // propose_guest_message. If the model's drafted message_text
+      // matches one of the three §2.3.4 categories (legal correspondence,
+      // regulatory submission, substantive licensed-professional comm),
+      // emit a refusal_envelope event in lieu of dispatching the tool.
+      // The classifier is the substrate failsafe; the system prompt +
+      // tool description steer the model to redirect via chat instead
+      // of calling the tool in the first place (defense-in-depth per
+      // P4 sign-off Decision 1).
+      if (block.name === "propose_guest_message") {
+        const messageText =
+          typeof (inputObj as { message_text?: unknown }).message_text === "string"
+            ? ((inputObj as { message_text: string }).message_text)
+            : "";
+        const { classifyPublisherCategory, detectLicensedProfessionalTerm } =
+          await import("./refusal-classifier");
+        const category = classifyPublisherCategory(messageText);
+        if (category !== null) {
+          const {
+            envelopeForPublisherCategory,
+            buildLicensedProfessionalRefusal,
+          } = await import("./refusal-envelope");
+          const envelope =
+            category === "licensed_professional"
+              ? buildLicensedProfessionalRefusal(
+                  detectLicensedProfessionalTerm(messageText),
+                )
+              : envelopeForPublisherCategory(category);
+          yield {
+            type: "refusal_envelope",
+            envelope,
+          };
+          roundRefusalEnvelope = envelope;
+          // Refusal closes the turn; do not dispatch any further tool
+          // calls in this round. The model's other tool_use blocks (if
+          // any) for this turn are skipped — refusing one tool call
+          // refuses the turn.
+          break;
+        }
+      }
+
       const dispatchStart = Date.now();
       yield {
         type: "tool_call_started",
@@ -392,6 +446,7 @@ async function* runOneRound(
     accumulatedText,
     toolCallRecords,
     auditIds,
+    refusalEnvelope: roundRefusalEnvelope,
   };
 }
 
@@ -465,6 +520,12 @@ export async function* runAgentTurn(
   let round = 0;
   let turnError: { code: string; message: string; recoverable: boolean } | null = null;
   let refusalReason: { reason: string; suggested_next_step: string | null } | null = null;
+  // M8 Phase D P4: structured refusal envelope (RefusalEnvelope shape).
+  // Set by the pre-dispatch classifier at propose_guest_message when a
+  // §2.3.4 publisher category matches. Persisted on the assistant turn's
+  // JSONB `refusal` column alongside the legacy {reason, suggested_next_step}
+  // path; turnReducer discriminates on the `kind` field at hydration.
+  let refusalEnvelope: import("./refusal-envelope").RefusalEnvelope | null = null;
 
   let history_with_results: Anthropic.MessageParam[] = seedMessages;
 
@@ -513,6 +574,15 @@ export async function* runAgentTurn(
     }
     collectedToolCalls.push(...roundResult.toolCallRecords);
     collectedAuditIds.push(...roundResult.auditIds);
+
+    // M8 Phase D P4: pre-dispatch refusal short-circuits the round.
+    // The envelope was already yielded as a refusal_envelope event; we
+    // capture it for persistence and break out of the round loop so
+    // finalizeTurn writes it to the JSONB column.
+    if (roundResult.refusalEnvelope) {
+      refusalEnvelope = roundResult.refusalEnvelope;
+      break;
+    }
 
     const stopReason = roundResult.finalMessage.stop_reason;
 
@@ -572,7 +642,11 @@ export async function* runAgentTurn(
     turn_id: assistantTurn.id,
     content_text: finalText.length > 0 ? finalText : null,
     tool_calls: collectedToolCalls.length > 0 ? collectedToolCalls : null,
-    refusal: refusalReason ? { reason: refusalReason.reason } : null,
+    refusal: refusalEnvelope
+      ? (refusalEnvelope as unknown as Record<string, unknown>)
+      : refusalReason
+        ? { reason: refusalReason.reason }
+        : null,
     input_tokens: lastFinalMessage?.usage.input_tokens ?? null,
     output_tokens: lastFinalMessage?.usage.output_tokens ?? null,
     cache_read_tokens: lastFinalMessage?.usage.cache_read_input_tokens ?? null,
@@ -584,6 +658,18 @@ export async function* runAgentTurn(
       type: "refusal",
       reason: refusalReason.reason,
       suggested_next_step: refusalReason.suggested_next_step,
+    };
+    return;
+  }
+
+  // M8 Phase D P4: refusal_envelope path. The envelope event was
+  // already yielded mid-round; emit `done` so the client closes the
+  // turn gracefully (no further tool dispatch, no further text).
+  if (refusalEnvelope) {
+    yield {
+      type: "done",
+      turn_id: persistedAssistant.id,
+      audit_ids: collectedAuditIds,
     };
     return;
   }

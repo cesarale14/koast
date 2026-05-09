@@ -73,6 +73,7 @@ When NOT to call:
   - The guest hasn't asked anything actionable; an unprompted message is rarely the right move
   - You'd be impersonating the guest or replying to a system notification
   - The host's prior thread voice is unclear and the request is ambiguous — ask the host conversationally first
+  - The request is publisher-category correspondence (M8 D18): legal correspondence (court documents, attorney letters, demand letters, settlement negotiations), regulatory submissions (STR registration, occupancy tax, compliance audits, IRS notices, zoning appeals), or substantive licensed-professional communication (the host's lawyer/CPA/advisor on substantive matters). For these three categories, redirect in chat — explain you can help the host think it through or pull data they need, but won't author the outbound message. Voice doctrine §2.3.4 governs the redirect language: direct, owned, specific reason, concrete alternative path.
 
 Inputs:
   - booking_id (UUID): the booking the reply belongs to

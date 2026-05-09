@@ -633,6 +633,9 @@ export interface UITurn {
     result_summary: string;
   }>;
   refusal: { reason: string; suggested_next_step: string | null } | null;
+  /** M8 Phase D F4 + P4 structured RefusalEnvelope (hydrates from
+   * JSONB `refusal` column when kind field is present). */
+  refusalEnvelope?: import("./refusal-envelope").RefusalEnvelope;
   /**
    * M6 D23 + M7 D45 — artifacts attached to this turn. Loads
    * agent_artifacts rows for the conversation in lifecycle states
@@ -950,7 +953,15 @@ export async function loadTurnsForConversation(
       success: !tc.result.is_error,
       result_summary: summarizeToolResult(tc.result.content, tc.result.is_error),
     }));
-    const refusal = t.refusal
+    // M8 Phase D F4 + P4: discriminate on `kind` field presence in
+    // the JSONB column. F4 RefusalEnvelope hydrates to refusalEnvelope;
+    // legacy {reason, suggested_next_step} stays in the M5 refusal
+    // field. Co-existence per F4 Decision 4.
+    const isF4Envelope =
+      t.refusal !== null &&
+      typeof t.refusal === "object" &&
+      typeof (t.refusal as { kind?: unknown }).kind === "string";
+    const refusal = !isF4Envelope && t.refusal
       ? {
           reason: String((t.refusal as { reason?: unknown }).reason ?? ""),
           suggested_next_step:
@@ -959,6 +970,9 @@ export async function loadTurnsForConversation(
             null,
         }
       : null;
+    const refusalEnvelope = isF4Envelope
+      ? (t.refusal as unknown as import("./refusal-envelope").RefusalEnvelope)
+      : undefined;
     return {
       id: t.id,
       role,
@@ -966,6 +980,7 @@ export async function loadTurnsForConversation(
       text: t.content_text,
       tool_calls,
       refusal,
+      refusalEnvelope,
       pendingArtifacts: artifactsByTurnId.get(t.id) ?? [],
     };
   });
