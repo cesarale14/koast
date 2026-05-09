@@ -31,7 +31,7 @@ import {
   type AuditFeedFilter,
 } from "@/lib/audit-feed";
 
-const VALID_FILTERS: ReadonlySet<AuditFeedFilter> = new Set([
+const VALID_FILTERS: ReadonlySet<AuditFeedFilter> = new Set<AuditFeedFilter>([
   "all",
   "memory",
   "messages",
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
 
   if (!VALID_FILTERS.has(filterParam as AuditFeedFilter)) {
     return NextResponse.json(
-      { error: `Invalid filter. Allowed: ${[...VALID_FILTERS].join(", ")}` },
+      { error: `Invalid filter. Allowed: ${Array.from(VALID_FILTERS).join(", ")}` },
       { status: 400 },
     );
   }

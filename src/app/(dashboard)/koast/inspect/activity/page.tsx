@@ -6,7 +6,7 @@ import {
 } from "@/lib/audit-feed";
 import { ActivityTab } from "@/components/inspect/ActivityTab";
 
-const VALID_FILTERS: ReadonlySet<AuditFeedFilter> = new Set([
+const VALID_FILTERS: ReadonlySet<AuditFeedFilter> = new Set<AuditFeedFilter>([
   "all",
   "memory",
   "messages",
