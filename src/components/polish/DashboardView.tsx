@@ -29,6 +29,8 @@ import KoastEmptyState from "./KoastEmptyState";
 import StatusDot from "./StatusDot";
 import HandwrittenGreeting from "./HandwrittenGreeting";
 import PlatformPills, { type ConnectedPlatform } from "./PlatformPills";
+import ConfidenceBandedRange from "./ConfidenceBandedRange";
+import { usePortfolioWeekendRange } from "@/hooks/usePortfolioWeekendRange";
 
 // ---------------- Types ----------------
 
@@ -674,24 +676,54 @@ function TodaysFocusBlock({
           alignItems: "stretch",
         }}
       >
-        <PricingIntelligenceCard performance={performance} propertyCount={summary.propertyCount} vp={vp} />
+        <PricingIntelligenceCard
+          performance={performance}
+          propertyCount={summary.propertyCount}
+          propertyIds={propertyIds}
+          vp={vp}
+        />
         <ActionCardStack actions={focusActions} />
       </div>
     </section>
   );
 }
 
-function PricingIntelligenceCard({ performance, propertyCount, vp }: { performance: CommandCenterData["performance"]; propertyCount: number; vp: { isMobile: boolean } }) {
-  // Dynamic copy: when real opportunities exist, hero switches to
-  // revenue framing. Absent that, the learning copy carries.
-  const hasUpside = false; // TODO: wire from portfolio pricing hook when the property-level upside data is aggregated server-side
-  const title = hasUpside
-    ? "$0 across your portfolio."
-    : "Measuring your rates, quietly.";
-  const sub = hasUpside
-    ? `Act-now + coming-up recommendations are surfaced per property. Acceptance: — (30d).`
-    : `Koast is learning your rate patterns across ${propertyCount} propert${propertyCount === 1 ? "y" : "ies"} and 90 forward dates. Once we've captured more channel rates, we'll surface real opportunities here.`;
+function PricingIntelligenceCard({
+  performance,
+  propertyCount,
+  propertyIds,
+  vp,
+}: {
+  performance: CommandCenterData["performance"];
+  propertyCount: number;
+  propertyIds: string[];
+  vp: { isMobile: boolean };
+}) {
+  // M8 C2 (D8): hero is the cohort-derived weekend uplift range. Below
+  // threshold falls through to ConfidenceBandedRange's Tracking copy.
+  // Loading and zero-property edge cases retain the prior "Measuring your
+  // rates, quietly." learning frame — voice-doctrine compliant fallback.
+  const { range, cohortSize, loading } = usePortfolioWeekendRange(propertyIds);
   void performance;
+  const showLearningFallback = loading || propertyCount === 0;
+
+  const heroTitleStyle = {
+    margin: 0,
+    fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
+    fontWeight: 400,
+    fontSize: vp.isMobile ? 24 : 36,
+    color: "var(--shore)",
+    letterSpacing: "-0.02em",
+    maxWidth: 540,
+    lineHeight: 1.2,
+  } as const;
+  const heroSubtitleStyle = {
+    margin: 0,
+    fontSize: 14,
+    color: "var(--sandbar)",
+    lineHeight: 1.6,
+    maxWidth: 560,
+  } as const;
 
   return (
     <article
@@ -732,31 +764,21 @@ function PricingIntelligenceCard({ performance, propertyCount, vp }: { performan
         >
           Pricing intelligence
         </span>
-        <h2
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
-            fontWeight: 400,
-            fontSize: vp.isMobile ? 24 : 36,
-            color: "var(--shore)",
-            letterSpacing: "-0.02em",
-            maxWidth: 540,
-            lineHeight: 1.2,
-          }}
-        >
-          {title}
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 14,
-            color: "var(--sandbar)",
-            lineHeight: 1.6,
-            maxWidth: 560,
-          }}
-        >
-          {sub}
-        </p>
+        {showLearningFallback ? (
+          <>
+            <h2 style={heroTitleStyle}>Measuring your rates, quietly.</h2>
+            <p style={heroSubtitleStyle}>
+              Koast is learning your rate patterns across {propertyCount} propert{propertyCount === 1 ? "y" : "ies"} and 90 forward dates. Once we&apos;ve captured more channel rates, we&apos;ll surface real opportunities here.
+            </p>
+          </>
+        ) : (
+          <ConfidenceBandedRange
+            range={range}
+            cohortSize={cohortSize}
+            titleStyle={heroTitleStyle}
+            subtitleStyle={heroSubtitleStyle}
+          />
+        )}
       </div>
       <div style={{ position: "relative", display: "flex", gap: 10, marginTop: 32 }}>
         <Link
@@ -775,7 +797,7 @@ function PricingIntelligenceCard({ performance, propertyCount, vp }: { performan
             gap: 6,
           }}
         >
-          {hasUpside ? "Review recommendations" : "Review rules"}
+          {range ? "Review recommendations" : "Review rules"}
         </Link>
         <Link
           href="/pricing"
