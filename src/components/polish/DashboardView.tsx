@@ -303,7 +303,7 @@ export default function DashboardView() {
     >
       <GreetingBlock user={data.user.name} summary={data.summary} greetingStatus={data.greetingStatus} criticalAlerts={data.criticalAlerts} vp={vp} />
       <PropertiesBlock cards={data.propertyCards} pendingByProperty={pendingByProperty} vp={vp} />
-      <TodaysFocusBlock performance={data.performance} summary={data.summary} focusActions={data.focusActions} vp={vp} />
+      <TodaysFocusBlock performance={data.performance} summary={data.summary} focusActions={data.focusActions} propertyIds={propertyIds} vp={vp} />
       <PortfolioPulseBlock metrics={data.pulseMetrics} range={pulseRange} onRangeChange={setPulseRange} vp={vp} />
       <FooterBlock syncStatus={data.summary.syncStatus} vp={vp} />
     </div>
@@ -658,11 +658,13 @@ function TodaysFocusBlock({
   performance,
   summary,
   focusActions,
+  propertyIds,
   vp,
 }: {
   performance: CommandCenterData["performance"];
   summary: CommandCenterData["summary"];
   focusActions: FocusAction[];
+  propertyIds: string[];
   vp: { isMobile: boolean; isNarrow: boolean };
 }) {
   return (
