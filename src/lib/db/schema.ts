@@ -654,6 +654,23 @@ export const userPreferences = pgTable("user_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ==================== Host State (M8 Phase G C4) ====================
+//
+// Per-host UI/inspection state. One row per host; upserted by the
+// audit-drawer mark-seen endpoint and by future host-scoped UI state
+// surfaces. RLS enforces auth.uid() = host_id.
+//
+// Phase G ships last_seen_inspect_at only. Future columns
+// (welcome_seen, dismissed_banners, last_seen_pricing_at, etc.) land
+// here without new tables. Migration: 20260511010000.
+
+export const hostState = pgTable("host_state", {
+  hostId: uuid("host_id").primaryKey(),
+  lastSeenInspectAt: timestamp("last_seen_inspect_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ==================== Property Channels ====================
 
 export const propertyChannels = pgTable("property_channels", {

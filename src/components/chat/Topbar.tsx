@@ -19,6 +19,8 @@ export type TopbarProps = {
   onClosePropertyMenu?: () => void;
   onSelectProperty?: (id: string) => void;
   onOpenAuditLog?: () => void;
+  /** M8 Phase G C4: unread-event badge text ("1"–"9" or "9+"), or null/undefined when no unread. */
+  auditUnreadBadge?: string | null;
   onNewThread?: () => void;
   /** Mobile drawer toggle — hamburger button is visible only at <768px via @media. */
   onToggleDrawer?: () => void;
@@ -35,6 +37,7 @@ export function Topbar({
   onClosePropertyMenu,
   onSelectProperty,
   onOpenAuditLog,
+  auditUnreadBadge,
   onNewThread,
   onToggleDrawer,
   onDismiss,
@@ -69,11 +72,35 @@ export function Topbar({
           title="Audit log"
           aria-label="Audit log"
           onClick={onOpenAuditLog}
+          style={{ position: "relative" }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 2" strokeLinecap="round" />
           </svg>
+          {auditUnreadBadge ? (
+            <span
+              aria-label={`${auditUnreadBadge} unread audit events`}
+              style={{
+                position: "absolute",
+                top: 2,
+                right: 2,
+                minWidth: 16,
+                height: 16,
+                padding: "0 4px",
+                background: "var(--coral-reef)",
+                color: "#fff",
+                fontSize: 9,
+                fontWeight: 700,
+                lineHeight: "16px",
+                borderRadius: 8,
+                textAlign: "center",
+                boxShadow: "0 0 0 2px var(--shore)",
+              }}
+            >
+              {auditUnreadBadge}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"

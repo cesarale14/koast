@@ -38,6 +38,7 @@ import { Composer, type ComposerState } from "./Composer";
 import { RespondingRow } from "./RespondingRow";
 import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
 import { ReengagementBanner } from "./ReengagementBanner";
+import { AuditDrawer } from "@/components/inspect/AuditDrawer";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
@@ -301,6 +302,24 @@ export function ChatClient({
     initialPropertyId,
   );
   const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
+  // M8 Phase G C4 — AuditDrawer state + unread badge.
+  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
+  const [auditUnreadBadge, setAuditUnreadBadge] = useState<string | null>(null);
+  const refetchAuditUnreadCount = useCallback(() => {
+    void fetch("/api/audit-feed/unread-count", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json && typeof json === "object" && "display" in json) {
+          setAuditUnreadBadge((json as { display: string | null }).display);
+        }
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+  }, []);
+  useEffect(() => {
+    refetchAuditUnreadCount();
+  }, [refetchAuditUnreadCount]);
 
   // M8 C8 Step F.3 — Bug 3 client-side fetches for property dropdown +
   // conversations rail. Pre-Step-D, /chat routes server-fetched these
@@ -919,6 +938,8 @@ export function ChatClient({
             onClosePropertyMenu={() => setPropertyMenuOpen(false)}
             onSelectProperty={(id) => persistActiveProperty(id)}
             onNewThread={onNewConversation}
+            onOpenAuditLog={() => setAuditDrawerOpen(true)}
+            auditUnreadBadge={auditUnreadBadge}
             onToggleDrawer={() => setDrawerOpen((v) => !v)}
             onDismiss={
               chatStoreDispatch
@@ -1153,6 +1174,11 @@ export function ChatClient({
         )}
       </Surface>
     </ChatShell>
+    <AuditDrawer
+      open={auditDrawerOpen}
+      onClose={() => setAuditDrawerOpen(false)}
+      onMarkSeen={refetchAuditUnreadCount}
+    />
     </div>
   );
 }
