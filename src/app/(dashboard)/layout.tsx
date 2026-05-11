@@ -9,6 +9,8 @@ import CommandPalette from "@/components/polish/CommandPalette";
 import { ChatStoreProvider } from "@/components/chat/ChatStore";
 import { ChatBar } from "@/components/chat/ChatBar";
 import { ChatClient } from "@/components/chat/ChatClient";
+import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { filterNavGroupsByVisibility } from "@/lib/tab-visibility";
 import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
@@ -332,15 +334,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  // Inject the live badge count onto the Messages item.
-  const dynamicNavGroups = navGroups.map((group) => ({
-    ...group,
-    items: group.items.map((item) =>
-      item.name === "Messages"
-        ? { ...item, badge: conflictCount }
-        : item
-    ),
-  }));
+  // M8 C6 (D12): conditional tab visibility. Hydrates from localStorage
+  // on repeat visits (no flicker); first-ever visit shows only always-
+  // visible tabs until the predicate fetch resolves. Hidden tabs are
+  // silently absent — no greyed-out / Coming-soon affordances per D12.
+  const { visibility: tabVisibility } = useTabVisibility();
+
+  // Inject the live Messages badge count, then filter conditional tabs.
+  const dynamicNavGroups = filterNavGroupsByVisibility(
+    navGroups.map((group) => ({
+      ...group,
+      items: group.items.map((item) =>
+        item.name === "Messages"
+          ? { ...item, badge: conflictCount }
+          : item
+      ),
+    })),
+    tabVisibility,
+  );
 
   const toggleSidebar = useCallback(() => {
     setSidebarExpanded((v) => {
