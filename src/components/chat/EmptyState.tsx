@@ -3,14 +3,20 @@
 import styles from "./ChatShell.module.css";
 import { KoastMark } from "./KoastMark";
 
-/** M8 C3 / D10 Tier 1 — locked starter copy. Ships as M8 minimal; Tier 2
- *  (context-aware LLM-generated starters) deferred to M9 per C3 sign-off
- *  (Telegram message 2780). */
+/** M8 D10 Tier 1 — locked starter copy, revised at F.1.
+ *
+ *  C3-shipped set ("Tell me about your first property" / "Just one property
+ *  for now" / etc.) was directionally wrong: those starters were Koast-voice
+ *  prompts, not host-voice utterances — clicking them sent Koast's own
+ *  question back to Koast. F.1 revised to four host-voice operational
+ *  starters per conventions v1.7 D10 + directional discipline note.
+ *
+ *  Tier 2 (context-aware LLM-generated starters) remains deferred to M9. */
 export const TIER_1_STARTERS: ReadonlyArray<string> = [
-  "Tell me about your first property",
-  "I'm coming from another tool — here's what I had set up there",
   "Walk me through what you can do",
-  "Just one property for now",
+  "I'm coming from another tool — here's what I had set up there",
+  "What should I be focused on today?",
+  "Catch me up on what changed",
 ];
 
 export type EmptyStateProps = {
