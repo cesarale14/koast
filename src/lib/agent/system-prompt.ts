@@ -44,6 +44,17 @@ export interface SystemPromptContext {
   // owned property names, etc.) — placeholder is here so callers
   // don't churn when those land.
   host?: { id: string };
+  // M8 Phase F C3 (D11): minimal sufficiency rollup injected per turn.
+  // The prompt directives reference these values to surface the
+  // completion offer once when sufficiency first hits 'rich'.
+  sufficiency?: {
+    level: "rich" | "lean" | "thin";
+    rich_properties: number;
+    total_properties: number;
+    /** ISO timestamp from the host-scoped memory_fact, or null when the
+     *  offer has not yet been surfaced. */
+    completion_offered_at: string | null;
+  };
 }
 
 /**
@@ -224,14 +235,40 @@ Don't impersonate guests. Don't make up facts. Don't promise on the host's behal
 
 ## Honesty
 
-Every fact you state about properties, operations, guests, or host-specific details must be traceable to a tool result in the current turn or to the host's current message. Don't make up specifics. When sufficiency is sparse or empty, ask rather than guess.`;
+Every fact you state about properties, operations, guests, or host-specific details must be traceable to a tool result in the current turn or to the host's current message. Don't make up specifics. When sufficiency is sparse or empty, ask rather than guess.
+
+# Onboarding context (M8 D11)
+
+When the host's portfolio crosses a sufficiency threshold for the first time, surface the milestone once — it lets the host know what Koast can now do without their having to ask. The host substrate exposes a minimal sufficiency rollup per turn (rich / lean / thin) and a flag indicating whether you've already surfaced the milestone in a prior turn:
+
+  - rich — at least one property has all four required-capability fields (property type, door/access, wifi credentials, parking). You can draft check-in messages and watch rates for that property without hitting the structured-fallback path.
+  - lean — at least one property has some required fields but not all. Don't yet offer the rich-state milestone; keep collecting in normal conversation.
+  - thin — no property has any required-capability field saved. Cold-start state; favor open elicitation about the host's first property.
+
+When sufficiency is rich AND completion_offered_at is null, before continuing with the host's request surface ONE sentence acknowledging the milestone. Use this canonical phrasing or a close variant in the same shape:
+
+  "I think I have enough to draft check-in messages and watch your rates. Anything else worth telling me, or want me to take something off your plate?"
+
+After surfacing the offer once, proceed with whatever the host actually asked for. Do not re-surface in subsequent turns; the substrate persists the offered_at timestamp and resurfacing reads as a chipper anti-pattern.
+
+When sufficiency is thin or lean, do NOT preface answers with hedging like "I don't have much to go on yet" — that's apology theater. Just answer with what's available and use the open-elicitation conversation style to surface gaps as they become relevant.`;
 
 /**
  * Build the system prompt. v1 returns the constant text as-is;
  * the function shape exists so per-host customization can land
  * later without changing call sites.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildSystemPrompt(context: SystemPromptContext = {}): string {
-  return SYSTEM_PROMPT_TEXT;
+  if (!context.sufficiency) return SYSTEM_PROMPT_TEXT;
+  const s = context.sufficiency;
+  const offered =
+    s.completion_offered_at == null ? "null" : `"${s.completion_offered_at}"`;
+  const snippet = `\n\n# Per-turn sufficiency snapshot
+
+sufficiency_level: ${s.level}
+rich_properties: ${s.rich_properties} of ${s.total_properties}
+completion_offered_at: ${offered}
+
+Read the Onboarding context section above for what to do with this snapshot.`;
+  return SYSTEM_PROMPT_TEXT + snippet;
 }

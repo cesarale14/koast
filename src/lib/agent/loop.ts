@@ -323,6 +323,59 @@ async function* runOneRound(
           // refuses the turn.
           break;
         }
+
+        // M8 Phase F C3 (D9): pre-dispatch required-capability check.
+        // Runs AFTER P4 publisher-category — P4 hard-refuses (close);
+        // C3 host-input-needs (open). If the property is missing wifi
+        // creds / door code / parking / property_type, emit a
+        // host_input_needed envelope and break dispatch. Booking →
+        // property resolution lives behind this intercept; a M9 cache
+        // is a forward-tracked perf candidate.
+        const bookingId =
+          typeof (inputObj as { booking_id?: unknown }).booking_id === "string"
+            ? ((inputObj as { booking_id: string }).booking_id)
+            : null;
+        if (bookingId) {
+          const supabaseRC = createServiceClient();
+          const { data: bookingRow, error: bookingErr } = await supabaseRC
+            .from("bookings")
+            .select("property_id")
+            .eq("id", bookingId)
+            .maybeSingle();
+          if (!bookingErr && bookingRow?.property_id) {
+            const { checkRequiredCapabilities, buildMultiMissingEnvelopeText } =
+              await import("./required-capabilities");
+            try {
+              const result = await checkRequiredCapabilities(
+                supabaseRC,
+                bookingRow.property_id as string,
+              );
+              if (!result.satisfied) {
+                const text = buildMultiMissingEnvelopeText(result.missing);
+                const envelope = {
+                  kind: "host_input_needed" as const,
+                  reason: text.reason,
+                  missing_inputs: text.missing_inputs,
+                  suggested_inputs: text.suggested_inputs,
+                };
+                yield {
+                  type: "refusal_envelope",
+                  envelope,
+                };
+                roundRefusalEnvelope = envelope;
+                break;
+              }
+            } catch (err) {
+              // Defensive: don't break dispatch on lookup error;
+              // logging signals the diagnostic path without blocking
+              // the model's tool call. Smoke gate verifies the
+              // happy-path; a hard error here is M9 telemetry candidate.
+              console.warn(
+                `[loop] C3 required-capability check skipped: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
+        }
       }
 
       const dispatchStart = Date.now();
@@ -508,8 +561,43 @@ export async function* runAgentTurn(
       )
     : history;
 
+  // M8 Phase F C3 (D11): per-turn minimal sufficiency rollup.
+  // Computed once per turn; passed into buildSystemPrompt so the model
+  // can surface the completion milestone once when sufficiency first
+  // hits 'rich'. Defensive on errors — sufficiency failure shouldn't
+  // block the turn; fall through to no-snapshot. createServiceClient
+  // is also inside the try because it throws when service-role env is
+  // unset (test environments / local-dev without secrets).
+  let supabaseForSufficiency: ReturnType<typeof createServiceClient> | null = null;
+  let sufficiencyContext:
+    | NonNullable<Parameters<typeof buildSystemPrompt>[0]>["sufficiency"]
+    | undefined;
+  try {
+    supabaseForSufficiency = createServiceClient();
+    const { classifySufficiency } = await import("./sufficiency");
+    const { readOnboardingCompletionOfferedAt: readOffered } = await import("./onboarding-state");
+    const classification = await classifySufficiency(supabaseForSufficiency, input.host.id);
+    const offeredAt = await readOffered(
+      supabaseForSufficiency,
+      input.host.id,
+    );
+    sufficiencyContext = {
+      level: classification.level,
+      rich_properties: classification.rollup.rich_properties,
+      total_properties: classification.rollup.properties,
+      completion_offered_at: offeredAt,
+    };
+  } catch (err) {
+    console.warn(
+      `[loop] C3 sufficiency snapshot skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // Step 4: system prompt + tools.
-  const systemPrompt = buildSystemPrompt({ host: input.host });
+  const systemPrompt = buildSystemPrompt({
+    host: input.host,
+    sufficiency: sufficiencyContext,
+  });
   const tools = getToolsForAnthropicSDK();
 
   const accumulatedText: string[] = [];
@@ -634,6 +722,32 @@ export async function* runAgentTurn(
   if (turnError && turnError.code === "anthropic_sdk_error") {
     yield { type: "error", ...turnError };
     return;
+  }
+
+  // M8 Phase F C3 (D11): first-time 'rich' transition writes the
+  // onboarding_completion_offered_at fact so future turns see it set
+  // and the prompt suppresses re-surfacing. Best-effort; failure here
+  // doesn't block the turn. The model's job is to actually surface the
+  // milestone sentence; this write captures the snapshot moment.
+  if (
+    sufficiencyContext &&
+    supabaseForSufficiency &&
+    sufficiencyContext.level === "rich" &&
+    sufficiencyContext.completion_offered_at === null
+  ) {
+    try {
+      const { writeOnboardingFact } = await import("./onboarding-state");
+      await writeOnboardingFact(
+        supabaseForSufficiency,
+        input.host.id,
+        "onboarding_completion_offered_at",
+        new Date().toISOString(),
+      );
+    } catch (err) {
+      console.warn(
+        `[loop] C3 onboarding-offered write skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // Finalize the pre-inserted assistant stub with the loop's outputs.

@@ -36,7 +36,8 @@ import { KoastMessage } from "./KoastMessage";
 import { ToolCall } from "./ToolCall";
 import { Composer, type ComposerState } from "./Composer";
 import { RespondingRow } from "./RespondingRow";
-import { EmptyState } from "./EmptyState";
+import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
+import { ReengagementBanner } from "./ReengagementBanner";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
@@ -937,8 +938,12 @@ export function ChatClient({
         }
         responding={isStreaming ? <RespondingRow onStop={cancel} /> : undefined}
       >
+        <ReengagementBanner hidden={pendingUserText !== null || draft.length > 0} />
         {!hasAnyTurns ? (
-          <EmptyState />
+          <EmptyState
+            starters={TIER_1_STARTERS}
+            onStarterSelect={(text) => setDraft(text)}
+          />
         ) : (
           <>
             {(() => {
