@@ -50,7 +50,7 @@ export async function GET() {
       return NextResponse.json(EMPTY_TAB_VISIBILITY);
     }
 
-    async function hasAny(table: string): Promise<boolean> {
+    const hasAny = async (table: string): Promise<boolean> => {
       const { data, error } = await supabase
         .from(table)
         .select("id")
@@ -58,7 +58,7 @@ export async function GET() {
         .limit(1);
       if (error) throw new Error(`${table}: ${error.message}`);
       return (data?.length ?? 0) > 0;
-    }
+    };
 
     const [calendar, reviews, turnovers, market_intel, comp_sets] = await Promise.all([
       hasAny("bookings"),
