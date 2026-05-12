@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import styles from "./ChatShell.module.css";
 import {
   PropertyContext,
@@ -102,6 +104,7 @@ export function Topbar({
             </span>
           ) : null}
         </button>
+        <GuideAffordance />
         <button
           type="button"
           className={styles["icon-btn"]}
@@ -128,5 +131,61 @@ export function Topbar({
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * GuideAffordance — M8 Phase H C13 (D13).
+ *
+ * "?" icon-btn next to the audit icon; opens /koast/guide/ on click.
+ * Tooltip "Guide" surfaces on hover to provide semantic clarity without
+ * cluttering the topbar with a text button (R-3 sign-off — δ icon+tooltip).
+ */
+function GuideAffordance() {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+    >
+      <Link
+        href="/koast/guide/"
+        className={styles["icon-btn"]}
+        title="Guide"
+        aria-label="Guide"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="9" />
+          <path
+            d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="17" r="0.6" fill="currentColor" />
+        </svg>
+      </Link>
+      {showTip ? (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 6,
+            padding: "4px 8px",
+            background: "var(--deep-sea)",
+            color: "var(--shore)",
+            fontSize: 11,
+            borderRadius: 4,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 50,
+          }}
+        >
+          Guide
+        </span>
+      ) : null}
+    </span>
   );
 }
