@@ -1,7 +1,8 @@
 # Agent Loop v1 — Milestone 9 Conventions
 
-**Status:** Locked, v2.0
+**Status:** Locked, v2.1
 **Drafted:** 2026-05-12
+**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-9-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-12-m9-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -15,6 +16,14 @@
 **Naming:** "Honesty + Voice Substrate" — M8 shipped the visible surface of trust; M9 ships the underlying architecture of honesty.
 
 ## Changelog
+
+**v2.1 — 2026-05-12 (M9 Phase A)**
+
+- §6.3 correction: API route test infrastructure exists (M6/M7 D38 substrate at `/api/agent/artifact` + `/api/agent/turn`); 7 endpoints owe tests (not 5). Phase B+ closes carry-forwards as adjacent work — no retroactive backfill in Phase A.
+- New process discipline: conventions drafting must include "verify against shipped state" step before lock. M9 v2.0 §6.3 framing was drafted without verifying infrastructure absence; Phase 1 STOP audit caught it. Future revisions + M10 drafting include explicit verification step.
+- §3 phase-budget acknowledgment: Phase A's 1-2 day estimate was scope-miss not duration-miss (infrastructure mostly existed; actual scope was doc + helpers + 1 exemplar ≈ half day). Other M9 phase budgets may have similar drift; Phase B kickoff re-budgets against actual M9 pace.
+- §6 structural: §6.3 reframed as "M8 endpoint test carry-forwards (corrected v2.1)"; prior §6.3 substrate-enabling content moves to §6.4 with the API-route-test bullet updated (its v2.0 framing was the corrected error).
+- Phase A artifacts shipped: `docs/testing/api-route-tests.md` (canonical pattern doc), `src/__tests__/helpers/supabase.ts` (shared mock factory), `src/app/api/audit-feed/unread-count/__tests__/route.test.ts` (canonical exemplar, 7 tests).
 
 **v2.0 — 2026-05-12** — Initial drafting against SHAPE 2 scope (~10 items, ~4 weeks). Cluster A (honesty substrate: output-schema enforcement + confidence metadata + sufficiency thresholds + tonal regression + substrate-catch coverage + completion-emission guard), Cluster B (voice substrate: voice_mode as memory_fact entity_type='host', Mode 2 propagation, original_draft diff capture), Cluster E (cleanup: review_rules drop + reviews-generate refactor, snapshot table drop, idle-status side-effect-on-GET fix, pricing_apply action_type seeding). Inherits M8 v1.7 discipline (10 what-worked patterns + 7 process-gap locks). Decisions D22-D31. Phase plan A-H, ~24 working days.
 
@@ -584,11 +593,35 @@ If Round-2 question surfaces during implementation: halt item, write to `milesto
 - Per-property voice variation (Belief 7 "fills in over time") — first multi-brand operator unblocks.
 - Embeddings as voice-extraction complement — post-Mode-1-generative.
 
-## 6.3 Substrate-enabling work happening *during* M9 (not anti-scope)
+## 6.3 M8 endpoint test carry-forwards (corrected v2.1)
+
+API route test infrastructure shipped at M6/M7 D38 (`/api/agent/artifact/__tests__/route.test.ts` + `/api/agent/turn/__tests__/route.test.ts`). M9 Phase A canonicalized the pattern (`docs/testing/api-route-tests.md`) + shared helpers (`src/__tests__/helpers/supabase.ts`) + a third exemplar at `/api/audit-feed/unread-count/__tests__/route.test.ts`.
+
+7 M8 endpoints currently lack route tests:
+
+- `/api/audit-feed/list` (Phase C F9)
+- `/api/audit-feed/since` (Phase C F9)
+- `/api/audit-feed/unread-count` (Phase G C4) — **shipped Phase A** as canonical exemplar
+- `/api/audit-feed/mark-seen` (Phase G C4)
+- `/api/dashboard/tab-visibility` (Phase E C6) — helper-tested
+- `/api/onboarding/idle-status` (Phase F C3) — also owes side-effect-on-GET fix per M9 Cluster E (E1)
+- `/api/agent/conversations` (Phase B/D)
+
+Phase B+ closes these as adjacent work when touching the endpoints. No retroactive backfill in Phase A (Trap 1 from Phase A diagnostic).
+
+v2.0 originally framed this as 5 carry-forwards requiring infrastructure installation. Phase 1 STOP audit on 2026-05-12 corrected:
+
+- Infrastructure exists (2 working exemplars at `/api/agent/artifact` + `/api/agent/turn`)
+- Actual count is 7 (not 5)
+- Gap is unwritten tests, not missing infrastructure
+
+This correction prompted the new process discipline captured in §4.1 changelog and §3 phase-budget acknowledgment: conventions drafting must include explicit "verify against shipped state" before locking architectural framing.
+
+## 6.4 Substrate-enabling work happening *during* M9 (not anti-scope)
 
 These look like scope expansion but are the cost of doing the items right:
 
-- API route test infrastructure (X2) — closes 5 separate M8 carry-forwards (F9 / C5 / C4 / audit-feed / route-tests). Phase A first-session work.
+- API route test pattern documentation + shared helpers + canonical exemplar (Phase A complete) — canonicalizes the M6/M7 pattern; substrate-enabling for Phase B+ endpoint tests.
 - Memory tab voice section content (M8 F1 extension) — voice_mode renders here per D25.
 - Voice doctrine §5 enumeration discipline — anti-pattern catalog stays synced with regex test layer per D24.
 - Repomix regenerate (Phase A complete) — stale May 5 output replaced by current f6e4f64 state (6.91 MB).
