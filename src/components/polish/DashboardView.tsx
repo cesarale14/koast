@@ -770,7 +770,7 @@ function PricingIntelligenceCard({
           <>
             <h2 style={heroTitleStyle}>Measuring your rates, quietly.</h2>
             <p style={heroSubtitleStyle}>
-              Koast is learning your rate patterns across {propertyCount} propert{propertyCount === 1 ? "y" : "ies"} and 90 forward dates. Once we&apos;ve captured more channel rates, we&apos;ll surface real opportunities here.
+              Koast is collecting weekend rate signals across {propertyCount} propert{propertyCount === 1 ? "y" : "ies"}. A confidence-banded recommendation lands here once at least four upcoming weekends have enough engine signals to band reliably &mdash; typically within a day or two of property connection.
             </p>
           </>
         ) : (
