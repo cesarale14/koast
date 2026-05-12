@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { callLLMWithEnvelope } from "@/lib/agent/llm-call";
+import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
 
 interface PropertyContext {
   name: string;
@@ -41,6 +43,19 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey });
 }
 
+const MODEL = "claude-sonnet-4-20250514";
+
+/**
+ * Site 2 — generateGuestReview (M9 Phase B F3).
+ *
+ * Makes TWO Anthropic SDK calls (review_text + private_note). Per
+ * Q-B3 resolution: two envelopes, one per SDK call. Each call gets
+ * its own buildEnvelope reflecting that call's context + purpose.
+ *
+ * Backward-compat (Option B migration): signature still returns
+ * `Promise<ReviewResult>`. F3 envelopes flow through internally; the
+ * function extracts `.content` and assembles the legacy shape.
+ */
 export async function generateGuestReview(
   booking: BookingContext,
   property: PropertyContext,
@@ -53,10 +68,7 @@ export async function generateGuestReview(
     ? rule.target_keywords.join(", ")
     : "clean, location, comfortable";
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 400,
-    system: `You are writing a host review for an Airbnb/VRBO guest. The review should be:
+  const reviewSystem = `You are writing a host review for an Airbnb/VRBO guest. The review should be:
 - Unique and specific to this guest's stay (never generic)
 - ${rule.tone} in tone
 - 2-4 sentences long
@@ -71,26 +83,60 @@ Booking source: ${booking.platform}
 
 IMPORTANT: Every review must be different. Vary sentence structure, opening phrases, and specific details. Never start two reviews the same way. Never use these overused phrases: 'wonderful guest', 'highly recommend', 'welcome back anytime' — find fresh ways to express the same sentiment.
 
-Return ONLY the review text, nothing else.`,
-    messages: [{ role: "user", content: "Write the guest review." }],
-  });
+Return ONLY the review text, nothing else.`;
 
-  const reviewText = response.content.find((b) => b.type === "text")?.text ?? "";
+  const reviewEnvelope = await callLLMWithEnvelope(
+    {
+      client,
+      model: MODEL,
+      max_tokens: 400,
+      system: reviewSystem,
+      messages: [{ role: "user", content: "Write the guest review." }],
+    },
+    {
+      buildEnvelope: (text): AgentTextOutput =>
+        buildGuestReviewEnvelope(text, rule, booking),
+      repairPrompt:
+        "Your previous review was empty or off-shape. Provide a 2-4 sentence host review of the guest, specific to their stay.",
+    },
+  );
 
-  // Generate private note
-  const noteResp = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 100,
-    messages: [{
-      role: "user",
-      content: `Write a brief, friendly private note (1 sentence) thanking ${firstName} for staying ${n} nights at ${property.name}. Example: "Thanks for keeping the place in great shape during your stay!" Return ONLY the note.`,
-    }],
-  });
-  const privateNote = noteResp.content.find((b) => b.type === "text")?.text ?? "";
+  // Site 2's second call — private note thanking the guest. No system
+  // prompt; the entire prompt lives in the user message. Q-B3: each
+  // call gets its own envelope — private notes have different context
+  // (shorter, less rule-driven) and different sufficiency profile.
+  const noteEnvelope = await callLLMWithEnvelope(
+    {
+      client,
+      model: MODEL,
+      max_tokens: 100,
+      messages: [{
+        role: "user",
+        content: `Write a brief, friendly private note (1 sentence) thanking ${firstName} for staying ${n} nights at ${property.name}. Example: "Thanks for keeping the place in great shape during your stay!" Return ONLY the note.`,
+      }],
+    },
+    {
+      buildEnvelope: (text): AgentTextOutput =>
+        buildPrivateNoteEnvelope(text),
+      repairPrompt:
+        "Your previous note was empty. Provide a one-sentence thank-you note.",
+    },
+  );
 
-  return { review_text: reviewText, private_note: privateNote, recommended: true };
+  return {
+    review_text: reviewEnvelope.content,
+    private_note: noteEnvelope.content,
+    recommended: true,
+  };
 }
 
+/**
+ * Site 3 — generateReviewResponse (M9 Phase B F3).
+ *
+ * Single SDK call. Confidence and sufficiency derive from the
+ * presence of the incoming review's text and rating — those anchor
+ * the response.
+ */
 export async function generateReviewResponse(
   incomingText: string,
   incomingRating: number,
@@ -105,10 +151,7 @@ export async function generateReviewResponse(
 
   const ratingCategory = incomingRating >= 4 ? "positive" : incomingRating >= 3 ? "mixed" : "negative";
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 300,
-    system: `Write a host response to a guest review on Airbnb/VRBO.
+  const responseSystem = `Write a host response to a guest review on Airbnb/VRBO.
 
 If positive (4-5 stars): Thank the guest warmly, reference something specific they mentioned, naturally include a property keyword from [${keywords}], invite them back. Keep it 2-3 sentences.
 
@@ -121,18 +164,36 @@ Rating: ${incomingRating} stars (${ratingCategory})
 Guest: ${firstName}, stayed ${n} nights
 Property: ${property.name} in ${property.city ?? "the area"}
 
-Return ONLY the response text.`,
-    messages: [{ role: "user", content: "Write the host response." }],
-  });
+Return ONLY the response text.`;
 
-  const responseText = response.content.find((b) => b.type === "text")?.text ?? "";
-  return { response_text: responseText };
+  const envelope = await callLLMWithEnvelope(
+    {
+      client,
+      model: MODEL,
+      max_tokens: 300,
+      system: responseSystem,
+      messages: [{ role: "user", content: "Write the host response." }],
+    },
+    {
+      buildEnvelope: (text): AgentTextOutput =>
+        buildReviewResponseEnvelope(text, incomingText, incomingRating),
+      repairPrompt:
+        "Your previous response was empty or off-shape. Provide a 2-4 sentence host response to the incoming review.",
+    },
+  );
+
+  return { response_text: envelope.content };
 }
 
-// Session 6.2 — generate a host's review of a guest, conditioned on
-// the guest's incoming review of the property (vibes from rating +
-// optional private feedback). Distinct from the legacy
-// generateGuestReview path which generated from booking context only.
+/**
+ * Site 4 — generateGuestReviewFromIncoming (M9 Phase B F3).
+ *
+ * Strongest anti-fabrication prompt-level discipline in the codebase.
+ * Per Q-B4 sign-off: bias rules STAY at prompt-level; F3 does NOT
+ * add structural .refine() for them. The envelope's `hedge` field
+ * surfaces a contextual qualifier when private feedback flags issues,
+ * giving the rendering layer a cue to handle with measured framing.
+ */
 export async function generateGuestReviewFromIncoming(input: {
   incoming_text: string | null;
   incoming_rating: number | null;
@@ -145,7 +206,7 @@ export async function generateGuestReviewFromIncoming(input: {
   const guest = input.guest_name?.split(" ")[0] ?? "the guest";
   const stayDesc = input.nights ? `${input.nights}-night stay` : "stay";
   const ratingTone = (input.incoming_rating ?? 5) >= 4 ? "positive" : "neutral-to-critical";
-  const flagged = input.private_feedback && input.private_feedback.trim().length > 0;
+  const flagged = !!(input.private_feedback && input.private_feedback.trim().length > 0);
 
   const system = `Write a host's review of a guest for Airbnb. Tone: ${ratingTone}. Length: 100-300 characters. Honest, not performatively warm. Never fabricate specifics.
 
@@ -165,15 +226,24 @@ Bias rules:
 
 Return ONLY the review text. No preamble, no quotes around it.`;
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 200,
-    system,
-    messages: [{ role: "user", content: "Write the guest review." }],
-  });
+  const envelope = await callLLMWithEnvelope(
+    {
+      client,
+      model: MODEL,
+      max_tokens: 200,
+      system,
+      messages: [{ role: "user", content: "Write the guest review." }],
+    },
+    {
+      buildEnvelope: (text): AgentTextOutput =>
+        buildIncomingReviewEnvelope(text, input, flagged),
+      repairPrompt:
+        "Your previous review was empty or off-shape. Provide a 100-300 character host review of the guest, on tone with the inputs.",
+    },
+  );
 
-  const text = response.content.find((b) => b.type === "text")?.text?.trim() ?? "";
-  return { public_review_draft: text };
+  // Site 4 trimmed text per the original implementation.
+  return { public_review_draft: envelope.content.trim() };
 }
 
 export function calculatePublishTime(
@@ -192,4 +262,137 @@ export function calculatePublishTime(
 
   // Normal delay
   return new Date(checkout.getTime() + delayDays * 24 * 60 * 60 * 1000);
+}
+
+// ---- F3 envelope builders (Phase B deterministic-from-context heuristics) ----
+
+/**
+ * Site 2 first call. Confidence keys off rule.target_keywords (explicit
+ * host preferences = confirmed) and rule.tone presence; sufficiency
+ * tracks the same gradient plus booking.guest_name as a third axis.
+ */
+function buildGuestReviewEnvelope(
+  text: string,
+  rule: ReviewRule,
+  booking: BookingContext,
+): AgentTextOutput {
+  const hasKeywords = rule.target_keywords.length > 0;
+  const hasTone = rule.tone.trim().length > 0;
+  const hasGuestName = booking.guest_name != null && booking.guest_name !== "";
+  const presentCount = [hasKeywords, hasTone, hasGuestName].filter(Boolean).length;
+
+  let confidence: AgentTextOutput["confidence"];
+  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  if (presentCount === 3) {
+    confidence = "confirmed";
+    sufficiency = "rich";
+  } else if (presentCount > 0) {
+    confidence = "high_inference";
+    sufficiency = "sparse";
+  } else {
+    confidence = "active_guess";
+    sufficiency = "empty";
+  }
+
+  return {
+    content: text,
+    confidence,
+    source_attribution: [],
+    sufficiency_signal: sufficiency,
+  };
+}
+
+/**
+ * Site 2 second call. Private notes have minimal context-dependence;
+ * the prompt only takes guest_name + property_name + nights, all
+ * universally available. Confidence stays at "active_guess" because
+ * the content is generic (a thank-you), and sufficiency is the
+ * universal-fallback "sparse" — there's no learned host preference
+ * feeding this output.
+ */
+function buildPrivateNoteEnvelope(text: string): AgentTextOutput {
+  return {
+    content: text,
+    confidence: "active_guess",
+    source_attribution: [],
+    sufficiency_signal: "sparse",
+  };
+}
+
+/**
+ * Site 3. Anchors on the incoming review: text + rating both being
+ * present is the strongest input signal. Empty incomingText (rare —
+ * Airbnb sometimes returns ratings-only) downgrades confidence.
+ */
+function buildReviewResponseEnvelope(
+  text: string,
+  incomingText: string,
+  incomingRating: number,
+): AgentTextOutput {
+  const hasText = incomingText.trim().length > 0;
+  const hasRating = Number.isFinite(incomingRating);
+  let confidence: AgentTextOutput["confidence"];
+  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  if (hasText && hasRating) {
+    confidence = "confirmed";
+    sufficiency = "rich";
+  } else if (hasText || hasRating) {
+    confidence = "high_inference";
+    sufficiency = "sparse";
+  } else {
+    confidence = "active_guess";
+    sufficiency = "empty";
+  }
+
+  return {
+    content: text,
+    confidence,
+    source_attribution: [],
+    sufficiency_signal: sufficiency,
+  };
+}
+
+/**
+ * Site 4. Confidence keys off the same incoming-review presence as
+ * Site 3. Adds `hedge` when private feedback flags issues — gives
+ * the rendering layer a cue to surface with measured framing
+ * (without inlining hedge phrases into the model's output, which is
+ * Phase F D24 tonal regression territory).
+ */
+function buildIncomingReviewEnvelope(
+  text: string,
+  input: {
+    incoming_text: string | null;
+    incoming_rating: number | null;
+    private_feedback: string | null;
+  },
+  flagged: boolean,
+): AgentTextOutput {
+  const hasIncomingText = input.incoming_text != null && input.incoming_text.trim().length > 0;
+  const hasIncomingRating = input.incoming_rating != null;
+  let confidence: AgentTextOutput["confidence"];
+  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  if (hasIncomingText && hasIncomingRating) {
+    confidence = "confirmed";
+    sufficiency = "rich";
+  } else if (hasIncomingText || hasIncomingRating) {
+    confidence = "high_inference";
+    sufficiency = "sparse";
+  } else {
+    confidence = "active_guess";
+    sufficiency = "empty";
+  }
+
+  const envelope: AgentTextOutput = {
+    content: text,
+    confidence,
+    source_attribution: [],
+    sufficiency_signal: sufficiency,
+  };
+
+  if (flagged) {
+    envelope.hedge = "private feedback flagged issues during stay; drafted with measured tone";
+  }
+
+  return envelope;
 }

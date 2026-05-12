@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { callLLMWithEnvelope } from "@/lib/agent/llm-call";
+import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
 
 interface PropertyContext {
   name: string;
@@ -79,15 +81,80 @@ Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include sp
     { role: "user", content: latestMessage },
   ];
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 300,
-    system: systemPrompt,
-    messages,
-  });
+  // M9 Phase B F3: wrap the LLM call in the AgentTextOutput envelope
+  // (D22 parallel structured channel). Envelope is constructed
+  // post-extraction from caller context; confidence + sufficiency
+  // are deterministic-from-context per Phase B's interpretation B
+  // (LLM continues to return plain text; generator wraps).
+  //
+  // Backward compatibility (Option B migration): signature stays
+  // Promise<string>; callers see legacy shape. Phase C wires the
+  // envelope through to rendering surfaces.
+  const envelope = await callLLMWithEnvelope(
+    {
+      client,
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 300,
+      system: systemPrompt,
+      messages,
+    },
+    {
+      buildEnvelope: (text): AgentTextOutput =>
+        buildDraftEnvelope(text, details ?? null),
+      repairPrompt:
+        "Your previous draft was empty. Please provide a complete, on-topic reply to the guest in 2-4 sentences.",
+    },
+  );
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  return textBlock ? textBlock.text : "";
+  return envelope.content;
+}
+
+/**
+ * Build the AgentTextOutput envelope for a generateDraft response.
+ *
+ * Phase B uses deterministic-from-context heuristics:
+ *   - confidence:        confirmed when full property details present;
+ *                        high_inference when partial; active_guess when none
+ *   - sufficiency_signal: matches the same gradient (rich/sparse/empty)
+ *   - source_attribution: empty for Phase B; Phase C wires this from
+ *                        the memory retrieval path
+ *
+ * Phase C (D23 sufficiency catalog) replaces these heuristics with
+ * proper per-tool threshold checks.
+ */
+function buildDraftEnvelope(
+  text: string,
+  details: PropertyDetailsContext | null,
+): AgentTextOutput {
+  const requiredKeys: Array<keyof PropertyDetailsContext> = [
+    "wifi_network",
+    "door_code",
+    "parking_instructions",
+    "checkin_time",
+  ];
+  const presentCount = details
+    ? requiredKeys.filter((k) => details[k] != null && details[k] !== "").length
+    : 0;
+
+  let confidence: AgentTextOutput["confidence"];
+  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  if (presentCount === requiredKeys.length) {
+    confidence = "confirmed";
+    sufficiency = "rich";
+  } else if (presentCount > 0) {
+    confidence = "high_inference";
+    sufficiency = "sparse";
+  } else {
+    confidence = "active_guess";
+    sufficiency = "empty";
+  }
+
+  return {
+    content: text,
+    confidence,
+    source_attribution: [],
+    sufficiency_signal: sufficiency,
+  };
 }
 
 // Auto-pilot message classification

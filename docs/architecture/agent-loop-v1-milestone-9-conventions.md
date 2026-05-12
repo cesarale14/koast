@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 9 Conventions
 
-**Status:** Locked, v2.1
+**Status:** Locked, v2.2
 **Drafted:** 2026-05-12
-**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline)
+**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-9-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-12-m9-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -16,6 +16,16 @@
 **Naming:** "Honesty + Voice Substrate" — M8 shipped the visible surface of trust; M9 ships the underlying architecture of honesty.
 
 ## Changelog
+
+**v2.2 — 2026-05-12 (M9 Phase B close)**
+
+- **D26 locked = α (generic wrapper).** First-call-site implementation (Site 1 — `messaging.ts:generateDraft`) demonstrated α's fit empirically: per-site marginal cost ~7 lines wrapper invocation + ~25-line `buildEnvelope` helper. Repair retry + fall-through handled once in the wrapper; Sites 2-4 inherit. Counter-test for β: ~120 lines duplicated control flow across 4 sites. α wins on minimal duplication + clean composition + inheritance to ~40 future tool catalog.
+- **Q-B3 resolved: two envelopes per SDK call.** `generateGuestReview` makes 2 sequential SDK calls; applying the wrapper twice with separate `buildEnvelope` functions is the natural fit. Different context inputs + different sufficiency profiles; one combined envelope would have forced artificial flattening.
+- **Q-B4 resolved: Site 4 bias rules stay at prompt-level** (per Phase B sign-off). F3 does NOT add structural `.refine()` for `generateGuestReviewFromIncoming`'s rating-tier banned-phrase patterns. Voice-doctrine refinements remain D24 Phase F territory (tonal regression substrate).
+- **New §6.5 — M10 carry-forwards from Phase B sign-off.** Three items: Site 5 chat-text catch (Phase D D27/A5 ownership confirmed), model version standardization (sonnet-4-5 vs sonnet-4 drift surfaced at Site 5), G8 verify-shipped-state at every phase kickoff (v2.1 discipline re-validated by Phase B's 5-vs-4 finding).
+- **§7.7 amended.** G8 carries forward to every M9 phase kickoff (not just conventions-revision time). Phase C onward applies G8 to its Phase 1 STOP audit.
+- **Phase B artifacts (Sites 1-4 substrate):** `src/lib/agent/schemas/agent-text-output.ts` (D22 envelope + SourceRef Zod schemas), `src/lib/agent/llm-call.ts` (α wrapper `callLLMWithEnvelope` + `LLMSchemaError`), `src/lib/claude/messaging.ts` (Site 1 refactor), `src/lib/reviews/generator.ts` (Sites 2-4 refactor with two-envelope pattern at Site 2 + hedge metadata at Site 4 when private feedback flags issues). 28 new tests across 4 test files (7 schema + 6 wrapper + 5 Site 1 + 10 Sites 2-4).
+- **Phase B budget actuals:** v2.0 nominal Days 3-6; actual <1 working day implementation time. Continues Phase A pattern — phase budgets are scope-shaped, not duration-shaped at typical pace. Phase C kickoff applies the same calibration check via G8.
 
 **v2.1 — 2026-05-12 (M9 Phase A)**
 
@@ -236,17 +246,21 @@ Three options considered: (a) column on `properties` (forces per-property voice;
 - Mode 2 propagation (D28, Round-2) reads voice_mode at LLM call sites and applies appropriate register.
 - Supersession events captured via M8 `supersession_reason` column with reasons like `'host_corrected'` or `'inferred_drift'`.
 
-## D26 — Output-schema enforcement locus deferred to Round-2 (A1)
+## D26 — Output-schema enforcement locus locked α (A1) [updated v2.2]
 
-**Decision:** Defer architectural locus for F3 Zod schema enforcement to first-LLM-call-site implementation in Cluster A Phase B.
+**Decision (v2.2 lock):** α — generic wrapper module at `src/lib/agent/llm-call.ts` (`callLLMWithEnvelope`). All 4 Phase B sites use the wrapper. Site 2 invokes it twice (Q-B3 — two envelopes, one per SDK call).
 
-Two options remain open until implementation surfaces preference:
-- (a) Generic LLM-call wrapper module — single `executeLLMCall(prompt, schema, retries)` helper used by all call sites
-- (b) Per-call-site Zod schemas — schemas live alongside their call sites; common patterns extract to shared module
+**Reasoning:** First call-site implementation (Site 1 — `messaging.ts:generateDraft` at Phase B Site 1 sign-off) demonstrated α's fit empirically. Per-site marginal cost ≈ 7 lines wrapper invocation + ~25-line `buildEnvelope` helper encoding deterministic-from-context heuristics. Repair retry + fall-through to error handled once in the wrapper; Sites 2-4 inherit the behavior without duplication.
 
-**Reasoning:** M8 deferred 8 of 20 ambiguities to Round-2; that pattern worked. Output-schema enforcement is a substrate decision better made when first call site refactor reveals patterns. Diagnostic surfaced both options; first call site implementation reveals which fits cleaner.
+Counter-test for β (per-site Zod) would duplicate ~30 lines of call + extract + build + validate + retry + throw control flow per site, ~120 lines across 4 sites. α wins on minimal duplication, clean composition, and inheritance to the ~40 future tool catalog (Method-in-code Phase 2).
 
-**Surface protocol:** When Phase B begins first LLM-call-site refactor, surface to human via `milestones/M9/round-2-questions.md`. Lock at that point; subsequent sites match locked pattern.
+Option γ (hybrid) doesn't apply for Phase B since Site 5 is out of scope per Path A. If Site 5's text-output path ever lands under F3 (currently D27/A5 territory), the wrapper either extends to support streaming or γ becomes the fit — that decision lives in M10 alongside the model-version standardization (§6.5 CF #2).
+
+**Implications:**
+- All 4 Phase B sites use `callLLMWithEnvelope`. Site 2 (`generateGuestReview`) invokes it twice (Q-B3 two-envelopes resolution).
+- Site-specific customization happens via the `buildEnvelope` callback + optional `repairPrompt` override. Adequate flexibility without site-specific control flow.
+- Backward compatibility preserved (Option B migration): generator signatures stay legacy (`Promise<string>` for Site 1, `Promise<ReviewResult>` for Site 2, etc.). Envelope flows through F3 internally. Phase C wires the envelope through to rendering surfaces.
+- The wrapper exports `LLMSchemaError` for callers that want to distinguish schema-failure from other errors. Default behavior is throw-and-propagate; downstream routes' existing try/catch + 500-with-message pattern handles it correctly per CLAUDE.md error discipline.
 
 ## D27 — Substrate-catch for chat-text refusals deferred to Round-2 (A5)
 
@@ -622,10 +636,21 @@ This correction prompted the new process discipline captured in §4.1 changelog 
 These look like scope expansion but are the cost of doing the items right:
 
 - API route test pattern documentation + shared helpers + canonical exemplar (Phase A complete) — canonicalizes the M6/M7 pattern; substrate-enabling for Phase B+ endpoint tests.
+- D22 `AgentTextOutput` envelope schema + `callLLMWithEnvelope` α-wrapper (Phase B complete) — F3 substrate at single-shot LLM call sites 1-4. Phase C wires rendering propagation via D22 metadata; Phase D/A5 extends to Site 5 agent-loop text path.
 - Memory tab voice section content (M8 F1 extension) — voice_mode renders here per D25.
 - Voice doctrine §5 enumeration discipline — anti-pattern catalog stays synced with regex test layer per D24.
 - Repomix regenerate (Phase A complete) — stale May 5 output replaced by current f6e4f64 state (6.91 MB).
 - `original_draft` storage migration if D29 lands on option (a) or (c) — small migration; non-blocking.
+
+## 6.5 M10 carry-forwards from M9 Phase B sign-off [added v2.2]
+
+Three items surfaced during Phase B sign-off; explicitly captured here to prevent silent drift.
+
+1. **Site 5 chat-text substrate-catch.** Per Path A sign-off, the agent loop's text output is OUT of F3 scope at Phase B. Coverage rolls forward to D27 (substrate-catch for chat-text refusals, Phase D Round-2) and A5 (substrate-catch coverage, Phase D). Not an M10 item per se — already named in Phase D scope. Captured here for traceability so that Phase D Phase 1 STOP audit picks up the Site 5 thread without re-derivation.
+
+2. **Model version standardization.** Sites 1-4 use `claude-sonnet-4-20250514`; Site 5 (agent loop) uses `claude-sonnet-4-5-20250929`. Model-version drift surfaced during Phase B Phase 1 STOP audit. Standardization is M10 candidate (out of M9 scope); requires deliberate decision on which model becomes canonical (newer Site 5 model is the natural answer but should be validated against the legacy 4 sites' use cases before flip — e.g., does Sonnet 4.5 maintain the anti-fabrication-strong behavior at Site 4 that Sonnet 4 demonstrated?).
+
+3. **G8 — verify-shipped-state at every M9 phase kickoff.** v2.1 introduced G8 as a conventions-drafting discipline ("verify against shipped state before locking architectural framing"). Phase B Phase 1 STOP audit re-validated its value by catching v2.0's 4-vs-5 site-count framing miss. v2.2 amends §7.7 to lock G8 at every M9 phase kickoff (not just at conventions-revision time). Phase C onward applies G8 to its Phase 1 STOP audit per §3.
 
 ---
 
@@ -721,6 +746,7 @@ M8 discipline gaps locked as M9 process:
 - **G5.** Side-effect-on-GET avoidance — Phase G closes M8 idle-status compromise (E1)
 - **G6.** Cross-surface coherence verification at phase close
 - **G7.** Substrate-step visual verification at Hard Checkpoints
+- **G8.** Verify-shipped-state at every M9 phase kickoff (v2.1 introduced as conventions-drafting discipline; v2.2 amends to ongoing per-phase process). Phase 1 STOP audit at each phase verifies the conventions doc's assumed shipped state against actual repo state BEFORE design proposal. Catches scope-frame misses before architectural decisions compound. M8 Phase F F.1 + M9 Phase A 5-vs-7 endpoint count + M9 Phase B 4-vs-5 LLM call site count all demonstrate the cost of skipping verification.
 
 New questions for v2.0 observation:
 
