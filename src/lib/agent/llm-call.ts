@@ -63,7 +63,7 @@ export interface LLMCallParams {
 export interface CallWithEnvelopeOptions {
   /**
    * Construct the envelope from the LLM's raw text. Caller-provided
-   * metadata (confidence, source_attribution, sufficiency_signal,
+   * metadata (confidence, source_attribution, output_grounding,
    * hedge) is encoded here; the wrapper validates the result against
    * AgentTextOutputSchema.
    */

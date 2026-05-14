@@ -115,7 +115,8 @@ Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include sp
  * Phase B uses deterministic-from-context heuristics:
  *   - confidence:        confirmed when full property details present;
  *                        high_inference when partial; active_guess when none
- *   - sufficiency_signal: matches the same gradient (rich/sparse/empty)
+ *   - output_grounding:  matches the same gradient (rich/sparse/empty)
+ *                        — renamed v2.3 per Q-C1 (c)
  *   - source_attribution: empty for Phase B; Phase C wires this from
  *                        the memory retrieval path
  *
@@ -137,23 +138,23 @@ function buildDraftEnvelope(
     : 0;
 
   let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  let grounding: AgentTextOutput["output_grounding"];
   if (presentCount === requiredKeys.length) {
     confidence = "confirmed";
-    sufficiency = "rich";
+    grounding = "rich";
   } else if (presentCount > 0) {
     confidence = "high_inference";
-    sufficiency = "sparse";
+    grounding = "sparse";
   } else {
     confidence = "active_guess";
-    sufficiency = "empty";
+    grounding = "empty";
   }
 
   return {
     content: text,
     confidence,
     source_attribution: [],
-    sufficiency_signal: sufficiency,
+    output_grounding: grounding,
   };
 }
 

@@ -4,7 +4,7 @@
  * Verifies:
  *   - Backward compatibility: signature stays Promise<string>; callers
  *     see legacy shape (Option B migration).
- *   - F3 envelope construction: confidence + sufficiency_signal track
+ *   - F3 envelope construction: confidence + output_grounding track
  *     property-details presence per Phase B's deterministic-from-context
  *     heuristics (Phase C replaces with D23 catalog).
  *   - Wrapper params: model, max_tokens, message assembly.
@@ -63,7 +63,7 @@ beforeEach(() => {
     content: "Hi! Wifi is in the welcome packet.",
     confidence: "confirmed",
     source_attribution: [],
-    sufficiency_signal: "rich",
+    output_grounding: "rich",
   });
 });
 
@@ -83,7 +83,7 @@ describe("generateDraft — envelope construction heuristics", () => {
     const envelope = wrapperCall[1].buildEnvelope("draft text");
 
     expect(envelope.confidence).toBe("confirmed");
-    expect(envelope.sufficiency_signal).toBe("rich");
+    expect(envelope.output_grounding).toBe("rich");
     expect(envelope.source_attribution).toEqual([]);
     expect(envelope.content).toBe("draft text");
   });
@@ -95,7 +95,7 @@ describe("generateDraft — envelope construction heuristics", () => {
     const envelope = wrapperCall[1].buildEnvelope("text");
 
     expect(envelope.confidence).toBe("high_inference");
-    expect(envelope.sufficiency_signal).toBe("sparse");
+    expect(envelope.output_grounding).toBe("sparse");
   });
 
   test("no property details → active_guess + empty", async () => {
@@ -105,7 +105,7 @@ describe("generateDraft — envelope construction heuristics", () => {
     const envelope = wrapperCall[1].buildEnvelope("text");
 
     expect(envelope.confidence).toBe("active_guess");
-    expect(envelope.sufficiency_signal).toBe("empty");
+    expect(envelope.output_grounding).toBe("empty");
   });
 });
 

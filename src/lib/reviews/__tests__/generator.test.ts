@@ -6,7 +6,7 @@
  *     migration; envelopes flow internally, downstream sees the same shape).
  *   - Q-B3 resolution: Site 2 makes TWO wrapper calls (two envelopes,
  *     one per SDK call).
- *   - Per-site envelope heuristics: confidence + sufficiency_signal
+ *   - Per-site envelope heuristics: confidence + output_grounding
  *     track the deterministic-from-context inputs each site has.
  *   - Site 4 hedge: SET when private feedback flags issues; ABSENT
  *     otherwise.
@@ -70,13 +70,13 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
         content: "Sarah was a thoughtful guest who kept the place spotless.",
         confidence: "confirmed",
         source_attribution: [],
-        sufficiency_signal: "rich",
+        output_grounding: "rich",
       })
       .mockResolvedValueOnce({
         content: "Thanks for taking such good care of Villa Jamaica!",
         confidence: "active_guess",
         source_attribution: [],
-        sufficiency_signal: "sparse",
+        output_grounding: "sparse",
       });
   });
 
@@ -99,7 +99,7 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
     const firstCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
     const envelope = firstCallOpts.buildEnvelope("test text");
     expect(envelope.confidence).toBe("confirmed");
-    expect(envelope.sufficiency_signal).toBe("rich");
+    expect(envelope.output_grounding).toBe("rich");
     expect(envelope.source_attribution).toEqual([]);
   });
 
@@ -110,7 +110,7 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
     const firstCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
     const envelope = firstCallOpts.buildEnvelope("test text");
     expect(envelope.confidence).toBe("active_guess");
-    expect(envelope.sufficiency_signal).toBe("empty");
+    expect(envelope.output_grounding).toBe("empty");
   });
 
   test("second-call envelope: private note is active_guess + sparse regardless of rule", async () => {
@@ -119,7 +119,7 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
     const secondCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[1][1];
     const envelope = secondCallOpts.buildEnvelope("Thanks!");
     expect(envelope.confidence).toBe("active_guess");
-    expect(envelope.sufficiency_signal).toBe("sparse");
+    expect(envelope.output_grounding).toBe("sparse");
   });
 });
 
@@ -131,7 +131,7 @@ describe("generateReviewResponse — Site 3", () => {
       content: "Thanks for the kind words, Sarah!",
       confidence: "confirmed",
       source_attribution: [],
-      sufficiency_signal: "rich",
+      output_grounding: "rich",
     });
   });
 
@@ -153,7 +153,7 @@ describe("generateReviewResponse — Site 3", () => {
     const opts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
     const envelope = opts.buildEnvelope("test response");
     expect(envelope.confidence).toBe("confirmed");
-    expect(envelope.sufficiency_signal).toBe("rich");
+    expect(envelope.output_grounding).toBe("rich");
   });
 
   test("envelope: empty incoming text → high_inference/sparse", async () => {
@@ -162,7 +162,7 @@ describe("generateReviewResponse — Site 3", () => {
     const opts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
     const envelope = opts.buildEnvelope("test response");
     expect(envelope.confidence).toBe("high_inference");
-    expect(envelope.sufficiency_signal).toBe("sparse");
+    expect(envelope.output_grounding).toBe("sparse");
   });
 });
 
@@ -174,7 +174,7 @@ describe("generateGuestReviewFromIncoming — Site 4", () => {
       content: "  Communicated clearly and respected the space.  ",
       confidence: "confirmed",
       source_attribution: [],
-      sufficiency_signal: "rich",
+      output_grounding: "rich",
     });
   });
 

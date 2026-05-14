@@ -12,9 +12,9 @@
  *     caller context + LLM output. The LLM continues to return plain
  *     text; the generator extracts and wraps. F3 Zod enforces the
  *     wrapped envelope shape.
- *   - Confidence + source_attribution + sufficiency_signal are
+ *   - Confidence + source_attribution + output_grounding are
  *     deterministic-from-context at Phase B; Phase C (D23) wires the
- *     sufficiency catalog and Phase E voice work touches `hedge`.
+ *     per-generator-call catalog and Phase E voice work touches `hedge`.
  *
  * Out of Phase B scope (covered separately):
  *   - Site 5 (agent loop) text-output enforcement → A5/D27 (Phase D)
@@ -73,10 +73,22 @@ export const AgentTextOutputSchema = z.object({
   hedge: z.string().optional(),
 
   /**
-   * Memory-retrieval sufficiency signal from M8 read_memory pattern.
-   * Phase C (D23) integrates this with the per-tool sufficiency catalog.
+   * Output-grounding signal for this specific generation — distinct
+   * from the M8 C3 host-onboarding `SufficiencyLevel` (`rich | lean
+   * | thin` in `src/lib/agent/sufficiency.ts`) and distinct from the
+   * M3 `read_memory` tool's `data_sufficiency.sufficiency_signal`
+   * (which shares the `rich | sparse | empty` vocabulary because
+   * read_memory is the upstream substrate this envelope inherits
+   * grounding values from when memory retrieval underlies the
+   * generated content).
+   *
+   * Renamed v2.3 from `sufficiency_signal` per Q-C1 (c): field-name
+   * level distinction between output-time grounding (this) vs
+   * host-onboarding sufficiency (M8 C3) prevents conflation at the
+   * envelope rendering boundary. Phase C (D23) populates this via
+   * the per-generator-call catalog rather than inline heuristics.
    */
-  sufficiency_signal: z.enum(["rich", "sparse", "empty"]).optional(),
+  output_grounding: z.enum(["rich", "sparse", "empty"]).optional(),
 });
 
 export type AgentTextOutput = z.infer<typeof AgentTextOutputSchema>;

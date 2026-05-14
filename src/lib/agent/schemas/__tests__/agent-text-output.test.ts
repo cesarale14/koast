@@ -25,7 +25,7 @@ describe("AgentTextOutputSchema", () => {
         { type: "memory_fact", id: "uuid-1", label: "Villa Jamaica wifi" },
       ],
       hedge: "based on the last 30 days",
-      sufficiency_signal: "rich",
+      output_grounding: "rich",
     });
     expect(result.success).toBe(true);
   });

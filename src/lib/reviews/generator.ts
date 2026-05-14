@@ -282,7 +282,7 @@ function buildGuestReviewEnvelope(
   const presentCount = [hasKeywords, hasTone, hasGuestName].filter(Boolean).length;
 
   let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  let sufficiency: AgentTextOutput["output_grounding"];
   if (presentCount === 3) {
     confidence = "confirmed";
     sufficiency = "rich";
@@ -298,7 +298,7 @@ function buildGuestReviewEnvelope(
     content: text,
     confidence,
     source_attribution: [],
-    sufficiency_signal: sufficiency,
+    output_grounding: sufficiency,
   };
 }
 
@@ -315,7 +315,7 @@ function buildPrivateNoteEnvelope(text: string): AgentTextOutput {
     content: text,
     confidence: "active_guess",
     source_attribution: [],
-    sufficiency_signal: "sparse",
+    output_grounding: "sparse",
   };
 }
 
@@ -332,7 +332,7 @@ function buildReviewResponseEnvelope(
   const hasText = incomingText.trim().length > 0;
   const hasRating = Number.isFinite(incomingRating);
   let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  let sufficiency: AgentTextOutput["output_grounding"];
   if (hasText && hasRating) {
     confidence = "confirmed";
     sufficiency = "rich";
@@ -348,7 +348,7 @@ function buildReviewResponseEnvelope(
     content: text,
     confidence,
     source_attribution: [],
-    sufficiency_signal: sufficiency,
+    output_grounding: sufficiency,
   };
 }
 
@@ -371,7 +371,7 @@ function buildIncomingReviewEnvelope(
   const hasIncomingText = input.incoming_text != null && input.incoming_text.trim().length > 0;
   const hasIncomingRating = input.incoming_rating != null;
   let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["sufficiency_signal"];
+  let sufficiency: AgentTextOutput["output_grounding"];
   if (hasIncomingText && hasIncomingRating) {
     confidence = "confirmed";
     sufficiency = "rich";
@@ -387,7 +387,7 @@ function buildIncomingReviewEnvelope(
     content: text,
     confidence,
     source_attribution: [],
-    sufficiency_signal: sufficiency,
+    output_grounding: sufficiency,
   };
 
   if (flagged) {
