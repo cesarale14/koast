@@ -156,12 +156,17 @@ export async function POST(
       reviewId = inserted.id;
     }
 
+    // M9 Phase C: D22 Option II parallel return. Site 2 has two SDK
+    // calls per Q-B3 lock; both envelopes surfaced. UI integration
+    // deferred to M10 per α + γ blend (C1 uniform).
     return NextResponse.json({
       review_id: reviewId,
       review_text: result.review_text,
       private_note: result.private_note,
       status: reviewData.status,
       scheduled_publish_at: reviewData.scheduledPublishAt,
+      envelope_review: result.envelope_review,
+      envelope_note: result.envelope_note,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
