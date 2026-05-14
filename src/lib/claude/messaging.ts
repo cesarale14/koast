@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { callLLMWithEnvelope } from "@/lib/agent/llm-call";
 import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
+import { generateDraftThreshold } from "@/lib/agent/sufficiency-catalog";
 
 interface PropertyContext {
   name: string;
@@ -112,49 +113,35 @@ Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include sp
 /**
  * Build the AgentTextOutput envelope for a generateDraft response.
  *
- * Phase B uses deterministic-from-context heuristics:
- *   - confidence:        confirmed when full property details present;
- *                        high_inference when partial; active_guess when none
- *   - output_grounding:  matches the same gradient (rich/sparse/empty)
- *                        — renamed v2.3 per Q-C1 (c)
- *   - source_attribution: empty for Phase B; Phase C wires this from
- *                        the memory retrieval path
+ * Phase C: confidence + output_grounding now come from the D23
+ * per-generator-call catalog (`generateDraftThreshold`). Phase B's
+ * inline gradient heuristic moved into the catalog; this builder
+ * stays thin (extract context for the catalog input + assemble the
+ * final envelope shape).
  *
- * Phase C (D23 sufficiency catalog) replaces these heuristics with
- * proper per-tool threshold checks.
+ *   - source_attribution: still empty for Phase B/C; future memory-
+ *     retrieval wire-through populates this when the generator's
+ *     prompt is derived from `read_memory` output.
  */
 function buildDraftEnvelope(
   text: string,
   details: PropertyDetailsContext | null,
 ): AgentTextOutput {
-  const requiredKeys: Array<keyof PropertyDetailsContext> = [
-    "wifi_network",
-    "door_code",
-    "parking_instructions",
-    "checkin_time",
-  ];
-  const presentCount = details
-    ? requiredKeys.filter((k) => details[k] != null && details[k] !== "").length
-    : 0;
-
-  let confidence: AgentTextOutput["confidence"];
-  let grounding: AgentTextOutput["output_grounding"];
-  if (presentCount === requiredKeys.length) {
-    confidence = "confirmed";
-    grounding = "rich";
-  } else if (presentCount > 0) {
-    confidence = "high_inference";
-    grounding = "sparse";
-  } else {
-    confidence = "active_guess";
-    grounding = "empty";
-  }
-
+  const { confidence, output_grounding } = generateDraftThreshold.evaluate({
+    details: details
+      ? {
+          wifi_network: details.wifi_network,
+          door_code: details.door_code,
+          parking_instructions: details.parking_instructions,
+          checkin_time: details.checkin_time,
+        }
+      : null,
+  });
   return {
     content: text,
     confidence,
     source_attribution: [],
-    output_grounding: grounding,
+    output_grounding,
   };
 }
 

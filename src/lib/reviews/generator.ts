@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { callLLMWithEnvelope } from "@/lib/agent/llm-call";
 import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
+import {
+  generateGuestReviewThreshold,
+  generatePrivateNoteThreshold,
+  generateReviewResponseThreshold,
+  generateGuestReviewFromIncomingThreshold,
+} from "@/lib/agent/sufficiency-catalog";
 
 interface PropertyContext {
   name: string;
@@ -267,97 +273,70 @@ export function calculatePublishTime(
 // ---- F3 envelope builders (Phase B deterministic-from-context heuristics) ----
 
 /**
- * Site 2 first call. Confidence keys off rule.target_keywords (explicit
- * host preferences = confirmed) and rule.tone presence; sufficiency
- * tracks the same gradient plus booking.guest_name as a third axis.
+ * Site 2 first call. Phase C: grounding evaluation moved to D23
+ * catalog (`generateGuestReviewThreshold`). Builder stays thin —
+ * shape the catalog input + assemble the envelope.
  */
 function buildGuestReviewEnvelope(
   text: string,
   rule: ReviewRule,
   booking: BookingContext,
 ): AgentTextOutput {
-  const hasKeywords = rule.target_keywords.length > 0;
-  const hasTone = rule.tone.trim().length > 0;
-  const hasGuestName = booking.guest_name != null && booking.guest_name !== "";
-  const presentCount = [hasKeywords, hasTone, hasGuestName].filter(Boolean).length;
-
-  let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["output_grounding"];
-  if (presentCount === 3) {
-    confidence = "confirmed";
-    sufficiency = "rich";
-  } else if (presentCount > 0) {
-    confidence = "high_inference";
-    sufficiency = "sparse";
-  } else {
-    confidence = "active_guess";
-    sufficiency = "empty";
-  }
-
+  const { confidence, output_grounding } = generateGuestReviewThreshold.evaluate({
+    rule: { tone: rule.tone, target_keywords: rule.target_keywords },
+    booking: { guest_name: booking.guest_name },
+  });
   return {
     content: text,
     confidence,
     source_attribution: [],
-    output_grounding: sufficiency,
+    output_grounding,
   };
 }
 
 /**
- * Site 2 second call. Private notes have minimal context-dependence;
- * the prompt only takes guest_name + property_name + nights, all
- * universally available. Confidence stays at "active_guess" because
- * the content is generic (a thank-you), and sufficiency is the
- * universal-fallback "sparse" — there's no learned host preference
- * feeding this output.
+ * Site 2 second call. Catalog handles the constant
+ * "active_guess / sparse" assignment for private notes — generic
+ * thank-you content with no learned host preference feed.
  */
 function buildPrivateNoteEnvelope(text: string): AgentTextOutput {
+  const { confidence, output_grounding } = generatePrivateNoteThreshold.evaluate({});
   return {
     content: text,
-    confidence: "active_guess",
+    confidence,
     source_attribution: [],
-    output_grounding: "sparse",
+    output_grounding,
   };
 }
 
 /**
- * Site 3. Anchors on the incoming review: text + rating both being
- * present is the strongest input signal. Empty incomingText (rare —
- * Airbnb sometimes returns ratings-only) downgrades confidence.
+ * Site 3. Phase C: grounding evaluation moved to D23 catalog
+ * (`generateReviewResponseThreshold`). Anchors on text + rating
+ * presence per the 2-axis gradient.
  */
 function buildReviewResponseEnvelope(
   text: string,
   incomingText: string,
   incomingRating: number,
 ): AgentTextOutput {
-  const hasText = incomingText.trim().length > 0;
-  const hasRating = Number.isFinite(incomingRating);
-  let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["output_grounding"];
-  if (hasText && hasRating) {
-    confidence = "confirmed";
-    sufficiency = "rich";
-  } else if (hasText || hasRating) {
-    confidence = "high_inference";
-    sufficiency = "sparse";
-  } else {
-    confidence = "active_guess";
-    sufficiency = "empty";
-  }
-
+  const { confidence, output_grounding } = generateReviewResponseThreshold.evaluate({
+    incomingText,
+    incomingRating,
+  });
   return {
     content: text,
     confidence,
     source_attribution: [],
-    output_grounding: sufficiency,
+    output_grounding,
   };
 }
 
 /**
- * Site 4. Confidence keys off the same incoming-review presence as
- * Site 3. Adds `hedge` when private feedback flags issues — gives
- * the rendering layer a cue to surface with measured framing
- * (without inlining hedge phrases into the model's output, which is
- * Phase F D24 tonal regression territory).
+ * Site 4. Phase C: grounding evaluation moved to D23 catalog
+ * (`generateGuestReviewFromIncomingThreshold`). `hedge` stays at
+ * builder layer because it's site-specific contextual metadata
+ * (private_feedback flagged), not a sufficiency gradient — Phase F
+ * D24 tonal regression covers the rendering-side enforcement.
  */
 function buildIncomingReviewEnvelope(
   text: string,
@@ -368,26 +347,16 @@ function buildIncomingReviewEnvelope(
   },
   flagged: boolean,
 ): AgentTextOutput {
-  const hasIncomingText = input.incoming_text != null && input.incoming_text.trim().length > 0;
-  const hasIncomingRating = input.incoming_rating != null;
-  let confidence: AgentTextOutput["confidence"];
-  let sufficiency: AgentTextOutput["output_grounding"];
-  if (hasIncomingText && hasIncomingRating) {
-    confidence = "confirmed";
-    sufficiency = "rich";
-  } else if (hasIncomingText || hasIncomingRating) {
-    confidence = "high_inference";
-    sufficiency = "sparse";
-  } else {
-    confidence = "active_guess";
-    sufficiency = "empty";
-  }
-
+  const { confidence, output_grounding } =
+    generateGuestReviewFromIncomingThreshold.evaluate({
+      incoming_text: input.incoming_text,
+      incoming_rating: input.incoming_rating,
+    });
   const envelope: AgentTextOutput = {
     content: text,
     confidence,
     source_attribution: [],
-    output_grounding: sufficiency,
+    output_grounding,
   };
 
   if (flagged) {
