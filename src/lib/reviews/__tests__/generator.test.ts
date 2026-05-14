@@ -80,7 +80,7 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
       });
   });
 
-  test("backward-compat: returns ReviewResult shape; two wrapper calls (one per SDK call)", async () => {
+  test("Phase C parallel return: ReviewResult + envelope_review + envelope_note (Q-B3 two-envelope per SDK call)", async () => {
     const result = await generateGuestReview(BOOKING, PROPERTY, RULE_RICH);
 
     expect(result.review_text).toBe(
@@ -91,6 +91,14 @@ describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => 
     );
     expect(result.recommended).toBe(true);
     expect(callLLMWithEnvelope).toHaveBeenCalledTimes(2);
+    expect(result.envelope_review.content).toBe(
+      "Sarah was a thoughtful guest who kept the place spotless.",
+    );
+    expect(result.envelope_review.confidence).toBe("confirmed");
+    expect(result.envelope_note.content).toBe(
+      "Thanks for taking such good care of Villa Jamaica!",
+    );
+    expect(result.envelope_note.confidence).toBe("active_guess");
   });
 
   test("first-call envelope: rich rule + named guest → confirmed/rich", async () => {
@@ -135,7 +143,7 @@ describe("generateReviewResponse — Site 3", () => {
     });
   });
 
-  test("backward-compat: returns ResponseResult shape", async () => {
+  test("Phase C parallel return: { response_text, envelope }", async () => {
     const result = await generateReviewResponse(
       "Loved the place!",
       5,
@@ -144,6 +152,8 @@ describe("generateReviewResponse — Site 3", () => {
       RULE_RICH,
     );
     expect(result.response_text).toBe("Thanks for the kind words, Sarah!");
+    expect(result.envelope.content).toBe("Thanks for the kind words, Sarah!");
+    expect(result.envelope.confidence).toBe("confirmed");
     expect(callLLMWithEnvelope).toHaveBeenCalledTimes(1);
   });
 
@@ -178,7 +188,7 @@ describe("generateGuestReviewFromIncoming — Site 4", () => {
     });
   });
 
-  test("backward-compat: returns { public_review_draft } and trims content", async () => {
+  test("Phase C parallel return: { public_review_draft (trimmed), envelope (untrimmed content) }", async () => {
     const result = await generateGuestReviewFromIncoming({
       incoming_text: "Great stay!",
       incoming_rating: 5,
@@ -190,6 +200,12 @@ describe("generateGuestReviewFromIncoming — Site 4", () => {
     expect(result.public_review_draft).toBe(
       "Communicated clearly and respected the space.",
     );
+    // Envelope surfaces the un-trimmed model output; Phase C exposes
+    // it alongside the trimmed legacy field.
+    expect(result.envelope.content).toBe(
+      "  Communicated clearly and respected the space.  ",
+    );
+    expect(result.envelope.confidence).toBe("confirmed");
   });
 
   test("envelope hedge: SET when private feedback flags issues", async () => {

@@ -41,7 +41,7 @@ export async function generateDraft(
   conversationHistory: ConversationMessage[],
   latestMessage: string,
   details?: PropertyDetailsContext | null
-): Promise<string> {
+): Promise<{ content: string; envelope: AgentTextOutput }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
@@ -107,7 +107,11 @@ Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include sp
     },
   );
 
-  return envelope.content;
+  // M9 Phase C: D22 Option II parallel return shape. Envelope exposed
+  // alongside legacy content; route layer surfaces both. UI integration
+  // (envelope reaches PendingDraftBubble for confidence rendering)
+  // deferred to M10 per α+γ blend, C1 uniform across all 4 routes.
+  return { content: envelope.content, envelope };
 }
 
 /**

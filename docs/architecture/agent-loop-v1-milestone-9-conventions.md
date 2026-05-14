@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 9 Conventions
 
-**Status:** Locked, v2.2
+**Status:** Locked, v2.3
 **Drafted:** 2026-05-12
-**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards)
+**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards; M9 Phase C v2.3 — D22 locked Option II API-layer + D23 locked Option B per-generator-call + Q-C1 vocabulary rename + 7 G8 catches + α + γ blend C1 uniform + G8 institutional pattern + M10 inheritance)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-9-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-12-m9-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -16,6 +16,19 @@
 **Naming:** "Honesty + Voice Substrate" — M8 shipped the visible surface of trust; M9 ships the underlying architecture of honesty.
 
 ## Changelog
+
+**v2.3 — 2026-05-12 (M9 Phase C close)**
+
+- **D22 propagation pattern locked: Option II parallel return path.** Generators return parallel shape (legacy content fields + envelope of AgentTextOutput shape); routes expose envelope in response shape uniformly across 4 routes per α + γ blend (C1 uniform lock).
+- **D22 scope clarified: Phase C ships API-layer propagation only.** UI integration (envelope reaches rendering components for confidence/grounding display) deferred to M10 per (η.4). Two-layer architecture surfaced; see §6 M10 inheritance.
+- **D23 scope clarified: per-generator-call catalog (Option B).** v2.0 "per-tool catalog" framing was wrong granularity; M8 C3 D9 MISSING_CAPABILITY_COPY already covers propose_guest_message at the per-tool level. Real sufficiency-relevant gap was at generator-call layer (Sites 1-4 buildEnvelope inline heuristics); catalog formalizes those.
+- **Q-C1 (c) vocabulary resolution: envelope field renamed `sufficiency_signal` → `output_grounding`.** Distinct from M8 C3 sufficiency.ts (rich/lean/thin for host-onboarding state). See §4 vocabulary distinction note. Phase C STEP 2 mechanical rename across schema + 4 generators + 4 test files.
+- **Q-C2 (β) retroactive phase notes:** `milestones/M9/items/phase-a.md` + `phase-b.md` + `phase-c.md` written; per-phase notes continue through M9. Restores M8 parity.
+- **7 G8 catches in Phase C** — most of any M9 phase. G8-1 vocabulary drift; G8-2 C2 ConfidenceBandedRange pricing-vs-LLM substrate distinction; G8-3 per-tool catalog scope correction; G8-4 rendering surface count correction; G8-5 retroactive phase notes gap; G8-6 M8 C3 ↔ D23 boundary; G8-7 D22 two-layer architecture (mid-implementation halt). See §7.7 institutional pattern.
+- **§7.7 G8 institutional pattern:** M9 v2.0 was drafted with systematic verification gap; G8 caught v2.0 framing misses at every phase kickoff (Phase A test infra, Phase B site count, Phase C D22 scope + D23 granularity). M10 conventions drafting must include explicit ground-truth verification per architectural claim. This is institutional learning, not just process discipline.
+- **§6.6 M10 inheritance** — D22 UI integration (two-layer, non-uniform across hybrid consumer pattern), voice doctrine for confidence rendering, v2.0 verification gap institutional pattern, C2 ConfidenceBandedRange evaluation (G8-2 left open).
+- **Phase C artifacts (substrate):** `src/lib/agent/sufficiency-catalog.ts` (D23 catalog + per-site entries; gradient3 shared helper), `src/lib/agent/__tests__/sufficiency-catalog.test.ts` (14 catalog tests). Generator + route signatures updated across 4 sites with parallel-return shape; Phase B tests adjusted to assert envelope alongside legacy fields. Backward-compat preserved at response level (legacy fields still present; envelope additive).
+- **Phase C budget vs v2.0 nominal Days 7-9:** actual ~1 working day across STEPs 1-7. First M9 phase to ship within nominal but well under upper bound. v2.2 §7.7 G1 calibration discipline + G8 application working as designed.
 
 **v2.2 — 2026-05-12 (M9 Phase B close)**
 
@@ -146,7 +159,27 @@ Deferral levers if scope tightens:
 
 Numbering continues from M8 v1.7 (latest D21 — property creation deferral). Each decision is locked. Decisions reference items by their convergence-list ID (F3-F6, P1-P3) or M8 Phase reference.
 
-## D22 — Confidence metadata propagation locked (A2)
+## D22 — Confidence metadata propagation locked: Option II parallel return (A2) [updated v2.3]
+
+**Decision (v2.3 lock):** Option II — generators return parallel shape `{ ...legacy_content_fields, envelope: AgentTextOutput }` (Site 2 has two envelopes per Q-B3 — `envelope_review` + `envelope_note`). Routes expose envelope(s) in response shape uniformly across 4 routes (`/api/messages/draft` + 3 `/api/reviews/*` routes). Two-layer architecture: Phase C ships Layer 1 (API-layer propagation); Layer 2 (UI integration — envelope reaches rendering components for confidence/grounding display) deferred to M10 per α + γ blend (C1 uniform lock).
+
+**Reasoning:** Phase C STEP 4 mid-implementation halt surfaced G8-7 — `/api/messages/draft` has NO direct UI consumer (persist-then-fetch via messages table → thread fetch). STEP 4.5 audit revealed hybrid consumer pattern across the 4 routes (Sites 1+2 persist-then-fetch; Sites 3+4 direct UI fetch). α + γ blend locked: API-layer propagation uniform; UI integration deferred to M10. C1 uniform treatment preserves M10 ability to design Layer 2 integration holistically across the hybrid consumer pattern.
+
+Option II preserves Phase B's internal-envelope work (smallest delta from Phase B substrate). Generator's `buildEnvelope` helpers stay in place (now consume D23 catalog per D23 lock); route handlers receive both shapes; UI evolves incrementally in M10.
+
+Layer 2 effort is non-uniform across the 4 routes (Phase C STEP 4.5 audit found hybrid consumer pattern):
+- Sites 1 + 2 (persist-then-fetch via thread route): Layer 2 requires DB persistence + thread route extension + component prop threading
+- Sites 3 + 4 (direct UI fetch): Layer 2 is component prop threading only
+
+v2.0 D22 framing assumed single-phase scope. G8-7 catch corrected.
+
+**Implications:**
+- All 4 generators return parallel shape with envelope (Site 2 returns two envelopes per Q-B3).
+- All 4 routes expose envelope in response shape (`envelope` for Sites 1/3/4; `envelope_review` + `envelope_note` for Site 2; `envelope` field optional in Site 3 `/api/reviews/respond` since the route also has save_draft/approve paths that don't run the generator).
+- Backward compatibility preserved (legacy response fields unchanged; envelope additive). Existing UI consumers (ReviewSlideOver, GuestReviewForm) ignore the additive `envelope` field via loose property access — no UI-side changes needed in Phase C.
+- D22 confidence metadata still computed via deterministic-from-context per D23 catalog (Phase B substrate; D23 formalized in Phase C). M10 may extend to memory-retrieval-derived confidence when read_memory is wired through generators' prompt context.
+
+## D22 — Confidence metadata propagation locked (A2) [original v2.1 framing, superseded by v2.3 lock above]
 
 **Decision:** Confidence metadata travels alongside content via a parallel structured channel, not as fields inside the content schema and not as rendering-time inference.
 
@@ -171,7 +204,30 @@ The rendering layer reads metadata and produces appropriate UI treatment (M8 `Co
 - Rendering layer in the chat substrate (M8 D1/D18 ChatStore + RefusalEnvelopeRenderer) consumes the metadata channel; existing surfaces extend rather than re-architect.
 - M8 `read_memory`'s `sufficiency_signal` (rich/sparse/empty) feeds the envelope when memory retrieval underlies the output. A4 D23 ties this to the per-tool sufficiency catalog.
 
-## D23 — Sufficiency thresholds locus locked (A4)
+## D23 — Sufficiency thresholds — per-generator-call catalog locked Option B (A4) [updated v2.3]
+
+**Decision (v2.3 lock):** Option B — per-generator-call catalog at `src/lib/agent/sufficiency-catalog.ts`. Catalog formalizes Phase B's inline `buildEnvelope` heuristics into typed per-Site threshold entries (Sites 1-4). `buildEnvelope` helpers consume the catalog (`<Site>Threshold.evaluate(input)`) instead of inline gradient logic.
+
+**Reasoning:** Phase C audit revealed v2.0 "per-tool catalog" framing was wrong granularity (G8-3):
+
+- 4 agent tools exist: `read_memory`, `read_guest_thread`, `write_memory_fact`, `propose_guest_message`.
+- Only `propose_guest_message` has a substantive sufficiency surface (input-time gate on required capabilities), and M8 C3 D9 `MISSING_CAPABILITY_COPY` registry already covers it.
+- Real sufficiency-relevant gap was at the **generator-call** layer — Sites 1-4 had inline gradient heuristics inside their `buildEnvelope` helpers. D23 catalog formalizes those.
+
+Per-tool sufficiency stays with M8 C3 D9 registry; D23 does not duplicate. M8 C3 ↔ D23 boundary (G8-6) made explicit in §4 vocabulary distinction note.
+
+Catalog structure:
+- Per-Site entry: `GeneratorThreshold<TInput>` with `generator` name + `evaluate(input)` returning `{ confidence, output_grounding }`.
+- Shared `gradient3(presentCount, totalCount)` helper expresses the 3-tier "all/some/none → confirmed-rich/high_inference-sparse/active_guess-empty" pattern across multi-axis entries.
+- Site 2 has two entries — `generateGuestReviewThreshold` (review_text, 3-axis) + `generatePrivateNoteThreshold` (private_note, constant "active_guess/sparse") — per Q-B3 two-envelope resolution.
+
+**Implications:**
+- `buildEnvelope` helpers become thin wrappers (extract context for catalog input + assemble final envelope shape including site-specific extras like Site 4's `hedge`).
+- D23 catalog uses the same `rich | sparse | empty` vocabulary as M3 `read_memory.data_sufficiency.sufficiency_signal` — they're the same concept (output-time grounding). Distinct from M8 C3 `SufficiencyLevel` (rich/lean/thin host-onboarding) — different vocabularies at field-name level (Q-C1 (c) rename to `output_grounding`).
+- 14 catalog unit tests (`src/lib/agent/__tests__/sufficiency-catalog.test.ts`) cover all entries.
+- M10 may extend catalog with read_memory wire-through (catalog input includes retrieved memory_facts state; entries downgrade grounding when retrieved facts are sparse/empty). Currently catalog derives grounding from caller-provided context, mirroring Phase B's inline heuristics.
+
+## D23 — Sufficiency thresholds locus locked (A4) [original v2.1 framing, superseded by v2.3 lock above]
 
 **Decision:** Hybrid — static catalog declared at tool-registration time defines threshold values; runtime computation checks `memory_facts` state (or other relevant data) against catalog at retrieval time.
 
@@ -506,6 +562,17 @@ Per-phase verification, per the M8 pattern. Each smoke gate is executable, not v
 - F8 / memory-export shipped-copy refresh applied per honest-scope persistence
 - All voice-bearing surfaces reviewed against voice doctrine
 
+## 4.4 Vocabulary distinction (added v2.3)
+
+Output-time grounding (envelope.`output_grounding`) and host-onboarding sufficiency (M8 C3 `SufficiencyLevel` in `src/lib/agent/sufficiency.ts`) are different concepts using distinct vocabularies:
+
+- **`output_grounding`: `'rich' | 'sparse' | 'empty'`** — measures whether a specific generation is grounded in retrieved facts. Per-output, per-generation. Lives on `AgentTextOutput` envelope (D22). Field renamed v2.3 from `sufficiency_signal` per Q-C1 (c).
+- **`SufficiencyLevel`: `'rich' | 'lean' | 'thin'`** — measures whether a host has configured enough across their portfolio for Koast to operate. Host-level, onboarding-completion-shaped. Lives on `SufficiencyClassification` output of M8 C3 `classifySufficiency`.
+
+Field names distinguish them at substrate level; do not conflate. v2.3 rename eliminated the word-overlap conflation risk that v2.0/v2.1/v2.2 had carried.
+
+A third related field — M3 `read_memory.data_sufficiency.sufficiency_signal` — shares the `rich | sparse | empty` vocabulary because it is the upstream substrate that envelope `output_grounding` inherits values from when memory retrieval underlies the generated content. read_memory's field keeps its name (M3-era convention; nested under `data_sufficiency` so semantic context is clear). They are structurally separate fields with identical vocabulary because they are conceptually the same signal.
+
 ## 4.3 Escalation patterns (inherited from M8 §4.3)
 
 If a smoke gate fails: surface to `milestones/M9/items/<item-name>.md`, halt phase progression, diagnose substrate-vs-implementation, escalate to human if substrate.
@@ -652,6 +719,22 @@ Three items surfaced during Phase B sign-off; explicitly captured here to preven
 
 3. **G8 — verify-shipped-state at every M9 phase kickoff.** v2.1 introduced G8 as a conventions-drafting discipline ("verify against shipped state before locking architectural framing"). Phase B Phase 1 STOP audit re-validated its value by catching v2.0's 4-vs-5 site-count framing miss. v2.2 amends §7.7 to lock G8 at every M9 phase kickoff (not just at conventions-revision time). Phase C onward applies G8 to its Phase 1 STOP audit per §3.
 
+## 6.6 M10 carry-forwards from M9 Phase C sign-off [added v2.3]
+
+Three Phase C carry-forwards, plus institutional-pattern carry-forward:
+
+1. **D22 UI integration (Layer 2 — two-layer architecture).** Phase C shipped Layer 1 (API-layer propagation). Layer 2 = envelope reaches rendering components for confidence/grounding display. Effort is non-uniform across the 4 routes per Phase C STEP 4.5 audit:
+   - Sites 1 + 2 (persist-then-fetch via thread route): Layer 2 requires DB persistence + thread route extension + component prop threading.
+   - Sites 3 + 4 (direct UI fetch): Layer 2 is component prop threading only.
+
+   M10 conventions drafting scopes per-pattern; uniform Phase C starting state (4 routes expose envelope; zero components consume it).
+
+2. **Voice doctrine for confidence rendering.** When envelope reaches rendering surfaces, how does Koast surface confidence/grounding metadata visually — numeric chip, hedge phrase, visual indicator, suppression on confirmed? Voice doctrine §3.4 honest-confidence binding applies; specific rendering pattern is M10 design decision.
+
+3. **C2 ConfidenceBandedRange evaluation (G8-2 left open).** v2.0 D22 listed C2 ConfidenceBandedRange as a rendering surface, but audit showed it consumes a pricing-engine shape (`ConfidenceBandedRangeValue`) not the LLM-text envelope. v2.3 documents the distinction. M10+ may rationalize via a higher-level Confidence rendering abstraction; not a Phase D-or-later urgent item.
+
+4. **Institutional pattern: M9 v2.0 verification gap.** See §7.7. M10 conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock.
+
 ---
 
 # Section 7 — Implementation prompt for Claude Code
@@ -746,7 +829,21 @@ M8 discipline gaps locked as M9 process:
 - **G5.** Side-effect-on-GET avoidance — Phase G closes M8 idle-status compromise (E1)
 - **G6.** Cross-surface coherence verification at phase close
 - **G7.** Substrate-step visual verification at Hard Checkpoints
-- **G8.** Verify-shipped-state at every M9 phase kickoff (v2.1 introduced as conventions-drafting discipline; v2.2 amends to ongoing per-phase process). Phase 1 STOP audit at each phase verifies the conventions doc's assumed shipped state against actual repo state BEFORE design proposal. Catches scope-frame misses before architectural decisions compound. M8 Phase F F.1 + M9 Phase A 5-vs-7 endpoint count + M9 Phase B 4-vs-5 LLM call site count all demonstrate the cost of skipping verification.
+- **G8.** Verify-shipped-state at every M9 phase kickoff (v2.1 introduced as conventions-drafting discipline; v2.2 amends to ongoing per-phase process; v2.3 elevates to institutional pattern — see below). Phase 1 STOP audit at each phase verifies the conventions doc's assumed shipped state against actual repo state BEFORE design proposal. Catches scope-frame misses before architectural decisions compound.
+
+### G8 institutional pattern (added v2.3)
+
+M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing misses at every phase kickoff:
+
+- **Phase A (v2.1):** API route test infrastructure exists from M6/M7 D38; v2.0 §6.3 assumed missing infrastructure (count was 5, actual 7).
+- **Phase B (v2.2):** 5 LLM call sites discovered (not 4 per v2.0 §3); Site 5 architecturally distinct (streaming + multi-turn + tool-use orchestration).
+- **Phase C (v2.3):** D22 has two-layer architecture (API + UI); v2.0 framing assumed single-phase scope. D23 per-tool catalog was wrong granularity; per-generator-call is the actual surface. Hybrid consumer pattern across 4 routes affects Layer 2 scope. SEVEN G8 catches total — most of any M9 phase.
+
+**Pattern:** M9 v2.0 conventions referenced shipped state without verification. Each phase kickoff has applied G8 and caught drift; revisions accumulate. Cost: ~half-day per phase in audit + scope adjustment + conventions revision.
+
+**Forward-applying to M10:** Conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock. Each named substrate, each scope claim, each integration boundary requires verification, not pattern-match from milestone-close inheritance.
+
+This is institutional learning, not just process discipline. Conventions drafting that doesn't ground-truth-verify produces work that accumulates rework at implementation time. M9's caught drift cost ~half-day per phase; M10 onward avoids the rework by verifying at drafting.
 
 New questions for v2.0 observation:
 

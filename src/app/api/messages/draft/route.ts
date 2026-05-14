@@ -80,8 +80,16 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const details = ((detailsData ?? []) as any[])[0] ?? null;
 
-    // Generate draft
-    const draft = await generateDraft(property, booking, conversationHistory, message.content, details);
+    // Generate draft. M9 Phase C: D22 Option II parallel return —
+    // generator returns { content, envelope }; route surfaces both.
+    // UI integration deferred to M10 per α + γ blend (C1 uniform).
+    const { content: draft, envelope } = await generateDraft(
+      property,
+      booking,
+      conversationHistory,
+      message.content,
+      details,
+    );
 
     // Save draft to message
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,7 +97,7 @@ export async function POST(request: NextRequest) {
       .update({ ai_draft: draft, draft_status: "generated" })
       .eq("id", messageId);
 
-    return NextResponse.json({ draft, messageId });
+    return NextResponse.json({ draft, messageId, envelope });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[messages/draft] Error:", msg);

@@ -67,11 +67,15 @@ beforeEach(() => {
   });
 });
 
-describe("generateDraft — backward-compat signature", () => {
-  test("returns the envelope's content as a string (Option B migration)", async () => {
+describe("generateDraft — Phase C parallel return shape (D22 Option II)", () => {
+  test("returns { content, envelope } — content from envelope.content, envelope surfaced alongside", async () => {
     const result = await generateDraft(PROPERTY, null, [], "test", null);
-    expect(typeof result).toBe("string");
-    expect(result).toBe("Hi! Wifi is in the welcome packet.");
+    expect(result.content).toBe("Hi! Wifi is in the welcome packet.");
+    expect(result.envelope).toMatchObject({
+      content: "Hi! Wifi is in the welcome packet.",
+      confidence: "confirmed",
+      output_grounding: "rich",
+    });
   });
 });
 

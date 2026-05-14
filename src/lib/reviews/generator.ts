@@ -31,10 +31,18 @@ interface ReviewResult {
   review_text: string;
   private_note: string;
   recommended: boolean;
+  /** M9 Phase C: D22 Option II parallel return. Two envelopes per
+   *  Q-B3 — one per SDK call (review_text + private_note). UI
+   *  integration deferred to M10 per α + γ blend. */
+  envelope_review: AgentTextOutput;
+  envelope_note: AgentTextOutput;
 }
 
 interface ResponseResult {
   response_text: string;
+  /** M9 Phase C: D22 Option II parallel return. UI integration
+   *  deferred to M10 per α + γ blend. */
+  envelope: AgentTextOutput;
 }
 
 function nights(checkIn: string, checkOut: string): number {
@@ -133,6 +141,8 @@ Return ONLY the review text, nothing else.`;
     review_text: reviewEnvelope.content,
     private_note: noteEnvelope.content,
     recommended: true,
+    envelope_review: reviewEnvelope,
+    envelope_note: noteEnvelope,
   };
 }
 
@@ -188,7 +198,7 @@ Return ONLY the response text.`;
     },
   );
 
-  return { response_text: envelope.content };
+  return { response_text: envelope.content, envelope };
 }
 
 /**
@@ -207,7 +217,7 @@ export async function generateGuestReviewFromIncoming(input: {
   guest_name: string | null;
   property_name: string;
   nights: number | null;
-}): Promise<{ public_review_draft: string }> {
+}): Promise<{ public_review_draft: string; envelope: AgentTextOutput }> {
   const client = getClient();
   const guest = input.guest_name?.split(" ")[0] ?? "the guest";
   const stayDesc = input.nights ? `${input.nights}-night stay` : "stay";
@@ -248,8 +258,10 @@ Return ONLY the review text. No preamble, no quotes around it.`;
     },
   );
 
-  // Site 4 trimmed text per the original implementation.
-  return { public_review_draft: envelope.content.trim() };
+  // Site 4 trimmed text per the original implementation. Envelope
+  // surfaces the un-trimmed content + Phase C metadata; route exposes
+  // both per D22 Option II.
+  return { public_review_draft: envelope.content.trim(), envelope };
 }
 
 export function calculatePublishTime(

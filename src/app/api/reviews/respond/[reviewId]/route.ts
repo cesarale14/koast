@@ -78,8 +78,14 @@ export async function POST(
       return NextResponse.json({ response_text: finalText, sent: true, published_at: sentAt });
     }
 
-    // Generate draft
+    // Generate draft. M9 Phase C: D22 Option II parallel return —
+    // generator returns { response_text, envelope }; route surfaces
+    // both in response. envelope present only on the generate path
+    // (save_draft / approve paths consume host-edited text and have
+    // no LLM call site, hence no envelope). UI integration deferred
+    // to M10 per α + γ blend (C1 uniform).
     let responseText = body.response_text;
+    let responseEnvelope: import("@/lib/agent/schemas/agent-text-output").AgentTextOutput | null = null;
 
     if (!responseText) {
       // Booking lookup is best-effort: Channex-synced reviews often
@@ -130,6 +136,7 @@ export async function POST(
           review.incoming_text, review.incoming_rating ?? 5, booking, property, rule
         );
         responseText = result.response_text;
+        responseEnvelope = result.envelope;
       } catch (gErr) {
         const msg = gErr instanceof Error ? gErr.message : String(gErr);
         console.error(`[reviews/respond] generation failed for ${params.reviewId}: ${msg}`);
@@ -146,7 +153,11 @@ export async function POST(
       response_draft: responseText,
     }).eq("id", params.reviewId);
 
-    return NextResponse.json({ response_text: responseText, sent: false });
+    return NextResponse.json({
+      response_text: responseText,
+      sent: false,
+      ...(responseEnvelope ? { envelope: responseEnvelope } : {}),
+    });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
