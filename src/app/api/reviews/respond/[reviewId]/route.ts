@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { generateReviewResponse } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 import { createChannexClient } from "@/lib/channex/client";
+import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 export async function POST(
   request: NextRequest,
@@ -132,8 +134,11 @@ export async function POST(
       }
 
       try {
+        // M9 Phase E B2 (a) lock: read host voice_mode + build voice prompt.
+        const voiceMode = await readVoiceMode(supabase, user.id);
+        const voicePrompt = buildVoicePrompt(voiceMode);
         const result = await generateReviewResponse(
-          review.incoming_text, review.incoming_rating ?? 5, booking, property, rule
+          review.incoming_text, review.incoming_rating ?? 5, booking, property, rule, voicePrompt,
         );
         responseText = result.response_text;
         responseEnvelope = result.envelope;
@@ -148,9 +153,13 @@ export async function POST(
       return NextResponse.json({ error: "Could not generate response" }, { status: 500 });
     }
 
-    // Save as draft only
+    // Save as draft only. M9 Phase E F6 (B3 (a) lock): also capture
+    // original_draft_text at generation time. responseEnvelope is null
+    // when path was save_draft/approve (no LLM call); when generate
+    // ran, persist Koast-generated text.
     await reviewTable.update({
       response_draft: responseText,
+      ...(responseEnvelope ? { original_draft_text: responseEnvelope.content } : {}),
     }).eq("id", params.reviewId);
 
     return NextResponse.json({

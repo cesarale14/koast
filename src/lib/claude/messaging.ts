@@ -40,7 +40,12 @@ export async function generateDraft(
   booking: BookingContext | null,
   conversationHistory: ConversationMessage[],
   latestMessage: string,
-  details?: PropertyDetailsContext | null
+  details?: PropertyDetailsContext | null,
+  /** M9 Phase E B2 (a) lock: optional voice context injected into the
+   *  system prompt. Built by route handler via readVoiceMode +
+   *  buildVoicePrompt before this call. Generator stays pure (no IO);
+   *  route owns the voice_mode read. */
+  voicePrompt?: string,
 ): Promise<{ content: string; envelope: AgentTextOutput }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
@@ -67,11 +72,13 @@ export async function generateDraft(
     ? `\n\nProperty information you KNOW and should share when asked:\n${detailLines.join("\n")}`
     : "";
 
+  const voiceBlock = voicePrompt ? `\n\n${voicePrompt}` : "";
+
   const systemPrompt = `You are a friendly, professional short-term rental host assistant for ${property.name}${property.city ? ` in ${property.city}` : ""}. Property details: ${property.bedrooms ?? "?"} bed, ${property.bathrooms ?? "?"} bath, max ${property.max_guests ?? "?"} guests.
 
 ${booking ? `Booking context: Guest ${booking.guest_name ?? "Guest"} is staying ${booking.check_in} to ${booking.check_out} (${numNights} nights)${booking.total_price ? ` for $${booking.total_price}` : ""}.` : "No active booking context."}${detailsBlock}
 
-Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include specific property details when relevant (check-in time, WiFi, parking, etc.). If you don't know something, say you'll check and get back to them. Never mention you are an AI.`;
+Respond warmly and helpfully. Keep responses concise (2-4 sentences). Include specific property details when relevant (check-in time, WiFi, parking, etc.). If you don't know something, say you'll check and get back to them. Never mention you are an AI.${voiceBlock}`;
 
   // Build messages from conversation history + latest
   const messages: Anthropic.MessageParam[] = [

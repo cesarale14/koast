@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateDraft } from "@/lib/claude/messaging";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,6 +82,12 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const details = ((detailsData ?? []) as any[])[0] ?? null;
 
+    // M9 Phase E B2 (a) lock: read host voice_mode + build voice
+    // prompt before generator call. Generator stays pure; route owns
+    // the voice_mode read.
+    const voiceMode = await readVoiceMode(supabase, user.id);
+    const voicePrompt = buildVoicePrompt(voiceMode);
+
     // Generate draft. M9 Phase C: D22 Option II parallel return —
     // generator returns { content, envelope }; route surfaces both.
     // UI integration deferred to M10 per α + γ blend (C1 uniform).
@@ -89,12 +97,19 @@ export async function POST(request: NextRequest) {
       conversationHistory,
       message.content,
       details,
+      voicePrompt,
     );
 
-    // Save draft to message
+    // Save draft to message. M9 Phase E F6 (B3 (a) lock): also
+    // capture original_draft_text alongside ai_draft for voice
+    // extraction supersession delta + trust-inspection.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("messages") as any)
-      .update({ ai_draft: draft, draft_status: "generated" })
+      .update({
+        ai_draft: draft,
+        draft_status: "generated",
+        original_draft_text: draft,
+      })
       .eq("id", messageId);
 
     return NextResponse.json({ draft, messageId, envelope });

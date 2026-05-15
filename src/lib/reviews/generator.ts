@@ -73,7 +73,9 @@ const MODEL = "claude-sonnet-4-20250514";
 export async function generateGuestReview(
   booking: BookingContext,
   property: PropertyContext,
-  rule: ReviewRule
+  rule: ReviewRule,
+  /** M9 Phase E B2 (a) lock — see messaging.ts:generateDraft note. */
+  voicePrompt?: string,
 ): Promise<ReviewResult> {
   const client = getClient();
   const n = nights(booking.check_in, booking.check_out);
@@ -81,6 +83,8 @@ export async function generateGuestReview(
   const keywords = rule.target_keywords.length > 0
     ? rule.target_keywords.join(", ")
     : "clean, location, comfortable";
+
+  const reviewVoiceBlock = voicePrompt ? `\n\n${voicePrompt}` : "";
 
   const reviewSystem = `You are writing a host review for an Airbnb/VRBO guest. The review should be:
 - Unique and specific to this guest's stay (never generic)
@@ -97,7 +101,7 @@ Booking source: ${booking.platform}
 
 IMPORTANT: Every review must be different. Vary sentence structure, opening phrases, and specific details. Never start two reviews the same way. Never use these overused phrases: 'wonderful guest', 'highly recommend', 'welcome back anytime' — find fresh ways to express the same sentiment.
 
-Return ONLY the review text, nothing else.`;
+Return ONLY the review text, nothing else.${reviewVoiceBlock}`;
 
   const reviewEnvelope = await callLLMWithEnvelope(
     {
@@ -158,7 +162,9 @@ export async function generateReviewResponse(
   incomingRating: number,
   booking: BookingContext,
   property: PropertyContext,
-  rule: ReviewRule
+  rule: ReviewRule,
+  /** M9 Phase E B2 (a) lock. */
+  voicePrompt?: string,
 ): Promise<ResponseResult> {
   const client = getClient();
   const n = nights(booking.check_in, booking.check_out);
@@ -166,6 +172,8 @@ export async function generateReviewResponse(
   const keywords = rule.target_keywords.join(", ") || "clean, location, comfortable";
 
   const ratingCategory = incomingRating >= 4 ? "positive" : incomingRating >= 3 ? "mixed" : "negative";
+
+  const responseVoiceBlock = voicePrompt ? `\n\n${voicePrompt}` : "";
 
   const responseSystem = `Write a host response to a guest review on Airbnb/VRBO.
 
@@ -180,7 +188,7 @@ Rating: ${incomingRating} stars (${ratingCategory})
 Guest: ${firstName}, stayed ${n} nights
 Property: ${property.name} in ${property.city ?? "the area"}
 
-Return ONLY the response text.`;
+Return ONLY the response text.${responseVoiceBlock}`;
 
   const envelope = await callLLMWithEnvelope(
     {
@@ -210,19 +218,24 @@ Return ONLY the response text.`;
  * surfaces a contextual qualifier when private feedback flags issues,
  * giving the rendering layer a cue to handle with measured framing.
  */
-export async function generateGuestReviewFromIncoming(input: {
-  incoming_text: string | null;
-  incoming_rating: number | null;
-  private_feedback: string | null;
-  guest_name: string | null;
-  property_name: string;
-  nights: number | null;
-}): Promise<{ public_review_draft: string; envelope: AgentTextOutput }> {
+export async function generateGuestReviewFromIncoming(
+  input: {
+    incoming_text: string | null;
+    incoming_rating: number | null;
+    private_feedback: string | null;
+    guest_name: string | null;
+    property_name: string;
+    nights: number | null;
+  },
+  /** M9 Phase E B2 (a) lock. */
+  voicePrompt?: string,
+): Promise<{ public_review_draft: string; envelope: AgentTextOutput }> {
   const client = getClient();
   const guest = input.guest_name?.split(" ")[0] ?? "the guest";
   const stayDesc = input.nights ? `${input.nights}-night stay` : "stay";
   const ratingTone = (input.incoming_rating ?? 5) >= 4 ? "positive" : "neutral-to-critical";
   const flagged = !!(input.private_feedback && input.private_feedback.trim().length > 0);
+  const incomingVoiceBlock = voicePrompt ? `\n\n${voicePrompt}` : "";
 
   const system = `Write a host's review of a guest for Airbnb. Tone: ${ratingTone}. Length: 100-300 characters. Honest, not performatively warm. Never fabricate specifics.
 
@@ -240,7 +253,7 @@ Bias rules:
 - 3 or below: neutral, factual ("good communication" / "respectful of the space"); do not invent positive details.
 - If private feedback flagged issues: acknowledge guest demeanor without praising — e.g. "communicated clearly" not "delightful guest".
 
-Return ONLY the review text. No preamble, no quotes around it.`;
+Return ONLY the review text. No preamble, no quotes around it.${incomingVoiceBlock}`;
 
   const envelope = await callLLMWithEnvelope(
     {

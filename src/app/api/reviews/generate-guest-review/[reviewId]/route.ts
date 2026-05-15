@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 import { generateGuestReviewFromIncoming } from "@/lib/reviews/generator";
+import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 // POST /api/reviews/generate-guest-review/[reviewId]
 //
@@ -69,6 +71,9 @@ export async function POST(
         : review.guest_name;
 
     try {
+      // M9 Phase E B2 (a) lock: read host voice_mode + build voice prompt.
+      const voiceMode = await readVoiceMode(supabase, user.id);
+      const voicePrompt = buildVoicePrompt(voiceMode);
       const result = await generateGuestReviewFromIncoming({
         incoming_text: review.incoming_text,
         incoming_rating: review.incoming_rating == null ? null : Number(review.incoming_rating),
@@ -76,7 +81,17 @@ export async function POST(
         guest_name: guestForPrompt && guestForPrompt !== "Airbnb Guest" ? guestForPrompt : null,
         property_name: property.name,
         nights,
-      });
+      }, voicePrompt);
+
+      // M9 Phase E F6 (B3 (a) lock): persist Koast-generated public
+      // review draft to guest_reviews.original_draft_text for voice
+      // extraction supersession delta + trust-inspection. UI continues
+      // to consume payload.public_review_draft from the route response.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (reviewTable as any)
+        .update({ original_draft_text: result.public_review_draft })
+        .eq("id", params.reviewId);
+
       return NextResponse.json(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

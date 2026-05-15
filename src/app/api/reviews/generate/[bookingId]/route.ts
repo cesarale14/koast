@@ -4,6 +4,9 @@ import { bookings, properties, reviewRules, guestReviews } from "@/lib/db/schema
 import { and, eq } from "drizzle-orm";
 import { generateGuestReview, calculatePublishTime } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
+import { createServiceClient } from "@/lib/supabase/service";
+import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 export async function POST(
   _request: Request,
@@ -112,7 +115,13 @@ export async function POST(
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms ? Number(property.bathrooms) : null,
     };
-    const result = await generateGuestReview(bookingCtx, propCtx, ruleCtx);
+    // M9 Phase E B2 (a) lock: read host voice_mode + build voice prompt
+    // before generator call.
+    const voiceSupabase = createServiceClient();
+    const voiceMode = await readVoiceMode(voiceSupabase, user.id);
+    const voicePrompt = buildVoicePrompt(voiceMode);
+
+    const result = await generateGuestReview(bookingCtx, propCtx, ruleCtx, voicePrompt);
     const isBadReview = !result.recommended;
     const publishAt = calculatePublishTime(booking.checkOut, rule.publishDelayDays ?? 3, isBadReview, rule.badReviewDelay ?? true);
 
@@ -128,6 +137,10 @@ export async function POST(
       propertyId: booking.propertyId,
       direction: "outgoing",
       draftText: result.review_text,
+      // M9 Phase E F6 (B3 (a) lock): capture Koast-generated text at
+      // generation time alongside draftText (host may edit draftText
+      // before publish; original stays as-of-generation).
+      originalDraftText: result.review_text,
       privateNote: result.private_note,
       recommendGuest: result.recommended,
       starRating: 5,
