@@ -343,7 +343,11 @@ describe("runAgentTurn — SDK error mid-stream", () => {
 });
 
 describe("runAgentTurn — refusal", () => {
-  test("emits refusal event when stop_reason='refusal'; persists assistant turn with refusal metadata", async () => {
+  test("emits refusal_envelope (G8-D3 upgrade) when stop_reason='refusal'; persists envelope on assistant turn", async () => {
+    // M9 Phase D G8-D3 closure: stop_reason='refusal' branch now emits
+    // a RefusalEnvelope (kind: hard_refusal by default per Q-D5) instead
+    // of the legacy generic refusal event. Test verifies the envelope
+    // emission shape + persistence per finalizeTurn refusal column.
     setSdkStream(
       makeFakeStream({
         finalMessage: { stop_reason: "refusal", content: [] },
@@ -356,8 +360,15 @@ describe("runAgentTurn — refusal", () => {
       user_message_text: "do something problematic",
     });
 
-    const refusal = events[events.length - 1];
-    expect(refusal.type).toBe("refusal");
+    // The post-stream-classifier emits a refusal_envelope event; the
+    // outer flow yields a final 'done' event. Verify both shapes are
+    // present in the event stream.
+    const envelopeEvent = events.find((e) => e.type === "refusal_envelope");
+    expect(envelopeEvent).toBeTruthy();
+    if (envelopeEvent && envelopeEvent.type === "refusal_envelope") {
+      expect(envelopeEvent.envelope.kind).toBe("hard_refusal");
+    }
+    expect(events[events.length - 1].type).toBe("done");
 
     // M6 turn_id-ordering fix: assistant turn finalized with refusal metadata
     expect(persistTurn).toHaveBeenCalledTimes(1); // user turn only

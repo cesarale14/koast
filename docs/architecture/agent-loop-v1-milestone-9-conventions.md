@@ -1,6 +1,6 @@
 # Agent Loop v1 — Milestone 9 Conventions
 
-**Status:** Locked, v2.3
+**Status:** Locked, v2.4
 **Drafted:** 2026-05-12
 **Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards; M9 Phase C v2.3 — D22 locked Option II API-layer + D23 locked Option B per-generator-call + Q-C1 vocabulary rename + 7 G8 catches + α + γ blend C1 uniform + G8 institutional pattern + M10 inheritance)
 **Canonical locations:**
@@ -16,6 +16,17 @@
 **Naming:** "Honesty + Voice Substrate" — M8 shipped the visible surface of trust; M9 ships the underlying architecture of honesty.
 
 ## Changelog
+
+**v2.4 — 2026-05-15 (M9 Phase D close)**
+
+- **D27 resolved at Option ε** (audit-surfaced beyond v2.0 α/β/γ/δ framing): post-stream classifier (A4 chat-text refusal substrate-catch) + `stop_reason === "refusal"` branch upgrade to emit RefusalEnvelope (closes G8-D3). v2.0 α framing (M8 P4 extension) was not viable — P4 is tool-input classifier inside `stop_reason === "tool_use"` branch; chat-text path is `stop_reason === "end_turn"` else branch (different hook locations).
+- **A6 = A6-3 scope:** A6-1 in-turn duplicate detection (shares A4 post-stream-classifier substrate; detection-only at Phase D, truncation M10 candidate) + A6-2 fact-write hardening (retry-with-backoff + error-level log on persistent failure; replaces M8 silent try/catch + console.warn swallowing pattern).
+- **Shared pattern catalog at `src/lib/agent/refusal-patterns.ts`:** authored data consumed by Phase D runtime classifier AND Phase F D24 CI shape regex (when F ships). No drift between runtime + CI enforcement layers.
+- **4 G8 catches in Phase D:** G8-D1 M8 P4 pre-dispatch pattern does NOT transfer directly to chat-text path; G8-D2 A4 + A6 share substrate boundary (single new module covers both); G8-D3 `stop_reason === "refusal"` currently emits generic event, not envelope (predates M8 F4); G8-D4 A6 scope = (ii) strengthen existing partial substrate, not net-new.
+- **§7.7 institutional pattern Phase D entry added.** M9 v2.0 was drafted with systematic verification gap; G8 has now caught v2.0 framing drift at FOUR consecutive phase kickoffs (Phase A test infra, Phase B site count, Phase C D22 scope + D23 granularity, Phase D D27 hook-location).
+- **§6.7 M10 inheritance from Phase D** — γ streaming-aware per-chunk classifier (deferred unless real-traffic latency surfaces), Phase F D24 CI inherits `refusal-patterns.ts` substrate, A6-1 truncation (Phase D ships detection-only), A6-2 fact-write failure audit table (Phase D logs at error level).
+- **Phase D artifacts (substrate):** `src/lib/agent/refusal-patterns.ts` (pattern catalog), `src/lib/agent/post-stream-classifier.ts` (classifyAccumulatedText + upgradeStopReasonRefusal), 23 new tests across two test files, `loop.ts` hook integrations at 3 activation points + A6-2 retry-with-backoff. Existing `loop.test.ts` refusal test updated to assert envelope shape per G8-D3 closure.
+- **Phase D budget vs v2.0 nominal Days 10-12:** actual <1 working day. Continues Phase A/B/C calibration pattern.
 
 **v2.3 — 2026-05-12 (M9 Phase C close)**
 
@@ -318,7 +329,28 @@ Option γ (hybrid) doesn't apply for Phase B since Site 5 is out of scope per Pa
 - Backward compatibility preserved (Option B migration): generator signatures stay legacy (`Promise<string>` for Site 1, `Promise<ReviewResult>` for Site 2, etc.). Envelope flows through F3 internally. Phase C wires the envelope through to rendering surfaces.
 - The wrapper exports `LLMSchemaError` for callers that want to distinguish schema-failure from other errors. Default behavior is throw-and-propagate; downstream routes' existing try/catch + 500-with-message pattern handles it correctly per CLAUDE.md error discipline.
 
-## D27 — Substrate-catch for chat-text refusals deferred to Round-2 (A5)
+## D27 — Substrate-catch for chat-text refusals locked Option ε (A5) [updated v2.4]
+
+**Decision (v2.4 lock):** Option ε — post-stream classifier (β) + `stop_reason === "refusal"` branch upgrade to emit RefusalEnvelope (closes G8-D3). Single substrate at `src/lib/agent/post-stream-classifier.ts`; two activation points in `loop.ts` (post-`stream.finalMessage()` in `runOneRound` for embedded-refusal catch; `stop_reason === "refusal"` branch in `runAgentTurn` for explicit-refusal envelope upgrade).
+
+**Reasoning:** Phase D Phase 1 STOP audit (G8-D1) revealed v2.0 D27 framing implied transferability of M8 P4 pre-dispatch pattern that doesn't hold:
+- M8 P4 hook lives INSIDE `stop_reason === "tool_use"` branch (loop.ts ~281-330), operates on **tool input** (`block.input.message_text`).
+- Chat-text path goes through `stop_reason === "end_turn"` else branch; text accumulated via `accumulatedText` during streaming. Different hook location, different input shape.
+- P4 is a precedent for the classifier+envelope+break shape; A4 needs a new substrate hook point.
+
+Option γ (per-chunk classifier during stream) over-engineered for current scale — false-positive risk on partial text ("I can't" → "I can't help" vs "I can't recall the exact details"). M10+ if real-traffic data shows latency cost from β waiting for finalMessage.
+
+Option δ (system-prompt only) rejected — rejecting δ IS the meta-decision of shipping Phase D substrate.
+
+Option ε surfaced from audit (G8-D3): `stop_reason === "refusal"` branch in loop.ts currently emits a generic `{ type: "refusal", reason }` event predating M8 F4 envelope substrate. A4 has TWO surfaces: embedded-refusal catch (end_turn text) + explicit-refusal envelope upgrade. Single classifier substrate covers both.
+
+**Implications:**
+- All chat-text refusal paths route through `RefusalEnvelope` (M8 F4 substrate); UI rendering uses existing `RefusalEnvelopeRenderer`.
+- Pattern catalog at `src/lib/agent/refusal-patterns.ts` is the source of truth; Phase F D24 CI shape regex inherits same substrate.
+- Detection-only at Phase D for A6-1 in-turn duplicates (truncation = M10 candidate).
+- Legacy `refusalReason` variable retained on assistant turn JSONB column for backward-compat hydration; no caller sets it anymore.
+
+## D27 — Substrate-catch for chat-text refusals deferred to Round-2 (A5) [original v2.1 framing, superseded by v2.4 lock above]
 
 **Decision:** Defer architectural locus for substrate-catch coverage of chat-text refusal path to F.5-pattern substrate work in Phase D.
 
@@ -719,6 +751,16 @@ Three items surfaced during Phase B sign-off; explicitly captured here to preven
 
 3. **G8 — verify-shipped-state at every M9 phase kickoff.** v2.1 introduced G8 as a conventions-drafting discipline ("verify against shipped state before locking architectural framing"). Phase B Phase 1 STOP audit re-validated its value by catching v2.0's 4-vs-5 site-count framing miss. v2.2 amends §7.7 to lock G8 at every M9 phase kickoff (not just at conventions-revision time). Phase C onward applies G8 to its Phase 1 STOP audit per §3.
 
+## 6.7 M10 carry-forwards from M9 Phase D sign-off [added v2.4]
+
+1. **γ streaming-aware per-chunk refusal detection** — Phase D Option γ (per-chunk classifier during stream loop) was deferred because false-positive risk on partial text outweighs the latency win at current scale. If real-traffic data shows β post-stream classifier introduces noticeable latency, M10 evaluates γ.
+
+2. **Phase F D24 CI inherits `refusal-patterns.ts` substrate.** v2.3 D24 split CI shape regex (M9 Phase F) + LLM judge nightly (M10) stands; the catalog is the shared source. Phase F imports the same pattern entries Phase D runtime uses; M10 LLM judge can reuse for evaluation prompts.
+
+3. **A6-1 truncation (Phase D ships detection-only).** Text-mangling risk (cutting mid-sentence) deferred; M10 designs the truncation boundary if duplicate-detection telemetry shows the gap matters. A6-2 fact-write hardening + the M8 prompt directive already cover the cross-turn case.
+
+4. **A6-2 fact-write failure audit table.** Phase D logs failures at `console.error` level. M10 candidate: write to `agent_audit_log` with `kind='a6_fact_write_failed'` so the failure surfaces in the audit feed for trust inspection.
+
 ## 6.6 M10 carry-forwards from M9 Phase C sign-off [added v2.3]
 
 Three Phase C carry-forwards, plus institutional-pattern carry-forward:
@@ -838,6 +880,7 @@ M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing
 - **Phase A (v2.1):** API route test infrastructure exists from M6/M7 D38; v2.0 §6.3 assumed missing infrastructure (count was 5, actual 7).
 - **Phase B (v2.2):** 5 LLM call sites discovered (not 4 per v2.0 §3); Site 5 architecturally distinct (streaming + multi-turn + tool-use orchestration).
 - **Phase C (v2.3):** D22 has two-layer architecture (API + UI); v2.0 framing assumed single-phase scope. D23 per-tool catalog was wrong granularity; per-generator-call is the actual surface. Hybrid consumer pattern across 4 routes affects Layer 2 scope. SEVEN G8 catches total — most of any M9 phase.
+- **Phase D (v2.4):** D27 hook-location framing wrong (G8-D1 — M8 P4 inside tool_use branch; chat-text in else branch). A4 + A6 share substrate boundary (G8-D2 — not pre-designed). `stop_reason === "refusal"` branch emits generic event predating M8 F4 envelope (G8-D3 — surfaced Option ε beyond v2.0 α/β/γ/δ). A6 scope = strengthen existing partial substrate (G8-D4 — M8 Phase F shipped fact-write + prompt directive; A6 hardens). FOUR G8 catches; fourth consecutive M9 phase catching v2.0 framing drift.
 
 **Pattern:** M9 v2.0 conventions referenced shipped state without verification. Each phase kickoff has applied G8 and caught drift; revisions accumulate. Cost: ~half-day per phase in audit + scope adjustment + conventions revision.
 

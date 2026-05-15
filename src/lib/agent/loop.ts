@@ -31,6 +31,10 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  classifyAccumulatedText,
+  upgradeStopReasonRefusal,
+} from "./post-stream-classifier";
+import {
   getOrCreateConversation,
   persistTurn,
   insertTurn,
@@ -274,9 +278,37 @@ async function* runOneRound(
   const auditIds: string[] = [];
   // P4: set when the pre-dispatch classifier matches; surfaced in
   // RoundResult so runAgentTurn() can finalize the refusal-shaped turn.
+  // M9 Phase D: also set by the post-stream classifier (A4 chat-text
+  // substrate-catch) per D27 Option ε.
   let roundRefusalEnvelope:
     | import("./refusal-envelope").RefusalEnvelope
     | undefined;
+
+  // M9 Phase D A4 (D27 Option ε): post-stream refusal classifier.
+  // Catches generic LLM-refusal phrases ("I can't help with that",
+  // "As an AI…", apology-prefixed refusals) in the assembled assistant
+  // text BEFORE we branch on stop_reason. Fires regardless of stop_reason
+  // — tool_use turns can have refusal voice in the pre-tool preamble,
+  // end_turn / refusal turns have it in the response text.
+  //
+  // Pattern catalog: src/lib/agent/refusal-patterns.ts (shared with Phase F
+  // D24 CI shape regex when that ships; same source).
+  const postStreamResult = classifyAccumulatedText(accumulatedText);
+  if (postStreamResult?.kind === "refusal") {
+    yield {
+      type: "refusal_envelope",
+      envelope: postStreamResult.envelope,
+    };
+    roundRefusalEnvelope = postStreamResult.envelope;
+    return {
+      events: [],
+      finalMessage,
+      accumulatedText,
+      toolCallRecords,
+      auditIds,
+      refusalEnvelope: roundRefusalEnvelope,
+    };
+  }
 
   if (finalMessage.stop_reason === "tool_use") {
     for (const block of finalMessage.content) {
@@ -705,10 +737,14 @@ export async function* runAgentTurn(
     }
 
     if (stopReason === "refusal") {
-      refusalReason = {
-        reason: "Model emitted a refusal stop reason.",
-        suggested_next_step: null,
-      };
+      // M9 Phase D G8-D3: upgrade the generic refusal event to an
+      // envelope-shaped emission via post-stream-classifier. v2.0 D27
+      // framing assumed this branch already used the M8 F4 envelope
+      // substrate; audit revealed it predates F4 and emits a generic
+      // event. v2.4 closes the gap.
+      const upgraded = upgradeStopReasonRefusal(roundResult.accumulatedText);
+      yield { type: "refusal_envelope", envelope: upgraded };
+      refusalEnvelope = upgraded;
       break;
     }
 
@@ -726,28 +762,69 @@ export async function* runAgentTurn(
 
   // M8 Phase F C3 (D11): first-time 'rich' transition writes the
   // onboarding_completion_offered_at fact so future turns see it set
-  // and the prompt suppresses re-surfacing. Best-effort; failure here
-  // doesn't block the turn. The model's job is to actually surface the
-  // milestone sentence; this write captures the snapshot moment.
+  // and the prompt suppresses re-surfacing. M9 Phase D A6-2 hardens
+  // the fact-write with retry-with-backoff + non-swallowing failure
+  // logging — M8 wrapped this in silent try/catch + console.warn,
+  // which let the fact-write fail silently and re-ask the model next
+  // turn. A6-3 + retries ensure the substrate guard actually holds.
   if (
     sufficiencyContext &&
     supabaseForSufficiency &&
     sufficiencyContext.level === "rich" &&
     sufficiencyContext.completion_offered_at === null
   ) {
-    try {
-      const { writeOnboardingFact } = await import("./onboarding-state");
-      await writeOnboardingFact(
-        supabaseForSufficiency,
-        input.host.id,
-        "onboarding_completion_offered_at",
-        new Date().toISOString(),
-      );
-    } catch (err) {
-      console.warn(
-        `[loop] C3 onboarding-offered write skipped: ${err instanceof Error ? err.message : String(err)}`,
+    const MAX_WRITE_ATTEMPTS = 3;
+    let writeAttempts = 0;
+    let writeError: Error | null = null;
+    const { writeOnboardingFact } = await import("./onboarding-state");
+    while (writeAttempts < MAX_WRITE_ATTEMPTS) {
+      try {
+        await writeOnboardingFact(
+          supabaseForSufficiency,
+          input.host.id,
+          "onboarding_completion_offered_at",
+          new Date().toISOString(),
+        );
+        writeError = null;
+        break;
+      } catch (err) {
+        writeError = err instanceof Error ? err : new Error(String(err));
+        writeAttempts += 1;
+        if (writeAttempts < MAX_WRITE_ATTEMPTS) {
+          // Exponential backoff: 100ms, 200ms (cap at 2 retries).
+          await new Promise((resolve) =>
+            setTimeout(resolve, 100 * Math.pow(2, writeAttempts - 1)),
+          );
+        }
+      }
+    }
+    if (writeError) {
+      // A6-2: surface the failure non-silently. M10 candidate: write
+      // to agent_audit_log with kind='a6_fact_write_failed' so the
+      // failure is visible in the audit feed. For Phase D, error-level
+      // log is the substrate event (not console.warn — that's
+      // M8 swallowing behavior A6-2 replaces).
+      console.error(
+        `[loop] A6-2 onboarding-offered write FAILED after ${MAX_WRITE_ATTEMPTS} attempts: ${writeError.message}`,
       );
     }
+  }
+
+  // M9 Phase D A6-1: cross-round completion-message duplicate detection.
+  // The post-stream classifier (runOneRound) catches refusal patterns
+  // per-round; here we look across rounds for the canonical completion
+  // sentence appearing multiple times in the assembled text. Detection-
+  // only at Phase D — truncation is M10 candidate (text-mangling has
+  // real risk of cutting mid-sentence; M10 designs the truncation
+  // boundary). Phase D logs the event; A6-2 fact-write guards the
+  // cross-turn case.
+  const crossRoundCompletionCheck = classifyAccumulatedText(
+    accumulatedText.join(""),
+  );
+  if (crossRoundCompletionCheck?.kind === "completion_duplicate") {
+    console.warn(
+      `[loop] A6-1 in-turn completion-message duplicate detected: pattern=${crossRoundCompletionCheck.pattern_id} occurrences=${crossRoundCompletionCheck.occurrences}`,
+    );
   }
 
   // Finalize the pre-inserted assistant stub with the loop's outputs.
@@ -767,18 +844,14 @@ export async function* runAgentTurn(
   });
   const persistedAssistant = assistantTurn;
 
-  if (refusalReason) {
-    yield {
-      type: "refusal",
-      reason: refusalReason.reason,
-      suggested_next_step: refusalReason.suggested_next_step,
-    };
-    return;
-  }
+  // M9 Phase D G8-D3: legacy refusalReason yield removed.
+  // stop_reason='refusal' branch now emits envelope via
+  // upgradeStopReasonRefusal at the round-loop break point; the
+  // refusalReason variable is retained on the assistant turn's
+  // JSONB column for backward-compat hydration but no caller sets
+  // it anymore. The unconditional envelope-or-done path below
+  // handles the unified flow.
 
-  // M8 Phase D P4: refusal_envelope path. The envelope event was
-  // already yielded mid-round; emit `done` so the client closes the
-  // turn gracefully (no further tool dispatch, no further text).
   if (refusalEnvelope) {
     yield {
       type: "done",
