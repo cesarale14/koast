@@ -566,4 +566,11 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
       "Doctrine file contains every banned phrase as quotation; v1 runner excludes voice-doctrine.md from the prompt-bearing scan. Judge can distinguish quote-from-instance (per R3 from STEP 5+ kickoff).",
     planned_layer: "llm-judge",
   },
+  {
+    id: "deferred_constitution_prompt_quote_vs_instance",
+    doctrine_section: "Constitution prompts (build-voice-prompt.ts, agent/system-prompt.ts)",
+    rationale_for_deferral:
+      "Constitution prompts cite banned phrases by name as negative-example pedagogy (legitimate technique for training LLM avoidance). v1 catalog cannot distinguish pedagogical quotation from inline violation — same architectural class as deferred_voice_doctrine_self_scan. The runner's CONSTITUTION_PROMPTS list documents the deferred surface; M10 LLM judge gates this class. D24 v1 scope is structural (call-site prompts) per v2.6 §3 + §7.8.",
+    planned_layer: "llm-judge",
+  },
 ];
