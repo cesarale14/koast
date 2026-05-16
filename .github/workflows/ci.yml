@@ -1,0 +1,48 @@
+name: CI
+
+# M9 Phase F STEP 8 — additive gating layer.
+#
+# Vercel's existing build (tsc + ESLint via `next build`) gates deploys.
+# This workflow gates PRs + main pushes with the SAME tsc + ESLint
+# checks plus the jest suite — which Vercel does NOT run. That's how
+# D24 (voice anti-pattern shape regex via anti-patterns.test.ts) gets
+# enforced pre-merge rather than relying on local discipline.
+#
+# Scope is deliberately minimal per /ultraplan Q-F2 (a):
+#   - one job, no matrix (M10 may add a Node version matrix)
+#   - three checks: npm run lint, npx tsc --noEmit, npm test
+#   - no caching beyond actions/setup-node's npm cache
+#   - no test-result publishing, no coverage upload
+# Add scope only with explicit decision in conventions.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: lint · tsc · test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
