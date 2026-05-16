@@ -1,8 +1,8 @@
 # Agent Loop v1 — Milestone 9 Conventions
 
-**Status:** Locked, v2.5
+**Status:** Locked, v2.6
 **Drafted:** 2026-05-12
-**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards; M9 Phase C v2.3 — D22 locked Option II API-layer + D23 locked Option B per-generator-call + Q-C1 vocabulary rename + 7 G8 catches + α + γ blend C1 uniform + G8 institutional pattern + M10 inheritance)
+**Revised:** 2026-05-12 (M9 Phase A v2.1 — §6.3 correction + verification discipline; M9 Phase B v2.2 — D26 locked α + Q-B3 + Q-B4 resolutions + M10 carry-forwards; M9 Phase C v2.3 — D22 locked Option II API-layer + D23 locked Option B per-generator-call + Q-C1 vocabulary rename + 7 G8 catches + α + γ blend C1 uniform + G8 institutional pattern + M10 inheritance; M9 Phase F v2.6 — D24 shape-regex layer shipped + structural call-site/constitution scope bifurcation + M10 inheritance + G8 stratification across pre-design / implementation-runtime / CI-activation / deployment-gate layers + phase-close multi-gate discipline)
 **Canonical locations:**
 - `~/koast/docs/architecture/agent-loop-v1-milestone-9-conventions.md` (repo, canonical for code-import)
 - `decisions/2026-05-12-m9-conventions.md` (vault, canonical for Method-grounding via mcpvault)
@@ -282,23 +282,30 @@ Runtime: when the tool dispatches, compare current memory_facts state against th
 - M8 C3 sufficiency classifier (rich/sparse/empty per memory_facts entity) is the substrate; D23 layers per-tool requirements on top.
 - Threshold violations route through M8 RefusalEnvelope (`kind: 'host_input_needed'`) — single rendering treatment.
 
-## D24 — Tonal regression mechanism locked (A7)
+## D24 — Tonal regression mechanism locked (A7) [updated v2.6]
 
-**Decision:** Both shape regex and LLM judge, with explicit phasing.
+**Decision (v2.6 lock):** Shape-regex layer shipped Phase F; LLM judge layer deferred to M10. Structural scope: D24 shape-regex gates **call-site prompts**; constitution prompts defer to M10 LLM judge.
 
-**M9 Phase F (Days 17-19) ships:**
-- Shape regex layer: regex patterns matching voice doctrine §5 anti-patterns (emoji in Koast-to-host, ✨/🎉 in any context, "Great question!", "I'd love to help", "Hope this helps!", etc.) run in CI on every commit touching prompt-bearing files. Fail-loud on match.
-- Reference voice doctrine §5 anti-pattern enumeration; regex patterns synced with doctrine same-PR.
+**M9 Phase F shipped:**
+- Shape primitive (γ extraction): `src/lib/agent/patterns/types.ts` — `PatternEntry<TKind>`, `PatternMatch<TKind>`, `findFirstMatch`, `findAllMatches`. Shared with M9 Phase D refusal-patterns module via re-export (zero consumer churn).
+- Voice anti-pattern catalog: `src/lib/voice/anti-patterns.ts` — 66 patterns enumerated across voice doctrine §5.1-§5.6 (sycophancy Koast-to-host 6 + host-to-guest 4; apology theater 7; over-hedging 7 single + 1 stacked; corporate voice 17 phrases + 4 constructions; chipper/lifestyle-brand 9; AI-recognizable 9 constructions + 2 specific). 7 stub entries in `PHASE_F_DEFER_TO_M10` document non-shipped catalog enforcement work by `planned_layer` (output-filter | llm-judge).
+- Runner + allow-list: `src/lib/voice/anti-patterns.runner.ts` — `PROMPT_BEARING_FILES` literal allow-list (call-site prompts, gated) + `CONSTITUTION_PROMPTS` documented deferred surface. `scanFile()` returns line + ±20 char context for failure UX.
+- Test wiring: `src/lib/voice/__tests__/anti-patterns.test.ts` — three describe blocks (catalog completeness introspection, meta-tests against fixtures, prompt-bearing file scan). 16 tests; 14 passing + 2 `test.skip` (constitution prompts surfaced in jest output rather than invisibly excluded).
+- Fixtures: `src/lib/voice/fixtures/{all-patterns,clean,edge-cases}.fixture.ts` — covers every catalog id; doctrine-honest clean voice; 5 edge cases including permitted-apology, single-hedge, stacked-hedge, quoted-violation, corporate-in-doctrine.
+- CI workflow: `.github/workflows/ci.yml` — single job, Node 20, ubuntu-latest, steps `npm ci → npm run lint → npx tsc --noEmit → npm test`. Triggers on `pull_request` against main + `push` to main. Additive to Vercel's existing tsc + ESLint deploy pipeline.
 
-**Deferred to M10 candidate:** LLM judge nightly job evaluating shipped-output samples from production traffic against voice doctrine. Larger investment (prompt engineering, sample selection, comparator-judge setup, drift-alert routing). Phased so M9 ships substrate without LLM-evaluation infrastructure.
+**Scope clarification (Phase F STEP 7 PATH C lock):** Prompt-bearing files split into two structurally distinct classes:
 
-**Reasoning:** Voice doctrine §1.6 ("Voice violations are bugs") requires actionable detection. Three options considered: (a) shape regex only (catches enumerated anti-patterns, misses semantic drift); (b) LLM judge only (catches semantic drift, requires significant infra investment, slower feedback loop); (c) both with phasing. Shape regex is cheap, fast, and catches the regression class M8 F.5 caught at smoke gate (chat-text refusal voice drift) — pulling that to CI prevents drift before staging. LLM judge handles harder semantic-drift case but warrants its own milestone shape.
+- **Call-site prompts** — direct output generation; voice violations leak to user-facing output. Gated by D24 shape-regex (PROMPT_BEARING_FILES). Current members: `src/lib/claude/messaging.ts`, `src/lib/reviews/generator.ts`.
+- **Constitution prompts** — behavior-defining; teach voice doctrine via negative-example pedagogy; quote-vs-instance ambiguity inherent to the file class. Documented in CONSTITUTION_PROMPTS export. Deferred to M10 LLM judge. Current members: `src/lib/voice/build-voice-prompt.ts`, `src/lib/agent/system-prompt.ts`.
 
-**Implications:**
-- M9 Phase F ships regex patterns in `src/lib/voice/anti-patterns.test.ts` (or similar) running via standard test infra.
-- CI configuration wires the test into the gating check.
-- Anti-pattern catalog committed alongside voice doctrine reference; doctrine updates flow into catalog updates same-PR.
-- LLM judge infra documented as M10 candidate in §6.1.
+Operational discipline codified at §7.9.
+
+**LLM judge layer deferred to M10.** Larger investment (prompt engineering, sample selection, comparator-judge setup, drift-alert routing); warrants its own milestone shape. M10 inheritance enumerated at §6.9.
+
+**Reasoning:** Voice doctrine §1.6 ("Voice violations are bugs") requires actionable detection. Shape regex is cheap, fast, and catches the regression class M8 F.5 caught at smoke gate (chat-text refusal voice drift) — pulling that to CI prevents drift before staging. LLM judge handles harder semantic-drift case but warrants its own milestone shape. The structural call-site/constitution bifurcation was surfaced during STEP 7 catalog runtime (G8-F4); /ultraplan's initial 4-file PROMPT_BEARING_FILES list had conflated two surfaces.
+
+**Honest scope record (Phase F):** CI activation surfaced unrelated pre-existing lint debt (Phase D origin: `let refusalReason` never reassigned; Phase E origin: `as any` directive misplacement on voice-mode.ts; Phase E origin: unused `messagesOrder` jest.fn). Vercel's existing build pipeline did not gate on these. Lint cleanup landed as STEP 8.5 prerequisite to STEP 8 CI workflow. G8-F5 institutional catch codified at §7.7. CI activation also surfaced undeclared ts-node devDependency (G8-F7) — ambient in local node_modules but not in `package.json`; jest's `jest.config.ts` parsing requires ts-node. Fix shipped same-step with package.json + package-lock.json declaration.
 
 ## D25 — voice_mode locus + payload locked (B1) [updated v2.5]
 
@@ -825,6 +832,38 @@ Three Phase C carry-forwards, plus institutional-pattern carry-forward:
 
 4. **Institutional pattern: M9 v2.0 verification gap.** See §7.7. M10 conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock.
 
+## 6.9 M10 carry-forwards from M9 Phase F sign-off [added v2.6]
+
+Phase F shipped the D24 shape-regex layer; remaining catalog enforcement and adjacent operational disciplines roll forward to M10.
+
+1. **Non-shape-regex catalog enforcement.** Sub-items by `planned_layer` (documented per-entry in `PHASE_F_DEFER_TO_M10`):
+   - **(i) output-filter** — mode-dependent surface controls (§5.5 emoji policy). Mode-dependent (Koast-to-host=zero, host-to-guest Mode 1=learned, Mode 2=minimal); enforcement surface is OUTPUT text per-mode, not prompt-bearing files.
+   - **(ii) llm-judge** — count-shape patterns (§5.5 exclamation cap: max one per response, milestone-context only). Count + semantic-context judgment, not phrase-shape regex.
+   - **(iii) llm-judge** — heuristic descriptions (§5.6 ensure-verb-chain: "ensure with abstract objects"). Shape regex would false-positive legitimate uses of `ensure` with concrete objects.
+   - **(iv) llm-judge** — contextual patterns (§5.7 Filler, §5.8 Self-narration, §5.9 Performative thoroughness). Length + structure + context-dependent.
+   - **(v) llm-judge** — voice-doctrine.md self-scan (quote-vs-instance). Doctrine contains every banned phrase as quotation; v1 runner excludes the file. Judge can distinguish quote-from-instance.
+   - **(vi) llm-judge** — constitution prompts self-scan (`build-voice-prompt.ts`, `system-prompt.ts`). Same architectural class as (v); constitution prompts cite banned phrases by name as negative-example pedagogy. Documented in CONSTITUTION_PROMPTS export at `src/lib/voice/anti-patterns.runner.ts`.
+
+2. **Husky pre-commit for local fast-fail.** Developer convenience; not authoritative gate. CI remains the authoritative gate.
+
+3. **Sentinel pattern** (`// koast-voice-allow: <id>`) for context-aware suppression. Useful only once LLM judge can read the sentinel context to decide whether suppression is doctrine-honest. M9 ships shape-regex-only and explicitly does NOT include per-line suppression sentinels.
+
+4. **Refinement queue for known false-positives** surfaced in `__fixtures__/edge-cases.fixture.ts` (e.g., `case_quoted_violation` documents that v1 catalog matches inside quotes; M10 LLM judge distinguishes).
+
+5. **Citation-section marker mechanism** (`[[cite: ...]]`) — deferred from PATH B analysis at STEP 7. Reconsider only if structural call-site/constitution bifurcation proves insufficient at M10; likely it will not, because structural is the answer.
+
+## 6.10 Shape primitive extraction methodology [added v2.6]
+
+Phase F's γ extraction pattern + supporting disciplines are inheritance methodology for M10's LLM judge catalog when it ships.
+
+(a) **Extraction pattern (γ):** primitives live at `src/lib/agent/patterns/types.ts`; domain catalogs import from the types module. When M10's LLM judge catalog ships, its shape primitives follow the same `extract-to-patterns/` pattern (not `extract-to-judge/` or `extract-to-judge-types.ts` — same primitives directory, shared shape).
+
+(b) **Re-export technique:** refactoring an existing primitive module preserves consumer surface via `export { ... } from "./patterns/types"` re-export rather than forcing consumer import-path updates. `src/lib/agent/refusal-patterns.ts` demonstrates: Phase D consumers (`post-stream-classifier.ts`, `__tests__/refusal-patterns.test.ts`) unmodified through the STEP 5 lift.
+
+(c) **SHIP/DEFER prefix convention:** deferred catalog entries are prefixed `deferred_` to prevent id collisions with shipped entries of similar phrase shape. The catalog completeness meta-test enforces `/^deferred_[a-z0-9_]+$/` for the DEFER bucket. Surfaced organically during STEP 7 first re-run when the test rejected an unprefixed stub — exactly the kind of in-step structural surfacing the meta-test was designed for.
+
+(d) **Catalog completeness introspection:** every SHIP entry must appear in the `all-patterns.fixture.ts` via `// pattern: <id>` delineation; meta-test verifies both directions (catalog→fixture and fixture→catalog) to catch orphan additions or removals. Forces same-PR fixture additions on catalog growth.
+
 ---
 
 # Section 7 — Implementation prompt for Claude Code
@@ -930,8 +969,25 @@ M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing
 - **Phase C (v2.3):** D22 has two-layer architecture (API + UI); v2.0 framing assumed single-phase scope. D23 per-tool catalog was wrong granularity; per-generator-call is the actual surface. Hybrid consumer pattern across 4 routes affects Layer 2 scope. SEVEN G8 catches total — most of any M9 phase.
 - **Phase D (v2.4):** D27 hook-location framing wrong (G8-D1). A4 + A6 share substrate (G8-D2). stop_reason='refusal' branch predates M8 F4 envelope (G8-D3 → Option ε). A6 = strengthen existing partial substrate (G8-D4). FOUR G8 catches.
 - **Phase E (v2.5):** M8 C13 binding copy located in `(dashboard)` route group (G8-E1). voice_mode in system-prompt.ts forward-comment-only (G8-E2). Sites 1-4 don't currently import voice doctrine; B2 starts at zero (G8-E3). original_draft has zero current substrate (G8-E4). D25 vs Method-in-code Belief 7 architecture unified via fact JSONB (G8-E5). M8 F1 MemorySupersessionInline already exists; voice section reuses (G8-E6 — only positive finding). SIX G8 catches; running total 20 across A-E.
+- **Phase F (v2.6):** SEVEN G8 catches across three distinct strata; running total 27 across A-F.
+  - **F1 — pre-design verification gap:** refusal-patterns.ts inheritance was MODULE SHAPE only, not patterns; v2.4 changelog framed inheritance ambiguously. Surfaced STEP 2 Phase 1 STOP.
+  - **F2 — pre-design verification gap:** CI substrate was GREENFIELD; v2.0 D24 assumed existing CI infrastructure. Surfaced STEP 2 Phase 1 STOP.
+  - **F3 — pre-design verification gap:** D24 v2.0 didn't operationalize "prompt-bearing files" scope. Surfaced STEP 2 Phase 1 STOP.
+  - **F4 — implementation-runtime verification gap:** /ultraplan's 4-file PROMPT_BEARING_FILES list conflated two structurally distinct surfaces (call-site vs constitution prompts). Catalog runtime surfaced the boundary mid-STEP-7; PATH C codified the bifurcation at §7.9.
+  - **F5 — CI-activation verification gap (subtype: declared rules vs unverified shipped code):** /ultraplan Q-F2 (a) codification of `npm run lint` as a CI gate surfaced three pre-existing lint errors introduced Phase D and Phase E. Cleared via STEP 8.5 cleanup.
+  - **F6 — deployment-gate verification gap:** Vercel production deploys failed silently from Phase D close (d582f9a) through Phase F STEP 7 (b36a0cf), ~24-hour window. Phase-close discipline included local tsc + test but not Vercel deploy-success verification. Production frozen at a71b37a throughout. Cleared via STEP 8.5 lint cleanup. Codified at §7.10.
+  - **F7 — CI-activation verification gap (subtype: declared dependencies vs unverified local environment):** ts-node was ambient in local node_modules but undeclared in `package.json`. CI's clean `npm ci` couldn't resolve ts-node when Jest parsed `jest.config.ts`. Same stratum as F5; different subtype.
 
 **Pattern:** M9 v2.0 conventions referenced shipped state without verification. Each phase kickoff has applied G8 and caught drift; revisions accumulate. Cost: ~half-day per phase in audit + scope adjustment + conventions revision.
+
+**Institutional abstraction (v2.6):** G8 catches operate at multiple gate layers and within layers at multiple subtypes. Phase F alone surfaced three distinct strata:
+
+- **Pre-design** (F1, F2, F3) — Phase 1 STOP catches against the conventions document's assumed shipped state.
+- **Implementation-runtime** (F4) — catches surfaced by the catalog/code actually running against shipped state mid-phase.
+- **CI-activation** (F5, F7) — catches surfaced when a new gating layer activates against state previously unverified by the prior gate posture. Subtypes within: declared rules vs unverified shipped code (F5); declared dependencies vs unverified local environment (F7).
+- **Deployment-gate** (F6) — catches surfaced when deploy-success verification is added to phase-close (the gate that should have caught Phase D + E silent prod-deploy failures).
+
+M10 conventions drafting must verify-against-shipped-state at design time AND retain runtime, CI-activation, and deployment-gate diagnostic disciplines.
 
 **Forward-applying to M10:** Conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock. Each named substrate, each scope claim, each integration boundary requires verification, not pattern-match from milestone-close inheritance.
 
@@ -960,6 +1016,49 @@ Final M9 session (Phase H):
 6. Update `~/koast/CLAUDE.md` with M9 conventions reference
 7. Tag the milestone close commit (`m9-close`)
 8. Surface to human: "M9 shipped. Report at milestones/M9/M9-close.md."
+
+## 7.9 Allow-list discipline + classification bifurcation [added v2.6]
+
+Codifies the prompt-file classification + same-PR allow-list update discipline locked at STEP 7 PATH C. Driven by G8-F4 implementation-runtime surfacing.
+
+Prompt-bearing files split into two classes:
+
+**(a) Call-site prompts** — output-generating; voice violations leak to user-facing output. Gated by D24 shape-regex via `PROMPT_BEARING_FILES` literal allow-list at `src/lib/voice/anti-patterns.runner.ts`. Current members:
+- `src/lib/claude/messaging.ts`
+- `src/lib/reviews/generator.ts`
+
+**(b) Constitution prompts** — behavior-defining; teach voice doctrine via negative-example pedagogy; quote-vs-instance ambiguity inherent. Documented in `CONSTITUTION_PROMPTS` export at the same location. Deferred to M10 LLM judge (§6.9 (vi)). Current members:
+- `src/lib/voice/build-voice-prompt.ts`
+- `src/lib/agent/system-prompt.ts`
+
+Operational discipline:
+
+1. **Classification required first.** New prompt files must be classified (call-site vs constitution) before adding to either list. Misclassification surfaces at runtime — call-site additions get scanned, constitution additions don't; the test failure or its absence is the diagnostic.
+2. **Same-PR allow-list update for both classes.** Adding a new prompt module requires updating `PROMPT_BEARING_FILES` (call-site) or `CONSTITUTION_PROMPTS` (constitution) in the same PR.
+3. **Per-phase G8 check verifies allow-list contains all shipped LLM call-site routes.** Phase 1 STOP audits include this verification against shipped LLM call-site routes.
+4. **Literal paths only; no globs.** Globs invite scope drift and silently catch unintended files. The test's existence-check protects against typos by surfacing path errors as discrete ENOENT failures rather than as confusing scan errors.
+
+## 7.10 Phase-close multi-gate verification discipline [added v2.6]
+
+Codifies the phase-close gate sequence including CI + Vercel observation. Driven by G8-F6 deployment-gate verification gap.
+
+Phase-close gate sequence (all required for "closed" status):
+
+(a) Local `npx tsc --noEmit` → 0 errors
+(b) Local `npm test` → all passing (specific count tracked per phase)
+(c) Local `npm run lint` → 0 errors
+(d) **CI workflow on close commit → green** (added v2.6)
+(e) **Vercel production deploy on close commit → green** (added v2.6)
+(f) Per-phase close note authored at `milestones/M{N}/items/phase-{Y}.md`
+(g) Conventions revision (if scope warrants) dual-canonical (vault + repo mirror)
+
+**F6 institutional discovery:** gates (a)-(c) alone are insufficient. Phase D and Phase E both passed (a)-(c) and (f)-(g) but failed (d) and (e) silently — Vercel production deploys errored from Phase D close (d582f9a) through Phase F STEP 7 (b36a0cf), ~24-hour window. The "close" claim was technically inaccurate prior to v2.6: close meant `main`, not `prod`.
+
+Implementation aids (recommended, not required):
+
+- Vercel webhook → Telegram notification on prod deploy failure
+- `gh run watch <run-id>` after CI-triggering commits (or REST API poll loop when gh CLI auth is unavailable)
+- `vercel ls --prod` check incorporated into phase-close verification
 
 ---
 
@@ -993,4 +1092,4 @@ Final M9 session (Phase H):
 
 ---
 
-*End conventions, v2.0.*
+*End conventions, v2.6.*
