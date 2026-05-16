@@ -134,8 +134,8 @@ export async function writeVoiceMode(
   }
 
   // Insert the new fact.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: inserted, error: insertErr } = await (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     supabase.from("memory_facts") as any
   )
     .insert({

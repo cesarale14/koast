@@ -94,14 +94,9 @@ function mockSupabaseForExtraction(opts: {
   hostMessages: Array<{ id: string; content: string; direction: string; created_at: string }>;
   priorVoiceFact?: { value: unknown } | null;
 }) {
-  // messages-table chain: .select().eq().order().limit() → returns the array
-  const messagesLimit = jest.fn(async () => ({
-    data: opts.hostMessages,
-    error: null,
-  }));
-  const messagesOrder = jest.fn(() => ({ limit: messagesLimit, returns: () => ({ ...({ then: (r: (v: { data: typeof opts.hostMessages; error: null }) => void) => r({ data: opts.hostMessages, error: null }) }) }) }));
-  // The actual call is .returns<HostMessageRow[]>() after .limit() — so chain
-  // .limit returns an object that has .returns method which returns awaitable.
+  // messages-table chain: .select().eq().order().limit().returns() →
+  // returns the array via the .returns<HostMessageRow[]>() boundary that
+  // the real call site reaches. Mock chain reproduces that shape.
   const messagesLimitReturns = jest.fn(() => Promise.resolve({ data: opts.hostMessages, error: null }));
   const messagesLimitWithReturns = jest.fn(() => ({ returns: messagesLimitReturns }));
   const messagesOrderWithLimit = jest.fn(() => ({ limit: messagesLimitWithReturns }));

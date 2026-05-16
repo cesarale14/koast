@@ -639,7 +639,7 @@ export async function* runAgentTurn(
 
   let round = 0;
   let turnError: { code: string; message: string; recoverable: boolean } | null = null;
-  let refusalReason: { reason: string; suggested_next_step: string | null } | null = null;
+  const refusalReason: { reason: string; suggested_next_step: string | null } | null = null;
   // M8 Phase D P4: structured refusal envelope (RefusalEnvelope shape).
   // Set by the pre-dispatch classifier at propose_guest_message when a
   // §2.3.4 publisher category matches. Persisted on the assistant turn's
