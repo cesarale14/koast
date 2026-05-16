@@ -26,18 +26,22 @@
  * Voice doctrine binding (§5 anti-pattern enumeration): refusal patterns
  * mirror the doctrine's banned phrases. Phase F D24 CI catches via regex;
  * Phase D substrate-catch via this catalog. Same source.
+ *
+ * M9 Phase F (γ extraction): the shape primitive (PatternEntry,
+ * PatternMatch, findFirstMatch, findAllMatches) has been lifted to
+ * src/lib/agent/patterns/types.ts and is re-exported here for backcompat
+ * with consumers (post-stream-classifier, refusal-patterns.test). No
+ * behavior change.
  */
 
-export type PatternEntry<TKind extends string> = {
-  /** Stable identifier — used in audit events + telemetry. */
-  id: string;
-  /** Regex pattern (source string); flags applied uniformly at match time. */
-  pattern: string;
-  /** Classification target — discriminates downstream handling. */
-  kind: TKind;
-  /** Human-readable purpose. Comment-grade; surfaces in audit events. */
-  description: string;
-};
+export {
+  type PatternEntry,
+  type PatternMatch,
+  findAllMatches,
+  findFirstMatch,
+} from "./patterns/types";
+
+import type { PatternEntry } from "./patterns/types";
 
 // ---- Refusal patterns (A4) ----
 
@@ -114,53 +118,3 @@ export const COMPLETION_DUPLICATE_PATTERNS: ReadonlyArray<PatternEntry<Completio
       "Trailing offering in canonical completion phrase. Secondary signature for robustness when model paraphrases the opening.",
   },
 ];
-
-// ---- Match helper ----
-
-export interface PatternMatch<TKind extends string> {
-  entry: PatternEntry<TKind>;
-  matchedText: string;
-  index: number;
-}
-
-/**
- * Run a pattern list against a text and return all matches.
- *
- * Pattern flags: case-insensitive + multiline by default. Patterns that
- * need case sensitivity (e.g., "as an AI" where "as an Ai" is also a
- * match) declare anchors in their pattern body.
- */
-export function findAllMatches<TKind extends string>(
-  text: string,
-  patterns: ReadonlyArray<PatternEntry<TKind>>,
-): PatternMatch<TKind>[] {
-  const matches: PatternMatch<TKind>[] = [];
-  for (const entry of patterns) {
-    const regex = new RegExp(entry.pattern, "gim");
-    let m: RegExpExecArray | null;
-    while ((m = regex.exec(text)) !== null) {
-      matches.push({ entry, matchedText: m[0], index: m.index });
-      // Guard against zero-length matches looping forever.
-      if (m.index === regex.lastIndex) regex.lastIndex += 1;
-    }
-  }
-  return matches.sort((a, b) => a.index - b.index);
-}
-
-/**
- * Return the FIRST match across a pattern list, or null. Convenience
- * for callers that only need to know "did something match?" not "what
- * are all the matches?". Faster than findAllMatches for short-circuit
- * paths.
- */
-export function findFirstMatch<TKind extends string>(
-  text: string,
-  patterns: ReadonlyArray<PatternEntry<TKind>>,
-): PatternMatch<TKind> | null {
-  for (const entry of patterns) {
-    const regex = new RegExp(entry.pattern, "im");
-    const m = regex.exec(text);
-    if (m) return { entry, matchedText: m[0], index: m.index };
-  }
-  return null;
-}
