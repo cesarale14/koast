@@ -166,6 +166,73 @@ Git plugin only — VPS-side commits should be substantive.
 - `templates/` — Templater templates (managed in Obsidian directly, 
   do not edit via mcpvault)
 
+### Vault note discipline (frontmatter + connectivity)
+
+Every vault note (excluding `templates/` and `inbox/` scratch) has 
+frontmatter for tag-pane queries AND a body-level `## Related` section 
+with `[[wikilinks]]` for graph-view connectivity. Codified during the 
+M9 Phase F STEP 9.5 vault-wide doctrine backfill. Frontmatter tags 
+alone don't create graph edges — only inline wikilinks do.
+
+**Same-PR discipline:** when you create a new vault note, ship its 
+frontmatter + Related section in the same write. When you create the 
+first note of a new section (a new milestone folder, a new research 
+topic), think through the link topology before writing.
+
+**Frontmatter taxonomy by section:**
+
+- `method/<doc>.md` — `tags: [method, foundational, <doc-slug>], 
+  type: method, status: canonical`
+- `decisions/<YYYY-MM-DD-slug>.md` — `tags: [<topic>-conventions OR 
+  decision, decision, <version-slug>], milestone: <M_N>, status: locked, 
+  version: <v_X_Y>, type: conventions|diagnostic|decision`
+- `milestones/M<N>/items/phase-<X>.md` — `tags: [m<N>, m<N>-phase-<X>, 
+  phase-close, milestone-shipped], milestone: M<N>, phase: <X>, 
+  type: phase-close`
+- `milestones/M<N>/<X>-phase-1-stop.md` — `tags: [m<N>, m<N>-phase-<X>, 
+  phase-1-stop, audit], milestone: M<N>, phase: <X>, type: phase-1-stop`
+- `milestones/M<N>/M<N>-close.md` — `tags: [m<N>, milestone-close, 
+  milestone-shipped], milestone: M<N>, type: milestone-close`
+- `sessions/<YYYY-MM-DD-topic-slug>.md` — `tags: [session, m<N> 
+  (where applicable), <topic-slug>], type: session, date: <YYYY-MM-DD>`
+- `research/<slug>.md` — `tags: [research, <topic-slug>(s)], 
+  type: research, date: <YYYY-MM-DD>`
+- `cf-backlog/cf-NNNN-<slug>.md` — `tags: [cf, cf-NNNN, <topic-slug>], 
+  type: carry-forward, milestone-source: M<N>`
+
+**Link topology (mandatory in `## Related` section):**
+
+- **Method docs** use the strict triangle: each links to the other 
+  two via `[[koast-method]]` / `[[koast-method-in-code]]` / 
+  `[[voice-doctrine]]`.
+- **Conventions docs are hubs.** Each milestone's conventions doc 
+  links to every phase close, every phase-1-stop audit, milestone-close, 
+  upstream diagnostic (where applicable), and the successor milestone's 
+  conventions doc.
+- **Phase notes follow the chain.** Each phase-close links to: the 
+  conventions doc (decision), the corresponding phase-1-stop audit 
+  (where exists), `[[phase-<prev>]]`, `[[phase-<next>]]`, and any 
+  substrate/sanity-check notes belonging to that phase. Phase-1-stop 
+  audits link back to: conventions doc + corresponding phase-close.
+- **Sessions link to the artifact they produced.** A session that 
+  shipped voice doctrine links to `[[voice-doctrine]]`; a session that 
+  shipped M8 conventions v1.0 links to `[[2026-05-05-m8-conventions]]`; 
+  etc.
+- **Research links to the method docs it grounds** (or to specific 
+  decisions when applicable).
+- **CFs link to the source milestone's conventions + the phase that 
+  surfaced them.**
+
+**Cruft hygiene:** delete byte-empty notes (`Untitled.md` and similar 
+accidental new-note artifacts) via `mcpvault__delete_note` rather than 
+leaving them in the vault — they pollute search results and graph view.
+
+**Verifying connectivity:** after a vault session, optionally run 
+`mcp__mcpvault__list_all_tags` to confirm new tags landed and 
+spot-check via `get_notes_info` that frontmatter took. The graph view 
+in Obsidian is the visual sanity check — isolated notes mean the 
+Related section is missing.
+
 ### Where the Method lives
 
 The Koast Method document is the source of truth for what Koast IS — 
