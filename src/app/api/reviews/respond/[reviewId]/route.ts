@@ -4,6 +4,7 @@ import { generateReviewResponse } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth";
 import { createChannexClient } from "@/lib/channex/client";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { readReviewPreferences } from "@/lib/memory/review-preferences";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 export async function POST(
@@ -107,16 +108,16 @@ export async function POST(
         .select("name, city, bedrooms, bathrooms")
         .eq("id", review.property_id)
         .limit(1);
-      const { data: rules } = await supabase
-        .from("review_rules")
-        .select("tone, target_keywords")
-        .eq("property_id", review.property_id)
-        .limit(1);
+      // M9 Phase G E3: review preferences source switched from
+      // `review_rules` table to `memory_facts` (entity_type='host' +
+      // sub_entity_type='reviews') via readReviewPreferences. Per-
+      // property scoping eliminated per Q-G2 locus shift. Helper returns
+      // DEFAULT_REVIEW_PREFERENCES_PAYLOAD when no fact exists.
+      const prefs = await readReviewPreferences(supabase, user.id);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const property = ((props ?? []) as any[])[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rule = ((rules ?? []) as any[])[0] ?? { tone: "warm", target_keywords: [] };
+      const rule = { tone: prefs.tone, target_keywords: prefs.target_keywords };
       const today = new Date().toISOString().slice(0, 10);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const booking = ((bookings ?? []) as any[])[0] ?? {

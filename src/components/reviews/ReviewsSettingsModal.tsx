@@ -39,17 +39,25 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
   if (!open || !mounted) return null;
 
   const save = async () => {
+    // M9 Phase G E3 Q-G6 β: review preferences are now per-host (not
+    // per-property). The propertyId guard remains as a UI sanity check
+    // (the modal opens against a property context) but the request
+    // itself is host-scoped — host_id derived from session auth in the
+    // /api/reviews/preferences route.
     if (!propertyId) {
       toast("Pick a property first", "error");
       return;
     }
     setSaving(true);
     try {
-      const res = await fetch(`/api/reviews/rules/${propertyId}`, {
+      const res = await fetch(`/api/reviews/preferences`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          // Schema requires is_active explicitly; settings modal locks
+          // it true (the modal doesn't expose a pause toggle today).
+          is_active: true,
           target_keywords: form.target_keywords.split(",").map((k) => k.trim()).filter(Boolean),
         }),
       });

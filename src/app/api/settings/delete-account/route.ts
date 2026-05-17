@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
         "cleaning_tasks",
         "ical_feeds",
         "guest_reviews",
-        "review_rules",
         "messages",
         "message_templates",
         "bookings",

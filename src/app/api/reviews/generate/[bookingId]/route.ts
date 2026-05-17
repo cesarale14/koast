@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/pooled";
-import { bookings, properties, reviewRules, guestReviews } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { bookings, properties, guestReviews } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { generateGuestReview, calculatePublishTime } from "@/lib/reviews/generator";
 import { getAuthenticatedUser, verifyBookingOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
+import { readReviewPreferences } from "@/lib/memory/review-preferences";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
 
 export async function POST(
@@ -72,30 +73,20 @@ export async function POST(
       .limit(1);
     if (!property) return NextResponse.json({ error: "Property not found" }, { status: 404 });
 
-    // Fetch review rules (or use defaults)
-    const [ruleRow] = await db
-      .select({
-        tone: reviewRules.tone,
-        targetKeywords: reviewRules.targetKeywords,
-        autoPublish: reviewRules.autoPublish,
-        publishDelayDays: reviewRules.publishDelayDays,
-        badReviewDelay: reviewRules.badReviewDelay,
-      })
-      .from(reviewRules)
-      .where(
-        and(
-          eq(reviewRules.propertyId, booking.propertyId),
-          eq(reviewRules.isActive, true)
-        )
-      )
-      .limit(1);
-
-    const rule = ruleRow ?? {
-      tone: "warm",
-      targetKeywords: ["clean", "location", "comfortable"],
-      autoPublish: false,
-      publishDelayDays: 3,
-      badReviewDelay: true,
+    // M9 Phase G E3: review preferences source switched from
+    // `review_rules` table to `memory_facts` (entity_type='host' +
+    // sub_entity_type='reviews') via readReviewPreferences. Per-property
+    // scoping eliminated per Q-G2 locus shift. Helper returns
+    // DEFAULT_REVIEW_PREFERENCES_PAYLOAD when no fact exists — matches
+    // historical route fallback shape exactly.
+    const prefsSupabase = createServiceClient();
+    const prefs = await readReviewPreferences(prefsSupabase, user.id);
+    const rule = {
+      tone: prefs.tone,
+      targetKeywords: prefs.target_keywords,
+      autoPublish: prefs.auto_publish,
+      publishDelayDays: prefs.publish_delay_days,
+      badReviewDelay: prefs.bad_review_delay,
     };
 
     // Generate review
