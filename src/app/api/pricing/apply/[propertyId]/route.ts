@@ -407,6 +407,53 @@ export async function POST(
           .in("id", appliedRecIds);
       }
 
+      // M9 Phase G E2: pricing_apply action_type seeding per M8 Phase A
+      // non-gating CF. VIEW unified_audit_feed (migration 20260507040000)
+      // maps 'pricing_apply' → 'rate_push' category; this INSERT lights
+      // up the forward-compat mapping so host-clicked applies surface in
+      // the audit feed. Narrow scope per v2.6 §1.3 framing; NOT agent-
+      // loop integration. INSERT gates on appliedRecIds.length > 0 —
+      // pure-failure runs (0 applied) stay out of the audit feed per
+      // /ultraplan §3.2 framing. Partial-failure (≥1 applied + some
+      // failed batches) fires with payload.partial_failure flag.
+      if (appliedRecIds.length > 0) {
+        const successfulChannels = Array.from(
+          new Set(
+            Array.from(successByDate.values()).flatMap((s) => Array.from(s)),
+          ),
+        ).map(channelSlugFor);
+        const partialFailure = failedBatches.length > 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: auditErr } = await (supabase.from("agent_audit_log") as any)
+          .insert({
+            host_id: user.id,
+            action_type: "pricing_apply",
+            source: "frontend_api",
+            actor_kind: "host",
+            actor_id: user.id,
+            autonomy_level: "confirmed",
+            outcome: "succeeded",
+            created_at: appliedAt,
+            payload: {
+              property_id: propertyId,
+              applied_count: appliedRecIds.length,
+              channels_pushed: successfulChannels,
+              recommendation_ids: appliedRecIds,
+              ...(partialFailure && {
+                partial_failure: true,
+                failed_batches: failedBatches,
+              }),
+            },
+            context: {
+              idempotency_key,
+              target_channels: targets.map((t) => t.channel),
+            },
+          });
+        if (auditErr) {
+          console.warn("[pricing/apply] agent_audit_log insert failed:", auditErr.message);
+        }
+      }
+
       const responseBody = {
         plan: bdcPlans[0]?.plan ?? null, // first BDC plan for backwards compat
         bdc_plans: bdcPlans,
