@@ -55,7 +55,8 @@ export const propertiesRelations = relations(properties, ({ many }) => ({
   cleaningTasks: many(cleaningTasks),
   localEvents: many(localEvents),
   guestReviews: many(guestReviews),
-  reviewRules: many(reviewRules),
+  // reviewRules relation removed M9 Phase G E3 (table dropped 20260517030000);
+  // review preferences live at memory_facts entity_type='host' + sub_entity_type='reviews'.
 }));
 
 // ==================== Listings ====================
@@ -367,25 +368,13 @@ export const cleaningTasksRelations = relations(cleaningTasks, ({ one }) => ({
   property: one(properties, { fields: [cleaningTasks.propertyId], references: [properties.id] }),
 }));
 
-// ==================== Review Rules ====================
-
-export const reviewRules = pgTable("review_rules", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  propertyId: uuid("property_id").notNull().references(() => properties.id),
-  isActive: boolean("is_active").default(true),
-  autoPublish: boolean("auto_publish").default(false),
-  publishDelayDays: integer("publish_delay_days").default(3),
-  tone: text("tone").default("warm"),
-  targetKeywords: text("target_keywords").array(),
-  badReviewDelay: boolean("bad_review_delay").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, (t) => [
-  index("idx_review_rules_property").on(t.propertyId),
-]);
-
-export const reviewRulesRelations = relations(reviewRules, ({ one }) => ({
-  property: one(properties, { fields: [reviewRules.propertyId], references: [properties.id] }),
-}));
+// ==================== Review Rules (DROPPED) ====================
+// M9 Phase G E3 (v2.6): review_rules table dropped via migration
+// 20260517030000_drop_review_rules.sql. Review preferences migrated to
+// memory_facts (entity_type='host' + sub_entity_type='reviews'). Helpers
+// at src/lib/memory/review-preferences.ts. Per-property → per-host
+// architectural change per Q-G2 locus shift. Backup table
+// review_rules_backup_phase_g preserves the empty column shape (0 rows).
 
 // ==================== Guest Reviews ====================
 
@@ -878,7 +867,8 @@ export type MemoryFactSubEntityType =
   | "wifi"
   | "hvac"
   | "kitchen_appliances"
-  | "voice"; // M9 Phase E D25 — voice_mode lives at entity_type='host' / sub_entity_type='voice' (migration 20260515220000)
+  | "voice" // M9 Phase E D25 — voice_mode lives at entity_type='host' / sub_entity_type='voice' (migration 20260515220000)
+  | "reviews"; // M9 Phase G E3 — review preferences live at entity_type='host' / sub_entity_type='reviews' (migration 20260517020000; review_rules table dropped at 20260517030000)
 
 /**
  * Controlled vocabulary for `memory_facts.entity_type` and
