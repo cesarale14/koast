@@ -1,39 +1,47 @@
 /**
- * GET /api/onboarding/idle-status — M8 C3 (D11 idle re-engagement).
+ * /api/onboarding/idle-status — M8 C3 (D11 idle re-engagement) +
+ * M9 Phase G E1 split (HTTP-semantic discipline).
  *
- * Returns the host's chat-idle state so the chat surface can surface a
- * lazy soft re-engagement banner once 24h has passed since the last
- * agent_turn, and silently mark onboarding complete once 48h has
- * passed without return.
+ * Two methods:
+ *   GET  — pure read. Returns the host's idle-state assessment so the
+ *          chat surface (ReengagementBanner) can decide whether to
+ *          surface the soft re-engagement banner. NO side effects.
+ *   POST — ack + writes. Called by the client immediately after a GET
+ *          that returned should_reengage=true OR should_silent_complete=true.
+ *          Server re-fetches state (does NOT trust client claims) and
+ *          performs the eligible writes:
+ *            - silent-complete: writeOnboardingFact("onboarding_marked_complete_at", now)
+ *            - reengage: writeOnboardingFact("onboarding_idle_reengaged_at", now)
+ *          Returns 200 { acked: true, written: [...] }.
  *
- * Response 200:
+ * Pre-split history: GET handler held both writes inline as a side-effect-on-GET
+ * pattern (see M8 Phase G mark-seen route doc comment citing this as the
+ * anti-pattern reference). M9 Phase G E1 closes that compromise.
+ *
+ * Idempotency: POST re-fetches state server-side and explicit early-returns
+ * if onboarding is already marked complete. writeOnboardingFact upserts;
+ * re-calling with the same fact is a supersession no-op.
+ *
+ * Auth: createClient + getUser. host_id from session.
+ *
+ * GET response 200:
  *   {
  *     hours_since_last_turn: number | null,
  *     should_reengage: boolean,
  *     should_silent_complete: boolean,
  *     reengagement_cooldown_active: boolean
  *   }
+ *   Cache-Control: no-store (per-host stateful response)
  *
- * Auth: createClient + getUser. host_id from session.
- *
- * Side effect: when should_silent_complete fires, writes the
- * `onboarding_marked_complete_at` memory_fact. Pure GET semantics
- * preserved for the reengage path — banner click is the host action,
- * which triggers a separate POST on send (handled in ChatClient).
+ * POST response 200:
+ *   { acked: true, written: ("marked_complete" | "reengaged")[] }
  */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  readOnboardingFact,
-  writeOnboardingFact,
-} from "@/lib/agent/onboarding-state";
-import { classifySufficiency } from "@/lib/agent/sufficiency";
-
-const REENGAGE_HOURS = 24;
-const SILENT_COMPLETE_HOURS = 48;
-const REENGAGE_COOLDOWN_HOURS = 24 * 7;
+import { writeOnboardingFact } from "@/lib/agent/onboarding-state";
+import { computeIdleStatus } from "@/lib/onboarding/idle-status";
 
 export async function GET() {
   try {
@@ -46,113 +54,66 @@ export async function GET() {
     }
     const supabase = createServiceClient();
 
-    const { data: lastTurn, error: turnErr } = await supabase
-      .from("agent_turns")
-      .select("created_at, agent_conversations!inner(host_id)")
-      .eq("agent_conversations.host_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (turnErr) {
-      return NextResponse.json(
-        { error: `agent_turns lookup failed: ${turnErr.message}` },
-        { status: 500 },
-      );
+    const state = await computeIdleStatus(supabase, user.id);
+    return NextResponse.json(
+      {
+        hours_since_last_turn: state.hours_since_last_turn,
+        should_reengage: state.should_reengage,
+        should_silent_complete: state.should_silent_complete,
+        reengagement_cooldown_active: state.reengagement_cooldown_active,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST() {
+  try {
+    const supabaseSession = createClient();
+    const {
+      data: { user },
+    } = await supabaseSession.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    }
+    const supabase = createServiceClient();
+
+    const state = await computeIdleStatus(supabase, user.id);
+
+    // R-E1.2: explicit early-return when already marked complete. The
+    // helper returns markedCompleteAt on that path; we never enter a
+    // write branch for an already-completed host.
+    if (state.markedCompleteAt) {
+      return NextResponse.json({ acked: true, written: [] });
     }
 
-    if (!lastTurn?.created_at) {
-      return NextResponse.json({
-        hours_since_last_turn: null,
-        should_reengage: false,
-        should_silent_complete: false,
-        reengagement_cooldown_active: false,
-      });
-    }
+    const written: Array<"marked_complete" | "reengaged"> = [];
+    const now = new Date().toISOString();
 
-    const ageMs = Date.now() - new Date(lastTurn.created_at as string).getTime();
-    const hours = ageMs / (60 * 60 * 1000);
-
-    // Skip the heavier lookups when the host is well within active window.
-    if (hours < REENGAGE_HOURS) {
-      return NextResponse.json({
-        hours_since_last_turn: hours,
-        should_reengage: false,
-        should_silent_complete: false,
-        reengagement_cooldown_active: false,
-      });
-    }
-
-    const [classification, reengagedAt, markedCompleteAt] = await Promise.all([
-      classifySufficiency(supabase, user.id),
-      readOnboardingFact(supabase, user.id, "onboarding_idle_reengaged_at"),
-      readOnboardingFact(supabase, user.id, "onboarding_marked_complete_at"),
-    ]);
-
-    // Already silently completed → never re-engage; surface terminal state.
-    if (markedCompleteAt) {
-      return NextResponse.json({
-        hours_since_last_turn: hours,
-        should_reengage: false,
-        should_silent_complete: false,
-        reengagement_cooldown_active: false,
-      });
-    }
-
-    // 48h+ idle with non-rich sufficiency → silently complete.
-    if (hours >= SILENT_COMPLETE_HOURS && classification.level !== "rich") {
+    if (state.should_silent_complete) {
       await writeOnboardingFact(
         supabase,
         user.id,
         "onboarding_marked_complete_at",
-        new Date().toISOString(),
+        now,
       );
-      return NextResponse.json({
-        hours_since_last_turn: hours,
-        should_reengage: false,
-        should_silent_complete: true,
-        reengagement_cooldown_active: false,
-      });
+      written.push("marked_complete");
     }
 
-    // 7-day cooldown after the last re-engagement.
-    if (reengagedAt) {
-      const cooldownAgeHours =
-        (Date.now() - new Date(reengagedAt).getTime()) / (60 * 60 * 1000);
-      if (cooldownAgeHours < REENGAGE_COOLDOWN_HOURS) {
-        return NextResponse.json({
-          hours_since_last_turn: hours,
-          should_reengage: false,
-          should_silent_complete: false,
-          reengagement_cooldown_active: true,
-        });
-      }
-    }
-
-    // Re-engage window: 24h ≤ hours < 48h, not previously cooled-down,
-    // sufficiency not rich (rich hosts don't need re-engagement).
-    const shouldReengage =
-      hours >= REENGAGE_HOURS && classification.level !== "rich";
-
-    if (shouldReengage) {
-      // Side-effect-on-GET: start the 7-day cooldown immediately so a
-      // refresh in the same window doesn't re-fire the banner. Honest
-      // pragmatic call — single one-shot marker; cleaner separation
-      // (split into POST ack) deferred as M9 polish if endpoint
-      // semantics drift becomes a concern.
+    if (state.should_reengage && !state.reengagement_cooldown_active) {
       await writeOnboardingFact(
         supabase,
         user.id,
         "onboarding_idle_reengaged_at",
-        new Date().toISOString(),
+        now,
       );
+      written.push("reengaged");
     }
 
-    return NextResponse.json({
-      hours_since_last_turn: hours,
-      should_reengage: shouldReengage,
-      should_silent_complete: false,
-      reengagement_cooldown_active: false,
-    });
+    return NextResponse.json({ acked: true, written });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
