@@ -1,5 +1,7 @@
 # Belief 3 — Memory Compounds Inventory
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document's "SHOULD BE DEPRECATED" framing for `review_rules` was acted on during M9 Phase G E3 — the table was dropped and review preferences moved to `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`). See `milestones/M9/items/phase-g.md` for the migration record.
+
 *Belief: "Memory compounds." — structured per-entity facts with provenance/confidence/lifecycle. Not chat logs. Inspectable, exportable, portable. The host's asset.*
 
 This is an inventory of what foundation exists in `~/koast` for that surface. Investigation only. No code changes.

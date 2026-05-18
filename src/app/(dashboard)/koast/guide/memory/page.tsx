@@ -55,9 +55,8 @@ export default function GuideMemoryPage() {
       <p className="m-0">
         This memory is your asset, not Koast&rsquo;s. You can browse it any time
         and correct anything. Export tooling that gives you a structured
-        download of everything Koast has accumulated is on the near-term
-        roadmap — we build the moat on accumulated value, not on hostile
-        lock-in.
+        download of everything Koast has accumulated is on the roadmap —
+        we build the moat on accumulated value, not on hostile lock-in.
       </p>
     </article>
   );

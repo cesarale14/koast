@@ -1,5 +1,7 @@
 # Reviews Blueprint
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document references the `review_rules` table and the `/api/reviews/rules/[propertyId]` endpoint, which were removed during M9 Phase G E3. Review preferences now live in `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`), accessible via `/api/reviews/preferences` (per-host scoping; per-property scoping eliminated). References below predate the migration; see `milestones/M9/items/phase-g.md` for the migration record.
+
 > Source-of-truth document for the Koast reviews subsystem. Written
 > 2026-04-25 after Sessions 6.5 → 6.7-POST. Replaces ad-hoc spec
 > material scattered across commit bodies and Telegram threads.

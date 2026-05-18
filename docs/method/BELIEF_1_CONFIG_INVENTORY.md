@@ -1,5 +1,7 @@
 # Belief 1 — Configuration Inventory
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document references the `review_rules` table and the `/api/reviews/rules/[propertyId]` endpoint, which were removed during M9 Phase G E3. Review preferences now live in `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`), accessible via `/api/reviews/preferences` (per-host scoping; per-property scoping eliminated). References below predate the migration; see `milestones/M9/items/phase-g.md` for the migration record.
+
 *Belief: "Koast is the agent, not the tool." — configuration is the exception, not the default.*
 
 This is an inventory of what currently exists in `~/koast` that is configuration-shaped: settings pages, forms that capture host preferences/templates/rules, and DB tables holding host-defined rules or preferences. Investigation only — no code changes.

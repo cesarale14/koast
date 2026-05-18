@@ -42,11 +42,11 @@ export default function GuideKoastOnYourBehalfPage() {
 
       <p className="m-0 mb-4">
         Today the gradient is honest about its cold-start state: the substrate
-        that learns from your approval patterns ships in a near-term milestone.
+        that learns from your approval patterns ships in a future milestone.
         Until then, more lands in the operational-confirm lane than will
-        eventually be there. Calibration becomes meaningfully personalized after
-        roughly three weeks of accumulated approvals — enough volume to
-        identify what you trust and what you want to keep eyes on.
+        eventually be there. Calibration becomes meaningfully personalized
+        once enough approvals accumulate — enough volume to identify what
+        you trust and what you want to keep eyes on.
       </p>
 
       <p className="m-0">

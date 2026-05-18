@@ -1,5 +1,7 @@
 # Belief 2 — Chat-as-Spine Inventory
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document references the `review_rules` table, which was removed during M9 Phase G E3. Review preferences now live in `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`). References below predate the migration; see `milestones/M9/items/phase-g.md` for the migration record.
+
 *Belief: "Conversation is the spine." — chat is the primary surface, omnipresent, renders interactive artifacts inline, with the experiential bar of Claude/Cursor.*
 
 This is an inventory of what foundation exists in `~/koast` for that surface. Investigation only. No code changes.

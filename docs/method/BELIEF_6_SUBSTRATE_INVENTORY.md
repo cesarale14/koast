@@ -1,5 +1,7 @@
 # Belief 6 — Full Digital Substrate Inventory
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document references the `review_rules` table and the `/api/reviews/rules/[propertyId]` endpoint, which were removed during M9 Phase G E3. Review preferences now live in `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`), accessible via `/api/reviews/preferences` (per-host scoping; per-property scoping eliminated). The `set_review_rules` tool entry below is superseded by per-host `memory_facts` writes via `writeReviewPreferences`. References below predate the migration; see `milestones/M9/items/phase-g.md` for the migration record.
+
 *Belief: "The full digital substrate." — Koast operates across the entire digital surface of the host's hosting business, in one relationship, with one accumulated memory, through one conversational interface. Where work crosses into the physical or fully-human, Koast supports but doesn't operate.*
 
 This is a substrate coverage map of `~/koast`. For each of the ten Method-named categories: classification + reasoning. Investigation only. No code changes.

@@ -1,5 +1,7 @@
 # Reviews Data Truth
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document references the `review_rules` table and the `/api/reviews/rules/[propertyId]` endpoint, which were removed during M9 Phase G E3. Review preferences now live in `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`), accessible via `/api/reviews/preferences` (per-host scoping; per-property scoping eliminated). References below predate the migration; see `milestones/M9/items/phase-g.md` for the migration record.
+
 > Diagnostic companion to `docs/REVIEWS_BLUEPRINT.md`. Produced
 > 2026-04-25 between Sessions 6.8 and the render-layer rebuild.
 > Read-only. PII redacted throughout.

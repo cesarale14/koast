@@ -1,5 +1,7 @@
 # Belief 7 — The Host's Voice Inventory
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document treats `review_rules.tone` as a per-property precedent for Mode 2 voice variants. M9 Phase G E3 dropped `review_rules` and migrated review preferences (including `tone`) to `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`) — preserving the precedent's logical shape but shifting to per-host scoping. M9 Phase E D25 shipped voice memory at the same locus via `sub_entity_type='voice'`. References below predate the Phase G migration; see `milestones/M9/items/phase-g.md` and `milestones/M9/items/phase-e.md` for the migration records.
+
 *Belief: "The host's voice." — Mode 1 (host's own voice, learned from existing messages) or Mode 2 (neutral host-approved tone). Voice is learned from observation, corrected through use, inspectable. The host chooses the mode.*
 
 This is the final Method investigation, focused on voice as a host-scoped, learnable property of agent communication. Voice doctrine (DESIGN_SYSTEM.md §15, the four LLM prompt patterns, no-emojis rule) was already covered in Belief 5 — this report doesn't re-cover it. Investigation only. No code changes.

@@ -1,5 +1,7 @@
 # The Method in Code
 
+> **Historical note (M9 Phase G E3, 2026-05-17):** This document's "4 deprecate (`review_rules`, ...)" disposition list was acted on during M9 Phase G E3 — the `review_rules` table was dropped and review preferences moved to `memory_facts` (`entity_type='host'` + `sub_entity_type='reviews'`). The deprecation execution is now complete for `review_rules` specifically (note: other listed tables — `message_templates`, `user_preferences`, `message_automation_firings` — were dropped earlier in M8 Phase A per the `20260507020000_drop_deprecated_config_tables.sql` migration). See `milestones/M9/items/phase-g.md` for the M9 Phase G E3 migration record.
+
 *Working draft — substance complete, will be refined as the work progresses.*
 
 ---
