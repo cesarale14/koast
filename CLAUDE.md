@@ -13,6 +13,14 @@
 Every prompt to Claude Code should start with:
 "Read ~/koast/CLAUDE.md and repomix-output.xml first."
 
+## M9 Conventions
+
+M9 ships under conventions v2.6.
+- Canonical: `decisions/2026-05-12-m9-conventions.md` (vault)
+- Repo mirror: `docs/architecture/agent-loop-v1-milestone-9-conventions.md`
+- Key sections: §1.3 SHAPE 2 scope · §6.9 + §6.10 M10 inheritance · §7.7 G8 dataset · §7.8 milestone close · §7.9 allow-list discipline · §7.10 phase-close multi-gate
+- Milestone close: `milestones/M9/M9-close.md` (vault) / `docs/architecture/agent-loop-v1-milestone-9-report.md` (repo)
+
 ## Phase 1 STOP discipline
 
 Before authoring code on any non-trivial change (multi-file architecture, new
