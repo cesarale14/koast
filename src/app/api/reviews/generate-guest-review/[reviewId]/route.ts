@@ -4,6 +4,7 @@ import { getAuthenticatedUser, verifyReviewOwnership } from "@/lib/auth/api-auth
 import { generateGuestReviewFromIncoming } from "@/lib/reviews/generator";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
+import { applyOutputJudges } from "@/lib/agent/judge/apply-output-judges";
 
 // POST /api/reviews/generate-guest-review/[reviewId]
 //
@@ -83,6 +84,17 @@ export async function POST(
         nights,
       }, voicePrompt);
 
+      // M10 Phase B STEP 6: J1 emoji output-filter applied to the
+      // guest-facing public_review_draft. original_draft_text below
+      // preserves the raw LLM output for trust-inspection.
+      const { finalText: filteredDraft, envelope: filteredEnvelope } =
+        applyOutputJudges(
+          result.public_review_draft,
+          "host-to-guest",
+          voiceMode?.mode ?? "neutral",
+          result.envelope,
+        );
+
       // M9 Phase E F6 (B3 (a) lock): persist Koast-generated public
       // review draft to guest_reviews.original_draft_text for voice
       // extraction supersession delta + trust-inspection. UI continues
@@ -92,7 +104,11 @@ export async function POST(
         .update({ original_draft_text: result.public_review_draft })
         .eq("id", params.reviewId);
 
-      return NextResponse.json(result);
+      return NextResponse.json({
+        ...result,
+        public_review_draft: filteredDraft,
+        envelope: filteredEnvelope,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[reviews/generate-guest-review] ${params.reviewId}: ${msg}`);

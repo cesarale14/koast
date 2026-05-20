@@ -1,5 +1,5 @@
 /**
- * γ shape primitives for the judge subsystem — M10 Phase B STEP 5
+ * γ shape primitives for the judge subsystem — M10 Phase B STEP 5/6
  * (§6.10 extraction methodology).
  *
  * Parallel to Phase F PatternEntry/PatternMatch (regex catalog) at
@@ -10,7 +10,13 @@
  * JudgeId is enum-grows-per-step. STEP 5 ships emoji_policy (J1). STEP 7
  * extends with exclamation_cap (J2). v2.8 expands further per Decision (d)
  * partial scope iii-vi roadmap.
+ *
+ * STEP 6 addition: JudgeResultSchema (Zod) so AgentTextOutput envelope
+ * can compose JudgeResult under the same Zod validation lane that D22
+ * uses for the rest of the envelope.
  */
+
+import { z } from "zod";
 
 /** Verdict of a judge run. Deterministic judges (e.g. J1 emoji_policy)
  * always return confidence=1.0; LLM-based judges (e.g. J2 exclamation_cap)
@@ -26,16 +32,21 @@ export type JudgeId = "emoji_policy";
  * compose policy on audience. */
 export type Audience = "koast-to-host" | "host-to-guest";
 
+/** Zod schema for JudgeResult — composed into AgentTextOutputSchema at
+ *  src/lib/agent/schemas/agent-text-output.ts. Schema mirrors the
+ *  JudgeResult interface; both stay in lock-step as JudgeId expands. */
+export const JudgeResultSchema = z.object({
+  // z.literal at STEP 6 (single-value union). STEP 7 widens to
+  // z.union([z.literal('emoji_policy'), z.literal('exclamation_cap')])
+  // or z.enum(['emoji_policy', 'exclamation_cap']) once the tuple has
+  // ≥2 entries (Zod's z.enum requires a tuple of ≥2 string literals).
+  judge_id: z.literal("emoji_policy"),
+  verdict: z.union([z.literal("pass"), z.literal("fail")]),
+  reason: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+
 /** Judge-result envelope payload. Attaches to AgentTextOutput.judge_results
  * (extension in STEP 6 envelope schema). */
-export interface JudgeResult {
-  judge_id: JudgeId;
-  verdict: JudgeVerdict;
-  /** Stable reason code — e.g. 'no_emoji_found', 'within_policy',
-   *  'stripped_to_policy', 'count_under_cap', 'theatrical_overuse'. */
-  reason: string;
-  /** 0..1. Deterministic judges = 1.0; LLM-based judges = calibrated. */
-  confidence: number;
-  /** Optional judge-specific metadata for envelope consumers. */
-  details?: Record<string, unknown>;
-}
+export type JudgeResult = z.infer<typeof JudgeResultSchema>;

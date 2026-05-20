@@ -28,6 +28,12 @@
  * Voice doctrine integration: F3 enforces STRUCTURAL output only.
  * Tonal regression (voice doctrine §5 anti-patterns) is D24 territory
  * (Phase F shape regex CI). F3 doesn't pre-empt Phase F substrate.
+ *
+ * M10 Phase B STEP 6 — envelope.judge_results propagation: the envelope
+ * schema now declares an optional `judge_results: JudgeResult[]` field
+ * (see agent-text-output.ts). buildEnvelope callbacks don't set it; route
+ * handlers attach J1/J2 judge results AFTER callLLMWithEnvelope returns,
+ * via the shared applyOutputJudges helper at src/lib/agent/judge/.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";

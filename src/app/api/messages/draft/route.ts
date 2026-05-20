@@ -4,6 +4,7 @@ import { generateDraft } from "@/lib/claude/messaging";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
+import { applyOutputJudges } from "@/lib/agent/judge/apply-output-judges";
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,19 +101,26 @@ export async function POST(request: NextRequest) {
       voicePrompt,
     );
 
+    // M10 Phase B STEP 6: J1 emoji output-filter applied at route
+    // boundary. original_draft_text below preserves the raw LLM output
+    // (trust-inspection); ai_draft persists the filtered version (what
+    // host will edit + send).
+    const { finalText: filteredDraft, envelope: filteredEnvelope } =
+      applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
+
     // Save draft to message. M9 Phase E F6 (B3 (a) lock): also
     // capture original_draft_text alongside ai_draft for voice
     // extraction supersession delta + trust-inspection.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("messages") as any)
       .update({
-        ai_draft: draft,
+        ai_draft: filteredDraft,
         draft_status: "generated",
         original_draft_text: draft,
       })
       .eq("id", messageId);
 
-    return NextResponse.json({ draft, messageId, envelope });
+    return NextResponse.json({ draft: filteredDraft, messageId, envelope: filteredEnvelope });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[messages/draft] Error:", msg);

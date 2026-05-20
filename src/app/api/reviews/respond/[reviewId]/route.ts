@@ -6,6 +6,7 @@ import { createChannexClient } from "@/lib/channex/client";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
 import { readReviewPreferences } from "@/lib/memory/review-preferences";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
+import { applyOutputJudges } from "@/lib/agent/judge/apply-output-judges";
 
 export async function POST(
   request: NextRequest,
@@ -141,8 +142,16 @@ export async function POST(
         const result = await generateReviewResponse(
           review.incoming_text, review.incoming_rating ?? 5, booking, property, rule, voicePrompt,
         );
-        responseText = result.response_text;
-        responseEnvelope = result.envelope;
+        // M10 Phase B STEP 6: J1 emoji output-filter for guest-facing
+        // public response.
+        const filtered = applyOutputJudges(
+          result.response_text,
+          "host-to-guest",
+          voiceMode?.mode ?? "neutral",
+          result.envelope,
+        );
+        responseText = filtered.finalText;
+        responseEnvelope = filtered.envelope;
       } catch (gErr) {
         const msg = gErr instanceof Error ? gErr.message : String(gErr);
         console.error(`[reviews/respond] generation failed for ${params.reviewId}: ${msg}`);

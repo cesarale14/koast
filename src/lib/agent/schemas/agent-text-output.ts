@@ -23,6 +23,7 @@
  */
 
 import { z } from "zod";
+import { JudgeResultSchema } from "@/lib/agent/patterns/judge-types";
 
 export const SourceRefSchema = z.object({
   /**
@@ -89,6 +90,15 @@ export const AgentTextOutputSchema = z.object({
    * the per-generator-call catalog rather than inline heuristics.
    */
   output_grounding: z.enum(["rich", "sparse", "empty"]).optional(),
+
+  /**
+   * Judge results attached at route boundary post-generation. Optional;
+   * existing callers see undefined. Populated by M10 Phase B STEP 6+
+   * applyOutputJudges helper at host-to-guest route boundaries; STEP 8
+   * extends with J2 exclamation-cap entries. Koast-to-host streaming
+   * integration (/api/agent/turn) deferred to v2.8 per G8-B1.
+   */
+  judge_results: z.array(JudgeResultSchema).optional(),
 });
 
 export type AgentTextOutput = z.infer<typeof AgentTextOutputSchema>;

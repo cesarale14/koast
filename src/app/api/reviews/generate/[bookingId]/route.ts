@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { readVoiceMode } from "@/lib/memory/voice-mode";
 import { readReviewPreferences } from "@/lib/memory/review-preferences";
 import { buildVoicePrompt } from "@/lib/voice/build-voice-prompt";
+import { applyOutputJudges } from "@/lib/agent/judge/apply-output-judges";
 
 export async function POST(
   _request: Request,
@@ -113,6 +114,20 @@ export async function POST(
     const voicePrompt = buildVoicePrompt(voiceMode);
 
     const result = await generateGuestReview(bookingCtx, propCtx, ruleCtx, voicePrompt);
+
+    // M10 Phase B STEP 6: J1 emoji output-filter applied to review_text
+    // (guest-facing). private_note untouched (host-facing internal; would
+    // require koast-to-host audience integration deferred per G8-B1).
+    // originalDraftText preserves raw LLM output for trust-inspection;
+    // draftText persists the filtered version.
+    const { finalText: filteredReviewText, envelope: filteredReviewEnvelope } =
+      applyOutputJudges(
+        result.review_text,
+        "host-to-guest",
+        voiceMode?.mode ?? "neutral",
+        result.envelope_review,
+      );
+
     const isBadReview = !result.recommended;
     const publishAt = calculatePublishTime(booking.checkOut, rule.publishDelayDays ?? 3, isBadReview, rule.badReviewDelay ?? true);
 
@@ -127,7 +142,7 @@ export async function POST(
       bookingId: params.bookingId,
       propertyId: booking.propertyId,
       direction: "outgoing",
-      draftText: result.review_text,
+      draftText: filteredReviewText,
       // M9 Phase E F6 (B3 (a) lock): capture Koast-generated text at
       // generation time alongside draftText (host may edit draftText
       // before publish; original stays as-of-generation).
@@ -165,11 +180,11 @@ export async function POST(
     // deferred to M10 per α + γ blend (C1 uniform).
     return NextResponse.json({
       review_id: reviewId,
-      review_text: result.review_text,
+      review_text: filteredReviewText,
       private_note: result.private_note,
       status: reviewData.status,
       scheduled_publish_at: reviewData.scheduledPublishAt,
-      envelope_review: result.envelope_review,
+      envelope_review: filteredReviewEnvelope,
       envelope_note: result.envelope_note,
     });
   } catch (err) {
