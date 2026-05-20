@@ -1,3 +1,5 @@
+> Repo developer-facing mirror of vault canonical `decisions/2026-05-12-m9-conventions.md`. Reconciled at M10 hygiene per v2.7 Decision (i) + §7.10 (f) dual-canonical content-fidelity discipline. Vault canonical is authoritative; this mirror reflects vault state at reconciliation commit.
+
 # Agent Loop v1 — Milestone 9 Conventions
 
 **Status:** Locked, v2.6
@@ -19,28 +21,29 @@
 
 **v2.5 — 2026-05-15 (M9 Phase E close)**
 
-- **D25 voice_mode shape locked:** entity_type='host' + sub_entity_type='voice'. Fact payload JSONB carries `mode` + features (cadence stats, greeting/closing patterns, vocabulary signature, sample_count) + optional seed_samples. Honors M8 C13 binding copy.
-- **B2 Mode 2 propagation locked at (a):** single doctrine import + voice_mode parameter, uniform across Sites 1-4 via `buildVoicePrompt`. G8-E3 caught net-new integration.
-- **B3 original_draft capture locked at (a) v1:** `original_draft_text` column on messages + guest_reviews. Separate table = M10 candidate.
-- **Voice learning mechanism = (iii) hybrid:** features + samples. SHAPE-RECOGNITION only; generative Mode 1 = M10+.
-- **Supersession trigger:** threshold-based (sample_count crosses 2× prior baseline).
-- **Voice extraction worker:** TS substrate ships; nightly scheduling infrastructure follow-up post-Phase E.
-- **Memory tab voice section UI deferred to M10** per Phase A Q-A1 component-test-infrastructure deferral.
-- **6 G8 catches in Phase E** — fifth consecutive M9 phase. Running total 20 catches across A-E.
-- **§6.8 M10 inheritance from Phase E** (6 carry-forwards).
-- **Phase E artifacts:** migration `20260515220000_voice_substrate.sql` + schema.ts + voice-fact-schema.ts + voice-mode.ts + extraction-worker.ts + build-voice-prompt.ts + 4 generator/route updates + 21 new tests. Phase D baseline 596 → 617 tests passing.
-- **Phase E budget vs v2.0 nominal Days 13-16:** actual <1 working day. Continues Phase A-D calibration pattern.
+- **D25 voice_mode shape locked:** entity_type='host' + sub_entity_type='voice'. Fact payload JSONB carries `mode: 'neutral' | 'learned'` + features (cadence stats, greeting/closing patterns, vocabulary signature, sample_count) + optional seed_samples (3-5 representative host writings as exemplars). Honors M8 C13 binding copy: "Voice memory learns how you write — your cadence, your vocabulary, the way you sign off."
+- **B2 Mode 2 propagation locked at (a):** single doctrine import + voice_mode parameter, uniform across Sites 1-4. G8-E3 caught Sites 1-4 don't currently import voice doctrine — Phase E ships net-new integration via `buildVoicePrompt` + voicePrompt parameter on generator signatures.
+- **B3 original_draft capture locked at (a) v1:** `original_draft_text` column on `messages` + `guest_reviews`. Captures Koast-generated text at generation time alongside existing ai_draft / draft_text / response_draft fields. Separate `message_drafts` table = M10 candidate when diff history needs grow.
+- **Voice learning mechanism locked at (iii) hybrid:** features (statistical) for prompt-injection programmatic use + samples (3-5 representative) as exemplars. Shape-recognition only per Method-in-code Belief 7 v1 framing; generative Mode 1 = M10+.
+- **Supersession trigger locked:** threshold-based — sample_count crosses 2× prior baseline; supersession_reason='outdated'. Host correction surface (Memory tab) uses 'incorrect'. Continuous-learn deferred.
+- **Voice extraction worker invocation:** TS substrate ships in Phase E (`src/lib/voice/extraction-worker.ts`). Nightly scheduling infrastructure (Vercel Cron vs VPS worker) is a follow-up decision post-Phase E; substrate is invocation-agnostic. Event-driven on message creation = M10 carry-forward.
+- **Memory tab voice section UI deferred to M10:** Per Phase A Q-A1 component test infrastructure deferral, MemoryVoiceSection.tsx not shipped in Phase E. Existing MemoryTab entity-grouped rendering surfaces host-entity voice facts at substrate level; dedicated voice section + supersession-history-rendered UI lands alongside D22 UI integration in M10. v2.5 explicit deferral; honest-scope vs forcing component-test-infra into Phase E.
+- **6 G8 catches in Phase E** — fifth consecutive M9 phase catching v2.0 framing drift. Running total: 1+2+7+4+6 = 20 G8 catches across M9 phases A-E. See §7.7 institutional pattern.
+- **§7.7 institutional pattern Phase E entry added.**
+- **§6.8 M10 inheritance from Phase E** — Memory tab voice section UI (deferred component-test-infra), event-driven worker invocation, separate drafts table, vocabulary signature depth, generative Mode 1, nightly scheduling infrastructure decision.
+- **Phase E artifacts:** migration `20260515220000_voice_substrate.sql` (sub_entity_type CHECK extension + original_draft_text columns), schema.ts updates (MemoryFactSubEntityType + messages.originalDraftText + guestReviews.originalDraftText), `src/lib/memory/voice-fact-schema.ts`, `src/lib/memory/voice-mode.ts`, `src/lib/voice/extraction-worker.ts`, `src/lib/voice/build-voice-prompt.ts`, generator + 4 route updates for B2 (a) + F6 (a) integration. 21 new tests across 2 test files (12 voice-mode + 9 extraction-worker).
+- **Phase E budget vs v2.0 nominal Days 13-16:** actual <1 working day total session time. First M9 phase to bring substantial substrate change (voice extraction + 4-site integration + capture wiring); still within nominal upper bound. Continues Phase A-D calibration pattern.
 
 **v2.4 — 2026-05-15 (M9 Phase D close)**
 
 - **D27 resolved at Option ε** (audit-surfaced beyond v2.0 α/β/γ/δ framing): post-stream classifier (A4 chat-text refusal substrate-catch) + `stop_reason === "refusal"` branch upgrade to emit RefusalEnvelope (closes G8-D3). v2.0 α framing (M8 P4 extension) was not viable — P4 is tool-input classifier inside `stop_reason === "tool_use"` branch; chat-text path is `stop_reason === "end_turn"` else branch (different hook locations).
 - **A6 = A6-3 scope:** A6-1 in-turn duplicate detection (shares A4 post-stream-classifier substrate; detection-only at Phase D, truncation M10 candidate) + A6-2 fact-write hardening (retry-with-backoff + error-level log on persistent failure; replaces M8 silent try/catch + console.warn swallowing pattern).
 - **Shared pattern catalog at `src/lib/agent/refusal-patterns.ts`:** authored data consumed by Phase D runtime classifier AND Phase F D24 CI shape regex (when F ships). No drift between runtime + CI enforcement layers.
-- **4 G8 catches in Phase D:** G8-D1 M8 P4 pre-dispatch pattern does NOT transfer directly to chat-text path; G8-D2 A4 + A6 share substrate boundary (single new module covers both); G8-D3 `stop_reason === "refusal"` currently emits generic event, not envelope (predates M8 F4); G8-D4 A6 scope = (ii) strengthen existing partial substrate, not net-new.
-- **§7.7 institutional pattern Phase D entry added.** M9 v2.0 was drafted with systematic verification gap; G8 has now caught v2.0 framing drift at FOUR consecutive phase kickoffs (Phase A test infra, Phase B site count, Phase C D22 scope + D23 granularity, Phase D D27 hook-location).
-- **§6.7 M10 inheritance from Phase D** — γ streaming-aware per-chunk classifier (deferred unless real-traffic latency surfaces), Phase F D24 CI inherits `refusal-patterns.ts` substrate, A6-1 truncation (Phase D ships detection-only), A6-2 fact-write failure audit table (Phase D logs at error level).
-- **Phase D artifacts (substrate):** `src/lib/agent/refusal-patterns.ts` (pattern catalog), `src/lib/agent/post-stream-classifier.ts` (classifyAccumulatedText + upgradeStopReasonRefusal), 23 new tests across two test files, `loop.ts` hook integrations at 3 activation points + A6-2 retry-with-backoff. Existing `loop.test.ts` refusal test updated to assert envelope shape per G8-D3 closure.
-- **Phase D budget vs v2.0 nominal Days 10-12:** actual <1 working day. Continues Phase A/B/C calibration pattern.
+- **4 G8 catches in Phase D:** G8-D1 M8 P4 pre-dispatch pattern does NOT transfer directly to chat-text path; G8-D2 A4 + A6 share substrate boundary (single new module covers both); G8-D3 `stop_reason === "refusal"` currently emits generic event, not envelope (predates M8 F4); G8-D4 A6 scope = (ii) strengthen existing partial substrate, not net-new (M8 Phase F shipped fact-write + prompt directive).
+- **§7.7 institutional pattern Phase D entry added.** M9 v2.0 was drafted with systematic verification gap; G8 has now caught v2.0 framing drift at FOUR consecutive phase kickoffs (Phase A test infra, Phase B site count, Phase C D22 scope + D23 granularity, Phase D D27 hook-location). Forward-applying to M10: conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock.
+- **§6.7 M10 inheritance from Phase D** — γ streaming-aware per-chunk classifier (deferred unless real-traffic latency surfaces), Phase F D24 CI inherits `refusal-patterns.ts` substrate, A6-1 truncation (Phase D ships detection-only).
+- **Phase D artifacts (substrate):** `src/lib/agent/refusal-patterns.ts` (pattern catalog), `src/lib/agent/post-stream-classifier.ts` (classifyAccumulatedText + upgradeStopReasonRefusal), `src/lib/agent/__tests__/refusal-patterns.test.ts` (12 tests), `src/lib/agent/__tests__/post-stream-classifier.test.ts` (11 tests), `loop.ts` hook integrations at 3 activation points + A6-2 retry-with-backoff for onboarding-offered fact-write. Existing `loop.test.ts` refusal test updated to assert envelope shape per G8-D3 closure.
+- **Phase D budget vs v2.0 nominal Days 10-12:** actual <1 working day. Continues Phase A/B/C calibration pattern — phase budgets are scope-shaped at typical pace.
 
 **v2.3 — 2026-05-12 (M9 Phase C close)**
 
@@ -51,7 +54,7 @@
 - **Q-C2 (β) retroactive phase notes:** `milestones/M9/items/phase-a.md` + `phase-b.md` + `phase-c.md` written; per-phase notes continue through M9. Restores M8 parity.
 - **7 G8 catches in Phase C** — most of any M9 phase. G8-1 vocabulary drift; G8-2 C2 ConfidenceBandedRange pricing-vs-LLM substrate distinction; G8-3 per-tool catalog scope correction; G8-4 rendering surface count correction; G8-5 retroactive phase notes gap; G8-6 M8 C3 ↔ D23 boundary; G8-7 D22 two-layer architecture (mid-implementation halt). See §7.7 institutional pattern.
 - **§7.7 G8 institutional pattern:** M9 v2.0 was drafted with systematic verification gap; G8 caught v2.0 framing misses at every phase kickoff (Phase A test infra, Phase B site count, Phase C D22 scope + D23 granularity). M10 conventions drafting must include explicit ground-truth verification per architectural claim. This is institutional learning, not just process discipline.
-- **§6.6 M10 inheritance** — D22 UI integration (two-layer, non-uniform across hybrid consumer pattern), voice doctrine for confidence rendering, v2.0 verification gap institutional pattern, C2 ConfidenceBandedRange evaluation (G8-2 left open).
+- **§6.5 M10 inheritance** — D22 UI integration (two-layer, non-uniform across hybrid consumer pattern), voice doctrine for confidence rendering, v2.0 verification gap institutional pattern, C2 ConfidenceBandedRange evaluation (G8-2 left open).
 - **Phase C artifacts (substrate):** `src/lib/agent/sufficiency-catalog.ts` (D23 catalog + per-site entries; gradient3 shared helper), `src/lib/agent/__tests__/sufficiency-catalog.test.ts` (14 catalog tests). Generator + route signatures updated across 4 sites with parallel-return shape; Phase B tests adjusted to assert envelope alongside legacy fields. Backward-compat preserved at response level (legacy fields still present; envelope additive).
 - **Phase C budget vs v2.0 nominal Days 7-9:** actual ~1 working day across STEPs 1-7. First M9 phase to ship within nominal but well under upper bound. v2.2 §7.7 G1 calibration discipline + G8 application working as designed.
 
@@ -317,18 +320,26 @@ Operational discipline codified at §7.9.
   features: {
     sentence_length_avg: number,
     sentence_length_stdev: number,
-    greeting_patterns: string[],
-    closing_patterns: string[],
-    vocabulary_signature: string[],
-    sample_count: number,
+    greeting_patterns: string[],   // top-K opening phrases
+    closing_patterns: string[],    // top-K sign-off patterns
+    vocabulary_signature: string[],// top-N distinctive words
+    sample_count: number,          // host-authored messages observed
   },
-  seed_samples?: string[]
+  seed_samples?: string[]          // 3-5 representative host writings
 }
 ```
 
-Feature mapping to M8 C13 binding copy: cadence → sentence_length_avg/stdev; vocabulary → vocabulary_signature[]; sign-off → closing_patterns[]; greeting_patterns[] bonus axis supporting "recognizably yours at scale."
+Feature mapping to M8 C13 binding copy ("Voice memory learns how you write — your cadence, your vocabulary, the way you sign off"):
+- cadence → sentence_length_avg + sentence_length_stdev
+- vocabulary → vocabulary_signature[]
+- sign-off → closing_patterns[]
+- greeting_patterns[] (bonus axis supporting "recognizably yours at scale")
 
-Migration `20260515220000_voice_substrate.sql` extends sub_entity_type CHECK to include 'voice'. Substrate at `src/lib/memory/voice-fact-schema.ts` + `src/lib/memory/voice-mode.ts`. Phase E ships SHAPE-RECOGNITION only per Method-in-code Belief 7 v1; generative Mode 1 = M10+.
+Migration `20260515220000_voice_substrate.sql` extends sub_entity_type CHECK constraint to include 'voice'. Substrate at `src/lib/memory/voice-fact-schema.ts` (Zod payload schema) + `src/lib/memory/voice-mode.ts` (`readVoiceMode` + `writeVoiceMode` helpers; supersession atomically marks prior fact superseded + records supersession_reason).
+
+Initial seeding: voice extraction worker (`src/lib/voice/extraction-worker.ts`) reads host platform messages, extracts features, writes voice_mode fact with source='inferred'. Supersession threshold per Q-E6 lock: sample_count crosses 2× prior baseline; supersession_reason='outdated'. Host-correction surface (Memory tab; deferred M10) writes new fact with supersession_reason='incorrect'.
+
+Phase E ships SHAPE-RECOGNITION only per Method-in-code Belief 7 v1 framing; generative Mode 1 = M10+. The fact payload's features + samples feed `buildVoicePrompt` at generation time per B2 (a) lock.
 
 ## D25 — voice_mode locus locked (B1) [original v2.1 framing, superseded by v2.5 lock above]
 
@@ -799,12 +810,17 @@ Three items surfaced during Phase B sign-off; explicitly captured here to preven
 
 Six Phase E carry-forwards:
 
-1. **Memory tab voice section UI (`MemoryVoiceSection.tsx`).** Phase A Q-A1 deferred component test infrastructure; v2.5 carries forward. UI ships M10 alongside D22 UI integration (Phase C §6.6 #1).
-2. **Voice extraction worker event-driven invocation.** v2.5 ships nightly per Q-E7 (iii). M10: event-driven on message creation for faster voice adaptation.
-3. **Separate `message_drafts` table.** v2.5 ships column approach per Q-E4 (a). Separate table M10 when diff history needs grow.
-4. **vocabulary_signature[] implementation depth.** v2.5 ships frequency-ranked top-N + stop-word filtering. Richer signature (n-grams, collocations, register markers) M10.
-5. **Generative Mode 1.** v2.5 ships shape-recognition; generative-from-scratch in host's voice is M10+.
-6. **Nightly scheduling infrastructure decision.** TS substrate ships invocation-agnostic; Vercel Cron vs VPS systemd timer is small follow-up post-Phase E.
+1. **Memory tab voice section UI (`MemoryVoiceSection.tsx`).** Phase A Q-A1 deferred component test infrastructure (RTL/jsdom + testMatch .tsx); v2.5 carries that deferral forward. Voice section UI ships in M10 alongside D22 UI integration (Phase C M10 carry-forward §6.6 #1). Phase E ships voice substrate; M10 ships rendering.
+
+2. **Voice extraction worker event-driven invocation.** v2.5 ships nightly invocation per Q-E7 (iii). M10 candidate: event-driven on host message-creation hook for faster voice adaptation.
+
+3. **Separate `message_drafts` table (Q-E4 (c)).** v2.5 ships column approach on messages + guest_reviews per Q-E4 (a). Separate table becomes natural when voice extraction needs richer diff history (per-edit deltas vs latest-only).
+
+4. **vocabulary_signature[] implementation depth.** v2.5 ships frequency-ranked top-N words with stop-word filtering. Richer signature (n-grams, distinctive collocations, register markers) is M10 enrichment.
+
+5. **Generative Mode 1 (voice extraction → voice generation).** v2.5 ships shape-recognition only per Method-in-code Belief 7 v1 framing. Generative Mode 1 (Koast writes original prose in host's voice, not just pattern-applied transformations) is M10+ work.
+
+6. **Nightly scheduling infrastructure decision.** v2.5 ships TS extraction worker module; the actual scheduling (Vercel Cron vs VPS systemd timer vs Next.js scheduled function) is a follow-up decision post-Phase E. Substrate is invocation-agnostic; scheduling lands in a small follow-up commit when the infrastructure choice locks.
 
 ## 6.7 M10 carry-forwards from M9 Phase D sign-off [added v2.4]
 
@@ -967,8 +983,8 @@ M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing
 - **Phase A (v2.1):** API route test infrastructure exists from M6/M7 D38; v2.0 §6.3 assumed missing infrastructure (count was 5, actual 7).
 - **Phase B (v2.2):** 5 LLM call sites discovered (not 4 per v2.0 §3); Site 5 architecturally distinct (streaming + multi-turn + tool-use orchestration).
 - **Phase C (v2.3):** D22 has two-layer architecture (API + UI); v2.0 framing assumed single-phase scope. D23 per-tool catalog was wrong granularity; per-generator-call is the actual surface. Hybrid consumer pattern across 4 routes affects Layer 2 scope. SEVEN G8 catches total — most of any M9 phase.
-- **Phase D (v2.4):** D27 hook-location framing wrong (G8-D1). A4 + A6 share substrate (G8-D2). stop_reason='refusal' branch predates M8 F4 envelope (G8-D3 → Option ε). A6 = strengthen existing partial substrate (G8-D4). FOUR G8 catches.
-- **Phase E (v2.5):** M8 C13 binding copy located in `(dashboard)` route group (G8-E1). voice_mode in system-prompt.ts forward-comment-only (G8-E2). Sites 1-4 don't currently import voice doctrine; B2 starts at zero (G8-E3). original_draft has zero current substrate (G8-E4). D25 vs Method-in-code Belief 7 architecture unified via fact JSONB (G8-E5). M8 F1 MemorySupersessionInline already exists; voice section reuses (G8-E6 — only positive finding). SIX G8 catches; running total 20 across A-E.
+- **Phase D (v2.4):** D27 hook-location framing wrong (G8-D1 — M8 P4 inside tool_use branch; chat-text in else branch). A4 + A6 share substrate boundary (G8-D2 — not pre-designed). `stop_reason === "refusal"` branch emits generic event predating M8 F4 envelope (G8-D3 — surfaced Option ε beyond v2.0 α/β/γ/δ). A6 scope = strengthen existing partial substrate (G8-D4 — M8 Phase F shipped fact-write + prompt directive; A6 hardens). FOUR G8 catches; fourth consecutive M9 phase catching v2.0 framing drift.
+- **Phase E (v2.5):** M8 C13 binding copy located at src/app/(dashboard)/koast/guide/memory/page.tsx (G8-E1 — initial grep missed (dashboard) route group). voice_mode in system-prompt.ts is forward-comment-only, not pre-shipped substrate (G8-E2). Sites 1-4 don't currently import voice doctrine; B2 starts at zero (G8-E3). original_draft has zero current substrate; F6 net-new (G8-E4). D25 vs Method-in-code Belief 7 architecture potential conflict, unified via fact JSONB payload (G8-E5). M8 F1 Memory tab DOES have MemorySupersessionInline substrate; voice section reuses pattern (G8-E6 — partial relief; the only positive G8-E finding). SIX G8 catches; fifth consecutive M9 phase. Running total 20 catches across A-E.
 - **Phase F (v2.6):** SEVEN G8 catches across three distinct strata; running total 27 across A-F.
   - **F1 — pre-design verification gap:** refusal-patterns.ts inheritance was MODULE SHAPE only, not patterns; v2.4 changelog framed inheritance ambiguously. Surfaced STEP 2 Phase 1 STOP.
   - **F2 — pre-design verification gap:** CI substrate was GREENFIELD; v2.0 D24 assumed existing CI infrastructure. Surfaced STEP 2 Phase 1 STOP.
@@ -978,8 +994,6 @@ M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing
   - **F6 — deployment-gate verification gap:** Vercel production deploys failed silently from Phase D close (d582f9a) through Phase F STEP 7 (b36a0cf), ~24-hour window. Phase-close discipline included local tsc + test but not Vercel deploy-success verification. Production frozen at a71b37a throughout. Cleared via STEP 8.5 lint cleanup. Codified at §7.10.
   - **F7 — CI-activation verification gap (subtype: declared dependencies vs unverified local environment):** ts-node was ambient in local node_modules but undeclared in `package.json`. CI's clean `npm ci` couldn't resolve ts-node when Jest parsed `jest.config.ts`. Same stratum as F5; different subtype.
 
-**Pattern:** M9 v2.0 conventions referenced shipped state without verification. Each phase kickoff has applied G8 and caught drift; revisions accumulate. Cost: ~half-day per phase in audit + scope adjustment + conventions revision.
-
 **Institutional abstraction (v2.6):** G8 catches operate at multiple gate layers and within layers at multiple subtypes. Phase F alone surfaced three distinct strata:
 
 - **Pre-design** (F1, F2, F3) — Phase 1 STOP catches against the conventions document's assumed shipped state.
@@ -988,6 +1002,8 @@ M9 v2.0 was drafted with systematic verification gap. G8 has caught v2.0 framing
 - **Deployment-gate** (F6) — catches surfaced when deploy-success verification is added to phase-close (the gate that should have caught Phase D + E silent prod-deploy failures).
 
 M10 conventions drafting must verify-against-shipped-state at design time AND retain runtime, CI-activation, and deployment-gate diagnostic disciplines.
+
+**Pattern:** M9 v2.0 conventions referenced shipped state without verification. Each phase kickoff has applied G8 and caught drift; revisions accumulate. Cost: ~half-day per phase in audit + scope adjustment + conventions revision.
 
 **Forward-applying to M10:** Conventions drafting must include explicit "verify against shipped state per architectural claim" step before lock. Each named substrate, each scope claim, each integration boundary requires verification, not pattern-match from milestone-close inheritance.
 
@@ -1093,3 +1109,25 @@ Implementation aids (recommended, not required):
 ---
 
 *End conventions, v2.6.*
+
+
+## Related M9 notes
+
+This conventions document is the canonical decision artifact for M9. The notes below are downstream — each phase's Phase 1 STOP audit and close note ground the conventions in shipped state.
+
+**Phase 1 STOP audits (pre-design verification per §7.7 G8 institutional pattern):**
+
+- [[B-phase-1-stop]]
+- [[C-phase-1-stop]]
+- [[D-phase-1-stop]]
+- [[E-phase-1-stop]]
+- [[F-phase-1-stop]]
+
+**Phase close notes (post-implementation records):**
+
+- [[phase-a]] — Test infrastructure canonicalized (v2.1)
+- [[phase-b]] — Cluster A Phase B close (v2.2)
+- [[phase-c]] — D22 + D23 substrate locks (v2.3)
+- [[phase-d]] — A4 + A6 + D27 (v2.4)
+- [[phase-e]] — D25 + B2 + B3 voice substrate (v2.5)
+- Phase F close note lands at STEP 10 (D24 + §6.9/§6.10/§7.9/§7.10 — v2.6)
