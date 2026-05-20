@@ -21,6 +21,14 @@ M9 ships under conventions v2.6.
 - Key sections: §1.3 SHAPE 2 scope · §6.9 + §6.10 M10 inheritance · §7.7 G8 dataset · §7.8 milestone close · §7.9 allow-list discipline · §7.10 phase-close multi-gate
 - Milestone close: `milestones/M9/M9-close.md` (vault) / `docs/architecture/agent-loop-v1-milestone-9-report.md` (repo)
 
+## M10 Conventions
+
+M10 begins under conventions v2.7.
+- Canonical: `decisions/2026-05-19-m10-conventions.md` (vault)
+- Repo mirror: `docs/architecture/agent-loop-v1-milestone-10-conventions.md`
+- Key sections: §1.3 SHAPE 2 + hybrid cluster scheme · §6.11-§6.15 institutional patterns · §7.7 G8 dataset expanded (4 new sub-strata) · §7.8 milestone close + reconciliation amendments · §7.10 phase-close multi-gate including new (f) dual-canonical content-fidelity gate
+- Milestone status: in-progress (Phase A pending)
+
 ## Phase 1 STOP discipline
 
 Before authoring code on any non-trivial change (multi-file architecture, new
