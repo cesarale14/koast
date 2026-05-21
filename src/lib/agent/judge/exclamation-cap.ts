@@ -20,6 +20,7 @@ import type {
   Audience,
   JudgeResult,
 } from "@/lib/agent/patterns/judge-types";
+import { invokeHaikuJudge } from "@/lib/agent/judge/exclamation-cap-llm";
 
 /** Per-audience exclamation cap. STEP 8 reuses for Haiku rescue path. */
 export const MODE_CAPS: Record<Audience, number> = {
@@ -71,4 +72,27 @@ export function judgeExclamationCapDeterministic(
     confidence: 1.0,
     details: { count, cap, audience },
   };
+}
+
+/**
+ * J2 hybrid judge — STEP 8. async per J2-c sync-on-borderline:
+ *
+ *   - count <= cap → deterministic pass (no LLM call; sync-fast path)
+ *   - count >  cap → invoke Haiku semantic judge (genuine-milestone vs
+ *                    theatrical-overuse) and return its result
+ *
+ * Signature (text, audience) per Q8-c; per-voiceMode cap tuning deferred
+ * to v2.8 with VoiceFeatures.emoji_frequency / Q2 cap calibration.
+ */
+export async function judgeExclamationCap(
+  text: string,
+  audience: Audience,
+): Promise<JudgeResult> {
+  const cap = MODE_CAPS[audience];
+  const count = countExclamations(text);
+  if (count <= cap) {
+    // Reuse deterministic result; sync-fast path skips the LLM entirely.
+    return judgeExclamationCapDeterministic(text, audience);
+  }
+  return invokeHaikuJudge(text, audience, count, cap);
 }

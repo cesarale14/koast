@@ -121,7 +121,7 @@ export async function POST(
     // originalDraftText preserves raw LLM output for trust-inspection;
     // draftText persists the filtered version.
     const { finalText: filteredReviewText, envelope: filteredReviewEnvelope } =
-      applyOutputJudges(
+      await applyOutputJudges(
         result.review_text,
         "host-to-guest",
         voiceMode?.mode ?? "neutral",

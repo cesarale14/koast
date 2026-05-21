@@ -88,7 +88,7 @@ export async function POST(
       // guest-facing public_review_draft. original_draft_text below
       // preserves the raw LLM output for trust-inspection.
       const { finalText: filteredDraft, envelope: filteredEnvelope } =
-        applyOutputJudges(
+        await applyOutputJudges(
           result.public_review_draft,
           "host-to-guest",
           voiceMode?.mode ?? "neutral",

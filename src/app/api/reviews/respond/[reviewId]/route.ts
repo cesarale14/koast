@@ -144,7 +144,7 @@ export async function POST(
         );
         // M10 Phase B STEP 6: J1 emoji output-filter for guest-facing
         // public response.
-        const filtered = applyOutputJudges(
+        const filtered = await applyOutputJudges(
           result.response_text,
           "host-to-guest",
           voiceMode?.mode ?? "neutral",

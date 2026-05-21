@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // (trust-inspection); ai_draft persists the filtered version (what
     // host will edit + send).
     const { finalText: filteredDraft, envelope: filteredEnvelope } =
-      applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
+      await applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
 
     // Save draft to message. M9 Phase E F6 (B3 (a) lock): also
     // capture original_draft_text alongside ai_draft for voice

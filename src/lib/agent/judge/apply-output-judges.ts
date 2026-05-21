@@ -22,6 +22,7 @@
  */
 
 import { applyEmojiPolicy } from "@/lib/voice/output-filter";
+import { judgeExclamationCap } from "@/lib/agent/judge/exclamation-cap";
 import type {
   Audience,
   JudgeResult,
@@ -39,24 +40,41 @@ export interface ApplyOutputJudgesResult {
  * the post-filter text + envelope augmented with judge_results. Existing
  * `baseEnvelope.judge_results` entries are preserved (appended, never
  * overwritten).
+ *
+ * STEP 8: async. J1 (sync, deterministic emoji filter) runs first; J2
+ * (async hybrid count-prefilter + Haiku rescue) runs on J1's filtered
+ * text. Both judge results append to envelope.judge_results.
+ *
+ * Fail-behavior (Q3 host-to-guest annotate-only):
+ *   - J2 verdict='fail' → text UNCHANGED; envelope flags the verdict.
+ *     The flag is functionally inert pending UI consumption (see
+ *     ultraplan §14.3).
+ *   - koast-to-host J2 fail-behavior (strip-excess) + route wiring
+ *     deferred to v2.8 streaming-judge bundle per G8-B1. Phase B
+ *     callers are all host-to-guest, so annotate-only covers every
+ *     live call-site.
  */
-export function applyOutputJudges(
+export async function applyOutputJudges(
   text: string,
   audience: Audience,
   voiceMode: VoiceMode,
   baseEnvelope: AgentTextOutput,
-): ApplyOutputJudgesResult {
+): Promise<ApplyOutputJudgesResult> {
   const j1 = applyEmojiPolicy(text, audience, voiceMode);
+
+  // STEP 8: J2 runs against J1's filtered text (post-emoji-strip).
+  // count_under_cap path is deterministic-sync; only count>cap invokes
+  // Haiku (sync-on-borderline per J2-c).
+  const j2 = await judgeExclamationCap(j1.filtered_text, audience);
 
   const judge_results: JudgeResult[] = [
     ...(baseEnvelope.judge_results ?? []),
     j1.judge_result,
+    j2,
   ];
 
-  // STEP 8 insertion point: invoke judgeExclamationCap on j1.filtered_text,
-  // append its result to judge_results, apply per-audience fail-behavior
-  // (Koast-to-host strip-excess; host-to-guest annotate-only).
-
+  // Host-to-guest annotate-only: text unchanged whether J2 passes or fails.
+  // koast-to-host strip-excess deferred v2.8 with streaming-judge (G8-B1).
   return {
     finalText: j1.filtered_text,
     envelope: { ...baseEnvelope, judge_results },
