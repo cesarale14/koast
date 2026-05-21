@@ -1,0 +1,35 @@
+-- M10 Phase C STEP 6: notifications.host_id backfill — Outcome 3 NO-OP.
+--
+-- STEP 6 §6.1 sub-step verify (phase-c-ultraplan §2.5 + STEP 4 §13.1) determined
+-- Outcome 3: existing notification rows have NO derivable owning-host path.
+--
+-- Schema inspection: notifications table stores id / type / recipient / message /
+-- channel / sent_at / created_at — no host reference column.
+--
+-- 4 notify* caller recipient semantics (src/lib/notifications/index.ts):
+--   - notifyCleanerAssigned / notifyCleanerReminder rows: recipient = cleaner.name
+--     (a name string, not cleaner_id). Deriving host_id via cleaner.name →
+--     cleaners table → cleaners.userId is fragile: cleaner names are not
+--     guaranteed unique per host; ambiguous across hosts; would silently
+--     miss-attribute rows.
+--   - notifyHostComplete / notifyHostIssue rows: recipient = literal "host".
+--     Zero derivable host_id at all.
+--
+-- Strategy: historical rows stay host_id=NULL PERMANENTLY. App-level
+-- enforcement on new rows (STEP 7 threads host_id through storeNotification +
+-- 4 notify* callers). Audit-feed 5th source (STEP 8) WHERE host_id = $auth_uid
+-- scopes naturally; NULL rows are excluded from per-host visibility — accepted
+-- state per phase-c-ultraplan §2.5.
+--
+-- Idempotency: this script is a documented no-op so re-runs are trivially safe.
+-- Per STEP 4 §13.5 correction: backfill UPDATE idempotency mechanism is
+-- WHERE-guard (e.g. WHERE host_id IS NULL — re-runs touch only still-null
+-- rows), NOT §6.12 UNIQUE-on-INSERT. §6.12 PRINCIPLE (re-runnable one-shot
+-- scripts) applies; MECHANISM is WHERE-guard. If a future best-effort backfill
+-- is authored (Outcome 1/2 surfacing later), use WHERE host_id IS NULL AND
+-- <derivable predicate> for idempotency.
+--
+-- No-op execution: documented marker only. The migration alone
+-- (20260521190000_notifications_host_id.sql) suffices for STEP 6.
+
+SELECT 'm10-phase-c-m3-host-id-backfill: no-op per Outcome 3 (phase-c-ultraplan §2.5)' AS status;

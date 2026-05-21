@@ -592,6 +592,15 @@ export const smsLog = pgTable("sms_log", {
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // M10 Phase C STEP 6 (M3): owning-host attribution. Nullable PERMANENT
+  // for historical rows (recipient is cleaner.name or "host" literal,
+  // neither derivable to a host). NOT NULL deferred / abandoned per
+  // Q-M3-a; new-row enforcement is app-level (STEP 7 threads host_id
+  // through storeNotification + 4 notify* callers). FK to auth.users(id)
+  // enforced at the SQL layer (migration 20260521190000) — Drizzle can't
+  // reference the auth schema, matches the user_id pattern on properties /
+  // sms_log / host_state.
+  hostId: uuid("host_id"),
   type: text("type").notNull(),
   recipient: text("recipient"),
   message: text("message").notNull(),
