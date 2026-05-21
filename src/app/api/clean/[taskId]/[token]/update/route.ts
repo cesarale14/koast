@@ -41,17 +41,21 @@ export async function POST(
       .update(updateData)
       .eq("id", params.taskId);
 
-    // Get property name for notifications
+    // Get property name + owning host for notifications. M10 Phase C STEP 7
+    // (M3): cleaner-facing route is public-token (no auth.uid); host_id
+    // derived via task.property_id -> properties.user_id.
     const { data: props } = await supabase
-      .from("properties").select("name").eq("id", task.property_id).limit(1);
+      .from("properties").select("name, user_id").eq("id", task.property_id).limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const propName = ((props ?? []) as any[])[0]?.name ?? "Property";
+    const prop = ((props ?? []) as any[])[0];
+    const propName: string = prop?.name ?? "Property";
+    const hostId: string | null = prop?.user_id ?? null;
 
     // Send notifications
     if (body.status === "completed") {
-      await notifyHostComplete(supabase, task, propName);
+      await notifyHostComplete(supabase, hostId, task, propName);
     } else if (body.status === "issue") {
-      await notifyHostIssue(supabase, task, propName, body.issueDescription ?? "Issue reported");
+      await notifyHostIssue(supabase, hostId, task, propName, body.issueDescription ?? "Issue reported");
     }
 
     return NextResponse.json({ updated: true });

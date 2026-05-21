@@ -7,9 +7,21 @@ interface NotificationPayload {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function storeNotification(supabase: any, payload: NotificationPayload, channel = "sms") {
+async function storeNotification(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  // M10 Phase C STEP 7 (M3): owning-host attribution. null permitted only
+  // for legitimately-unknown host paths (defensive null-safety); all 4
+  // notify* callers source a host id (cleaner-notify via opts.userId;
+  // host-notify via explicit hostId param). NULL rows stay invisible to
+  // per-host audit-feed filtering (STEP 8 WHERE host_id = $auth_uid).
+  hostId: string | null,
+  payload: NotificationPayload,
+  channel = "sms",
+) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from("notifications") as any).insert({
+    host_id: hostId,
     type: payload.type,
     recipient: payload.recipient,
     message: payload.message,
@@ -50,7 +62,11 @@ export async function notifyCleanerAssigned(
     messageBody: body,
     twilioSid: sid,
   });
-  await storeNotification(supabase, { type: "cleaner_assigned", recipient: cleaner.name, message: body });
+  await storeNotification(
+    supabase,
+    opts?.userId ?? null,
+    { type: "cleaner_assigned", recipient: cleaner.name, message: body },
+  );
 }
 
 export async function notifyCleanerReminder(
@@ -77,12 +93,20 @@ export async function notifyCleanerReminder(
     messageBody: body,
     twilioSid: sid,
   });
-  await storeNotification(supabase, { type: "cleaner_reminder", recipient: cleaner.name, message: body });
+  await storeNotification(
+    supabase,
+    opts?.userId ?? null,
+    { type: "cleaner_reminder", recipient: cleaner.name, message: body },
+  );
 }
 
 export async function notifyHostComplete(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  // M10 Phase C STEP 7 (M3): owning-host id. Cleaner-facing routes derive
+  // via task.property_id -> properties.user_id (no auth.uid available;
+  // public-token endpoint). Pass null only if derivation legitimately fails.
+  hostId: string | null,
   task: { id: string; scheduled_date: string },
   propertyName: string,
   hostPhone?: string | null,
@@ -104,12 +128,18 @@ export async function notifyHostComplete(
       twilioSid: sid,
     });
   }
-  await storeNotification(supabase, { type: "host_complete", recipient: "host", message: body });
+  await storeNotification(
+    supabase,
+    hostId,
+    { type: "host_complete", recipient: "host", message: body },
+  );
 }
 
 export async function notifyHostIssue(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  // M10 Phase C STEP 7 (M3): owning-host id. Same pattern as notifyHostComplete.
+  hostId: string | null,
   task: { id: string; scheduled_date: string; cleaner_token?: string },
   propertyName: string,
   issue: string,
@@ -127,5 +157,9 @@ export async function notifyHostIssue(
       twilioSid: sid,
     });
   }
-  await storeNotification(supabase, { type: "host_issue", recipient: "host", message: body });
+  await storeNotification(
+    supabase,
+    hostId,
+    { type: "host_issue", recipient: "host", message: body },
+  );
 }
