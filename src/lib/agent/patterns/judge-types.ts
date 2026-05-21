@@ -24,8 +24,11 @@ import { z } from "zod";
 export type JudgeVerdict = "pass" | "fail";
 
 /** SHIP catalog. Strict union ensures judge_id is type-checked at
- * call-sites; misspellings caught at compile time. */
-export type JudgeId = "emoji_policy";
+ * call-sites; misspellings caught at compile time. STEP 5 ships
+ * emoji_policy (J1); STEP 7 adds exclamation_cap (J2 deterministic
+ * count-prefilter); STEP 8 wires Haiku semantic rescue under the same
+ * judge_id. v2.8 expands per Decision (d) partial scope iii-vi roadmap. */
+export type JudgeId = "emoji_policy" | "exclamation_cap";
 
 /** Audience axis (orthogonal to voice_mode per phase-b-ultraplan §2.1).
  * Determined per-route, not per-host. Shared across all judges that
@@ -36,11 +39,10 @@ export type Audience = "koast-to-host" | "host-to-guest";
  *  src/lib/agent/schemas/agent-text-output.ts. Schema mirrors the
  *  JudgeResult interface; both stay in lock-step as JudgeId expands. */
 export const JudgeResultSchema = z.object({
-  // z.literal at STEP 6 (single-value union). STEP 7 widens to
-  // z.union([z.literal('emoji_policy'), z.literal('exclamation_cap')])
-  // or z.enum(['emoji_policy', 'exclamation_cap']) once the tuple has
-  // ≥2 entries (Zod's z.enum requires a tuple of ≥2 string literals).
-  judge_id: z.literal("emoji_policy"),
+  // STEP 7 widens from STEP 6's z.literal('emoji_policy') now that the
+  // catalog has ≥2 entries — Zod's z.enum tuple-arity requirement is now
+  // satisfied (cf. STEP 6 phase-b-step6 commit body sidestep note).
+  judge_id: z.enum(["emoji_policy", "exclamation_cap"]),
   verdict: z.union([z.literal("pass"), z.literal("fail")]),
   reason: z.string().min(1),
   confidence: z.number().min(0).max(1),

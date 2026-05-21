@@ -167,8 +167,13 @@ describe("§7.6 completeness meta-test", () => {
   // tsc will fail this map until the new key + its fixture-set entry are
   // added in the same PR. That's the same-PR-fixture enforcement §6.10
   // codifies.
+  // STEP 7 added 'exclamation_cap'. Its fixtures live in
+  // src/lib/agent/judge/__tests__/exclamation-cap.test.ts (deterministic
+  // count-prefilter); the Record exhaustiveness here registers the
+  // presence so the suite stays compile-checked across the M10 catalog.
   const JUDGE_ID_FIXTURES_PRESENT: Record<JudgeId, true> = {
     emoji_policy: true,
+    exclamation_cap: true,
   };
 
   test("every JudgeId enum value has ≥1 fixture in this suite", () => {
