@@ -29,6 +29,15 @@ const CATEGORY_BADGE: Record<
     bg: "#dde8e0",
     fg: "var(--tideline)",
   },
+  // M10 Phase C STEP 8 (M3): notifications audit-log rows surface as their
+  // own category badge (singular "Notification" mirrors the per-row Memory /
+  // Message / Rate / Outcome / SMS singular labels). The "Notifications"
+  // CHIP-LEVEL filter aggregates both 'sms' + 'notification' categories.
+  notification: {
+    label: "Notification",
+    bg: "#e2dace",
+    fg: "var(--tideline)",
+  },
   other: {
     label: "Other",
     bg: "var(--hairline)",

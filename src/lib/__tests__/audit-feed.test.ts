@@ -10,6 +10,7 @@ import {
   categoriesForFilter,
   decodeCursor,
   encodeCursor,
+  type AuditEventCategory,
   type AuditFeedCursor,
   type AuditFeedFilter,
 } from "../audit-feed";
@@ -74,10 +75,12 @@ describe("categoriesForFilter — D17b chip → category fold", () => {
     ]);
   });
 
-  test("sms → ['sms']", () => {
-    // M8 chip is honest about its content; M9 extends to ['sms',
-    // 'notification'] when notifications source rejoins the VIEW.
-    expect(categoriesForFilter("sms")).toEqual(["sms"]);
+  test("notifications → ['sms', 'notification']", () => {
+    // M10 Phase C STEP 8 (M3): chip renamed sms → notifications; surfaces
+    // both legacy sms_log rows (category 'sms') AND new notifications
+    // audit-log rows (category 'notification'). The renamed chip activates
+    // the v1.2 design intent codified in the original VIEW migration.
+    expect(categoriesForFilter("notifications")).toEqual(["sms", "notification"]);
   });
 
   test("all five chips covered (exhaustiveness sanity)", () => {
@@ -86,11 +89,38 @@ describe("categoriesForFilter — D17b chip → category fold", () => {
       "memory",
       "messages",
       "pricing",
-      "sms",
+      "notifications",
     ];
     for (const chip of chips) {
       const result = categoriesForFilter(chip);
       expect(result === null || Array.isArray(result)).toBe(true);
     }
+  });
+
+  test("M10 Phase C STEP 8 — notifications chip aggregates legacy + new sources (length + both categories)", () => {
+    const result = categoriesForFilter("notifications");
+    expect(result).not.toBeNull();
+    expect(result).toHaveLength(2);
+    expect(result).toContain("sms");
+    expect(result).toContain("notification");
+  });
+
+  test("M10 Phase C STEP 8 — 'notification' AuditEventCategory value is supported", () => {
+    // Runtime crossover for the TypeScript-only widening at audit-feed.ts:
+    // AuditEventCategory now includes 'notification'. A runtime fixture
+    // exercising the value protects against future enum narrowing.
+    const v: AuditEventCategory = "notification";
+    expect(v).toBe("notification");
+  });
+
+  test("M10 Phase C STEP 8 — 'sms' is no longer a valid AuditFeedFilter key (renamed to notifications)", () => {
+    // Type-level rename: AuditFeedFilter values are { all, memory, messages,
+    // pricing, notifications }. 'sms' is rejected at compile time; this
+    // runtime assertion guards FILTER_TO_CATEGORIES against future re-introduction.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const f = categoriesForFilter as (k: string) => any;
+    // The renamed-away 'sms' key returns undefined (Record lookup miss) —
+    // explicit negative case for the rename.
+    expect(f("sms")).toBeUndefined();
   });
 });

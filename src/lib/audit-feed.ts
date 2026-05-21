@@ -7,8 +7,12 @@
  *   - F1 Memory tab (`/koast/inspect/memory`) — memory_write filtered
  *   - `/api/audit-feed/since` — between-turns polling channel (M8 D2)
  *
- * Path β + γ.1 fix from Phase C HARD GATE means all four sources now
- * surface (channex rows recovered). This helper enforces host-scoping
+ * Path β + γ.1 fix from Phase C HARD GATE means all five sources now
+ * surface (M8 path β/γ.1 recovered channex; M10 Phase C STEP 8 added
+ * notifications as the 5th source — see migration
+ * 20260521210000_unified_audit_feed_v2_notifications.sql + companion
+ * STEP 6 schema migration that added notifications.host_id). This helper
+ * enforces host-scoping
  * (caller passes hostId; helper trusts it — auth happens at the route
  * boundary), cursor-based pagination (stable across feed churn), and
  * D17b chip-name → category fold.
@@ -34,6 +38,10 @@ export type AuditEventCategory =
   | "rate_push"
   | "sms"
   | "pricing_outcome"
+  // M10 Phase C STEP 8 (M3) activated: notifications source emits this
+  // category. The "Notifications" chip surfaces both 'sms' (sms_log) and
+  // 'notification' (notifications) rows together — see FILTER_TO_CATEGORIES.
+  | "notification"
   | "other";
 
 export type AuditEventOutcome =
@@ -58,18 +66,20 @@ export type AuditEvent = {
 
 /**
  * D17b chip-name vocabulary. Maps to the granular VIEW categories at
- * the FILTER_TO_CATEGORIES table below. Conventions v1.2 freezes the
- * five chips: All / Memory / Messages / Pricing / SMS. The "SMS" chip
- * is honest about M8 content (notifications source excluded; rejoins
- * in M9 with host_id schema migration, at which point the chip
- * renames to "Notifications" and surfaces sms + notification rows).
+ * the FILTER_TO_CATEGORIES table below. M10 Phase C STEP 8 (M3)
+ * activates the "Notifications" chip: surfaces sms + notification rows
+ * together (the M8 v1.2 design intent — see migration
+ * 20260507040000_unified_audit_feed_view.sql v1.2 notes). The renamed
+ * chip preceded the substrate by ~1 year of design.
+ *
+ * Five chips: All / Memory / Messages / Pricing / Notifications.
  */
 export type AuditFeedFilter =
   | "all"
   | "memory"
   | "messages"
   | "pricing"
-  | "sms";
+  | "notifications";
 
 const FILTER_TO_CATEGORIES: Record<AuditFeedFilter, AuditEventCategory[] | null> =
   {
@@ -77,7 +87,9 @@ const FILTER_TO_CATEGORIES: Record<AuditFeedFilter, AuditEventCategory[] | null>
     memory: ["memory_write"],
     messages: ["guest_message"],
     pricing: ["rate_push", "pricing_outcome"],
-    sms: ["sms"],
+    // "Notifications" chip surfaces both legacy sms_log rows (category 'sms')
+    // and new notifications rows (category 'notification') — M10 Phase C STEP 8.
+    notifications: ["sms", "notification"],
   };
 
 export type AuditFeedCursor = {

@@ -7,7 +7,9 @@ const CHIPS: ReadonlyArray<{ value: AuditFeedFilter; label: string }> = [
   { value: "memory", label: "Memory" },
   { value: "messages", label: "Messages" },
   { value: "pricing", label: "Pricing" },
-  { value: "sms", label: "SMS" },
+  // M10 Phase C STEP 8 (M3): renamed from "SMS" to "Notifications" — chip
+  // surfaces both sms_log delivery events + notifications audit-log rows.
+  { value: "notifications", label: "Notifications" },
 ];
 
 export function ActivityFilterChips({

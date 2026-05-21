@@ -9,8 +9,10 @@ const COPY: Record<AuditFeedFilter, string> = {
     "No guest messages drafted yet. Koast drafts replies as guest messages land; they show up here once you approve them.",
   pricing:
     "No rate pushes yet. Koast applies rate suggestions to your channels when you accept them in pricing.",
-  sms:
-    "No SMS sent yet. Koast sends turnover instructions to cleaners when bookings land.",
+  // M10 Phase C STEP 8 (M3): chip renamed SMS -> Notifications; now surfaces
+  // both sms_log + notifications audit-log rows.
+  notifications:
+    "No notifications yet. Koast logs SMS to cleaners and notification events here as they happen.",
 };
 
 export function ActivityEmptyState({ filter }: { filter: AuditFeedFilter }) {

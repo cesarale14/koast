@@ -36,7 +36,9 @@ const VALID_FILTERS: ReadonlySet<AuditFeedFilter> = new Set<AuditFeedFilter>([
   "memory",
   "messages",
   "pricing",
-  "sms",
+  // M10 Phase C STEP 8: renamed from 'sms' to 'notifications' (surfaces
+  // both sms_log + notifications rows in one chip).
+  "notifications",
 ]);
 
 const DEFAULT_LIMIT = 50;
