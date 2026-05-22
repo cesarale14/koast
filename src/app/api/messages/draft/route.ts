@@ -108,15 +108,21 @@ export async function POST(request: NextRequest) {
     const { finalText: filteredDraft, envelope: filteredEnvelope } =
       await applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
 
-    // Save draft to message. M9 Phase E F6 (B3 (a) lock): also
-    // capture original_draft_text alongside ai_draft for voice
-    // extraction supersession delta + trust-inspection.
+    // Save draft to message. M9 Phase E F6 (B3 (a) lock): also capture
+    // original_draft_text alongside ai_draft for voice extraction
+    // supersession delta + trust-inspection.
+    // M10 Phase D STEP 7 (S3): also persist the D22 AgentTextOutput envelope
+    // (post-J1+J2 filteredEnvelope; contains confidence + judge_results +
+    // deferred S3 fields for future Slice). STEP 8 wires UI display to read
+    // this column. Historical drafts have NULL envelope per STEP 6
+    // nullable-permanent (M3-outcome-3-family 2nd instance).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("messages") as any)
       .update({
         ai_draft: filteredDraft,
         draft_status: "generated",
         original_draft_text: draft,
+        envelope: filteredEnvelope,
       })
       .eq("id", messageId);
 
