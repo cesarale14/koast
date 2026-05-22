@@ -13,6 +13,10 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+// M10 Phase D STEP 6 (S3): typed JSONB envelope column on messages.
+// Import-direction note: db schema → agent envelope schema is one-way (the
+// envelope schema is Zod-only, no DB deps, so no circularity).
+import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
 
 // ==================== Properties ====================
 
@@ -266,6 +270,13 @@ export const messages = pgTable("messages", {
   // ai_draft (which may be replaced by host edits in some flows). Source
   // for voice extraction supersession delta + trust-inspection.
   originalDraftText: text("original_draft_text"),
+  // M10 Phase D STEP 6 (S3): D22 AgentTextOutput envelope per draft.
+  // Nullable PERMANENT per phase-d-ultraplan §3.6 (M3-outcome-3-family 2nd
+  // instance after notifications.host_id): historical drafts predate envelope
+  // (NULL by nature); new drafts populate at STEP 7 (/api/messages/draft);
+  // UI displays at STEP 8 (display-on-presence). NOT NULL DB constraint
+  // deferred — app-level enforcement on new rows.
+  envelope: jsonb("envelope").$type<AgentTextOutput>(),
   readAt: timestamp("read_at", { withTimezone: true }),
   channexInsertedAt: timestamp("channex_inserted_at", { withTimezone: true }),
   channexUpdatedAt: timestamp("channex_updated_at", { withTimezone: true }),
