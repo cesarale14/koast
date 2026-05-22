@@ -298,6 +298,18 @@ export async function listMemoryFacts(
       totalSuperseded++;
       continue;
     }
+    // M10 Phase D STEP 9 (S4): voice facts (entity_type='host' +
+    // sub_entity_type='voice') surface in the dedicated MemoryVoiceSection
+    // above entity-type groups via a separate readVoiceMode fetch
+    // (phase-d-ultraplan §13.2 resolved (b) — listMemoryFacts already
+    // returns voice rows unpaginated, but display_value humanizes the raw
+    // VoiceFactPayload jsonb so (c) client-filter requires shape change).
+    // Skip voice rows here to avoid double-rendering them in the generic
+    // host group AND the dedicated voice section.
+    if (row.entity_type === "host" && row.sub_entity_type === "voice") {
+      if (row.status === "active") totalActive++;
+      continue;
+    }
     if (row.status === "active") totalActive++;
     // Only render active + deprecated facts as top-level rows. Deprecated
     // are extremely rare today; treat as active for rendering purposes
