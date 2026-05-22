@@ -5,7 +5,10 @@ import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { X } from "lucide-react";
 
-interface RuleForm {
+// M10 Phase D STEP 5 (S1): renamed from RuleForm. Schema migrated to
+// review-preferences (memory_facts entity_type='host' + sub_entity_type='reviews')
+// per M9 Phase G E3; UI terminology catches up here.
+interface PreferenceForm {
   auto_publish: boolean;
   publish_delay_days: number;
   tone: string;
@@ -13,16 +16,18 @@ interface RuleForm {
   bad_review_delay: boolean;
 }
 
+// M10 Phase D STEP 5 (S2): propertyId prop removed. Review preferences are
+// host-scoped (per M9 Phase G E3); propertyId was dead residual + a UI
+// sanity-check stub. propertyName stays for the modal header label.
 interface ReviewsSettingsModalProps {
-  propertyId: string | null;
   propertyName: string;
   open: boolean;
   onClose: () => void;
 }
 
-export default function ReviewsSettingsModal({ propertyId, propertyName, open, onClose }: ReviewsSettingsModalProps) {
+export default function ReviewsSettingsModal({ propertyName, open, onClose }: ReviewsSettingsModalProps) {
   const { toast } = useToast();
-  const [form, setForm] = useState<RuleForm>({
+  const [form, setForm] = useState<PreferenceForm>({
     auto_publish: false,
     publish_delay_days: 3,
     tone: "warm",
@@ -39,15 +44,10 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
   if (!open || !mounted) return null;
 
   const save = async () => {
-    // M9 Phase G E3 Q-G6 β: review preferences are now per-host (not
-    // per-property). The propertyId guard remains as a UI sanity check
-    // (the modal opens against a property context) but the request
-    // itself is host-scoped — host_id derived from session auth in the
+    // M9 Phase G E3 Q-G6 β: review preferences are per-host (not per-property).
+    // M10 Phase D STEP 5 (S2): propertyId sanity-check guard removed — the
+    // modal is host-scoped; host_id is derived from session auth in the
     // /api/reviews/preferences route.
-    if (!propertyId) {
-      toast("Pick a property first", "error");
-      return;
-    }
     setSaving(true);
     try {
       const res = await fetch(`/api/reviews/preferences`, {
@@ -63,7 +63,7 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? `Failed (${res.status})`);
-      toast("Review rules saved");
+      toast("Review preferences saved");
       onClose();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Failed", "error");
@@ -86,7 +86,7 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
         <div className="flex items-center justify-between p-5" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--golden)" }}>
-              Review rules
+              Review preferences
             </div>
             <div className="text-[14px] font-semibold" style={{ color: "var(--coastal)" }}>
               {propertyName}
@@ -188,11 +188,11 @@ export default function ReviewsSettingsModal({ propertyId, propertyName, open, o
           <button
             type="button"
             onClick={save}
-            disabled={saving || !propertyId}
+            disabled={saving}
             className="px-4 py-2 text-[12px] font-semibold disabled:opacity-50"
             style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}
           >
-            {saving ? "Saving…" : "Save rules"}
+            {saving ? "Saving…" : "Save preferences"}
           </button>
         </div>
       </div>

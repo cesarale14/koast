@@ -283,7 +283,8 @@ export default function ReviewsPage() {
   const activePropertyName = propertyFilter === "all"
     ? (userProperties[0]?.name ?? "Properties")
     : (userProperties.find((p) => p.id === propertyFilter)?.name ?? "Property");
-  const settingsPropertyId = propertyFilter === "all" ? (userProperties[0]?.id ?? null) : propertyFilter;
+  // M10 Phase D STEP 5 (S2): settingsPropertyId removed — modal is host-scoped
+  // (M9 Phase G E3) and no longer takes a propertyId prop.
 
   return (
     <div>
@@ -476,7 +477,6 @@ export default function ReviewsPage() {
       )}
 
       <ReviewsSettingsModal
-        propertyId={settingsPropertyId}
         propertyName={activePropertyName}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
