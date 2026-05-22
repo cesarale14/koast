@@ -77,6 +77,22 @@ interface MessageRow {
   ai_draft?: string | null;
   draft_status?: string | null;
   sent_at?: string | null;
+  // M10 Phase D STEP 8 (S3): D22 AgentTextOutput envelope persisted at
+  // STEP 7 (post-J1+J2). Nullable for historical drafts per STEP 6
+  // (M3-outcome-3-family 2nd instance). PendingDraftBubble renders
+  // confidence + judge_results review-needed via inline composition;
+  // display gates on presence. Deferred S3 fields (source_attribution /
+  // hedge / output_grounding) persisted in JSONB but not surfaced this
+  // Slice.
+  envelope?: {
+    confidence?: "confirmed" | "high_inference" | "active_guess";
+    judge_results?: Array<{
+      judge_id: string;
+      verdict: "pass" | "fail";
+      reason: string;
+      confidence: number;
+    }>;
+  } | null;
   // Optimistic-UI state — only set on temp rows. Slice 2.
   __optimistic?: { status: "sending" | "sent" | "failed"; clientId: string; error?: string };
 }

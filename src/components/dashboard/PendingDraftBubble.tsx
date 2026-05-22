@@ -23,11 +23,18 @@
 // transitions). Animation work tracked separately.
 
 import { Sparkles } from "lucide-react";
+import { KoastChip } from "@/components/polish/KoastChip";
+import StatusDot from "@/components/polish/StatusDot";
+import {
+  CONFIDENCE_LABEL,
+  type DraftEnvelope,
+} from "@/components/dashboard/draft-envelope-labels";
 
 interface PendingDraftBubbleMessage {
   id: string;
   ai_draft?: string | null;
   content: string;
+  envelope?: DraftEnvelope | null;
 }
 
 export default function PendingDraftBubble({
@@ -40,6 +47,18 @@ export default function PendingDraftBubble({
   onDiscard: () => void;
 }) {
   const body = (msg.ai_draft ?? msg.content ?? "").trim();
+
+  // M10 Phase D STEP 8 (S3): envelope-driven indicators. Display gates on
+  // envelope presence (historical drafts NULL → clean per STEP 6 nullable-
+  // permanent / M3-outcome-3-family 2nd instance).
+  const envelope = msg.envelope;
+  const confidenceCfg = envelope?.confidence
+    ? CONFIDENCE_LABEL[envelope.confidence]
+    : null;
+  // judge_results verdict='fail' on any entry → review-needed indicator
+  // (activates Phase B Q3 inert flag — first UI consumer of envelope.judge_results).
+  const failJudge = envelope?.judge_results?.find((r) => r.verdict === "fail");
+
   return (
     <div className="flex justify-end items-end gap-2">
       <div
@@ -61,6 +80,31 @@ export default function PendingDraftBubble({
           Suggested · Pending approval
         </div>
         <p className="whitespace-pre-wrap">{body}</p>
+        {(confidenceCfg || failJudge) && (
+          <div className="mt-2 flex items-center gap-2 flex-wrap" data-testid="draft-envelope-indicators">
+            {confidenceCfg && (
+              <KoastChip
+                variant={confidenceCfg.variant}
+                data-testid="draft-confidence-badge"
+                aria-label={`Draft confidence: ${confidenceCfg.label}`}
+              >
+                {confidenceCfg.label}
+              </KoastChip>
+            )}
+            {failJudge && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-medium"
+                style={{ color: "rgba(247,243,236,0.9)" }}
+                data-testid="draft-review-needed-indicator"
+                title={`Review needed: ${failJudge.judge_id} — ${failJudge.reason}`}
+                aria-label={`Review needed: ${failJudge.judge_id} flagged this draft (${failJudge.reason})`}
+              >
+                <StatusDot tone="alert" size={8} halo />
+                Review
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Actions sit to the right of the bubble in the conversation gutter,

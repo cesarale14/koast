@@ -105,7 +105,12 @@ export async function GET(
         "attachments, read_at, channex_inserted_at, created_at, " +
         // Session 8a: surface ai_draft + draft_status so the inbox
         // can render pending automation drafts inline.
-        "ai_draft, draft_status, sent_at"
+        // M10 Phase D STEP 8 (S3): surface envelope so UnifiedInbox/
+        // PendingDraftBubble can render confidence badge + judge_results
+        // review-needed indicator (activates Phase B Q3). Nullable per
+        // STEP 6 (M3-outcome-3-family); historical drafts envelope=NULL,
+        // display gates on presence.
+        "ai_draft, draft_status, sent_at, envelope"
       )
       .eq("thread_id", threadId)
       .order("channex_inserted_at", { ascending: true });
