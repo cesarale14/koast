@@ -95,10 +95,14 @@ export async function extractVoiceForHost(
   // 1. Read host-authored messages (outbound direction). Cap at a
   //    sensible upper bound for v1 (1000 messages); statistical
   //    features stabilize well before that.
+  //    actor_kind='host' + actor_id=hostId excludes agent-generated
+  //    drafts and prevents cross-host voice-signature conflation.
   const { data: messages, error: messagesErr } = await supabase
     .from("messages")
     .select("id, content, direction, created_at")
     .eq("direction", "outbound")
+    .eq("actor_kind", "host")
+    .eq("actor_id", hostId)
     .order("created_at", { ascending: false })
     .limit(1000)
     .returns<HostMessageRow[]>();

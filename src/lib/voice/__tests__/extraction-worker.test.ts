@@ -94,14 +94,19 @@ function mockSupabaseForExtraction(opts: {
   hostMessages: Array<{ id: string; content: string; direction: string; created_at: string }>;
   priorVoiceFact?: { value: unknown } | null;
 }) {
-  // messages-table chain: .select().eq().order().limit().returns() →
-  // returns the array via the .returns<HostMessageRow[]>() boundary that
-  // the real call site reaches. Mock chain reproduces that shape.
+  // messages-table chain: .select().eq().eq().eq().order().limit().returns()
+  // → returns the array via the .returns<HostMessageRow[]>() boundary
+  // that the real call site reaches. messagesEqChain.eq is chainable so
+  // direction + actor_kind + actor_id can stack before .order().
   const messagesLimitReturns = jest.fn(() => Promise.resolve({ data: opts.hostMessages, error: null }));
   const messagesLimitWithReturns = jest.fn(() => ({ returns: messagesLimitReturns }));
   const messagesOrderWithLimit = jest.fn(() => ({ limit: messagesLimitWithReturns }));
-  const messagesEq = jest.fn(() => ({ order: messagesOrderWithLimit }));
-  const messagesSelect = jest.fn(() => ({ eq: messagesEq }));
+  const messagesEqChain: { eq: jest.Mock; order: jest.Mock } = {
+    eq: jest.fn(),
+    order: messagesOrderWithLimit,
+  };
+  messagesEqChain.eq.mockReturnValue(messagesEqChain);
+  const messagesSelect = jest.fn(() => ({ eq: messagesEqChain.eq }));
 
   // memory_facts-table chain — for readVoiceMode + writeVoiceMode operations.
   // readVoiceMode: .select().eq().eq().eq().eq().eq().order().limit().maybeSingle()
@@ -147,12 +152,15 @@ function mockSupabaseForExtraction(opts: {
     throw new Error(`Unexpected from(${table})`);
   });
 
-  return { from } as unknown as Parameters<typeof extractVoiceForHost>[0];
+  return {
+    supabase: { from } as unknown as Parameters<typeof extractVoiceForHost>[0],
+    messagesEqMock: messagesEqChain.eq,
+  };
 }
 
 describe("extractVoiceForHost — integration paths", () => {
   test("returns insufficient_samples when host has <10 messages", async () => {
-    const supabase = mockSupabaseForExtraction({
+    const { supabase } = mockSupabaseForExtraction({
       hostMessages: [
         { id: "m1", content: "Hi", direction: "outbound", created_at: "2026-05-01" },
       ],
@@ -169,7 +177,7 @@ describe("extractVoiceForHost — integration paths", () => {
       direction: "outbound",
       created_at: "2026-05-01",
     }));
-    const supabase = mockSupabaseForExtraction({
+    const { supabase } = mockSupabaseForExtraction({
       hostMessages,
       priorVoiceFact: null,
     });
@@ -177,5 +185,27 @@ describe("extractVoiceForHost — integration paths", () => {
     expect(result.status).toBe("extracted");
     expect(result.fact_id).toBe("new-fact-id");
     expect(result.sample_count).toBe(15);
+  });
+
+  test("scopes query to actor_kind='host' AND actor_id=hostId (regression guard)", async () => {
+    // Pre-fix the query filter was only .eq("direction","outbound") and
+    // hostId was ignored at the query layer — at multi-host scale that
+    // silently conflated all hosts' outbound messages into 'this host's'
+    // voice signature. This guard asserts the eq() chain stays scoped.
+    const hostMessages = Array.from({ length: 15 }, (_, i) => ({
+      id: `m${i}`,
+      content: `Body ${i}.`,
+      direction: "outbound",
+      created_at: "2026-05-01",
+    }));
+    const { supabase, messagesEqMock } = mockSupabaseForExtraction({
+      hostMessages,
+      priorVoiceFact: null,
+    });
+    await extractVoiceForHost(supabase, "host-1");
+    const eqCalls = messagesEqMock.mock.calls;
+    expect(eqCalls).toContainEqual(["direction", "outbound"]);
+    expect(eqCalls).toContainEqual(["actor_kind", "host"]);
+    expect(eqCalls).toContainEqual(["actor_id", "host-1"]);
   });
 });
