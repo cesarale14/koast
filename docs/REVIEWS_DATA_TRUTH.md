@@ -489,7 +489,7 @@ The new render layer's contract from `pending/route.ts`:
 ### RDX-7 — Cleanup (Tier 2)
 
 - Delete `is_bad_review` from sync writes (move to host-marked-only).
-- Delete `/api/reviews/generate/[bookingId]` (dead code; blueprint §9.5).
+- ~~Delete `/api/reviews/generate/[bookingId]`~~ — DONE M11 Phase A item 3 (full cascade: route + `generateGuestReview` + `calculatePublishTime` + sufficiency-catalog Site 2 + tests).
 - Delete `auto_publish` column or comment out (blueprint §9.4).
 
 ---

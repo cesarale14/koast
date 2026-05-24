@@ -112,41 +112,9 @@ export const generateDraftThreshold: GeneratorThreshold<GenerateDraftCatalogInpu
   },
 };
 
-// ---- Site 2 (first call): generateGuestReview review_text ----
-
-export interface GenerateGuestReviewCatalogInput {
-  rule: { tone: string; target_keywords: string[] };
-  booking: { guest_name: string | null };
-}
-
-export const generateGuestReviewThreshold: GeneratorThreshold<GenerateGuestReviewCatalogInput> = {
-  generator: "generateGuestReview",
-  evaluate: ({ rule, booking }) => {
-    const hasKeywords = rule.target_keywords.length > 0;
-    const hasTone = rule.tone.trim().length > 0;
-    const hasGuestName =
-      booking.guest_name != null && booking.guest_name !== "";
-    const present = [hasKeywords, hasTone, hasGuestName].filter(Boolean).length;
-    return gradient3(present, 3);
-  },
-};
-
-// ---- Site 2 (second call): generateGuestReview private_note ----
-
-/**
- * Private notes have minimal context-dependence — the prompt only
- * takes guest_name + property_name + nights, all universally
- * available. Static "active_guess / sparse" assignment because the
- * content is generic (a thank-you), and there's no learned host
- * preference feeding this output.
- */
-export const generatePrivateNoteThreshold: GeneratorThreshold<Record<string, never>> = {
-  generator: "generateGuestReview.privateNote",
-  evaluate: () => ({
-    confidence: "active_guess",
-    output_grounding: "sparse",
-  }),
-};
+// Site 2 (generateGuestReview review_text + private_note) catalog
+// entries removed M11 Phase A item 3 — function deleted as superseded
+// by counter-flow Site path. Pre-two-sided-model artifact.
 
 // ---- Site 3: generateReviewResponse ----
 

@@ -2,8 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { callLLMWithEnvelope } from "@/lib/agent/llm-call";
 import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
 import {
-  generateGuestReviewThreshold,
-  generatePrivateNoteThreshold,
   generateReviewResponseThreshold,
   generateGuestReviewFromIncomingThreshold,
 } from "@/lib/agent/sufficiency-catalog";
@@ -27,17 +25,6 @@ interface ReviewRule {
   target_keywords: string[];
 }
 
-interface ReviewResult {
-  review_text: string;
-  private_note: string;
-  recommended: boolean;
-  /** M9 Phase C: D22 Option II parallel return. Two envelopes per
-   *  Q-B3 — one per SDK call (review_text + private_note). UI
-   *  integration deferred to M10 per α + γ blend. */
-  envelope_review: AgentTextOutput;
-  envelope_note: AgentTextOutput;
-}
-
 interface ResponseResult {
   response_text: string;
   /** M9 Phase C: D22 Option II parallel return. UI integration
@@ -58,97 +45,6 @@ function getClient(): Anthropic {
 }
 
 const MODEL = "claude-sonnet-4-20250514";
-
-/**
- * Site 2 — generateGuestReview (M9 Phase B F3).
- *
- * Makes TWO Anthropic SDK calls (review_text + private_note). Per
- * Q-B3 resolution: two envelopes, one per SDK call. Each call gets
- * its own buildEnvelope reflecting that call's context + purpose.
- *
- * Backward-compat (Option B migration): signature still returns
- * `Promise<ReviewResult>`. F3 envelopes flow through internally; the
- * function extracts `.content` and assembles the legacy shape.
- */
-export async function generateGuestReview(
-  booking: BookingContext,
-  property: PropertyContext,
-  rule: ReviewRule,
-  /** M9 Phase E B2 (a) lock — see messaging.ts:generateDraft note. */
-  voicePrompt?: string,
-): Promise<ReviewResult> {
-  const client = getClient();
-  const n = nights(booking.check_in, booking.check_out);
-  const firstName = booking.guest_name?.split(" ")[0] ?? "our guest";
-  const keywords = rule.target_keywords.length > 0
-    ? rule.target_keywords.join(", ")
-    : "clean, location, comfortable";
-
-  const reviewVoiceBlock = voicePrompt ? `\n\n${voicePrompt}` : "";
-
-  const reviewSystem = `You are writing a host review for an Airbnb/VRBO guest. The review should be:
-- Unique and specific to this guest's stay (never generic)
-- ${rule.tone} in tone
-- 2-4 sentences long
-- Naturally incorporate 1-2 of these property keywords: ${keywords}
-  (don't force them — weave them in naturally so future guests see them in review responses and they feed Airbnb's search algorithm)
-- Mention the guest by first name
-- Reference something specific: length of stay, time of year, or property features
-
-Property: ${property.name} in ${property.city ?? "the area"}, ${property.bedrooms ?? "?"}BR/${property.bathrooms ?? "?"}BA
-Guest: ${firstName}, stayed ${booking.check_in} to ${booking.check_out} (${n} nights)
-Booking source: ${booking.platform}
-
-IMPORTANT: Every review must be different. Vary sentence structure, opening phrases, and specific details. Never start two reviews the same way. Never use these overused phrases: 'wonderful guest', 'highly recommend', 'welcome back anytime' — find fresh ways to express the same sentiment.
-
-Return ONLY the review text, nothing else.${reviewVoiceBlock}`;
-
-  const reviewEnvelope = await callLLMWithEnvelope(
-    {
-      client,
-      model: MODEL,
-      max_tokens: 400,
-      system: reviewSystem,
-      messages: [{ role: "user", content: "Write the guest review." }],
-    },
-    {
-      buildEnvelope: (text): AgentTextOutput =>
-        buildGuestReviewEnvelope(text, rule, booking),
-      repairPrompt:
-        "Your previous review was empty or off-shape. Provide a 2-4 sentence host review of the guest, specific to their stay.",
-    },
-  );
-
-  // Site 2's second call — private note thanking the guest. No system
-  // prompt; the entire prompt lives in the user message. Q-B3: each
-  // call gets its own envelope — private notes have different context
-  // (shorter, less rule-driven) and different sufficiency profile.
-  const noteEnvelope = await callLLMWithEnvelope(
-    {
-      client,
-      model: MODEL,
-      max_tokens: 100,
-      messages: [{
-        role: "user",
-        content: `Write a brief, friendly private note (1 sentence) thanking ${firstName} for staying ${n} nights at ${property.name}. Example: "Thanks for keeping the place in great shape during your stay!" Return ONLY the note.`,
-      }],
-    },
-    {
-      buildEnvelope: (text): AgentTextOutput =>
-        buildPrivateNoteEnvelope(text),
-      repairPrompt:
-        "Your previous note was empty. Provide a one-sentence thank-you note.",
-    },
-  );
-
-  return {
-    review_text: reviewEnvelope.content,
-    private_note: noteEnvelope.content,
-    recommended: true,
-    envelope_review: reviewEnvelope,
-    envelope_note: noteEnvelope,
-  };
-}
 
 /**
  * Site 3 — generateReviewResponse (M9 Phase B F3).
@@ -277,62 +173,7 @@ Return ONLY the review text. No preamble, no quotes around it.${incomingVoiceBlo
   return { public_review_draft: envelope.content.trim(), envelope };
 }
 
-export function calculatePublishTime(
-  checkOutDate: string,
-  delayDays: number,
-  isBadReview: boolean,
-  badReviewDelay: boolean
-): Date {
-  const checkout = new Date(checkOutDate);
-
-  if (isBadReview && badReviewDelay) {
-    // Publish in the last 2 hours of the 14-day (336-hour) window
-    const windowEnd = new Date(checkout.getTime() + 14 * 24 * 60 * 60 * 1000);
-    return new Date(windowEnd.getTime() - 2 * 60 * 60 * 1000); // 2 hours before deadline
-  }
-
-  // Normal delay
-  return new Date(checkout.getTime() + delayDays * 24 * 60 * 60 * 1000);
-}
-
 // ---- F3 envelope builders (Phase B deterministic-from-context heuristics) ----
-
-/**
- * Site 2 first call. Phase C: grounding evaluation moved to D23
- * catalog (`generateGuestReviewThreshold`). Builder stays thin —
- * shape the catalog input + assemble the envelope.
- */
-function buildGuestReviewEnvelope(
-  text: string,
-  rule: ReviewRule,
-  booking: BookingContext,
-): AgentTextOutput {
-  const { confidence, output_grounding } = generateGuestReviewThreshold.evaluate({
-    rule: { tone: rule.tone, target_keywords: rule.target_keywords },
-    booking: { guest_name: booking.guest_name },
-  });
-  return {
-    content: text,
-    confidence,
-    source_attribution: [],
-    output_grounding,
-  };
-}
-
-/**
- * Site 2 second call. Catalog handles the constant
- * "active_guess / sparse" assignment for private notes — generic
- * thank-you content with no learned host preference feed.
- */
-function buildPrivateNoteEnvelope(text: string): AgentTextOutput {
-  const { confidence, output_grounding } = generatePrivateNoteThreshold.evaluate({});
-  return {
-    content: text,
-    confidence,
-    source_attribution: [],
-    output_grounding,
-  };
-}
 
 /**
  * Site 3. Phase C: grounding evaluation moved to D23 catalog

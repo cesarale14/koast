@@ -9,8 +9,6 @@
 
 import {
   generateDraftThreshold,
-  generateGuestReviewThreshold,
-  generatePrivateNoteThreshold,
   generateReviewResponseThreshold,
   generateGuestReviewFromIncomingThreshold,
 } from "../sufficiency-catalog";
@@ -63,43 +61,10 @@ describe("generateDraftThreshold (Site 1)", () => {
   });
 });
 
-describe("generateGuestReviewThreshold (Site 2 review_text)", () => {
-  test("all 3 axes present → confirmed/rich", () => {
-    expect(
-      generateGuestReviewThreshold.evaluate({
-        rule: { tone: "warm", target_keywords: ["clean"] },
-        booking: { guest_name: "Sarah" },
-      }),
-    ).toEqual({ confidence: "confirmed", output_grounding: "rich" });
-  });
-
-  test("missing all axes → active_guess/empty", () => {
-    expect(
-      generateGuestReviewThreshold.evaluate({
-        rule: { tone: "", target_keywords: [] },
-        booking: { guest_name: null },
-      }),
-    ).toEqual({ confidence: "active_guess", output_grounding: "empty" });
-  });
-
-  test("partial axes → high_inference/sparse", () => {
-    expect(
-      generateGuestReviewThreshold.evaluate({
-        rule: { tone: "warm", target_keywords: [] },
-        booking: { guest_name: null },
-      }),
-    ).toEqual({ confidence: "high_inference", output_grounding: "sparse" });
-  });
-});
-
-describe("generatePrivateNoteThreshold (Site 2 private_note)", () => {
-  test("constant active_guess/sparse regardless of inputs", () => {
-    expect(generatePrivateNoteThreshold.evaluate({})).toEqual({
-      confidence: "active_guess",
-      output_grounding: "sparse",
-    });
-  });
-});
+// Site 2 (generateGuestReviewThreshold + generatePrivateNoteThreshold)
+// describe blocks removed M11 Phase A item 3 — catalog entries deleted
+// as cascade of generateGuestReview function removal (superseded by
+// counter-flow Site path; pre-two-sided-model artifact).
 
 describe("generateReviewResponseThreshold (Site 3)", () => {
   test("text + rating both present → confirmed/rich", () => {

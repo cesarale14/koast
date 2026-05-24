@@ -47,7 +47,7 @@ import {
 export const PROMPT_BEARING_FILES: ReadonlyArray<string> = [
   // Call-site prompts: direct output generation. D24 enforces.
   "src/lib/claude/messaging.ts",       // generateDraft system prompt
-  "src/lib/reviews/generator.ts",      // generateGuestReview / -Response / -FromIncoming
+  "src/lib/reviews/generator.ts",      // generateReviewResponse / -FromIncoming
 ];
 
 /**

@@ -15,7 +15,6 @@
  */
 
 import {
-  generateGuestReview,
   generateReviewResponse,
   generateGuestReviewFromIncoming,
 } from "../generator";
@@ -51,84 +50,9 @@ const RULE_RICH = {
   target_keywords: ["clean", "location"],
 };
 
-const RULE_BARE = {
-  tone: "",
-  target_keywords: [],
-};
-
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.ANTHROPIC_API_KEY = "test-key";
-});
-
-// ---- Site 2: generateGuestReview (2 wrapper calls per Q-B3) ----
-
-describe("generateGuestReview — Site 2 (Q-B3: two envelopes per call)", () => {
-  beforeEach(() => {
-    (callLLMWithEnvelope as jest.Mock)
-      .mockResolvedValueOnce({
-        content: "Sarah was a thoughtful guest who kept the place spotless.",
-        confidence: "confirmed",
-        source_attribution: [],
-        output_grounding: "rich",
-      })
-      .mockResolvedValueOnce({
-        content: "Thanks for taking such good care of Villa Jamaica!",
-        confidence: "active_guess",
-        source_attribution: [],
-        output_grounding: "sparse",
-      });
-  });
-
-  test("Phase C parallel return: ReviewResult + envelope_review + envelope_note (Q-B3 two-envelope per SDK call)", async () => {
-    const result = await generateGuestReview(BOOKING, PROPERTY, RULE_RICH);
-
-    expect(result.review_text).toBe(
-      "Sarah was a thoughtful guest who kept the place spotless.",
-    );
-    expect(result.private_note).toBe(
-      "Thanks for taking such good care of Villa Jamaica!",
-    );
-    expect(result.recommended).toBe(true);
-    expect(callLLMWithEnvelope).toHaveBeenCalledTimes(2);
-    expect(result.envelope_review.content).toBe(
-      "Sarah was a thoughtful guest who kept the place spotless.",
-    );
-    expect(result.envelope_review.confidence).toBe("confirmed");
-    expect(result.envelope_note.content).toBe(
-      "Thanks for taking such good care of Villa Jamaica!",
-    );
-    expect(result.envelope_note.confidence).toBe("active_guess");
-  });
-
-  test("first-call envelope: rich rule + named guest → confirmed/rich", async () => {
-    await generateGuestReview(BOOKING, PROPERTY, RULE_RICH);
-
-    const firstCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
-    const envelope = firstCallOpts.buildEnvelope("test text");
-    expect(envelope.confidence).toBe("confirmed");
-    expect(envelope.output_grounding).toBe("rich");
-    expect(envelope.source_attribution).toEqual([]);
-  });
-
-  test("first-call envelope: bare rule + no guest name → active_guess/empty", async () => {
-    const bareBooking = { ...BOOKING, guest_name: null };
-    await generateGuestReview(bareBooking, PROPERTY, RULE_BARE);
-
-    const firstCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[0][1];
-    const envelope = firstCallOpts.buildEnvelope("test text");
-    expect(envelope.confidence).toBe("active_guess");
-    expect(envelope.output_grounding).toBe("empty");
-  });
-
-  test("second-call envelope: private note is active_guess + sparse regardless of rule", async () => {
-    await generateGuestReview(BOOKING, PROPERTY, RULE_RICH);
-
-    const secondCallOpts = (callLLMWithEnvelope as jest.Mock).mock.calls[1][1];
-    const envelope = secondCallOpts.buildEnvelope("Thanks!");
-    expect(envelope.confidence).toBe("active_guess");
-    expect(envelope.output_grounding).toBe("sparse");
-  });
 });
 
 // ---- Site 3: generateReviewResponse ----

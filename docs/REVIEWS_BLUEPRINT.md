@@ -401,7 +401,7 @@ All routes under `src/app/api/reviews/`.
 | `POST /api/reviews/sync` | `sync/route.ts` (38L post-6.7) | Auth required | Calls `syncReviewsForUser()` helper | Upserts `guest_reviews`; stamps `properties.reviews_last_synced_at` per-property on success |
 | `POST /api/reviews/respond/[reviewId]` | `respond/route.ts` (153L) | `verifyReviewOwnership` | Triple-mode: `action='generate'` (default), `action='save_draft'`, `action='approve'` | `approve` calls `client.respondToReview()`; on Channex non-200, NO local mutation. On 200, sets `response_sent`, `published_at`, `status='published'` |
 | `POST /api/reviews/approve/[reviewId]` | `approve/route.ts` (61L) | `verifyReviewOwnership` | Persist edited draft text + `is_bad_review` flag (LEGACY-ish, used for "Mark as bad review" menu action) | Updates `is_bad_review` |
-| `POST /api/reviews/generate/[bookingId]` | `generate/route.ts` (169L) | `verifyBookingOwnership` | LEGACY — generates an outgoing review from a booking (pre-two-sided model). Today the host→guest path goes through the incoming-review counter-review flow (§2.2), so this route is dead but not deleted | Inserts a `direction='outgoing'` row |
+| ~~`POST /api/reviews/generate/[bookingId]`~~ | DELETED M11 Phase A item 3 (route + `generateGuestReview` + `calculatePublishTime` + sufficiency-catalog Site 2 + tests; full §7.7 #6 cascade). Pre-two-sided-model artifact. Host→guest path goes through the incoming-review counter-review flow (§2.2). | — | — |
 | `POST /api/reviews/generate-guest-review/[reviewId]` | `generate-guest-review/route.ts` (89L) | `verifyReviewOwnership` | AI-drafts only the `public_review` text for the host→guest counter-review form. Scores + recommendation are host judgment — never auto-filled | None |
 | `POST /api/reviews/submit-guest-review/[reviewId]` | `submit-guest-review/route.ts` (186L) | `verifyReviewOwnership` | Three-stage submission: lock + Channex POST + ack stamp. Inner+outer rollback. Validation enforced server-side | Stamps `guest_review_submitted_at` then `guest_review_channex_acked_at`; `airbnb_confirmed_at` set later by sync |
 | `POST /api/reviews/[reviewId]/guest-name` | `[reviewId]/guest-name/route.ts` (47L) | `verifyReviewOwnership` | Set/clear manual guest-name override | Updates `guest_name_override` |
@@ -687,12 +687,9 @@ non-goal in §1.3, hosts could end up auto-replying without trust
 calibration. Recommend either deleting the column or commenting it
 out in schema.ts pending an explicit product decision.
 
-### 9.5 `/api/reviews/generate/[bookingId]` is dead code
+### 9.5 `/api/reviews/generate/[bookingId]` — DELETED M11 Phase A item 3
 
-**Severity:** Low. 169L route that creates `direction='outgoing'`
-rows. Pre-two-sided-model artifact. Today only the
-counter-review-on-incoming-row path is wired (§2.2). Remove or
-gate behind a feature flag in a cleanup session.
+**Status:** RESOLVED. Full cascade delete (route + `generateGuestReview` + `calculatePublishTime` + sufficiency-catalog Site 2 entries + their unit tests). Pre-two-sided-model artifact; host→guest path goes through the counter-review-on-incoming-row flow (§2.2). `guest_reviews.ai_context` JSONB column left in place (data-side; separate disposition pass for orphan-write-target column drop).
 
 ### 9.6 No virtualization on the review list
 
@@ -792,8 +789,8 @@ Ordered by priority. Each item is a single session unless noted.
 
 #### T2.5 — Dead code cleanup
 
-- Implements §9.3, §9.4, §9.5.
-- Delete `/api/reviews/generate/[bookingId]`. Gate or delete `auto_publish`. Backfill or filter legacy `direction='outgoing'` rows.
+- Implements §9.3, §9.4, ~~§9.5~~ (§9.5 RESOLVED M11 Phase A item 3).
+- ~~Delete `/api/reviews/generate/[bookingId]`.~~ DONE M11 Phase A item 3. Remaining: Gate or delete `auto_publish`. Backfill or filter legacy `direction='outgoing'` rows.
 - **Size: small** (~2h).
 
 #### T2.6 — Virtualization
@@ -864,7 +861,6 @@ src/app/api/reviews/pending/route.ts              219L
 src/app/api/reviews/sync/route.ts                  38L
 src/app/api/reviews/respond/[reviewId]/route.ts   153L
 src/app/api/reviews/approve/[reviewId]/route.ts    61L
-src/app/api/reviews/generate/[bookingId]/route.ts 169L  (dead — §9.5)
 src/app/api/reviews/generate-guest-review/[reviewId]/route.ts  89L
 src/app/api/reviews/submit-guest-review/[reviewId]/route.ts   186L
 src/app/api/reviews/[reviewId]/guest-name/route.ts 47L
