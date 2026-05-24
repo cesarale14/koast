@@ -117,10 +117,20 @@ export async function POST(request: NextRequest) {
     // this column. Historical drafts have NULL envelope per STEP 6
     // nullable-permanent (M3-outcome-3-family 2nd instance).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // M10 Phase E STEP 8a (G8-E1 fix): draft_status was previously written as
+    // "generated" — all UI consumers (UnifiedInbox PendingDraftBubble render-gate
+    // line 786; approveDraft; discard route) gate on "draft_pending_approval".
+    // Two ai-draft producers disagreed on status for one concept
+    // (messaging_executor.py writes "draft_pending_approval" for the same
+    // lifecycle state). Consequence: envelope-bearing drafts (only this route
+    // writes envelopes) never rendered; Phase D S8 confidence+judge display was
+    // unreachable in production. Unifying on "draft_pending_approval" reaches
+    // the existing consumers without UI changes. Safety-gate (Phase E STEP 8a)
+    // confirmed zero readers of "generated" + zero production rows.
     await (supabase.from("messages") as any)
       .update({
         ai_draft: filteredDraft,
-        draft_status: "generated",
+        draft_status: "draft_pending_approval",
         original_draft_text: draft,
         envelope: filteredEnvelope,
       })

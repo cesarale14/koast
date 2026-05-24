@@ -154,7 +154,9 @@ describe("/api/messages/draft — envelope persistence (M10 Phase D STEP 7)", ()
     const updatePayload = updateMock.mock.calls[0][0];
     expect(updatePayload).toMatchObject({
       ai_draft: generatedEnvelope.content,
-      draft_status: "generated",
+      // M10 Phase E STEP 8a (G8-E1 fix): write the status all UI consumers
+      // gate on. See the dedicated regression-guard test below.
+      draft_status: "draft_pending_approval",
       original_draft_text: generatedEnvelope.content,
       envelope: filteredEnvelope,
     });
@@ -162,5 +164,71 @@ describe("/api/messages/draft — envelope persistence (M10 Phase D STEP 7)", ()
     // the raw generator envelope.
     expect(updatePayload.envelope).toBe(filteredEnvelope);
     expect(updatePayload.envelope.judge_results).toHaveLength(1);
+  });
+
+  test("G8-E1 regression guard: draft_status MUST be 'draft_pending_approval' (the value all UI consumers gate on; not 'generated')", async () => {
+    // M10 Phase E STEP 8a institutional record. The /api/messages/draft route
+    // previously wrote draft_status="generated"; PendingDraftBubble render
+    // (UnifiedInbox.tsx:786), approveDraft, and the discard route all gate on
+    // "draft_pending_approval" — envelope-bearing drafts never reached the UI.
+    // messaging_executor.py (the Python worker that creates template-rendered
+    // drafts) writes "draft_pending_approval" for the same conceptual state.
+    // This test guards against any silent regression to "generated".
+    (getAuthenticatedUser as MockedFn<typeof getAuthenticatedUser>).mockResolvedValue({
+      user: { id: "host-uuid" },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    (
+      verifyPropertyOwnership as MockedFn<typeof verifyPropertyOwnership>
+    ).mockResolvedValue(true);
+
+    const updateMock = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
+    const messageRow = { id: "msg-uuid", property_id: "p", booking_id: null, content: "?", platform: "airbnb", sender_name: "G" };
+    const propertyRow = { name: "Villa", city: "T", bedrooms: 2, bathrooms: 1, max_guests: 4 };
+    const fromMock = jest.fn((table: string) => {
+      if (table === "messages") {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+              limit: jest.fn().mockResolvedValue({ data: [messageRow], error: null }),
+            }),
+          }),
+          update: updateMock,
+        };
+      }
+      if (table === "properties") {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue({ data: [propertyRow], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue({ data: [], error: null }) }), limit: jest.fn().mockResolvedValue({ data: [], error: null }) }) }) };
+    });
+    (createServiceClient as MockedFn<typeof createServiceClient>).mockReturnValue({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      from: fromMock as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    (readVoiceMode as MockedFn<typeof readVoiceMode>).mockResolvedValue(null);
+    (buildVoicePrompt as MockedFn<typeof buildVoicePrompt>).mockReturnValue("");
+    const env = { content: "hi", confidence: "confirmed" as const, source_attribution: [] };
+    (generateDraft as MockedFn<typeof generateDraft>).mockResolvedValue({ content: env.content, envelope: env });
+    (applyOutputJudges as MockedFn<typeof applyOutputJudges>).mockResolvedValue({ finalText: env.content, envelope: env });
+
+    const req = new NextRequest("https://test.koasthq.com/api/messages/draft", {
+      method: "POST",
+      body: JSON.stringify({ messageId: "msg-uuid" }),
+    });
+    await POST(req);
+
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.draft_status).toBe("draft_pending_approval");
+    expect(payload.draft_status).not.toBe("generated");
   });
 });
