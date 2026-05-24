@@ -379,8 +379,10 @@ export const cleaningTasksRelations = relations(cleaningTasks, ({ one }) => ({
 // 20260517030000_drop_review_rules.sql. Review preferences migrated to
 // memory_facts (entity_type='host' + sub_entity_type='reviews'). Helpers
 // at src/lib/memory/review-preferences.ts. Per-property → per-host
-// architectural change per Q-G2 locus shift. Backup table
-// review_rules_backup_phase_g preserves the empty column shape (0 rows).
+// architectural change per Q-G2 locus shift. (M10 Phase G H1: backup
+// table review_rules_backup_phase_g dropped via
+// 20260524010000_drop_review_rules_backup_phase_g.sql — rollback window
+// long expired; zero readers.)
 
 // ==================== Guest Reviews ====================
 
