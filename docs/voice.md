@@ -570,7 +570,7 @@ The "Remove the rule" affordance matters: host-set rules should be visible and r
 
 # Section 5 — Anti-patterns
 
-This section enumerates the patterns Koast must never produce. It's organized by failure mode rather than by surface — the same banned phrase is wrong across all surfaces for the same reason.
+This section enumerates the patterns Koast must never produce. It's organized by failure mode primary (each sub-section names a single failure mode), with per-surface sub-differentiation where surface context legitimately changes the answer — see §5.5 (emoji + exclamation policies that differ across Koast-to-host / Koast-as-publisher / Host-to-guest Mode 1/Mode 2) for the canonical example. Adding a new anti-pattern: follow the same shape — failure-mode primary, per-surface sub-block only when surface context changes the answer (M10 D51).
 
 The list is *additive over time*. When new failure modes surface in production, they get added here. Each entry has the pattern, why it's wrong, and (where useful) the corrected version.
 
@@ -993,6 +993,8 @@ When the doctrine evolves, the change protocol:
 2. Mirror the change to `method/voice-doctrine.md` in the vault (next vault session)
 3. If the change affects system prompt content, regenerate the assembled prompts via `getVoiceDoctrineForAgent()`
 4. Run the existing voice review against affected surfaces — does the output still match the doctrine? If not, update the calling code
+
+**M10-cycle observation (2026-05-24):** no new guest-facing-draft-tone refinements surfaced during the M10 substrate cycle (Phases A-G). Continued accumulation is M11+ as K1 (voice extraction nightly) + L1 (host-trigger generateDraft UI) produce observation data.
 
 ## 6.9 What the doctrine doesn't cover
 
