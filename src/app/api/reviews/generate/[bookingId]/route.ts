@@ -118,8 +118,7 @@ export async function POST(
     // M10 Phase B STEP 6: J1 emoji output-filter applied to review_text
     // (guest-facing). private_note untouched (host-facing internal; would
     // require koast-to-host audience integration deferred per G8-B1).
-    // originalDraftText preserves raw LLM output for trust-inspection;
-    // draftText persists the filtered version.
+    // draftText persists the filtered version (post-J1).
     const { finalText: filteredReviewText, envelope: filteredReviewEnvelope } =
       await applyOutputJudges(
         result.review_text,
@@ -143,10 +142,6 @@ export async function POST(
       propertyId: booking.propertyId,
       direction: "outgoing",
       draftText: filteredReviewText,
-      // M9 Phase E F6 (B3 (a) lock): capture Koast-generated text at
-      // generation time alongside draftText (host may edit draftText
-      // before publish; original stays as-of-generation).
-      originalDraftText: result.review_text,
       privateNote: result.private_note,
       recommendGuest: result.recommended,
       starRating: 5,

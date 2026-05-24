@@ -102,9 +102,8 @@ export async function POST(request: NextRequest) {
     );
 
     // M10 Phase B STEP 6: J1 emoji output-filter applied at route
-    // boundary. original_draft_text below preserves the raw LLM output
-    // (trust-inspection); ai_draft persists the filtered version (what
-    // host will edit + send).
+    // boundary. ai_draft persists the filtered version (what host will
+    // edit + send).
     const { finalText: filteredDraft, envelope: filteredEnvelope } =
       await applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
 

@@ -265,11 +265,6 @@ export const messages = pgTable("messages", {
   // drafts AND template-rendered drafts produced by messaging_executor.py.
   // Values: none | generated | sent | draft_pending_approval | discarded
   draftStatus: text("draft_status").default("none"),
-  // M9 Phase E F6 (B3 (a) lock; migration 20260515220000): captures the
-  // Koast-generated draft text at generation time, distinct from
-  // ai_draft (which may be replaced by host edits in some flows). Source
-  // for voice extraction supersession delta + trust-inspection.
-  originalDraftText: text("original_draft_text"),
   // M10 Phase D STEP 6 (S3): D22 AgentTextOutput envelope per draft.
   // Nullable PERMANENT per phase-d-ultraplan §3.6 (M3-outcome-3-family 2nd
   // instance after notifications.host_id): historical drafts predate envelope
@@ -399,10 +394,6 @@ export const guestReviews = pgTable("guest_reviews", {
   guestName: text("guest_name"),
   draftText: text("draft_text"),
   finalText: text("final_text"),
-  // M9 Phase E F6 (B3 (a) lock; migration 20260515220000): captures
-  // Koast-generated draft (Sites 2-4) at generation time, distinct
-  // from draftText / response_draft which may track host edits.
-  originalDraftText: text("original_draft_text"),
   starRating: integer("star_rating").default(5),
   recommendGuest: boolean("recommend_guest").default(true),
   privateNote: text("private_note"),

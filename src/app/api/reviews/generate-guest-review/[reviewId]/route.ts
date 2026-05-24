@@ -85,8 +85,7 @@ export async function POST(
       }, voicePrompt);
 
       // M10 Phase B STEP 6: J1 emoji output-filter applied to the
-      // guest-facing public_review_draft. original_draft_text below
-      // preserves the raw LLM output for trust-inspection.
+      // guest-facing public_review_draft.
       const { finalText: filteredDraft, envelope: filteredEnvelope } =
         await applyOutputJudges(
           result.public_review_draft,
@@ -95,14 +94,12 @@ export async function POST(
           result.envelope,
         );
 
-      // M9 Phase E F6 (B3 (a) lock): persist Koast-generated public
-      // review draft to guest_reviews.original_draft_text for voice
-      // extraction supersession delta + trust-inspection. UI continues
-      // to consume payload.public_review_draft from the route response.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (reviewTable as any)
-        .update({ original_draft_text: result.public_review_draft })
-        .eq("id", params.reviewId);
+      // M10 Phase E STEP 8e (G8-E3 strip): the original_draft_text persist
+      // here was the sole purpose of a Supabase .update() call against a
+      // phantom column (migration 20260515220000 RECORDED-AND-PARTIALLY-APPLIED;
+      // column never in prod; zero readers anywhere). Whole block deleted —
+      // orphan-write after strip; the user-facing payload (public_review_draft
+      // + envelope) flows via NextResponse.json directly.
 
       return NextResponse.json({
         ...result,

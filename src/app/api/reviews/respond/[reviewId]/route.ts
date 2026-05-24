@@ -163,14 +163,21 @@ export async function POST(
       return NextResponse.json({ error: "Could not generate response" }, { status: 500 });
     }
 
-    // Save as draft only. M9 Phase E F6 (B3 (a) lock): also capture
-    // original_draft_text at generation time. responseEnvelope is null
-    // when path was save_draft/approve (no LLM call); when generate
-    // ran, persist Koast-generated text.
-    await reviewTable.update({
-      response_draft: responseText,
-      ...(responseEnvelope ? { original_draft_text: responseEnvelope.content } : {}),
-    }).eq("id", params.reviewId);
+    // Save as draft only. M10 Phase E STEP 8e (G8-E3 strip): the conditional
+    // original_draft_text key was removed (phantom column; never in prod; zero
+    // readers). .select().single() + error check added per the 8c surface-
+    // failure pattern so any OTHER missing-column / RLS-denial surfaces loudly
+    // as a 500 rather than silently no-opping.
+    const { data: updated, error: updateError } = await reviewTable
+      .update({ response_draft: responseText })
+      .eq("id", params.reviewId)
+      .select()
+      .single();
+    if (updateError || !updated) {
+      throw new Error(
+        `response_draft persist failed: ${updateError?.message ?? "no row returned from UPDATE"}`,
+      );
+    }
 
     return NextResponse.json({
       response_text: responseText,
