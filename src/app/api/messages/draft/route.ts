@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Fetch message
     const { data: msgs } = await supabase
       .from("messages")
-      .select("id, property_id, booking_id, content, platform, sender_name")
+      .select("id, thread_id, property_id, booking_id, content, platform, sender_name")
       .eq("id", messageId)
       .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,35 +108,56 @@ export async function POST(request: NextRequest) {
     const { finalText: filteredDraft, envelope: filteredEnvelope } =
       await applyOutputJudges(draft, "host-to-guest", voiceMode?.mode ?? "neutral", envelope);
 
-    // Save draft to message. M9 Phase E F6 (B3 (a) lock): also capture
-    // original_draft_text alongside ai_draft for voice extraction
-    // supersession delta + trust-inspection.
-    // M10 Phase D STEP 7 (S3): also persist the D22 AgentTextOutput envelope
-    // (post-J1+J2 filteredEnvelope; contains confidence + judge_results +
-    // deferred S3 fields for future Slice). STEP 8 wires UI display to read
-    // this column. Historical drafts have NULL envelope per STEP 6
-    // nullable-permanent (M3-outcome-3-family 2nd instance).
-    // M10 Phase E STEP 8a (G8-E1 fix): draft_status was previously written as
-    // "generated" — all UI consumers (UnifiedInbox PendingDraftBubble render-gate
-    // line 786; approveDraft; discard route) gate on "draft_pending_approval".
-    // Two ai-draft producers disagreed on status for one concept
-    // (messaging_executor.py writes "draft_pending_approval" for the same
-    // lifecycle state). Consequence: envelope-bearing drafts (only this route
-    // writes envelopes) never rendered; Phase D S8 confidence+judge display was
-    // unreachable in production. Unifying on "draft_pending_approval" reaches
-    // the existing consumers without UI changes. Safety-gate (Phase E STEP 8a)
-    // confirmed zero readers of "generated" + zero production rows.
+    // Persist draft. M10 Phase E STEP 8c (G8-E2 fix): INSERT a new outbound
+    // draft row matching messaging_executor.py:319-332 (the working reference
+    // producer). The prior code UPDATEd the inbound message in place — wrong
+    // shape (the draft_status-first render gate at UnifiedInbox.tsx:831 would
+    // replace the guest's bubble with the draft) and silently no-opped in
+    // production (browser-confirmed: target row pristine after multiple 200
+    // POSTs; SELECT-works + UPDATE-zero-rows signature).
+    //
+    // M9 Phase E F6 (B3 (a) lock): original_draft_text alongside ai_draft for
+    // voice extraction supersession delta + trust-inspection.
+    // M10 Phase D STEP 7 (S3): envelope persists the D22 AgentTextOutput
+    // (post-J1+J2 filteredEnvelope: confidence + judge_results + deferred S3
+    // fields). UnifiedInbox PendingDraftBubble reads draft_status +
+    // envelope; both flow through this INSERT.
+    // M10 Phase E STEP 8a (G8-E1): draft_status="draft_pending_approval" is
+    // the value all UI consumers gate on (messaging_executor + this route now
+    // unified on producer-shape + producer-value).
+    //
+    // .select().single() + error check: never ship another silent-200 write.
+    // If the INSERT errors or returns no row, throw → outer try/catch returns
+    // 500. Surfaces RLS / service-role / trigger denials loudly.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from("messages") as any)
-      .update({
+    const { data: inserted, error: insertError } = await (supabase.from("messages") as any)
+      .insert({
+        thread_id: message.thread_id,
+        property_id: message.property_id,
+        booking_id: message.booking_id,
+        platform: message.platform ?? "unknown",
+        direction: "outbound",
+        sender: "property",
+        sender_name: "Host",
+        content: filteredDraft,
         ai_draft: filteredDraft,
-        draft_status: "draft_pending_approval",
         original_draft_text: draft,
+        draft_status: "draft_pending_approval",
         envelope: filteredEnvelope,
       })
-      .eq("id", messageId);
+      .select()
+      .single();
+    if (insertError || !inserted) {
+      throw new Error(
+        `draft persist failed: ${insertError?.message ?? "no row returned from INSERT"}`,
+      );
+    }
 
-    return NextResponse.json({ draft: filteredDraft, messageId, envelope: filteredEnvelope });
+    return NextResponse.json({
+      draft: filteredDraft,
+      messageId: inserted.id,
+      envelope: filteredEnvelope,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[messages/draft] Error:", msg);
