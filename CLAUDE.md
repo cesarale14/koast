@@ -23,11 +23,12 @@ M9 ships under conventions v2.6.
 
 ## M10 Conventions
 
-M10 begins under conventions v2.7.
+M10 shipped under conventions v2.7.
 - Canonical: `decisions/2026-05-19-m10-conventions.md` (vault)
 - Repo mirror: `docs/architecture/agent-loop-v1-milestone-10-conventions.md`
 - Key sections: §1.3 SHAPE 2 + hybrid cluster scheme · §6.11-§6.15 institutional patterns · §7.7 G8 dataset expanded (4 new sub-strata) · §7.8 milestone close + reconciliation amendments · §7.10 phase-close multi-gate including new (f) dual-canonical content-fidelity gate
-- Milestone status: in-progress (Phase A pending)
+- Milestone close: `milestones/M10/M10-close.md` (vault) / `docs/architecture/agent-loop-v1-milestone-10-report.md` (repo)
+- 8 phases A-H closed; 9 tags (m10-phase-{a..h}-close + m10-close); D32-D51 (20 decisions); G8 dataset 5 (A1, B1, E1, E2-multi-layer, E3); test trajectory 665 → 739 (+74). v2.8 conventions deferred to a separate post-M10 pass per §1.1 (timing-tied to deferred J3 LLM-judge runtime per D34 vi).
 
 ## Phase 1 STOP discipline
 
@@ -617,6 +618,12 @@ Ireland VPS (54.220.193.50) runs BTC5MIN MACD+CVD Polymarket bot (`~/BTC5MIN/`),
 - Agent chat shell at `/chat` — property dropdown, SSE streaming, full chat surface (M5, 2026-05-03)
 - Memory recall via `read_memory` tool — agent reads property facts in-conversation (M3, 2026-05-02)
 - Memory writing via `write_memory_fact` gated tool — host-approved property facts persist with full supersession cascade across `agent_artifacts` (lifecycle) and `memory_facts` (data) layers (M6, 2026-05-04, validated end-to-end in production)
+- J1 emoji output-filter + J2 exclamation-cap LLM-judge enforced on `/api/messages/draft` host-to-guest drafts (M10 Phase B; first end-to-end production render at M10 Phase E STEP 8e)
+- J3 constitution-prompt anti-pattern registry SUBSTRATE shipped at `src/lib/agent/patterns/constitution-judge-types.ts` + `src/lib/voice/constitution-anti-patterns.ts` (M10 Phase C); runtime LLM-judge consumer DEFERRED to v2.8/M11 per D34 (vi)
+- K1 voice-extraction nightly cron — Vercel Cron `/api/cron/voice-extraction @ 0 5 * * *` + shared `runExtractionForAllHosts` handler + manual-trigger `/api/voice/extract` (verifyServiceKey-only; D49) (M10 Phase E; Points 1/2/3 confirmed in-milestone; Point 4 next-day-fire-via-Vercel-Cron-Logs operator-attestable; extraction-worker.ts host-filter landmine to fix BEFORE host #2 onboarding)
+- L1 K-button "Draft reply with Koast AI" in Messages thread compose bar (`UnifiedInbox.tsx`) — generates voice-adapted draft via `/api/messages/draft`; renders with Phase D S8 confidence badge + judge_results StatusDot in `PendingDraftBubble` (M10 Phase E STEP 8e; first live envelope display in production)
+- `notifications.host_id` end-to-end (M10 Phase C M3): schema migration (nullable; M3-outcome-3-family nullable-permanent pattern); `storeNotification` threads host_id from 4 `notify*` callers; `unified_audit_feed` 5th source (view migration); SMS → Notifications UI category rename (3 files; settings/capabilities preserved as channel-value)
+- Voice doctrine §5 catalog scope clarified (M10 Phase G D51): failure-mode-organized PRIMARY + per-surface sub-differentiation where surface context changes the answer (canonical example: §5.5 emoji + exclamation policies differing across Koast-to-host / Koast-as-publisher / Host-to-guest Mode 1/2)
 
 ## Known Gaps — Direct Booking Flag
 - **No canonical flag for "direct booking enabled."** `propertyCards[].connectedPlatforms` (Dashboard) should include `'direct'` when a property accepts direct bookings, but the schema has no `direct_booking_enabled` column on `properties` (nor a counterpart on `property_channels`). Session 4 derives `'direct'` only when the legacy `platforms` list already contains `'direct'` — which happens today only via an obscure Channex mapping path. Real implementation: add a boolean column (`properties.direct_booking_enabled`), surface a toggle in Property Settings, and update the Dashboard derivation to read it.
