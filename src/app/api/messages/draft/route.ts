@@ -116,7 +116,6 @@ export async function POST(request: NextRequest) {
     // deferred S3 fields for future Slice). STEP 8 wires UI display to read
     // this column. Historical drafts have NULL envelope per STEP 6
     // nullable-permanent (M3-outcome-3-family 2nd instance).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // M10 Phase E STEP 8a (G8-E1 fix): draft_status was previously written as
     // "generated" — all UI consumers (UnifiedInbox PendingDraftBubble render-gate
     // line 786; approveDraft; discard route) gate on "draft_pending_approval".
@@ -127,6 +126,7 @@ export async function POST(request: NextRequest) {
     // unreachable in production. Unifying on "draft_pending_approval" reaches
     // the existing consumers without UI changes. Safety-gate (Phase E STEP 8a)
     // confirmed zero readers of "generated" + zero production rows.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("messages") as any)
       .update({
         ai_draft: filteredDraft,
