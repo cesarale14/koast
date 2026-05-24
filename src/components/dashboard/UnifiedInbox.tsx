@@ -22,7 +22,9 @@
 //   - 'reservation_request' → amber badge "Reservation request"
 //   - 'message' → no badge (default)
 //
-// The Koast-AI "K" button stays disabled (slice 3 wires AI drafts).
+// The Koast-AI "K" button generates a voice-adapted AI draft for the latest
+// inbound message in the thread (M10 Phase E STEP 8b / L1; calls
+// /api/messages/draft → PendingDraftBubble renders with Phase D S8 envelope).
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
@@ -197,6 +199,10 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
   // send button to prevent double-submit (paired with the route-level
   // in-flight dedup).
   const [sending, setSending] = useState(false);
+  // M10 Phase E STEP 8b (L1): K-button generateDraft in-flight gate. Mirrors
+  // `sending` pattern — prevents double-click on the AI-draft trigger while a
+  // draft generation is in flight.
+  const [drafting, setDrafting] = useState(false);
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [mounted, setMounted] = useState(false);
@@ -420,6 +426,43 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
     void sendMessage(failedMsg.content, failedMsg.__optimistic.clientId);
   }, [sendMessage]);
 
+  // M10 Phase E STEP 8b (L1): K-button onClick. Generates a voice-adapted AI
+  // draft for the latest inbound message in the active thread, then re-fetches
+  // the thread so the persisted PendingDraftBubble (envelope + confidence
+  // badge per Phase D S8) renders. Reaches the existing UI consumers via
+  // draft_status="draft_pending_approval" (STEP 8a G8-E1 fix). No toast import
+  // in this file; errors go to console.warn matching the mark-read failure
+  // pattern. Inline error UX is a v2.8 candidate for user-triggered actions.
+  const handleGenerateDraft = useCallback(async () => {
+    if (!activeId || drafting) return;
+    const latestInbound = [...activeMessages]
+      .reverse()
+      .find((m) => m.direction === "inbound");
+    if (!latestInbound) return;
+    setDrafting(true);
+    try {
+      const res = await fetch("/api/messages/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: latestInbound.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      // Re-fetch the thread so the just-persisted draft (envelope + confidence)
+      // renders via PendingDraftBubble. Mirrors the line-237 thread fetch shape.
+      const fresh = await fetch(`/api/messages/threads/${activeId}`).then((r) => r.json());
+      setActiveMessages((fresh?.messages ?? []) as MessageRow[]);
+      setActiveContext((fresh?.context ?? null) as ConversationContext | null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[UnifiedInbox] generate-draft failed:", msg);
+    } finally {
+      setDrafting(false);
+    }
+  }, [activeId, drafting, activeMessages]);
+
   return (
     <div className="flex h-full bg-white" style={{ borderTop: "1px solid var(--dry-sand)" }}>
       <style jsx global>{`
@@ -452,6 +495,8 @@ export default function UnifiedInbox({ threads: initialThreads, properties }: Un
         onApproveDraft={approveDraft}
         onDiscardDraft={discardDraft}
         sending={sending}
+        drafting={drafting}
+        onGenerateDraft={handleGenerateDraft}
         onBack={() => setActiveId(null)}
       />
 
@@ -663,7 +708,7 @@ function ConversationItem({ t, active, index, onSelect }: {
 
 function ThreadColumn({
   thread, messages, context, loading, threadScrollRef, mounted,
-  composer, setComposer, onSend, onRetry, onApproveDraft, onDiscardDraft, sending, onBack,
+  composer, setComposer, onSend, onRetry, onApproveDraft, onDiscardDraft, sending, drafting, onGenerateDraft, onBack,
 }: {
   thread: ThreadRow | null;
   messages: MessageRow[];
@@ -678,6 +723,8 @@ function ThreadColumn({
   onApproveDraft: (msg: MessageRow) => void;
   onDiscardDraft: (msg: MessageRow) => void;
   sending: boolean;
+  drafting: boolean;
+  onGenerateDraft: () => void;
   onBack: () => void;
 }) {
   const messagesByDay = useMemo(() => {
@@ -807,19 +854,45 @@ function ThreadColumn({
       {/* Compose bar — slice 2. Optimistic UI; failures surface inline on the bubble (see MessageBubble). */}
       <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid var(--dry-sand)" }}>
         <div className="px-4 py-3 flex items-end gap-2">
-          <button type="button" disabled
-            className="flex items-center justify-center flex-shrink-0 self-center"
-            style={{
-              width: 40, height: 40, borderRadius: "50%",
-              background: "linear-gradient(135deg, var(--golden), #a87d3a)",
-              color: "var(--deep-sea)", fontWeight: 800, fontSize: 15,
-              opacity: 0.45, cursor: "not-allowed",
-              boxShadow: "0 2px 8px rgba(196,154,90,0.25)",
-            }}
-            title="Koast AI — coming in slice 3"
-          >
-            K
-          </button>
+          {(() => {
+            // M10 Phase E STEP 8b (L1): Koast-AI draft trigger. Enabled when an
+            // inbound message is present in the thread and no draft generation
+            // is in flight. POST → /api/messages/draft (writes draft_status
+            // "draft_pending_approval" + envelope per STEP 8a + Phase D S7); on
+            // success, parent re-fetches the thread so PendingDraftBubble
+            // renders with the confidence badge (Phase D S8).
+            const latestInbound = [...messages]
+              .reverse()
+              .find((m) => m.direction === "inbound");
+            const canDraft = !drafting && !!latestInbound;
+            return (
+              <button
+                type="button"
+                onClick={onGenerateDraft}
+                disabled={!canDraft}
+                className="flex items-center justify-center flex-shrink-0 self-center transition-opacity"
+                style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: "linear-gradient(135deg, var(--golden), #a87d3a)",
+                  color: "var(--deep-sea)", fontWeight: 800, fontSize: 15,
+                  opacity: drafting ? 0.65 : canDraft ? 1 : 0.45,
+                  cursor: canDraft ? "pointer" : "not-allowed",
+                  boxShadow: "0 2px 8px rgba(196,154,90,0.25)",
+                }}
+                title={
+                  drafting
+                    ? "Drafting reply…"
+                    : latestInbound
+                      ? "Draft reply with Koast AI"
+                      : "No incoming message to draft a reply for"
+                }
+                aria-label={drafting ? "Drafting reply with Koast AI" : "Draft reply with Koast AI"}
+                aria-busy={drafting}
+              >
+                {drafting ? "…" : "K"}
+              </button>
+            );
+          })()}
           <textarea
             value={composer}
             onChange={(e) => setComposer(e.target.value)}
