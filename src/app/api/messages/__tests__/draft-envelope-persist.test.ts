@@ -9,9 +9,11 @@
  *    fixed at STEP 8c).
  *  - Payload includes thread_id + property_id + booking_id from the inbound
  *    message; direction='outbound'; sender='property'; sender_name='Host';
- *    content+ai_draft=filteredDraft; original_draft_text=raw generator output
- *    (B3 (a) lock); draft_status='draft_pending_approval' (G8-E1 unified
- *    producer-value); envelope=filteredEnvelope (Phase D S7 D22 envelope).
+ *    content+ai_draft=filteredDraft; draft_status='draft_pending_approval'
+ *    (G8-E1 unified producer-value); envelope=filteredEnvelope (Phase D S7
+ *    D22 envelope). STEP 8d dropped original_draft_text — phantom column not
+ *    in production (schema.ts ↔ prod drift, migration 20260515220000 unapplied;
+ *    zero readers across the codebase).
  *  - .select().single() error/empty surfaces as 500 (G8-E2 surface-failure
  *    guard — never ship another silent-200 write).
  *
@@ -175,7 +177,6 @@ describe("/api/messages/draft — INSERT-outbound persistence (M10 Phase E STEP 
       sender_name: "Host",
       content: generatedEnvelope.content,
       ai_draft: generatedEnvelope.content,
-      original_draft_text: generatedEnvelope.content,
       // G8-E1 unified producer-value (UnifiedInbox.tsx:831 render gate +
       // discard route + approveDraft all gate on this value).
       draft_status: "draft_pending_approval",
@@ -184,6 +185,11 @@ describe("/api/messages/draft — INSERT-outbound persistence (M10 Phase E STEP 
     });
     expect(payload.envelope).toBe(filteredEnvelope);
     expect(payload.envelope.judge_results).toHaveLength(1);
+    // STEP 8d (G8-E2 root cause) regression guard: original_draft_text MUST
+    // NOT be in the payload (phantom column; not in production messages
+    // schema; would re-introduce the silent-fail-pre-8c bug under any future
+    // surface-failure-guard removal).
+    expect(payload).not.toHaveProperty("original_draft_text");
 
     // Response surfaces the new row's id (handler re-fetches the thread; the
     // new row appears alongside the inbound via the thread fetch).

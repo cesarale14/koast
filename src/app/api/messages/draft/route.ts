@@ -116,8 +116,17 @@ export async function POST(request: NextRequest) {
     // production (browser-confirmed: target row pristine after multiple 200
     // POSTs; SELECT-works + UPDATE-zero-rows signature).
     //
-    // M9 Phase E F6 (B3 (a) lock): original_draft_text alongside ai_draft for
-    // voice extraction supersession delta + trust-inspection.
+    // M10 Phase E STEP 8d (G8-E2 root cause): original_draft_text was the
+    // phantom-column trigger — declared in schema.ts:263 but never migrated to
+    // production messages (migration 20260515220000_voice_substrate.sql did
+    // not apply to prod). Every write of this route since inception named the
+    // phantom column → Supabase REST returned "Could not find column" →
+    // silent-fail (pre-8c .select().single() guard). Dropped from the INSERT
+    // here. NOT adding a migration for an unread column (§7.7 uninstantiated-
+    // mechanism: zero readers across the codebase). v2.8 candidate: schema.ts
+    // ↔ production-DB parity check for Supabase-client write paths (Drizzle
+    // queries don't exercise this column so the drift was invisible).
+    //
     // M10 Phase D STEP 7 (S3): envelope persists the D22 AgentTextOutput
     // (post-J1+J2 filteredEnvelope: confidence + judge_results + deferred S3
     // fields). UnifiedInbox PendingDraftBubble reads draft_status +
@@ -141,7 +150,6 @@ export async function POST(request: NextRequest) {
         sender_name: "Host",
         content: filteredDraft,
         ai_draft: filteredDraft,
-        original_draft_text: draft,
         draft_status: "draft_pending_approval",
         envelope: filteredEnvelope,
       })
