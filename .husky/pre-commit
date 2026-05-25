@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Pre-commit gate: lint only. Full project scope.
+# tsc + jest defer to CI — both exceed pre-commit budget on this codebase
+# (tsc ~87s warm-cache, jest ~90s; lint ~28s is the achievable-cost gate).
+# Lint catches the class that breaks Vercel builds (unused vars per CLAUDE.md).
+# Bypass with --no-verify only when investigating; not as routine.
+
+echo "[pre-commit] next lint"
+npm run lint || exit 1
+
+echo "[pre-commit] gate passed"
