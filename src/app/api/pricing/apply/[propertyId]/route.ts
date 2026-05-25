@@ -249,11 +249,7 @@ export async function POST(
             dateFrom,
             dateTo,
           });
-          // Defensive: only set if the helper returned a real Map (auto-mock
-          // in tests may return undefined; runtime check keeps the loop safe).
-          if (stateMap instanceof Map) {
-            nonBdcPriorStates.set(t.channel, stateMap);
-          }
+          nonBdcPriorStates.set(t.channel, stateMap);
         } catch (preflightErr) {
           // Pre-flight failure is non-fatal — the push proceeds without
           // captured prior_state for this channel; affected dates won't be

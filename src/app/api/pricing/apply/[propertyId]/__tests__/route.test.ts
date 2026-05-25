@@ -30,7 +30,17 @@ jest.mock("@/lib/supabase/service");
 jest.mock("@/lib/channex/client");
 jest.mock("@/lib/concurrency/locks");
 jest.mock("@/lib/channex/calendar-push-gate");
-jest.mock("@/lib/channex/safe-restrictions");
+// M11 Phase C item 1 (M2) follow-up — factory mock returns proper shapes
+// so the route's non-BDC pre-flight + payload assembly works without
+// production-side defensive instanceof guards. Empty Map / empty array
+// return values match what the real helpers return for an empty/non-
+// matching plan state.
+jest.mock("@/lib/channex/safe-restrictions", () => ({
+  buildSafeBdcRestrictions: jest.fn(),
+  fetchCurrentChannelState: jest.fn().mockResolvedValue(new Map()),
+  priorStateFromBdcPlan: jest.fn().mockReturnValue([]),
+  toChannexRestrictionValues: jest.fn().mockReturnValue([]),
+}));
 
 import {
   getAuthenticatedUser,

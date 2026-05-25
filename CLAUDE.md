@@ -682,7 +682,7 @@ Open carry-forwards:
 - **Revenue chart data query** — canvas chart exists; daily revenue aggregation from `bookings` needs fixing. Currently shows empty state.
 - **Dashboard greeting** — may still show auth username instead of display name on some paths.
 - **Channel health monitoring** — no `channel_health` table, no 5-minute worker, no disconnect alert banners.
-- **Auto-apply pricing** — toggle dimmed ("Coming soon"). Unlock after ≥14 days of validation data.
+- **Auto-apply pricing** — toggle dimmed ("Coming soon"). Unlock after ≥14 days of validation data. **Forward contract with M11 Phase C M2 rate-push revert:** when auto-apply ships, it must respect the revert contract — apply was host-initiated, and revert returns the host's choice to the prior state. Auto-apply must either (a) skip dates that were recently reverted (by reading `agent_audit_log.context.reverted_at` against the property's recent pricing_apply rows), OR (b) explicitly notify when re-pushing (e.g. "Auto-apply pushed $250 on dates where you previously reverted $200"). Silent re-clobber of a host-reverted rate would make the M2 revert feature cosmetic. M2's contract is "host's last expressed intent for this date is canonical until they choose otherwise"; auto-apply's design must respect that. See `~/koast-vault/milestones/M11/items/phase-c.md` for the M2 disposition record.
 - **Airbnb OAuth** — connected as of 2026-04-22 (re-verified MSG-S2-PRE 2026-04-26). See the "Active Properties" Airbnb OAuth note above for the canonical state.
 - **Google OAuth** — button on login, needs Supabase Google-provider config.
 
