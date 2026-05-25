@@ -130,6 +130,8 @@ export default function SettingsPage() {
   // Export
   const [exportingJson, setExportingJson] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  // M11 Phase D item 1 (M4): memory export.
+  const [exportingMemory, setExportingMemory] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -283,6 +285,35 @@ export default function SettingsPage() {
       toast("Export failed", "error");
     }
     setExportingJson(false);
+  };
+
+  // M11 Phase D item 1 (M4): memory export. Calls the dedicated
+  // /api/memory/export endpoint which derives hostId from the
+  // authenticated session ONLY (hard-floor cross-host isolation
+  // invariant). Returns JSON with Content-Disposition: attachment;
+  // browser handles the download.
+  const handleExportMemory = async () => {
+    setExportingMemory(true);
+    try {
+      const res = await fetch("/api/memory/export", { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        toast(body.error ?? "Memory export failed", "error");
+        setExportingMemory(false);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `koast-memory-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Memory exported");
+    } catch {
+      toast("Memory export failed", "error");
+    }
+    setExportingMemory(false);
   };
 
   const handleExportCsv = async () => {
@@ -715,6 +746,13 @@ export default function SettingsPage() {
             className="h-9 px-4 text-sm font-medium text-neutral-700 border border-[var(--border)] hover:border-neutral-300 rounded-lg transition-colors disabled:opacity-50"
           >
             {exportingCsv ? "Exporting..." : "Export Bookings (CSV)"}
+          </button>
+          <button
+            onClick={handleExportMemory}
+            disabled={exportingMemory}
+            className="h-9 px-4 text-sm font-medium text-neutral-700 border border-[var(--border)] hover:border-neutral-300 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {exportingMemory ? "Exporting..." : "Export Memory (JSON)"}
           </button>
         </div>
       </SectionCard>
