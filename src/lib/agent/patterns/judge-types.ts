@@ -27,8 +27,23 @@ export type JudgeVerdict = "pass" | "fail";
  * call-sites; misspellings caught at compile time. STEP 5 ships
  * emoji_policy (J1); STEP 7 adds exclamation_cap (J2 deterministic
  * count-prefilter); STEP 8 wires Haiku semantic rescue under the same
- * judge_id. v2.8 expands per Decision (d) partial scope iii-vi roadmap. */
-export type JudgeId = "emoji_policy" | "exclamation_cap";
+ * judge_id. v2.8 expands per Decision (d) partial scope iii-vi roadmap.
+ *
+ * M12 Phase B J3 expansion (Q8 sign-off): full iii-vi enum added upfront
+ * to prevent Phase D rollout enum-grow churn. Only ensure_verb_chain is
+ * RUNTIME-ACTIVE at Phase B ship; the other 5 are reserved IDs whose
+ * runtime activation happens during Phase D iii-vi rollout. Reserved IDs
+ * preserve type-checking consistency across the dispatch + Zod schema
+ * boundary without requiring per-stub-activation enum amendment. */
+export type JudgeId =
+  | "emoji_policy"               // J1 (M10 Phase B; emoji-strip output-filter)
+  | "exclamation_cap"            // J2 (M10 Phase B; count-prefilter + Haiku rescue)
+  | "ensure_verb_chain"          // J3 iii (M12 Phase B ACTIVATED — §5.6 verb-chain)
+  | "filler"                     // J3 iv-a reserved (Phase D iii-vi rollout)
+  | "self_narration"             // J3 iv-b reserved
+  | "performative_thoroughness"  // J3 iv-c reserved
+  | "voice_doctrine_self_scan"   // J3 v reserved
+  | "constitution_prompt_quote_vs_instance";  // J3 vi reserved
 
 /** Audience axis (orthogonal to voice_mode per phase-b-ultraplan §2.1).
  * Determined per-route, not per-host. Shared across all judges that
@@ -39,10 +54,21 @@ export type Audience = "koast-to-host" | "host-to-guest";
  *  src/lib/agent/schemas/agent-text-output.ts. Schema mirrors the
  *  JudgeResult interface; both stay in lock-step as JudgeId expands. */
 export const JudgeResultSchema = z.object({
-  // STEP 7 widens from STEP 6's z.literal('emoji_policy') now that the
-  // catalog has ≥2 entries — Zod's z.enum tuple-arity requirement is now
-  // satisfied (cf. STEP 6 phase-b-step6 commit body sidestep note).
-  judge_id: z.enum(["emoji_policy", "exclamation_cap"]),
+  // M12 Phase B (J3): enum widened to full 8-ID catalog. ensure_verb_chain
+  // is runtime-active at Phase B; filler / self_narration /
+  // performative_thoroughness / voice_doctrine_self_scan /
+  // constitution_prompt_quote_vs_instance are reserved IDs awaiting
+  // Phase D iii-vi rollout (Q8 sign-off — upfront enum prevents churn).
+  judge_id: z.enum([
+    "emoji_policy",
+    "exclamation_cap",
+    "ensure_verb_chain",
+    "filler",
+    "self_narration",
+    "performative_thoroughness",
+    "voice_doctrine_self_scan",
+    "constitution_prompt_quote_vs_instance",
+  ]),
   verdict: z.union([z.literal("pass"), z.literal("fail")]),
   reason: z.string().min(1),
   confidence: z.number().min(0).max(1),

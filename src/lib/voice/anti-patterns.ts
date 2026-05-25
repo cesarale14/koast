@@ -49,6 +49,16 @@ export type DeferredAntiPatternStub = {
   doctrine_section: string;
   rationale_for_deferral: string;
   planned_layer: "llm-judge" | "output-filter";
+  /** M12 Phase B (J3) addition: stubs that have transitioned from
+   *  documented-deferral to runtime-active. The stub id stays as the
+   *  catalog historical record; runtime_active=true + judge_id together
+   *  signal "this stub now has a live consumer at applyOutputJudges
+   *  dispatch." */
+  runtime_active?: boolean;
+  /** When runtime_active, the dispatching JudgeId (mirrors judge-types.ts
+   *  union). Kept as string here to avoid a cross-module type import in
+   *  the voice catalog; the union enforcement lives at the dispatch site. */
+  judge_id?: string;
 };
 
 // Helper: produce a PatternEntry.description from the voice-specific fields
@@ -537,6 +547,13 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "Doctrine names 'ensure with abstract objects' as a heuristic, not a literal phrase. Shape regex would false-positive legitimate uses of 'ensure' with concrete objects. Judge layer can read the object's concreteness.",
     planned_layer: "llm-judge",
+    // M12 Phase B (J3 LLM-judge runtime) — TRANSITIONED to runtime-active.
+    // Catalog id preserved for historical record (the stub WAS deferred
+    // at M10 Phase B); runtime_active + judge_id signal the live consumer
+    // at src/lib/agent/judge/ensure-verb-chain.ts dispatched via
+    // applyOutputJudges. Audience scope at Phase B: host-to-guest only.
+    runtime_active: true,
+    judge_id: "ensure_verb_chain",
   },
   {
     id: "deferred_5_7_filler",
