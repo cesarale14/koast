@@ -89,6 +89,18 @@ deferred to CF #30 — that locus designation is itself a decision.
   require: (a) Phase 1 STOP surfacing, (b) explicit decision in conventions
   doc, (c) cost/benefit named (what does this dep give us? what's the
   alternative without it?).
+- **Verify foundational edits via grep, don't trust Edit success messages.**
+  M11 Phase C item 1 surfaced a case where the Edit tool reported success
+  but the file was unchanged — caught only by independent `git diff` /
+  `grep` after the fact. Same epistemic shape as §3.4 spec-vs-reality
+  falsifications (claimed state diverging from actual state, surfaced only
+  by independent verification). Applies to every edit, not just one phase:
+  for changes that other code depends on at compile/test time, the
+  downstream tsc/test failure surfaces the discrepancy; for changes that
+  DON'T have a downstream gate (CLAUDE.md, docs, comment-only edits,
+  config additions), independently verify the change landed via `grep` /
+  `git diff` before moving on. The Edit tool's success message is
+  necessary but not sufficient evidence of the change.
 
 ## Commit format
 
