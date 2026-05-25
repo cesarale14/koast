@@ -49,7 +49,10 @@ import {
 } from "@/lib/channex/calendar-push-gate";
 import {
   buildSafeBdcRestrictions,
+  fetchCurrentChannelState,
+  priorStateFromBdcPlan,
   toChannexRestrictionValues,
+  type CapturedPriorState,
   type KoastRestrictionProposal,
   type SafeRestrictionPlan,
 } from "@/lib/channex/safe-restrictions";
@@ -228,6 +231,38 @@ export async function POST(
       // here; applying a rec is a per-channel action.
       const appliedAt = new Date().toISOString();
       const calendarRateUpserts: Array<Record<string, unknown>> = [];
+
+      // M11 Phase C item 1 (M2) — pre-flight state capture for non-BDC
+      // channels. BDC pre-flight already happens inside buildSafeBdcRestrictions
+      // (and its rate_changes/min_stay_changes surface the prior state via
+      // priorStateFromBdcPlan). Non-BDC's direct-push path doesn't read first,
+      // so capture explicitly here for symmetric revert precision.
+      const nonBdcPriorStates = new Map<string, Map<string, CapturedPriorState>>();
+      for (const t of targets) {
+        if (isBdcChannelCode(t.channel)) continue;
+        try {
+          const stateMap = await fetchCurrentChannelState({
+            channex,
+            channexPropertyId,
+            ratePlanId: t.id,
+            channel: t.channel,
+            dateFrom,
+            dateTo,
+          });
+          // Defensive: only set if the helper returned a real Map (auto-mock
+          // in tests may return undefined; runtime check keeps the loop safe).
+          if (stateMap instanceof Map) {
+            nonBdcPriorStates.set(t.channel, stateMap);
+          }
+        } catch (preflightErr) {
+          // Pre-flight failure is non-fatal — the push proceeds without
+          // captured prior_state for this channel; affected dates won't be
+          // listed in payload.prior_state so the AuditDrawer renders them
+          // as non-revertable. Apply itself remains correct.
+          const msg = preflightErr instanceof Error ? preflightErr.message : String(preflightErr);
+          console.warn(`[pricing/apply ${t.channel}] prior-state pre-flight failed (revert capture skipped): ${msg}`);
+        }
+      }
 
       // Per-target push loop. Each target = one Channex rate plan = one
       // platform (BDC, ABB, etc.). BDC runs through safe-restrictions;
@@ -423,6 +458,36 @@ export async function POST(
           ),
         ).map(channelSlugFor);
         const partialFailure = failedBatches.length > 0;
+
+        // M11 Phase C item 1 (M2) — assemble priorState across successful
+        // (date, channel) pushes for revert precision. BDC: read from each
+        // plan via priorStateFromBdcPlan (rate_changes + min_stay_changes
+        // already capture the from-state). Non-BDC: read from the pre-flight
+        // map (only present for channels whose pre-flight succeeded).
+        const priorStateEntries: CapturedPriorState[] = [];
+        // BDC contributions
+        for (const bdcPlan of bdcPlans) {
+          const successfulBdcDates = new Set<string>();
+          for (const [date, channels] of Array.from(successByDate.entries())) {
+            if (channels.has(bdcPlan.channel)) successfulBdcDates.add(date);
+          }
+          priorStateEntries.push(
+            ...priorStateFromBdcPlan(bdcPlan.plan, bdcPlan.channel, successfulBdcDates),
+          );
+        }
+        // Non-BDC contributions
+        for (const [channel, stateMap] of Array.from(nonBdcPriorStates.entries())) {
+          for (const [date, channels] of Array.from(successByDate.entries())) {
+            if (!channels.has(channel)) continue;
+            const prior = stateMap.get(date);
+            if (!prior) continue;
+            // Only emit if there's something to revert (rate or min_stay
+            // was non-null pre-push).
+            if (prior.rate === null && prior.min_stay_arrival === null) continue;
+            priorStateEntries.push(prior);
+          }
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: auditErr } = await (supabase.from("agent_audit_log") as any)
           .insert({
@@ -439,6 +504,11 @@ export async function POST(
               applied_count: appliedRecIds.length,
               channels_pushed: successfulChannels,
               recommendation_ids: appliedRecIds,
+              // M11 Phase C item 1 (M2): prior_state for revert. Only
+              // dates+channels that actually pushed AND had a non-null
+              // pre-state field are listed. Empty array allowed (no
+              // revertable dates → no revert button).
+              prior_state: priorStateEntries,
               ...(partialFailure && {
                 partial_failure: true,
                 failed_batches: failedBatches,

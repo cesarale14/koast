@@ -328,3 +328,99 @@ export function toChannexRestrictionValues(
     return out;
   });
 }
+
+// ---- M11 Phase C item 1 (M2) — pre-flight state capture for revert ----
+
+/**
+ * Per-date prior state captured before a pricing/apply push. Used to
+ * persist into agent_audit_log.payload.prior_state so a future revert
+ * has a precise target. Channel-agnostic shape; populated by both the
+ * BDC path (from SafeRestrictionPlan rate_changes/min_stay_changes) and
+ * the non-BDC path (from fetchCurrentChannelState).
+ */
+export type CapturedPriorState = {
+  date: string;
+  channel: string;
+  /** Prior rate in DOLLARS; null if it was unset on the channel. */
+  rate: number | null;
+  min_stay_arrival: number | null;
+};
+
+/**
+ * Read current per-date state for a rate plan via Channex. Thin wrapper
+ * around getRestrictionsBucketed that normalizes the result to the
+ * CapturedPriorState shape needed for revert prior_state capture.
+ *
+ * Used by the non-BDC apply path (BDC pre-flight already lives inside
+ * buildSafeBdcRestrictions and surfaces via plan.rate_changes/min_stay_changes).
+ * Caller passes the channel code so the captured state carries channel
+ * lineage for symmetric multi-channel revert.
+ */
+export async function fetchCurrentChannelState(opts: {
+  channex: ChannexClient;
+  channexPropertyId: string;
+  ratePlanId: string;
+  channel: string;
+  dateFrom: string;
+  dateTo: string;
+}): Promise<Map<string, CapturedPriorState>> {
+  const bucketed = await opts.channex.getRestrictionsBucketed(
+    opts.channexPropertyId,
+    opts.dateFrom,
+    opts.dateTo,
+    ["rate", "min_stay_arrival"],
+  );
+  const planState = bucketed[opts.ratePlanId] ?? {};
+  const out = new Map<string, CapturedPriorState>();
+  for (const [date, stateRaw] of Object.entries(planState)) {
+    const state = stateRaw as { rate?: string; min_stay_arrival?: number };
+    const rateStr = state.rate;
+    const rateNum =
+      typeof rateStr === "string" && rateStr !== "" ? Number(rateStr) : null;
+    // Same "0 == unset" treatment as buildSafeBdcRestrictions.
+    const rate =
+      rateNum != null && Number.isFinite(rateNum) && rateNum > 0 ? rateNum : null;
+    out.set(date, {
+      date,
+      channel: opts.channel,
+      rate,
+      min_stay_arrival:
+        typeof state.min_stay_arrival === "number" ? state.min_stay_arrival : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Build a prior_state array from a successful BDC apply, sourced from
+ * the SafeRestrictionPlan's rate_changes / min_stay_changes (already
+ * populated during the pre-flight read). Combined with the per-date
+ * channel-success Map, returns only entries that actually pushed
+ * successfully (matches the apply path's partial-failure semantics).
+ *
+ * @param plan The SafeRestrictionPlan returned by buildSafeBdcRestrictions
+ * @param channel The channel code (e.g. 'BDC')
+ * @param successfulDates Set of date strings that successfully pushed
+ *   for this channel (subset of plan.entries_to_push dates).
+ */
+export function priorStateFromBdcPlan(
+  plan: SafeRestrictionPlan,
+  channel: string,
+  successfulDates: Set<string>,
+): CapturedPriorState[] {
+  // Index rate_changes / min_stay_changes by date for O(1) lookup.
+  const rateFromByDate = new Map<string, number>();
+  for (const rc of plan.rate_changes) rateFromByDate.set(rc.date, rc.from);
+  const minStayFromByDate = new Map<string, number | null>();
+  for (const mc of plan.min_stay_changes) minStayFromByDate.set(mc.date, mc.from);
+
+  const out: CapturedPriorState[] = [];
+  for (const date of Array.from(successfulDates)) {
+    const rate = rateFromByDate.get(date) ?? null;
+    const minStay = minStayFromByDate.get(date) ?? null;
+    // Only emit if at least one field changed (otherwise nothing to revert).
+    if (rate === null && minStay === null) continue;
+    out.push({ date, channel, rate, min_stay_arrival: minStay });
+  }
+  return out;
+}

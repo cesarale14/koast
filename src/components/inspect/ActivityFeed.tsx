@@ -12,6 +12,9 @@ type Props = {
   loading: boolean;
   error: string | null;
   onLoadMore: () => void;
+  /** M11 Phase C item 1 (M2): forwarded to per-event Revert controls.
+   *  Called after a successful revert so the parent can refresh. */
+  onRevertSuccess?: () => void;
 };
 
 export function ActivityFeed({
@@ -21,6 +24,7 @@ export function ActivityFeed({
   loading,
   error,
   onLoadMore,
+  onRevertSuccess,
 }: Props) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -56,6 +60,7 @@ export function ActivityFeed({
           <ActivityEvent
             key={`${event.source_table}:${event.source_id}`}
             event={event}
+            onRevertSuccess={onRevertSuccess}
           />
         ))}
       </div>

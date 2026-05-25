@@ -44,6 +44,11 @@ const stakesMap: Map<ActionType, StakesClass> = new Map([
   // constructively (writes the agent_artifacts row, returns proposal
   // output to the model).
   ["write_memory_fact", "medium"],
+  // M11 Phase C item 1 (M2) — host-direct revert of a prior pricing_apply.
+  // medium-stakes (mirrors pricing.apply user-visible side effects);
+  // substrate gates to require_confirmation; the host's UI click in
+  // AuditDrawer is the confirmation (inline, not artifact-mediated).
+  ["revert_rate_push", "medium"],
 ]);
 
 /**

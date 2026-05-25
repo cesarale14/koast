@@ -156,6 +156,30 @@ export function AuditDrawer({ open, onClose, onMarkSeen }: Props) {
       });
   }, [state.loading, state.nextCursor, fetchPage]);
 
+  // M11 Phase C item 1 (M2): after a successful revert, re-fetch the
+  // first page so the reverted row re-renders with the "Reverted" label
+  // and the new revert audit row shows alongside.
+  const onRevertSuccess = useCallback(() => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    fetchPage(null)
+      .then((data) => {
+        setState({
+          events: data.events,
+          nextCursor: data.next_cursor,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setState((s) => ({
+          ...s,
+          loading: false,
+          error: "Revert succeeded but the feed didn't refresh. Close and re-open the drawer.",
+        }));
+      });
+  }, [fetchPage]);
+
   if (!open) return null;
 
   return (
@@ -261,6 +285,7 @@ export function AuditDrawer({ open, onClose, onMarkSeen }: Props) {
               loading={state.loading}
               error={null}
               onLoadMore={onLoadMore}
+              onRevertSuccess={onRevertSuccess}
             />
           )}
         </div>
