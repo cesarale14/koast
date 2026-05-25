@@ -1032,3 +1032,48 @@ export type AgentArtifactState =
   | "confirmed"
   | "edited"
   | "dismissed";
+
+// ==================== Host Action Patterns (M11 Phase B item 1 — F8) ====================
+//
+// Per agent-loop-v1-design.md §7.3 + M11 Phase B STEP 2 reconciliation.
+// Light fingerprint of host responses to agent-proposed actions. Subject
+// = host (calibration target). Originating actor implicit (agent at v1).
+// Pattern-match index for Phase 2+ calibration logic. Full audit lives
+// in agent_audit_log (optional join via agent_audit_log_id).
+//
+// Migration 20260525080000_host_action_patterns.sql.
+
+export const hostActionPatterns = pgTable(
+  "host_action_patterns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hostId: uuid("host_id").notNull(),
+    actionType: text("action_type").notNull(),
+    // outcome values: 'confirmed' | 'modified' | 'dismissed' | 'silent'
+    // CHECK constraint enforced at DB. Controlled vocabulary mirrored
+    // at type level via HostActionPatternOutcome below.
+    outcome: text("outcome").notNull(),
+    payloadSummary: jsonb("payload_summary").notNull().default({}),
+    agentAuditLogId: uuid("agent_audit_log_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_host_action_patterns_lookup").on(t.hostId, t.actionType, t.createdAt),
+  ],
+);
+
+/**
+ * Controlled vocabulary for `host_action_patterns.outcome`. Mirrors the
+ * CHECK constraint at the database layer per the M1 typed-union convention
+ * for CHECK-constrained text columns.
+ *
+ *   - 'confirmed' — host approved an agent artifact unchanged
+ *   - 'modified'  — host edited then approved (M7 D38 edit path)
+ *   - 'dismissed' — host rejected (artifact state='dismissed')
+ *   - 'silent'    — autonomous (Phase 2+; dead-value at v1)
+ */
+export type HostActionPatternOutcome =
+  | "confirmed"
+  | "modified"
+  | "dismissed"
+  | "silent";

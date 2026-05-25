@@ -47,6 +47,8 @@ import { writeMemoryFactHandler } from "@/lib/action-substrate/handlers/write-me
 import { proposeGuestMessageHandler } from "@/lib/action-substrate/handlers/propose-guest-message";
 import { updateArtifactState } from "@/lib/action-substrate/artifact-writer";
 import { updateAuditOutcome } from "@/lib/action-substrate/audit-writer";
+import { recordHostActionPattern } from "@/lib/action-substrate/host-action-patterns";
+import type { HostActionPatternOutcome } from "@/lib/db/schema";
 import { makeSseResponse, serializeSseEvent } from "@/lib/agent/sse";
 import { ChannexSendError } from "@/lib/channex/messages";
 import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
@@ -75,6 +77,39 @@ interface ArtifactRow {
   conversation_id: string;
   turn_id: string;
   commit_metadata: Record<string, unknown> | null;
+}
+
+/**
+ * M11 Phase B (M1): map artifact.kind to the stakes-registry action_type.
+ * Keeps the artifact route's host_action_patterns writes aligned with
+ * the action_type vocabulary the rest of the substrate uses.
+ */
+function actionTypeForArtifactKind(kind: string): string {
+  switch (kind) {
+    case "property_knowledge_confirmation":
+      return "write_memory_fact";
+    case "guest_message_proposal":
+      return "propose_guest_message";
+    default:
+      return kind;
+  }
+}
+
+/**
+ * M11 Phase B (M1): light fingerprint of an artifact's payload for
+ * pattern matching. Free-form at v1 per phase-b-phase-1-stop.md §5.3.
+ * Phase 2+ consumers may define per-action-type schemas.
+ */
+function summarizeArtifactPayload(artifact: ArtifactRow): Record<string, unknown> {
+  if (artifact.kind === "property_knowledge_confirmation") {
+    const p = artifact.payload as { sub_entity_type?: string; attribute?: string };
+    return { sub_entity_type: p.sub_entity_type, attribute: p.attribute };
+  }
+  if (artifact.kind === "guest_message_proposal") {
+    const p = artifact.payload as { booking_id?: string; edited_text?: string };
+    return { booking_id: p.booking_id, edited: typeof p.edited_text === "string" };
+  }
+  return {};
 }
 
 /**
@@ -195,6 +230,19 @@ export async function POST(request: NextRequest) {
       await updateAuditOutcome(audit_id, "failed", {
         error_message: "dismissed_by_host",
       });
+      // M11 Phase B (M1): record host_action_pattern row. Best-effort;
+      // failure here is non-fatal (substrate analytics, not user-facing).
+      await recordHostActionPattern({
+        host_id: user.id,
+        action_type: actionTypeForArtifactKind(artifact.kind),
+        outcome: "dismissed",
+        payload_summary: summarizeArtifactPayload(artifact),
+        agent_audit_log_id: audit_id,
+      }).catch((patternErr) => {
+        console.warn(
+          `[artifact] host_action_patterns write failed (non-fatal): ${patternErr instanceof Error ? patternErr.message : String(patternErr)}`,
+        );
+      });
       return NextResponse.json({ success: true, state: "dismissed" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -247,6 +295,16 @@ export async function POST(request: NextRequest) {
 
   // 4c. Approve path: dispatch via action handler registry, stream
   // the completed event + done as SSE.
+  //
+  // M11 Phase B (M1): capture pre-approve state so the host_action_pattern
+  // row written post-success can distinguish 'confirmed' (was 'emitted')
+  // from 'modified' (was 'edited', i.e. host edited the draft before
+  // approving).
+  const preApproveState: "emitted" | "edited" = artifact.state as
+    | "emitted"
+    | "edited";
+  const approveOutcome: HostActionPatternOutcome =
+    preApproveState === "edited" ? "modified" : "confirmed";
   const dispatchStart = Date.now();
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -311,6 +369,19 @@ export async function POST(request: NextRequest) {
               }),
             ),
           );
+
+          // M11 Phase B (M1): pattern write, best-effort; non-fatal on failure.
+          await recordHostActionPattern({
+            host_id: user.id,
+            action_type: actionTypeForArtifactKind(artifact.kind),
+            outcome: approveOutcome,
+            payload_summary: summarizeArtifactPayload(artifact),
+            agent_audit_log_id: audit_id,
+          }).catch((patternErr) => {
+            console.warn(
+              `[artifact] host_action_patterns write failed (non-fatal): ${patternErr instanceof Error ? patternErr.message : String(patternErr)}`,
+            );
+          });
         } else if (artifact.kind === "guest_message_proposal") {
           // M7 path with §6 failure encoding for ChannexSendError.
           const guestPayload = artifact.payload as {
@@ -357,6 +428,19 @@ export async function POST(request: NextRequest) {
                 }),
               ),
             );
+
+            // M11 Phase B (M1): pattern write, best-effort; non-fatal on failure.
+            await recordHostActionPattern({
+              host_id: user.id,
+              action_type: actionTypeForArtifactKind(artifact.kind),
+              outcome: approveOutcome,
+              payload_summary: summarizeArtifactPayload(artifact),
+              agent_audit_log_id: audit_id,
+            }).catch((patternErr) => {
+              console.warn(
+                `[artifact] host_action_patterns write failed (non-fatal): ${patternErr instanceof Error ? patternErr.message : String(patternErr)}`,
+              );
+            });
           } catch (guestErr) {
             // §6 amendment: ChannexSendError AND ColdSendUnsupportedError
             // both route through the same encoding (state stays 'emitted',

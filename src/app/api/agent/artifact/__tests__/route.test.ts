@@ -23,6 +23,17 @@ jest.mock("@/lib/action-substrate/handlers/write-memory-fact");
 jest.mock("@/lib/action-substrate/handlers/propose-guest-message");
 jest.mock("@/lib/action-substrate/artifact-writer");
 jest.mock("@/lib/action-substrate/audit-writer");
+// M11 Phase B (M1): mock host-action-patterns so the route's best-effort
+// recordHostActionPattern() calls don't try to hit a real supabase client.
+// Explicit factory required because the route chains .catch() on the return
+// value — auto-mock returns undefined, which throws TypeError on .catch.
+jest.mock("@/lib/action-substrate/host-action-patterns", () => ({
+  recordHostActionPattern: jest.fn().mockResolvedValue({
+    pattern_id: "mock-pattern-id",
+    created_at: "2026-05-25T08:00:00+00:00",
+  }),
+  readPatternsForHost: jest.fn().mockResolvedValue([]),
+}));
 jest.mock("@/lib/agent/tools", () => ({}), { virtual: false });
 
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
