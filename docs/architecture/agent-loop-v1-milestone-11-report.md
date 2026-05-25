@@ -147,7 +147,7 @@ J3 LLM-judge runtime IS the v2.8 trigger. M12 centerpiece = J3 runtime + concurr
 | Apply-discipline taxonomy | 4 instances / 1 sub-class (all verify-absence) | 6 instances / 2 sub-classes (verify-absence ×5 + verify-presence ×1) | §4.2 amendment with state-changing 3-part verify (information_schema.tables + pg_indexes + pg_policies+relrowsecurity) |
 | M3-outcome-3-family | 2 instances | 3 instances (substrate-without-immediate-behavior-change pattern reinforced) | §6.X codification with 3-instance evidence |
 | Phase 1 STOP sub-disciplines | 1 (§3.4 falsification) | 4 (A/B/C/D) | §3.X amendment formalizing the 4 sub-discipline taxonomy |
-| OPERATING PATTERN | n/a | Process artifact in CLAUDE.md (speed-tiered + self-red-team + hard-floor + CONSULT FLAG) | §-amendment candidate codifying TIER framing + hard-floor enumeration + self-red-team replacement of routine outside review |
+| OPERATING PATTERN | n/a | **ADOPTED AND LIVE** in CLAUDE.md (commit f6a94a6); speed-tiered + self-red-team + hard-floor + CONSULT FLAG; governing all item work since Phase D | M12 codifies the existing adopted reality into v2.8 conventions doc — **NOT proposed-up-for-debate**; the pattern itself stays as in CLAUDE.md, formal §-amendment captures it for the conventions canon. Register distinction: the taxonomies above are evidence for future amendments; the OPERATING PATTERN is an amendment already in force. |
 | Tooling-reliability observation | n/a | Edit success ≠ proof of file change (CLAUDE.md Code Rules) | §3.4 sub-class candidate (5th: tooling-reliability) OR standalone CLAUDE.md note |
 
 ### 9.3 — DEFERRED WORK inventory (5 items remain; all J3-runtime or Mode-1 tied)
@@ -170,6 +170,7 @@ J3 LLM-judge runtime IS the v2.8 trigger. M12 centerpiece = J3 runtime + concurr
 - ✓ M2 rate-push revert (D17d v1.1 lifted) — Phase C
 - ✓ M4 memory export (M8 C13 R-5 kept promise) — Phase D
 - ✓ K1 Point 4 cron-fire attestation — Phase A close (operator-attested @ 02:55 UTC, triple-purpose with item 1 verification)
+- ✓ **CLUSTER M COMPLETE** — all 4 deferred items shipped across M10+M11: M3 (notifications.host_id) at M10 Phase C; M1 (host_action_patterns) at M11 Phase B; M2 (rate-push revert; D17d v1.1 lifted) at M11 Phase C; M4 (memory export; M8 C13 R-5 kept promise) at M11 Phase D. Backlog carried since M2 design → M4 → M9 → M10 → M11 is now empty.
 
 ### 9.4 — M12 first-step suggestions (advisory only)
 
