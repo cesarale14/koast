@@ -64,6 +64,20 @@ named in the conventions doc. M6's D27 (call read_memory before
 write_memory_fact) lives at the prompt locus with substrate enforcement
 deferred to CF #30 — that locus designation is itself a decision.
 
+## OPERATING PATTERN (speed-tiered)
+
+Every item opens with an explicit TIER decision, set by scope AND a hard floor.
+
+HARD FLOOR — always TIER 1 regardless of file count: cross-host data isolation, Channex writes, auth/RLS. Any change where a solo-invisible bug is production-expensive.
+
+TIER 1 (subsystem OR hard-floor): full Phase 1 STOP → /ultraplan if 5+ files / new subsystem / API+UI+DB → self-red-team → HALT for operator sign-off → ship → vault STOP note + §10 → close artifact + tag. Operator may loop in the outside reviewer (chat-Claude); for hard-floor items this is recommended, not optional.
+
+TIER 2 (small: 1-3 files, UI tweak, bug fix, tooling, dead-code, config; NOT hard-floor): state disposition in 2-3 lines → self-red-team → ship → one-paragraph note appended to the phase file. NO standalone STOP, NO close artifact, NO tag, NO separate sign-off round. Proceed without operator gate unless a CONSULT FLAG fires.
+
+SELF-RED-TEAM (both tiers, before HALT/commit): state the strongest case against your own recommendation and against your top two default answers. Revise if it survives; note why it fails if not. This replaces routine outside review.
+
+CONSULT FLAG: raise explicitly when a decision is architecture-class, scope-gating, or you are genuinely uncertain — recommend the operator loop in the outside reviewer before proceeding. Otherwise proceed.
+
 ## Planning Mode
 - Use **/ultraplan** for multi-file architecture changes (5+ files, new subsystems, API + UI + DB changes).
 - Skip ultraplan for small fixes (1-3 files, UI tweaks, single bug fixes).
