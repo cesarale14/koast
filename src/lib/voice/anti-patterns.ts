@@ -590,6 +590,17 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "Length + structure analysis (multi-paragraph response when one sentence would do). Not phrase-shape.",
     planned_layer: "llm-judge",
+    // M12 Phase D (iii-vi rollout iv-c) — TRANSITIONED to runtime-active.
+    // Boundary refined at sign-off per operator msg 3475: GENERIC
+    // INTERCHANGEABLE vs CONTEXT-SPECIFIC (NOT informational vs not). The
+    // judge protects authentic relational warmth (named guest/property/
+    // occasion/situation) from over-block — operator-binding asymmetric
+    // cost says over-blocking warmth is the WORST failure mode for THIS
+    // judge. Live consumer at src/lib/agent/judge/performative-
+    // thoroughness.ts dispatched via applyOutputJudges (j6 slot).
+    // Audience scope at Phase D: host-to-guest only.
+    runtime_active: true,
+    judge_id: "performative_thoroughness",
   },
   {
     id: "deferred_voice_doctrine_self_scan",

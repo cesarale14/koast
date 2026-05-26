@@ -26,6 +26,7 @@ import { judgeExclamationCap } from "@/lib/agent/judge/exclamation-cap";
 import { judgeEnsureVerbChain } from "@/lib/agent/judge/ensure-verb-chain";
 import { judgeSelfNarration } from "@/lib/agent/judge/self-narration";
 import { judgeFiller } from "@/lib/agent/judge/filler";
+import { judgePerformativeThoroughness } from "@/lib/agent/judge/performative-thoroughness";
 import type {
   Audience,
   JudgeId,
@@ -134,6 +135,19 @@ export async function applyOutputJudges(
     ? null
     : await judgeFiller(j1.filtered_text, audience);
 
+  // J3-iv-c — performative-thoroughness (M12 Phase D; activated stub iv-c).
+  // Pre-filter skips single-sentence responses (nothing to flag) + short text.
+  // LLM judge applies the GENERIC INTERCHANGEABLE vs CONTEXT-SPECIFIC
+  // discriminator per operator msg 3475 binding refinement: would each
+  // sentence be IDENTICAL across guests/properties? Generic → fail; context-
+  // specific (named guest/property/occasion/situation = authentic warmth) → pass.
+  // ASYMMETRIC DEFAULT: borderline → PASS (over-block of authentic warmth is
+  // the WORST failure mode; would homogenize host voice and work against
+  // voice-extraction).
+  const j6 = skipSet.has("performative_thoroughness")
+    ? null
+    : await judgePerformativeThoroughness(j1.filtered_text, audience);
+
   const judge_results: JudgeResult[] = [
     ...(baseEnvelope.judge_results ?? []),
     j1.judge_result,
@@ -141,6 +155,7 @@ export async function applyOutputJudges(
     ...(j3 ? [j3] : []),
     ...(j4 ? [j4] : []),
     ...(j5 ? [j5] : []),
+    ...(j6 ? [j6] : []),
   ];
 
   // ANNOTATE-ONLY fail-behavior uniform across J1/J2/J3 at v1: text
