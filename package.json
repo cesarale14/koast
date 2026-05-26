@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "jest",
     "prepare": "husky",
-    "voice:scan:doctrine": "tsx scripts/voice-scan-doctrine.ts"
+    "voice:scan:doctrine": "tsx scripts/voice-scan-doctrine.ts",
+    "voice:scan:constitution": "tsx scripts/voice-scan-constitution.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

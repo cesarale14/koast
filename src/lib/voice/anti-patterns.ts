@@ -623,5 +623,15 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "Constitution prompts cite banned phrases by name as negative-example pedagogy (legitimate technique for training LLM avoidance). v1 catalog cannot distinguish pedagogical quotation from inline violation — same architectural class as deferred_voice_doctrine_self_scan. The runner's CONSTITUTION_PROMPTS list documents the deferred surface; M10 LLM judge gates this class. D24 v1 scope is structural (call-site prompts) per v2.6 §3 + §7.8.",
     planned_layer: "llm-judge",
+    // M12 Phase D (iii-vi rollout vi) — TRANSITIONED to runtime-active.
+    // CI-TIME class: live consumer is scripts/voice-scan-constitution.ts
+    // (npm run voice:scan:constitution), NOT applyOutputJudges runtime
+    // dispatch. Homomorphic with v (voice-scan-doctrine): same per-match
+    // quote-vs-instance LLM classification, shared classifier at
+    // src/lib/agent/judge/quote-vs-instance.ts. Differs in target file
+    // list (CONSTITUTION_PROMPTS from anti-patterns.runner.ts) + judgeId
+    // + targetClass="constitution".
+    runtime_active: true,
+    judge_id: "constitution_prompt_quote_vs_instance",
   },
 ];

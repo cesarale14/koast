@@ -279,6 +279,47 @@ describe("quote-vs-instance — ENVELOPE-PRESENCE substrate guard", () => {
 // SCAN SCRIPT integration — voice-scan-doctrine.ts (J3-v activation)
 // ============================================================================
 
+describe("voice-scan-constitution — script integration (J3-vi activation; homomorphic with v)", () => {
+  test("scanConstitutionText returns declarative-use violations + skips quotes", async () => {
+    // Constitution prompt mock content: one in negative-example block (PASS),
+    // one in declarative position (FAIL).
+    const fakeConstitution = `// VOICE_DOCTRINE_SUMMARY
+export const VOICE_PROMPT = \`
+  Never write phrases like "rest assured" — they signal AI voice.
+  Use specific assurances instead.
+
+  Rest assured, the system will handle the booking automatically.
+\`;
+`;
+
+    mockCreate
+      .mockResolvedValueOnce(
+        makeHaikuResponse(
+          '{"verdict":"pass","reason":"negative_example_block","confidence":0.92}',
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeHaikuResponse(
+          '{"verdict":"fail","reason":"declarative_use","confidence":0.95}',
+        ),
+      );
+
+    const { scanConstitutionText } = await import(
+      "@/../scripts/voice-scan-constitution"
+    );
+    const violations = await scanConstitutionText(
+      fakeConstitution,
+      "src/lib/voice/build-voice-prompt.ts",
+    );
+
+    expect(violations.length).toBe(1);
+    expect(violations[0].matchedPhrase).toMatch(/rest assured/i);
+    expect(violations[0].verdict).toBe("fail");
+    expect(violations[0].reason).toBe("declarative_use");
+    expect(violations[0].patternId).toBe("ai_rest_assured");
+  });
+});
+
 describe("voice-scan-doctrine — script integration (J3-v activation)", () => {
   test("scanDoctrineText returns declarative-use violations + skips quotes", async () => {
     // Mixed doctrine content: one quote context (PASS), one declarative (FAIL)
