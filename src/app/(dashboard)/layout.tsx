@@ -11,6 +11,7 @@ import { ChatPrimarySurface } from "@/components/chat/ChatPrimarySurface";
 import { InspectSurface } from "@/components/chat/InspectSurface";
 import { isChatPrimary } from "@/lib/chat/isChatPrimary";
 import { useAuditPoll } from "@/components/chat/useAuditPoll";
+import { useSurfaceTelemetry } from "@/hooks/useSurfaceTelemetry";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { filterNavGroupsByVisibility } from "@/lib/tab-visibility";
 import {
@@ -463,10 +464,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  * it directly in DashboardLayout would call the hook before the provider
  * is available. Inside the provider it has access to the store.
  *
- * The hook is fire-and-forget: it mounts the polling effect, subscribes to
- * visibility + pathname changes, and renders nothing.
+ * Also mounts useSurfaceTelemetry (M13 Phase 1.A STEP 4 A5 binding) so
+ * surface-occupancy + navigation telemetry batches across the dashboard
+ * tree. The hook is fire-and-forget: it batches events and flushes on
+ * a 30s timer / visibility-hidden / unmount.
+ *
+ * Both hooks render nothing.
  */
 function AuditPollMount() {
   useAuditPoll();
+  useSurfaceTelemetry();
   return null;
 }

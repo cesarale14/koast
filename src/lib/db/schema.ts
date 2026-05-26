@@ -1077,3 +1077,71 @@ export type HostActionPatternOutcome =
   | "modified"
   | "dismissed"
   | "silent";
+
+// ==================== host_surface_telemetry (M13 Phase 1.A STEP 4) ====================
+// Per operator msg 3518 A5 binding: surface-occupancy + navigation
+// telemetry with entry_trigger making the chat-primary inversion thesis
+// falsifiable. Subject = host (per-host private; cross-host aggregation
+// MUST pass through future anonymization VIEW per CLAUDE.md R5 firewall
+// contract).
+//
+// Migration 20260526221659_host_surface_telemetry.sql.
+
+export const hostSurfaceTelemetry = pgTable(
+  "host_surface_telemetry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hostId: uuid("host_id").notNull(),
+    sessionId: text("session_id").notNull(),
+    ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+    // event_kind values: 'chat_view' | 'inspect_view' | 'inspect_entry'
+    // CHECK constraint enforced at DB. Controlled vocabulary mirrored
+    // at type level via HostSurfaceTelemetryEventKind below.
+    eventKind: text("event_kind").notNull(),
+    pathname: text("pathname").notNull(),
+    // task_class values: 'scan' | 'bulk_operate' | 'visual_survey' |
+    // 'config' | 'external_link' | 'other' | null
+    taskClass: text("task_class"),
+    // entry_trigger values: 'agent_offered_navchip' | 'self_navigated' | null
+    // (null on chat_view / inspect_view; carries value on inspect_entry).
+    entryTrigger: text("entry_trigger"),
+    context: jsonb("context").notNull().default({}),
+  },
+  (t) => [
+    index("idx_host_surface_telemetry_host_ts").on(t.hostId, t.ts),
+    index("idx_host_surface_telemetry_event_kind").on(t.eventKind, t.ts),
+  ],
+);
+
+/**
+ * Controlled vocabulary for `host_surface_telemetry.event_kind`.
+ *   - 'chat_view'      — host is on chat-primary
+ *   - 'inspect_view'   — host is on an inspect surface (periodic heartbeat)
+ *   - 'inspect_entry'  — transition into an inspect surface (carries entry_trigger)
+ */
+export type HostSurfaceTelemetryEventKind =
+  | "chat_view"
+  | "inspect_view"
+  | "inspect_entry";
+
+/**
+ * Controlled vocabulary for `host_surface_telemetry.task_class`. Buckets
+ * inspect intent for analysis. Null when event_kind ∈ {chat_view}.
+ */
+export type HostSurfaceTelemetryTaskClass =
+  | "scan"
+  | "bulk_operate"
+  | "visual_survey"
+  | "config"
+  | "external_link"
+  | "other";
+
+/**
+ * Controlled vocabulary for `host_surface_telemetry.entry_trigger`.
+ * Falsifiability of the chat-primary inversion thesis (operator msg 3518 A5):
+ *   - 'agent_offered_navchip' — agent surfaced a navchip; host followed
+ *   - 'self_navigated'        — host went to inspect without an agent prompt
+ */
+export type HostSurfaceTelemetryEntryTrigger =
+  | "agent_offered_navchip"
+  | "self_navigated";
