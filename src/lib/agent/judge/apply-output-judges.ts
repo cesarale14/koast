@@ -25,6 +25,7 @@ import { applyEmojiPolicy } from "@/lib/voice/output-filter";
 import { judgeExclamationCap } from "@/lib/agent/judge/exclamation-cap";
 import { judgeEnsureVerbChain } from "@/lib/agent/judge/ensure-verb-chain";
 import { judgeSelfNarration } from "@/lib/agent/judge/self-narration";
+import { judgeFiller } from "@/lib/agent/judge/filler";
 import type {
   Audience,
   JudgeId,
@@ -123,12 +124,23 @@ export async function applyOutputJudges(
     ? null
     : await judgeSelfNarration(j1.filtered_text, audience);
 
+  // J3-iv-a — filler (M12 Phase D; activated stub iv-a). Pre-filter detects
+  // the 7 canonical filler-candidate words (really/very/just/actually/
+  // basically/honestly/literally). LLM judge classifies role
+  // (filler-no-info-added vs legitimate emphasis/softening/specification).
+  // ASYMMETRIC DEFAULT: borderline cases default to PASS per §5.7 over-block
+  // aversion (real hosts use these words for legitimate register).
+  const j5 = skipSet.has("filler")
+    ? null
+    : await judgeFiller(j1.filtered_text, audience);
+
   const judge_results: JudgeResult[] = [
     ...(baseEnvelope.judge_results ?? []),
     j1.judge_result,
     ...(j2 ? [j2] : []),
     ...(j3 ? [j3] : []),
     ...(j4 ? [j4] : []),
+    ...(j5 ? [j5] : []),
   ];
 
   // ANNOTATE-ONLY fail-behavior uniform across J1/J2/J3 at v1: text

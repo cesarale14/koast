@@ -32,10 +32,19 @@ jest.mock("@/lib/agent/judge/self-narration", () => ({
   judgeSelfNarration: jest.fn(),
 }));
 
+// M12 Phase D (J3-iv-a) — mock the filler judge. Default returns a
+// deterministic skip so the pre-existing tests stay green. Individual
+// J5 tests override per-test.
+jest.mock("@/lib/agent/judge/filler", () => ({
+  __esModule: true,
+  judgeFiller: jest.fn(),
+}));
+
 import { applyOutputJudges } from "@/lib/agent/judge/apply-output-judges";
 import { judgeExclamationCap } from "@/lib/agent/judge/exclamation-cap";
 import { judgeEnsureVerbChain } from "@/lib/agent/judge/ensure-verb-chain";
 import { judgeSelfNarration } from "@/lib/agent/judge/self-narration";
+import { judgeFiller } from "@/lib/agent/judge/filler";
 import type { AgentTextOutput } from "@/lib/agent/schemas/agent-text-output";
 
 const mockJudgeExclamationCap = judgeExclamationCap as jest.MockedFunction<
@@ -47,6 +56,7 @@ const mockJudgeEnsureVerbChain = judgeEnsureVerbChain as jest.MockedFunction<
 const mockJudgeSelfNarration = judgeSelfNarration as jest.MockedFunction<
   typeof judgeSelfNarration
 >;
+const mockJudgeFiller = judgeFiller as jest.MockedFunction<typeof judgeFiller>;
 
 const J2_PASS_DEFAULT = {
   judge_id: "exclamation_cap" as const,
@@ -72,6 +82,14 @@ const J4_SKIP_DEFAULT = {
   details: { audience: "host-to-guest" as const, skipped: true },
 };
 
+const J5_SKIP_DEFAULT = {
+  judge_id: "filler" as const,
+  verdict: "pass" as const,
+  reason: "no_filler",
+  confidence: 1.0,
+  details: { audience: "host-to-guest" as const, skipped: true },
+};
+
 beforeEach(() => {
   // Default J2 mock = deterministic pass so STEP 6 J1-focused tests stay
   // green. Individual STEP 8 tests override per-test.
@@ -87,6 +105,11 @@ beforeEach(() => {
   // J4-specific tests override per-test.
   mockJudgeSelfNarration.mockReset();
   mockJudgeSelfNarration.mockResolvedValue(J4_SKIP_DEFAULT);
+
+  // Default J5 mock = deterministic skip so pre-Phase-D-iv-a tests stay
+  // green. J5-specific tests override per-test.
+  mockJudgeFiller.mockReset();
+  mockJudgeFiller.mockResolvedValue(J5_SKIP_DEFAULT);
 });
 
 function baseEnvelope(
@@ -112,8 +135,8 @@ describe("applyOutputJudges — route-integration contract (STEP 6 J1)", () => {
       env,
     );
     expect(finalText).toBe("Welcome 👋 enjoy ");
-    // M12 Phase D: envelope now carries J1 + J2 + J3 + J4 results.
-    expect(envelope.judge_results).toHaveLength(4);
+    // M12 Phase D: envelope now carries J1 + J2 + J3 + J4 + J5 results.
+    expect(envelope.judge_results).toHaveLength(5);
     const j1Result = envelope.judge_results!.find((r) => r.judge_id === "emoji_policy")!;
     expect(j1Result.verdict).toBe("fail");
     expect(j1Result.reason).toBe("stripped_to_policy");
@@ -145,8 +168,8 @@ describe("applyOutputJudges — route-integration contract (STEP 6 J1)", () => {
     };
     const env = baseEnvelope(text, { judge_results: [priorJudge] });
     const { envelope } = await applyOutputJudges(text, "host-to-guest", "neutral", env);
-    // M12 Phase D: 1 prior + 1 new J1 + 1 J2 mock + 1 J3 mock + 1 J4 mock = 5
-    expect(envelope.judge_results).toHaveLength(5);
+    // M12 Phase D iv-a: 1 prior + 1 J1 + 1 J2 mock + 1 J3 mock + 1 J4 mock + 1 J5 mock = 6
+    expect(envelope.judge_results).toHaveLength(6);
     expect(envelope.judge_results![0]).toEqual(priorJudge);
   });
 
@@ -180,8 +203,8 @@ describe("applyOutputJudges — route-integration contract (STEP 6 J1)", () => {
     expect(result.envelope.source_attribution).toEqual([
       { type: "memory_fact", id: "fact-1" },
     ]);
-    // M12 Phase D: J1 + J2 mock + J3 mock + J4 mock = 4 results.
-    expect(result.envelope.judge_results).toHaveLength(4);
+    // M12 Phase D iv-a: J1 + J2 mock + J3 mock + J4 mock + J5 mock = 5 results.
+    expect(result.envelope.judge_results).toHaveLength(5);
     expect(typeof result.finalText).toBe("string");
   });
 });
@@ -196,15 +219,17 @@ describe("applyOutputJudges — STEP 8 J1+J2 composition", () => {
       "neutral",
       env,
     );
-    // M12 Phase D: J1 + J2 + J3 + J4 = 4 results, in order.
-    expect(envelope.judge_results).toHaveLength(4);
+    // M12 Phase D iv-a: J1 + J2 + J3 + J4 + J5 = 5 results, in order.
+    expect(envelope.judge_results).toHaveLength(5);
     expect(envelope.judge_results![0].judge_id).toBe("emoji_policy");
     expect(envelope.judge_results![1].judge_id).toBe("exclamation_cap");
     expect(envelope.judge_results![2].judge_id).toBe("ensure_verb_chain");
     expect(envelope.judge_results![3].judge_id).toBe("self_narration");
+    expect(envelope.judge_results![4].judge_id).toBe("filler");
     expect(mockJudgeExclamationCap).toHaveBeenCalledTimes(1);
     expect(mockJudgeEnsureVerbChain).toHaveBeenCalledTimes(1);
     expect(mockJudgeSelfNarration).toHaveBeenCalledTimes(1);
+    expect(mockJudgeFiller).toHaveBeenCalledTimes(1);
   });
 
   test("host-to-guest J2 fail (mocked) → annotate-only: text UNCHANGED from J1 filter; envelope flags fail (Q3)", async () => {
@@ -325,8 +350,8 @@ describe("applyOutputJudges — M12 Phase B J3 ensure-verb-chain integration", (
     );
     // J3 dispatch skipped via per-call-site override hook.
     expect(mockJudgeEnsureVerbChain).not.toHaveBeenCalled();
-    // J1 + J2 + J4 still ran → 3 results, no J3 entry.
-    expect(envelope.judge_results).toHaveLength(3);
+    // J1 + J2 + J4 + J5 still ran → 4 results, no J3 entry.
+    expect(envelope.judge_results).toHaveLength(4);
     expect(envelope.judge_results!.find((r) => r.judge_id === "ensure_verb_chain")).toBeUndefined();
   });
 
@@ -342,11 +367,12 @@ describe("applyOutputJudges — M12 Phase B J3 ensure-verb-chain integration", (
     );
     expect(mockJudgeExclamationCap).not.toHaveBeenCalled();
     expect(mockJudgeEnsureVerbChain).toHaveBeenCalledTimes(1);
-    // J1 + J3 + J4 = 3 (J2 skipped)
-    expect(envelope.judge_results).toHaveLength(3);
+    // J1 + J3 + J4 + J5 = 4 (J2 skipped)
+    expect(envelope.judge_results).toHaveLength(4);
     expect(envelope.judge_results![0].judge_id).toBe("emoji_policy");
     expect(envelope.judge_results![1].judge_id).toBe("ensure_verb_chain");
     expect(envelope.judge_results![2].judge_id).toBe("self_narration");
+    expect(envelope.judge_results![3].judge_id).toBe("filler");
   });
 
   test("J3 INFRASTRUCTURE-ERROR fallthrough (mocked) → envelope carries flag; text ships unchanged", async () => {
@@ -439,8 +465,8 @@ describe("applyOutputJudges — M12 Phase D J4 self-narration integration", () =
     );
     // J4 dispatch skipped via per-call-site override hook.
     expect(mockJudgeSelfNarration).not.toHaveBeenCalled();
-    // J1 + J2 + J3 still ran → 3 results, no J4 entry.
-    expect(envelope.judge_results).toHaveLength(3);
+    // J1 + J2 + J3 + J5 still ran → 4 results, no J4 entry.
+    expect(envelope.judge_results).toHaveLength(4);
     expect(envelope.judge_results!.find((r) => r.judge_id === "self_narration")).toBeUndefined();
   });
 
@@ -469,5 +495,89 @@ describe("applyOutputJudges — M12 Phase D J4 self-narration integration", () =
     const j4Result = envelope.judge_results!.find((r) => r.judge_id === "self_narration")!;
     expect(j4Result.reason).toBe("judge_infrastructure_error");
     expect((j4Result.details as Record<string, unknown>).infrastructure_error).toBe(true);
+  });
+});
+
+describe("applyOutputJudges — M12 Phase D iv-a J5 filler integration", () => {
+  test("J5 verdict='fail' (mocked) → annotate-only: text UNCHANGED; envelope flags fail", async () => {
+    mockJudgeFiller.mockResolvedValueOnce({
+      judge_id: "filler",
+      verdict: "fail",
+      reason: "no_information_added",
+      confidence: 0.9,
+      details: { audience: "host-to-guest", detected_word: "really", judged: true },
+    });
+    const text = "I'll really get back to you soon about that question.";
+    const env = baseEnvelope(text);
+    const { finalText, envelope } = await applyOutputJudges(
+      text,
+      "host-to-guest",
+      "neutral",
+      env,
+    );
+    // ANNOTATE-ONLY: text unchanged by J5; only J1 may filter (no emoji here).
+    expect(finalText).toBe(text);
+    const j5Result = envelope.judge_results!.find((r) => r.judge_id === "filler")!;
+    expect(j5Result.verdict).toBe("fail");
+    expect(j5Result.reason).toBe("no_information_added");
+  });
+
+  test("J5 verdict='pass' (mocked) → envelope flags pass; legitimate softening recognized", async () => {
+    mockJudgeFiller.mockResolvedValueOnce({
+      judge_id: "filler",
+      verdict: "pass",
+      reason: "legitimate_softening",
+      confidence: 0.92,
+      details: { audience: "host-to-guest", detected_word: "just", judged: true },
+    });
+    const text = "Just confirming the check-in time is 4pm today.";
+    const env = baseEnvelope(text);
+    const { envelope } = await applyOutputJudges(text, "host-to-guest", "neutral", env);
+    const j5Result = envelope.judge_results!.find((r) => r.judge_id === "filler")!;
+    expect(j5Result.verdict).toBe("pass");
+    expect(j5Result.reason).toBe("legitimate_softening");
+  });
+
+  test("policyOverride.skip_judges=['filler'] → J5 NOT called; envelope omits J5 entry", async () => {
+    const text = "I'll really get back to you soon.";
+    const env = baseEnvelope(text);
+    const { envelope } = await applyOutputJudges(
+      text,
+      "host-to-guest",
+      "neutral",
+      env,
+      { skip_judges: ["filler"] },
+    );
+    expect(mockJudgeFiller).not.toHaveBeenCalled();
+    // J1 + J2 + J3 + J4 still ran → 4 results, no J5 entry.
+    expect(envelope.judge_results).toHaveLength(4);
+    expect(envelope.judge_results!.find((r) => r.judge_id === "filler")).toBeUndefined();
+  });
+
+  test("J5 INFRASTRUCTURE-ERROR fallthrough (mocked) → envelope carries flag; text ships unchanged", async () => {
+    mockJudgeFiller.mockResolvedValueOnce({
+      judge_id: "filler",
+      verdict: "fail",
+      reason: "judge_infrastructure_error",
+      confidence: 0.0,
+      details: {
+        audience: "host-to-guest",
+        infrastructure_error: true,
+        error_message: "Request timed out",
+      },
+    });
+    const text = "I'll really get back to you about that.";
+    const env = baseEnvelope(text);
+    const { finalText, envelope } = await applyOutputJudges(
+      text,
+      "host-to-guest",
+      "neutral",
+      env,
+    );
+    // FAIL-OPEN: text ships unchanged despite judge-infra failure.
+    expect(finalText).toBe(text);
+    const j5Result = envelope.judge_results!.find((r) => r.judge_id === "filler")!;
+    expect(j5Result.reason).toBe("judge_infrastructure_error");
+    expect((j5Result.details as Record<string, unknown>).infrastructure_error).toBe(true);
   });
 });

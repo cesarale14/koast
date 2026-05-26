@@ -561,6 +561,13 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "'Really', 'very', 'just' are sometimes appropriate. Context-dependent enforcement.",
     planned_layer: "llm-judge",
+    // M12 Phase D (iii-vi rollout iv-a) — TRANSITIONED to runtime-active.
+    // Catalog id preserved for historical record; runtime_active + judge_id
+    // signal the live consumer at src/lib/agent/judge/filler.ts dispatched
+    // via applyOutputJudges (j5 slot). Audience scope at Phase D:
+    // host-to-guest only.
+    runtime_active: true,
+    judge_id: "filler",
   },
   {
     id: "deferred_5_8_self_narration",
