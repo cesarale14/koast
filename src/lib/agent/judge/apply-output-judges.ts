@@ -24,6 +24,7 @@
 import { applyEmojiPolicy } from "@/lib/voice/output-filter";
 import { judgeExclamationCap } from "@/lib/agent/judge/exclamation-cap";
 import { judgeEnsureVerbChain } from "@/lib/agent/judge/ensure-verb-chain";
+import { judgeSelfNarration } from "@/lib/agent/judge/self-narration";
 import type {
   Audience,
   JudgeId,
@@ -113,11 +114,21 @@ export async function applyOutputJudges(
     ? null
     : await judgeEnsureVerbChain(j1.filtered_text, audience);
 
+  // J3-iv-b — self-narration (M12 Phase D; activated stub iv-b). Pre-filter
+  // detects the 4 canonical self-narration verb chains (I'll help / Let me
+  // help / I'm here to help / Happy to help). LLM judge classifies follow-
+  // through specificity (generic theater vs specific concrete action).
+  // Same FAIL-OPEN contract + ANNOTATE-ONLY behavior as J3-iii.
+  const j4 = skipSet.has("self_narration")
+    ? null
+    : await judgeSelfNarration(j1.filtered_text, audience);
+
   const judge_results: JudgeResult[] = [
     ...(baseEnvelope.judge_results ?? []),
     j1.judge_result,
     ...(j2 ? [j2] : []),
     ...(j3 ? [j3] : []),
+    ...(j4 ? [j4] : []),
   ];
 
   // ANNOTATE-ONLY fail-behavior uniform across J1/J2/J3 at v1: text

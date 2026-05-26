@@ -568,6 +568,14 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "'I'll help you with...' is banned theater when content follows generically but legitimate when content follows specifically. Judge must read what comes after.",
     planned_layer: "llm-judge",
+    // M12 Phase D (iii-vi rollout) — TRANSITIONED to runtime-active.
+    // Catalog id preserved for historical record (the stub WAS deferred
+    // at M10 Phase B); runtime_active + judge_id signal the live consumer
+    // at src/lib/agent/judge/self-narration.ts dispatched via
+    // applyOutputJudges (j4 slot). Audience scope at Phase D:
+    // host-to-guest only.
+    runtime_active: true,
+    judge_id: "self_narration",
   },
   {
     id: "deferred_5_9_performative_thoroughness",
