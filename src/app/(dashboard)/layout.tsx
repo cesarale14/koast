@@ -7,8 +7,10 @@ import { ToastProvider } from "@/components/ui/Toast";
 import TopBarSearch from "@/components/polish/TopBarSearch";
 import CommandPalette from "@/components/polish/CommandPalette";
 import { ChatStoreProvider } from "@/components/chat/ChatStore";
-import { ChatBar } from "@/components/chat/ChatBar";
-import { ChatClient } from "@/components/chat/ChatClient";
+import { ChatPrimarySurface } from "@/components/chat/ChatPrimarySurface";
+import { InspectSurface } from "@/components/chat/InspectSurface";
+import { isChatPrimary } from "@/lib/chat/isChatPrimary";
+import { useAuditPoll } from "@/components/chat/useAuditPoll";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { filterNavGroupsByVisibility } from "@/lib/tab-visibility";
 import {
@@ -364,13 +366,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarWidth = sidebarExpanded ? 240 : 60;
 
   // M8 C8 Step D — early-return preserved only for /_preview/m5-states.
-  // /chat routes now render alongside the persistent chat layout slot
-  // (ChatBar + ChatClient mounted below) instead of replacing the
-  // dashboard chrome. Per conventions v1.4 D1: chat is a layout slot,
-  // not a route.
+  // M13 Phase 1.A: /chat routes now render via pathname-derived layout
+  // (chat-primary surface displaces children; inspect routes wrap children
+  // in InspectSurface). The reducer no longer tracks `expanded`.
   if (pathname?.startsWith("/_preview/m5-states")) {
     return <>{children}</>;
   }
+
+  const chatPrimary = isChatPrimary(pathname);
 
   return (
     <ChatStoreProvider
@@ -378,6 +381,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       initialHistory={[]}
       initialProposals={[]}
     >
+      {/* Audit polling mounted at layout scope so unread count tracks
+          across navigation. Pauses when on chat-primary (host is engaged
+          on the spine) or tab hidden. */}
+      <AuditPollMount />
       <div className="flex h-screen overflow-x-hidden" style={{ backgroundColor: "var(--shore)" }}>
         <DesktopSidebar pathname={pathname} expanded={sidebarExpanded} onToggle={toggleSidebar} groups={dynamicNavGroups} />
 
@@ -404,7 +411,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Menu size={20} strokeWidth={1.5} />
                 </button>
                 <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
-                  {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Dashboard"}
+                  {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Koast"}
                 </span>
               </div>
               <TopBarSearch />
@@ -415,30 +422,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </header>
 
-            <main className="flex-1 overflow-auto" style={{ paddingBottom: "56px" }}>
+            <main className="flex-1 overflow-auto">
               <ToastProvider>
-                {pathname === "/calendar" || pathname === "/messages" ? (
-                  <div className="h-full page-enter">{children}</div>
-                ) : /^\/properties\/[^/]+$/.test(pathname) ? (
-                  // Property detail page handles its own layout (full-bleed
-                  // hero + max-w content). Skip the wrapper padding.
-                  <div className="page-enter">{children}</div>
+                {chatPrimary ? (
+                  /* M13 Phase 1.A chat-primary surface — displaces children
+                     at `/` and `/chat/*`. The wedge-scope active property
+                     surfaces null at Phase 1.A; 1.B wires the active
+                     property hook. */
+                  <ChatPrimarySurface
+                    propertyName={null}
+                    monthsActive={null}
+                    conversationCount={null}
+                  />
                 ) : (
-                  <div className="p-4 md:p-8 page-enter">{children}</div>
+                  <InspectSurface>
+                    {pathname === "/calendar" || pathname === "/messages" ? (
+                      <div className="h-full page-enter">{children}</div>
+                    ) : /^\/properties\/[^/]+$/.test(pathname) ? (
+                      // Property detail page handles its own layout (full-bleed
+                      // hero + max-w content). Skip the wrapper padding.
+                      <div className="page-enter">{children}</div>
+                    ) : (
+                      <div className="p-4 md:p-8 page-enter">{children}</div>
+                    )}
+                  </InspectSurface>
                 )}
               </ToastProvider>
             </main>
           </div>
         </div>
         <CommandPalette />
-
-        {/* M8 C8 Step D — persistent chat layout slot (D1).
-            ChatBar: bottom-anchored resting state (z-40, hides when expanded).
-            ChatClient: expanded surface, store-driven visibility (display:none when collapsed).
-            Both mount unconditionally at layout scope so chat state survives navigation. */}
-        <ChatBar />
-        <ChatClient />
       </div>
     </ChatStoreProvider>
   );
+}
+
+/**
+ * AuditPollMount — thin client wrapper that runs useAuditPoll inside the
+ * ChatStoreProvider tree. The hook reads pathname + store state; mounting
+ * it directly in DashboardLayout would call the hook before the provider
+ * is available. Inside the provider it has access to the store.
+ *
+ * The hook is fire-and-forget: it mounts the polling effect, subscribes to
+ * visibility + pathname changes, and renders nothing.
+ */
+function AuditPollMount() {
+  useAuditPoll();
+  return null;
 }

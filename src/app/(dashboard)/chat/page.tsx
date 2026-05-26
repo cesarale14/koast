@@ -1,32 +1,22 @@
-"use client";
-
 /**
- * /chat — landing route, thin client shell (M8 C8 Step D).
+ * /chat — landing route, M13 Phase 1.A redirect (operator msg 3518 A4).
  *
- * Per conventions v1.3 D1 (geometry locked) + v1.4 D1 (state store
- * convention) + Step D layout invert: the chat panel is at layout
- * scope (ChatBar + ChatClient mounted unconditionally in the dashboard
- * layout). This route's only responsibility is to expand the panel
- * when the host navigates to /chat directly.
+ * Pre-M13: this route dispatched EXPAND to open the chat panel overlay.
+ * That pattern (M8 C8 Step D layout-slot inversion) is retired —
+ * chat-primary surface is pathname-derived, with `/` and `/chat/*` both
+ * counting as chat-primary. The bare `/chat` route exists only as a
+ * compatibility redirect to `/`; direct deep-links to a specific
+ * conversation still resolve via `/chat/[conversation_id]`.
  *
- * Step E (next) leaves this route as-is — there is no per-route data
- * to hydrate beyond "open the panel." The panel's empty state shows
- * the rail's empty conversation list (or whatever the store has) and
- * waits for the host to start a conversation.
- *
- * Replaces the prior server-component implementation that fetched
- * conversations + properties + history; that data flow now lives in
- * /chat/[conversation_id] (Step E) for deep-linked conversations and
- * in lazy ChatClient state otherwise.
+ * Why redirect to `/` and not render: the canonical chat-primary landing
+ * is `/`. Keeping `/chat` as a separate landing surface duplicates the
+ * empty-conversation entry point without value; the redirect collapses
+ * them. Browser back from `/` does not return to `/chat`; the redirect
+ * is a 308 (server-side).
  */
 
-import { useEffect } from "react";
-import { useChatStore } from "@/components/chat/ChatStore";
+import { redirect } from "next/navigation";
 
 export default function ChatLandingPage() {
-  const { dispatch } = useChatStore();
-  useEffect(() => {
-    dispatch({ type: "EXPAND" });
-  }, [dispatch]);
-  return null;
+  redirect("/");
 }

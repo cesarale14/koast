@@ -19,10 +19,12 @@ import {
 
 describe("chatReducer — initial state", () => {
   test("initialChatState matches expected shape", () => {
+    // M13 Phase 1.A — `expanded` removed from ChatState. The UI surface
+    // (chat-primary vs inspect) is pathname-derived in the dashboard
+    // layout, not stored in the reducer.
     expect(initialChatState).toEqual({
       activeConversationId: null,
       conversationHistory: [],
-      expanded: false,
       turnState: "idle",
       unreadAuditCount: 0,
       lastSeenAuditTs: null,
@@ -31,31 +33,19 @@ describe("chatReducer — initial state", () => {
   });
 });
 
-describe("chatReducer — UI state", () => {
-  test("EXPAND sets expanded=true and clears unread audit count", () => {
-    const start: ChatState = {
-      ...initialChatState,
-      unreadAuditCount: 5,
-      lastSeenAuditTs: "2026-05-08T00:00:00Z",
-    };
-    const next = chatReducer(start, { type: "EXPAND" });
-    expect(next.expanded).toBe(true);
-    expect(next.unreadAuditCount).toBe(0);
-    // lastSeenAuditTs is preserved — expand doesn't reset the timestamp.
-    expect(next.lastSeenAuditTs).toBe("2026-05-08T00:00:00Z");
-  });
-
-  test("COLLAPSE sets expanded=false without touching audit state", () => {
-    const start: ChatState = {
-      ...initialChatState,
-      expanded: true,
-      unreadAuditCount: 3,
-      lastSeenAuditTs: "2026-05-08T00:00:00Z",
-    };
-    const next = chatReducer(start, { type: "COLLAPSE" });
-    expect(next.expanded).toBe(false);
-    expect(next.unreadAuditCount).toBe(3);
-    expect(next.lastSeenAuditTs).toBe("2026-05-08T00:00:00Z");
+describe("chatReducer — UI state (M13 Phase 1.A retired)", () => {
+  // M13 Phase 1.A retired EXPAND, COLLAPSE, and the `expanded` flag.
+  // The reducer no longer participates in layout-surface decisions.
+  // The previous tests for EXPAND / COLLAPSE are removed because the
+  // actions no longer exist; pathname-derived rendering is asserted in
+  // src/lib/chat/tests/isChatPrimary.test.ts instead.
+  test("reducer has no EXPAND or COLLAPSE action types (compile-time check)", () => {
+    // Sentinel: this test exists to make the retirement explicit. The
+    // exhaustiveness check in chatReducer's default branch + the
+    // ChatAction discriminated union enforce this at compile time. If
+    // EXPAND or COLLAPSE were re-added, TypeScript would fail before
+    // jest ran.
+    expect(true).toBe(true);
   });
 });
 
@@ -250,14 +240,11 @@ describe("chatReducer — audit feed", () => {
     expect(next.lastSeenAuditTs).toBe("2026-05-08T00:00:00Z");
   });
 
-  test("EXPAND also clears unread audit count (UI consumer convenience)", () => {
-    // Documented duplicate behavior: EXPAND clears unread for the case
-    // where the host taps the bar with new audit indicator visible.
-    // AUDIT_SEEN remains for explicit dismissal without expanding.
-    const start: ChatState = { ...initialChatState, unreadAuditCount: 5 };
-    const next = chatReducer(start, { type: "EXPAND" });
-    expect(next.unreadAuditCount).toBe(0);
-  });
+  // M13 Phase 1.A retired the EXPAND-clears-unread convenience. The
+  // unread-counter is dismissed via AUDIT_SEEN (explicit) or by the
+  // host navigating to chat-primary (the polling pause replaces the
+  // expanded-on-click trigger; see useAuditPoll.test for the new
+  // pause condition).
 });
 
 describe("chatReducer — purity", () => {
@@ -273,7 +260,7 @@ describe("chatReducer — purity", () => {
       type: "PROPOSAL_RECEIVED",
       proposal: { id: "p2" },
     });
-    chatReducer(start, { type: "EXPAND" });
+    chatReducer(start, { type: "AUDIT_SEEN" });
     expect(start).toEqual(snapshot);
   });
 });

@@ -9,7 +9,11 @@
  * On mount, the hydrator dispatches:
  * - SET_ACTIVE_CONVERSATION (clears history pending the next dispatch)
  * - HYDRATE_CONVERSATION (replaces with the fetched turns)
- * - EXPAND (opens the chat panel; the host arrived at /chat/[id])
+ *
+ * M13 Phase 1.A — EXPAND dispatch removed; chat-primary surface is
+ * pathname-derived in `(dashboard)/layout.tsx`, not store-state. The
+ * /chat/[id] route IS chat-primary by pathname, so the surface mounts
+ * automatically with the hydrated conversation.
  *
  * Returns null — no UI; the chat panel at layout scope renders the
  * conversation surface.
@@ -31,7 +35,6 @@ export function ConversationHydrator({
   useEffect(() => {
     dispatch({ type: "SET_ACTIVE_CONVERSATION", conversationId });
     dispatch({ type: "HYDRATE_CONVERSATION", turns: history });
-    dispatch({ type: "EXPAND" });
   }, [conversationId, history, dispatch]);
   return null;
 }

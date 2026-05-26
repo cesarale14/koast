@@ -4,9 +4,9 @@
  * Server component (RSC). Fetches conversation history via
  * `loadTurnsForConversation` and renders <ConversationHydrator> client
  * wrapper that dispatches SET_ACTIVE_CONVERSATION + HYDRATE_CONVERSATION
- * + EXPAND on mount. The chat surface itself is at layout scope (Step D
- * mounts ChatClient inside the dashboard layout); this route only
- * hydrates the store and triggers expansion.
+ * on mount. The chat surface itself is rendered by the M13 Phase 1.A
+ * pathname-derived layout (chat-primary at `/chat/*`); this route only
+ * hydrates the store.
  *
  * Auth pattern matches the prior implementation. Foreign or unknown
  * conversation_ids notFound() — host-ownership check is inside

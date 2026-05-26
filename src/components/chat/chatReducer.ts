@@ -36,12 +36,21 @@ export type ChatProposal = {
 
 export type TurnState = "idle" | "streaming" | "tool_call_pending";
 
+/**
+ * M13 Phase 1.A — pathname-derived layout state machine (operator msg 3515
+ * R1 binding refinement): the reducer holds CONVERSATION state only. The
+ * UI surface (chat-primary vs inspect) is derived from pathname in
+ * `(dashboard)/layout.tsx`, NOT stored in this reducer. Browser
+ * back/forward is correct for free; no mode/URL desync risk.
+ *
+ * RETIRED at M13 Phase 1.A: `expanded: boolean`, `EXPAND` action,
+ * `COLLAPSE` action. The previous overlay-on-click pattern (M8 C8 Step D)
+ * is replaced by chat-primary-as-default-at-/ + inspect-on-routes.
+ */
 export type ChatState = {
   // Conversation
   activeConversationId: string | null;
   conversationHistory: ChatTurn[];
-  // UI
-  expanded: boolean;
   // Turn (REFLECTED from useAgentTurn via Step C bridge; not store-owned)
   turnState: TurnState;
   // Audit feed (store-native; Step F populates)
@@ -52,8 +61,6 @@ export type ChatState = {
 };
 
 export type ChatAction =
-  | { type: "EXPAND" }
-  | { type: "COLLAPSE" }
   | { type: "SET_ACTIVE_CONVERSATION"; conversationId: string | null }
   | { type: "HYDRATE_CONVERSATION"; turns: ChatTurn[] }
   | { type: "TURN_STATE_CHANGED"; turnState: TurnState }
@@ -69,7 +76,6 @@ export type ChatAction =
 export const initialChatState: ChatState = {
   activeConversationId: null,
   conversationHistory: [],
-  expanded: false,
   turnState: "idle",
   unreadAuditCount: 0,
   lastSeenAuditTs: null,
@@ -82,12 +88,6 @@ export const initialChatState: ChatState = {
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
-    case "EXPAND":
-      // Expanding clears the unread indicator: the host is now seeing
-      // the surface where new audit events would land.
-      return { ...state, expanded: true, unreadAuditCount: 0 };
-    case "COLLAPSE":
-      return { ...state, expanded: false };
     case "SET_ACTIVE_CONVERSATION":
       // Switching conversation clears history pending HYDRATE_CONVERSATION.
       return {

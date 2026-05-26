@@ -1,25 +1,31 @@
 "use client";
 
 /**
- * useAuditPoll — between-turns polling hook for the chat bar's audit
- * indicator (M8 C8 substrate Step F).
+ * useAuditPoll — between-turns polling hook for the chat audit
+ * indicator (M8 C8 substrate Step F; M13 Phase 1.A pause-condition revision).
  *
- * Polls /api/audit-feed/since at a moderate interval when the chat
- * panel is in resting state and the tab is visible. Pauses when:
- * - state.expanded === true (host is engaged; in-conversation streaming
- *   covers updates within the panel)
+ * Polls /api/audit-feed/since at a moderate interval when the host is
+ * on an inspect-mode route (not chat-primary) and the tab is visible.
+ * Pauses when:
+ * - pathname is chat-primary (`/` or `/chat/*`) — host is engaged in
+ *   the chat surface; in-conversation streaming covers updates there
  * - document.visibilityState === 'hidden' (tab backgrounded)
+ *
+ * M13 Phase 1.A revision: the prior pause-on-`state.expanded` condition
+ * is replaced with pause-on-chat-primary-pathname. The reducer no longer
+ * tracks `expanded` (UI surface is pathname-derived); the polling
+ * semantic-equivalent is "pause when on the chat surface."
  *
  * On response with new events, dispatches AUDIT_TICK with the count and
  * newest timestamp. The store's reducer (chatReducer.ts) updates
- * unreadAuditCount + lastSeenAuditTs; ChatBar reads unreadAuditCount and
- * renders the badge.
+ * unreadAuditCount + lastSeenAuditTs; MiniChatBack reads unreadAuditCount
+ * and renders the badge.
  *
  * Lifecycle:
  * - First poll fires immediately on mount (when not paused)
  * - Subsequent polls every POLL_INTERVAL_MS
  * - AbortController cancels in-flight fetch on cleanup
- * - Effect re-creates on expanded / tabHidden change (resume from paused)
+ * - Effect re-creates on pathname / tabHidden change (resume from paused)
  *
  * Round-2 deferred: persistent last_seen_inspect_at across sessions
  * (currently in-memory only — first poll on a fresh page load uses NOW()
@@ -28,7 +34,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useChatStore } from "./ChatStore";
+import { isChatPrimary } from "@/lib/chat/isChatPrimary";
 
 const POLL_INTERVAL_MS = 90 * 1000; // 90s — Round-2 confirms; v1.4 D2 says 60-120s
 
@@ -48,6 +56,8 @@ type AuditFeedResponse = {
 
 export function useAuditPoll() {
   const { state, dispatch } = useChatStore();
+  const pathname = usePathname();
+  const onChatPrimary = isChatPrimary(pathname);
 
   // Track tab visibility so the polling effect can pause when backgrounded
   // and resume when foregrounded. SSR guard: document undefined on server.
@@ -73,9 +83,9 @@ export function useAuditPoll() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  // Polling effect — pauses when expanded or tab hidden
+  // Polling effect — pauses when on chat-primary route or tab hidden
   useEffect(() => {
-    if (state.expanded) return;
+    if (onChatPrimary) return;
     if (tabHidden) return;
 
     const abortController = new AbortController();
@@ -124,5 +134,5 @@ export function useAuditPoll() {
       abortController.abort();
       clearInterval(intervalId);
     };
-  }, [state.expanded, tabHidden, dispatch]);
+  }, [onChatPrimary, tabHidden, dispatch]);
 }
