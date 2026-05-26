@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "voice:scan:doctrine": "tsx scripts/voice-scan-doctrine.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -608,6 +608,14 @@ export const PHASE_F_DEFER_TO_M10: ReadonlyArray<DeferredAntiPatternStub> = [
     rationale_for_deferral:
       "Doctrine file contains every banned phrase as quotation; v1 runner excludes voice-doctrine.md from the prompt-bearing scan. Judge can distinguish quote-from-instance (per R3 from STEP 5+ kickoff).",
     planned_layer: "llm-judge",
+    // M12 Phase D (iii-vi rollout v) — TRANSITIONED to runtime-active.
+    // CI-TIME class: live consumer is scripts/voice-scan-doctrine.ts
+    // (npm run voice:scan:doctrine), NOT applyOutputJudges runtime
+    // dispatch. Per-match quote-vs-instance LLM classification on
+    // PHASE_F_SHIP catalog matches in method/voice-doctrine.md. Shared
+    // classifier at src/lib/agent/judge/quote-vs-instance.ts.
+    runtime_active: true,
+    judge_id: "voice_doctrine_self_scan",
   },
   {
     id: "deferred_constitution_prompt_quote_vs_instance",
