@@ -147,4 +147,60 @@ describe("system prompt", () => {
   test("M7 D44: read_guest_thread teaches max_messages re-call when context insufficient", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(/max_messages/);
   });
+
+  // --------- M13 Phase 1.B operational doctrine ---------
+
+  test("M13 Phase 1.B: Operational doctrine section present with all 8 numbered points", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/# Operational doctrine/);
+    // Each numbered point's lead phrase is asserted verbatim — these are
+    // the anchor markers a doctrine-lint or downstream regression-guard
+    // can call back to. Reordering must intentionally update this test.
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/1\. Koast IS the operating layer/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/2\. Never make a host look up a technical ID/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/3\. Tool inputs are natural references, not IDs/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/4\. Apply the scope the host already gave/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/5\. Ambiguity resolves with a select-from-list affordance/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/6\. Bridge to inspect informationally, not by mediating/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/7\. Navigation is direct first, agent-assisted second/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/8\. Both surfaces are first-class/);
+  });
+
+  test("M13 Phase 1.B: doctrine closing line anchors point 3 forward to tool design (1.D)", () => {
+    expect(SYSTEM_PROMPT_TEXT).toMatch(
+      /doctrine is a system-wide standard.*extends to tool design/i,
+    );
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/point 3 binds the natural-reference contract/);
+  });
+
+  test("M13 Phase 1.B: prompt anti-patterns only appear inside the doctrine (negated context)", () => {
+    // Per doctrine points 1 + 2: "your PMS" and "find the ID" patterns
+    // legitimately appear inside the doctrine ITSELF (where they're
+    // negated — "Never refer to 'your PMS'"). The regression-guard
+    // shape: the phrases must NOT appear OUTSIDE the doctrine section.
+    // Approach: slice the text into pre-doctrine + post-doctrine and
+    // assert neither slice contains the anti-pattern phrasing.
+    const doctrineStart = SYSTEM_PROMPT_TEXT.indexOf("# Operational doctrine");
+    const doctrineEnd = SYSTEM_PROMPT_TEXT.indexOf("# Tools available");
+    expect(doctrineStart).toBeGreaterThan(0);
+    expect(doctrineEnd).toBeGreaterThan(doctrineStart);
+    const preDoctrine = SYSTEM_PROMPT_TEXT.slice(0, doctrineStart);
+    const postDoctrine = SYSTEM_PROMPT_TEXT.slice(doctrineEnd);
+    expect(preDoctrine).not.toMatch(/your PMS/i);
+    expect(preDoctrine).not.toMatch(/please provide the booking ID/i);
+    expect(postDoctrine).not.toMatch(/your PMS/i);
+    expect(postDoctrine).not.toMatch(/please provide the booking ID/i);
+  });
+
+  test("M13 Phase 1.B: doctrine section is positioned between Identity and Tools available", () => {
+    // Per v1.4 iteration log: doctrine sits at the top of the prompt,
+    // after Identity and before the capability sections, so the model
+    // reads it as constitutional context (like the Method) rather than
+    // as a per-capability rule.
+    const identityIdx = SYSTEM_PROMPT_TEXT.indexOf("# Identity");
+    const doctrineIdx = SYSTEM_PROMPT_TEXT.indexOf("# Operational doctrine");
+    const toolsIdx = SYSTEM_PROMPT_TEXT.indexOf("# Tools available");
+    expect(identityIdx).toBeGreaterThanOrEqual(0);
+    expect(doctrineIdx).toBeGreaterThan(identityIdx);
+    expect(toolsIdx).toBeGreaterThan(doctrineIdx);
+  });
 });
