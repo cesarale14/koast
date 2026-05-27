@@ -34,9 +34,15 @@ export function ChatPrimarySurface({
   monthsActive,
   conversationCount,
 }: ChatPrimarySurfaceProps) {
+  // Parent (`(dashboard)/layout.tsx` chat-primary branch) sets
+  // height: 100dvh and overflow: hidden. This surface fills the parent.
+  // PropertyContextBar + FooterLine render conditionally (return null on
+  // empty props at Phase 1.A); ChatClient mounts the full ChatShell
+  // which uses its own internal 100dvh + safe-area-inset-bottom on the
+  // composer (see ChatShell.module.css).
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col flex-1 min-h-0"
       style={{ backgroundColor: "var(--shore)" }}
     >
       <PropertyContextBar propertyName={propertyName} />

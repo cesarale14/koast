@@ -376,6 +376,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const chatPrimary = isChatPrimary(pathname);
 
+  // M13 Phase 1.A follow-on (operator msg 3521 FIX 2): chat-primary OWNS
+  // the viewport. The legacy StayCommand chrome (DesktopSidebar +
+  // MobileSidebar + global topbar header + CommandPalette) is stripped
+  // on `/` and `/chat/*`. The chat surface's own ChatShell.Topbar provides
+  // the single nav affordance (hamburger opens Rail with conversation
+  // list + property dropdown + audit log + new thread). Inspect routes
+  // keep the legacy chrome unchanged.
+  //
+  // FIX 1 (operator msg 3521): height: 100dvh on the chat-primary wrapper.
+  // The prior `flex h-screen` (100vh) on mobile included the URL bar,
+  // pushing the composer below the visible viewport. dvh excludes browser
+  // chrome and tracks dynamically as the URL bar collapses on scroll.
+  // ChatShell.module.css already pads composer-wrap with
+  // env(safe-area-inset-bottom) for iPhone home-indicator clearance.
+  if (chatPrimary) {
+    return (
+      <ChatStoreProvider
+        initialConversationId={null}
+        initialHistory={[]}
+        initialProposals={[]}
+      >
+        <AuditPollMount />
+        <div
+          className="flex flex-col overflow-hidden"
+          style={{
+            height: "100dvh",
+            backgroundColor: "var(--shore)",
+          }}
+        >
+          <ToastProvider>
+            <ChatPrimarySurface
+              propertyName={null}
+              monthsActive={null}
+              conversationCount={null}
+            />
+          </ToastProvider>
+        </div>
+      </ChatStoreProvider>
+    );
+  }
+
   return (
     <ChatStoreProvider
       initialConversationId={null}
@@ -425,29 +466,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <main className="flex-1 overflow-auto">
               <ToastProvider>
-                {chatPrimary ? (
-                  /* M13 Phase 1.A chat-primary surface — displaces children
-                     at `/` and `/chat/*`. The wedge-scope active property
-                     surfaces null at Phase 1.A; 1.B wires the active
-                     property hook. */
-                  <ChatPrimarySurface
-                    propertyName={null}
-                    monthsActive={null}
-                    conversationCount={null}
-                  />
-                ) : (
-                  <InspectSurface>
-                    {pathname === "/calendar" || pathname === "/messages" ? (
-                      <div className="h-full page-enter">{children}</div>
-                    ) : /^\/properties\/[^/]+$/.test(pathname) ? (
-                      // Property detail page handles its own layout (full-bleed
-                      // hero + max-w content). Skip the wrapper padding.
-                      <div className="page-enter">{children}</div>
-                    ) : (
-                      <div className="p-4 md:p-8 page-enter">{children}</div>
-                    )}
-                  </InspectSurface>
-                )}
+                <InspectSurface>
+                  {pathname === "/calendar" || pathname === "/messages" ? (
+                    <div className="h-full page-enter">{children}</div>
+                  ) : /^\/properties\/[^/]+$/.test(pathname) ? (
+                    // Property detail page handles its own layout (full-bleed
+                    // hero + max-w content). Skip the wrapper padding.
+                    <div className="page-enter">{children}</div>
+                  ) : (
+                    <div className="p-4 md:p-8 page-enter">{children}</div>
+                  )}
+                </InspectSurface>
               </ToastProvider>
             </main>
           </div>

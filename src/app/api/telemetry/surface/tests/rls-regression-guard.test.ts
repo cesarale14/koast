@@ -46,12 +46,15 @@ function makeMockServiceClient(): {
   return {
     inserts,
     client: {
-      from: (_table: string) => ({
-        insert: async (rows: Array<Record<string, unknown>>) => {
-          inserts.push({ rows });
-          return { error: null };
-        },
-      }),
+      from: (table: string) => {
+        expect(table).toBe("host_surface_telemetry");
+        return {
+          insert: async (rows: Array<Record<string, unknown>>) => {
+            inserts.push({ rows });
+            return { error: null };
+          },
+        };
+      },
     },
   };
 }

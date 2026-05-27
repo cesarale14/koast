@@ -3,8 +3,9 @@
  *
  * Distinct from `/api/audit-feed/since`: this endpoint serves the
  * Activity tab's paginated browsing (cursor-based, full envelope), while
- * /since is the lean polling channel used by ChatBar's useAuditPoll.
- * Both wrap the same F9 helper — single source of truth for the VIEW.
+ * /since is the lean polling channel used by AuditPollMount /
+ * useAuditPoll (M13 Phase 1.A). Both wrap the same F9 helper — single
+ * source of truth for the VIEW.
  *
  * Auth: createClient + supabase.auth.getUser(). host_id derived from
  * the authenticated session — never from query params.

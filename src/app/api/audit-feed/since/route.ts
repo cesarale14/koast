@@ -2,9 +2,11 @@
  * GET /api/audit-feed/since — between-turns polling endpoint (M8 C8 Step F).
  *
  * Catch-up channel: returns events newer than the client-provided
- * timestamp, scoped to the authenticated host. Used by ChatBar's
- * useAuditPoll hook to surface a "Koast did something silently"
- * indicator while the chat panel is in resting state.
+ * timestamp, scoped to the authenticated host. Used by the
+ * AuditPollMount (M13 Phase 1.A) which runs useAuditPoll inside the
+ * dashboard layout's ChatStoreProvider tree; the unread count surfaces
+ * via MiniChatBack on inspect routes ("Koast is here" + badge).
+ * Polling pauses while the host is on a chat-primary route.
  *
  * Per conventions v1.4 D2: per-turn streaming preserved as-is; this is
  * the between-turns lightweight polling channel. Persistent SSE deferred.
@@ -89,15 +91,15 @@ export async function GET(request: Request) {
     );
 
     // Adapt F9's cursor-based response to the legacy /since contract
-    // (ChatBar polling consumer doesn't need cursor — it polls forward
-    // from last-seen timestamp). has_more derives from next_cursor;
-    // newest_ts is the most recent event in this batch (events are
-    // ordered newest-first by F9).
+    // (AuditPollMount / useAuditPoll polling consumer doesn't need
+    // cursor — it polls forward from last-seen timestamp). has_more
+    // derives from next_cursor; newest_ts is the most recent event in
+    // this batch (events are ordered newest-first by F9).
     const hasMore = next_cursor !== null;
     const newestTs = events.length > 0 ? events[0].occurred_at : null;
 
     // Project to the leaner /since envelope (keeps backwards-compat
-    // for the existing ChatBar consumer).
+    // for the AuditPollMount / useAuditPoll consumer).
     const projected = events.map((e) => ({
       occurred_at: e.occurred_at,
       category: e.category,
