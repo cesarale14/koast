@@ -57,7 +57,11 @@ __pycache__/
 
 # Per-milestone working files (D-F4 / D-GITIGNORE).
 # Authored during STOP discipline + commit construction; removed before/after commit.
+# Pattern broadened in M13 Phase 1.B to cover phase-suffixed STOP / RCA files
+# (e.g. .m13-phase1B-stop.md, .m13-phase1B-slow-conv-rca.md).
 .m*-phase1-stop.md
+.m*-phase1[A-Z]-*.md
+.m*-phase[0-9]*-stop.md
 .m*-recovery.md
 .m*-cp5-draft.txt
 .m*-checkpoint*.md
