@@ -8,6 +8,7 @@ import TopBarSearch from "@/components/polish/TopBarSearch";
 import CommandPalette from "@/components/polish/CommandPalette";
 import { ChatStoreProvider } from "@/components/chat/ChatStore";
 import { ChatPrimarySurface } from "@/components/chat/ChatPrimarySurface";
+import { ChatURLSync } from "@/components/chat/ChatURLSync";
 import { InspectSurface } from "@/components/chat/InspectSurface";
 import { isChatPrimary } from "@/lib/chat/isChatPrimary";
 import { useAuditPoll } from "@/components/chat/useAuditPoll";
@@ -408,6 +409,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           initialHistory={[]}
           initialProposals={[]}
         >
+          {/* M13 Phase 1.B follow-on (operator msg 3539):
+              ChatURLSync watches pathname + dispatches store updates
+              when the URL conversation_id changes. The page.tsx at
+              /chat/[id] renders <ConversationHydrator> but the
+              chat-primary branch DROPS {children} (chat-primary owns
+              the viewport), so the page's hydrator never mounts.
+              ChatURLSync runs INSIDE the store provider on the chat-
+              primary branch and replaces the dropped page's role. */}
+          <ChatURLSync />
           <AuditPollMount />
           <div
             className="flex flex-col overflow-hidden"
