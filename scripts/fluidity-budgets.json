@@ -1,0 +1,12 @@
+{
+  "$comment": "M13 Phase 1.B fluidity budgets — the contract scripts/fluidity-check.ts enforces in CI and the production telemetry rollup compares against. Each value is the host-perceived ceiling in milliseconds. Keys match the host_surface_telemetry.budget_class CHECK constraint vocabulary exactly. Edits here must ship alongside the corresponding migration if the vocab changes.",
+  "property_focus": 100,
+  "chat_start_of_stream": 500,
+  "cmd_k_first_result": 100,
+  "route_nav": 100,
+  "perceived_action": 50,
+  "$meta": {
+    "ci_tolerance_multiplier": 2,
+    "ci_tolerance_note": "Per operator Telegram msg 3527: unit-test perf is noisy + platform-dependent; CI hard-fail bound is 2× the budget. Production telemetry rollup is the truth-source for the 1× contract. CI noise should not block work."
+  }
+}

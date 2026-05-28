@@ -1095,21 +1095,40 @@ export const hostSurfaceTelemetry = pgTable(
     sessionId: text("session_id").notNull(),
     ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
     // event_kind values: 'chat_view' | 'inspect_view' | 'inspect_entry'
+    //                   | 'fluidity_measurement' (M13 Phase 1.B)
     // CHECK constraint enforced at DB. Controlled vocabulary mirrored
     // at type level via HostSurfaceTelemetryEventKind below.
     eventKind: text("event_kind").notNull(),
     pathname: text("pathname").notNull(),
     // task_class values: 'scan' | 'bulk_operate' | 'visual_survey' |
-    // 'config' | 'external_link' | 'other' | null
+    // 'config' | 'external_link' | 'other' | null. Navigation-only;
+    // null on perf rows.
     taskClass: text("task_class"),
     // entry_trigger values: 'agent_offered_navchip' | 'self_navigated' | null
     // (null on chat_view / inspect_view; carries value on inspect_entry).
     entryTrigger: text("entry_trigger"),
+    // M13 Phase 1.B — fluidity extension (additive migration
+    // 20260528001210_host_surface_telemetry_fluidity.sql). On perf rows
+    // (event_category='perf'): latency_ms + budget_class are required
+    // at application layer. On navigation rows: both NULL.
+    latencyMs: decimal("latency_ms"),
+    budgetClass: text("budget_class"),
+    // M13 Phase 1.B — discriminator. NOT NULL DEFAULT 'navigation'
+    // (existing rows backfilled to 'navigation' on migration).
+    eventCategory: text("event_category").notNull().default("navigation"),
     context: jsonb("context").notNull().default({}),
   },
   (t) => [
     index("idx_host_surface_telemetry_host_ts").on(t.hostId, t.ts),
     index("idx_host_surface_telemetry_event_kind").on(t.eventKind, t.ts),
+    // Perf-class analyzer query path — partial index on event_category='perf'
+    // keeps the rollup query fast as data accumulates. Mirrored from the
+    // migration's CREATE INDEX idx_host_surface_telemetry_perf.
+    index("idx_host_surface_telemetry_perf").on(
+      t.hostId,
+      t.eventCategory,
+      t.budgetClass,
+    ),
   ],
 );
 
@@ -1122,7 +1141,30 @@ export const hostSurfaceTelemetry = pgTable(
 export type HostSurfaceTelemetryEventKind =
   | "chat_view"
   | "inspect_view"
-  | "inspect_entry";
+  | "inspect_entry"
+  | "fluidity_measurement";
+
+/**
+ * M13 Phase 1.B controlled vocabulary for
+ * `host_surface_telemetry.budget_class`. Each value names a discrete
+ * fluidity budget the perceived-action contract makes auditable. See
+ * scripts/fluidity-budgets.json for the budget values (this enum
+ * names the keys; the manifest names the values).
+ */
+export type HostSurfaceTelemetryBudgetClass =
+  | "property_focus"
+  | "chat_start_of_stream"
+  | "cmd_k_first_result"
+  | "route_nav"
+  | "perceived_action";
+
+/**
+ * M13 Phase 1.B controlled vocabulary for
+ * `host_surface_telemetry.event_category`. The discriminator that
+ * separates navigation telemetry (existing) from fluidity telemetry
+ * (new) so the analyzer query path doesn't conflate them.
+ */
+export type HostSurfaceTelemetryEventCategory = "navigation" | "perf";
 
 /**
  * Controlled vocabulary for `host_surface_telemetry.task_class`. Buckets

@@ -41,7 +41,13 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const EVENT_KIND = ["chat_view", "inspect_view", "inspect_entry"] as const;
+const EVENT_KIND = [
+  "chat_view",
+  "inspect_view",
+  "inspect_entry",
+  // M13 Phase 1.B — perf measurement event_kind.
+  "fluidity_measurement",
+] as const;
 const TASK_CLASS = [
   "scan",
   "bulk_operate",
@@ -51,16 +57,56 @@ const TASK_CLASS = [
   "other",
 ] as const;
 const ENTRY_TRIGGER = ["agent_offered_navchip", "self_navigated"] as const;
+// M13 Phase 1.B — fluidity controlled vocab. Mirrors
+// scripts/fluidity-budgets.json keys + matches the DB CHECK constraint.
+const BUDGET_CLASS = [
+  "property_focus",
+  "chat_start_of_stream",
+  "cmd_k_first_result",
+  "route_nav",
+  "perceived_action",
+] as const;
+const EVENT_CATEGORY = ["navigation", "perf"] as const;
 
-const eventSchema = z.object({
-  session_id: z.string().min(1).max(128),
-  event_kind: z.enum(EVENT_KIND),
-  pathname: z.string().min(1).max(512),
-  task_class: z.enum(TASK_CLASS).nullable().optional(),
-  entry_trigger: z.enum(ENTRY_TRIGGER).nullable().optional(),
-  context: z.record(z.string(), z.unknown()).optional(),
-  ts: z.string().datetime().optional(),
-});
+const eventSchema = z
+  .object({
+    session_id: z.string().min(1).max(128),
+    event_kind: z.enum(EVENT_KIND),
+    pathname: z.string().min(1).max(512),
+    task_class: z.enum(TASK_CLASS).nullable().optional(),
+    entry_trigger: z.enum(ENTRY_TRIGGER).nullable().optional(),
+    // M13 Phase 1.B — fluidity fields.
+    event_category: z.enum(EVENT_CATEGORY).optional(),
+    latency_ms: z.number().nonnegative().finite().nullable().optional(),
+    budget_class: z.enum(BUDGET_CLASS).nullable().optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
+    ts: z.string().datetime().optional(),
+  })
+  .superRefine((ev, ctx) => {
+    // Cross-column contract: perf rows REQUIRE latency_ms + budget_class.
+    // CHECK constraints at the DB can't enforce cross-column rules cleanly;
+    // the API is the single insert path, so enforce here.
+    if (
+      ev.event_category === "perf" ||
+      ev.event_kind === "fluidity_measurement"
+    ) {
+      if (typeof ev.latency_ms !== "number") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["latency_ms"],
+          message: "perf-class telemetry requires latency_ms (number, ms)",
+        });
+      }
+      if (!ev.budget_class) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["budget_class"],
+          message:
+            "perf-class telemetry requires budget_class (one of the enumerated values)",
+        });
+      }
+    }
+  });
 
 const bodySchema = z.object({
   events: z.array(eventSchema).min(1).max(50),
@@ -97,16 +143,28 @@ export async function POST(req: Request) {
     // host_id-server-derived discipline explicit + match the convention
     // of every other telemetry-class endpoint in the repo.
     const service = createServiceClient();
-    const rows = parsed.events.map((e) => ({
-      host_id: user.id,
-      session_id: e.session_id,
-      event_kind: e.event_kind,
-      pathname: e.pathname,
-      task_class: e.task_class ?? null,
-      entry_trigger: e.entry_trigger ?? null,
-      context: e.context ?? {},
-      ...(e.ts ? { ts: e.ts } : {}),
-    }));
+    const rows = parsed.events.map((e) => {
+      // Default event_category: perf when the event_kind names a perf
+      // measurement, navigation otherwise. Lets clients omit the field
+      // for chat_view / inspect_view / inspect_entry batches (back-
+      // compat shape — pre-1.B clients still work unchanged).
+      const eventCategory =
+        e.event_category ??
+        (e.event_kind === "fluidity_measurement" ? "perf" : "navigation");
+      return {
+        host_id: user.id,
+        session_id: e.session_id,
+        event_kind: e.event_kind,
+        pathname: e.pathname,
+        task_class: e.task_class ?? null,
+        entry_trigger: e.entry_trigger ?? null,
+        event_category: eventCategory,
+        latency_ms: e.latency_ms ?? null,
+        budget_class: e.budget_class ?? null,
+        context: e.context ?? {},
+        ...(e.ts ? { ts: e.ts } : {}),
+      };
+    });
 
     const { error: insertErr } = await service
       .from("host_surface_telemetry")

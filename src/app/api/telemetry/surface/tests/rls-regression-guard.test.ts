@@ -265,5 +265,115 @@ describe("POST /api/telemetry/surface — RLS regression-guard (§3.5.D 3rd inst
     expect(svc.inserts[0]?.rows[0]?.event_kind).toBe("chat_view");
     expect(svc.inserts[0]?.rows[0]?.pathname).toBe("/");
     expect(svc.inserts[0]?.rows[0]?.context).toEqual({ ui_locale: "en-US" });
+    // Navigation row carries event_category='navigation' by default; perf
+    // fields remain null. M13 Phase 1.B fluidity extension shape.
+    expect(svc.inserts[0]?.rows[0]?.event_category).toBe("navigation");
+    expect(svc.inserts[0]?.rows[0]?.latency_ms).toBeNull();
+    expect(svc.inserts[0]?.rows[0]?.budget_class).toBeNull();
+  });
+
+  // --------- M13 Phase 1.B Step 4 — fluidity perf rows ---------
+
+  test("M13 Phase 1.B: perf row insert carries latency_ms + budget_class + event_category='perf'", async () => {
+    const svc = makeMockServiceClient();
+    mockedCreateServiceClient.mockReturnValue(svc.client);
+
+    const req = new Request("https://app.koasthq.com/api/telemetry/surface", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        events: [
+          {
+            session_id: "sess-perf",
+            event_kind: "fluidity_measurement",
+            pathname: "/calendar",
+            latency_ms: 87.4,
+            budget_class: "cmd_k_first_result",
+          },
+        ],
+      }),
+    });
+
+    const resp = await POST(req);
+    expect(resp.status).toBe(200);
+    const row = svc.inserts[0]?.rows[0];
+    expect(row?.host_id).toBe(SERVER_DERIVED_HOST);
+    expect(row?.event_kind).toBe("fluidity_measurement");
+    expect(row?.event_category).toBe("perf");
+    expect(row?.latency_ms).toBe(87.4);
+    expect(row?.budget_class).toBe("cmd_k_first_result");
+  });
+
+  test("M13 Phase 1.B: perf event_kind without latency_ms returns 400", async () => {
+    const req = new Request("https://app.koasthq.com/api/telemetry/surface", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        events: [
+          {
+            session_id: "sess-perf-missing",
+            event_kind: "fluidity_measurement",
+            pathname: "/calendar",
+            budget_class: "cmd_k_first_result",
+            // latency_ms missing — cross-column refinement should reject
+          },
+        ],
+      }),
+    });
+    const resp = await POST(req);
+    expect(resp.status).toBe(400);
+  });
+
+  test("M13 Phase 1.B: perf event_kind without budget_class returns 400", async () => {
+    const req = new Request("https://app.koasthq.com/api/telemetry/surface", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        events: [
+          {
+            session_id: "sess-perf-missing-budget",
+            event_kind: "fluidity_measurement",
+            pathname: "/calendar",
+            latency_ms: 42,
+            // budget_class missing — cross-column refinement should reject
+          },
+        ],
+      }),
+    });
+    const resp = await POST(req);
+    expect(resp.status).toBe(400);
+  });
+
+  test("M13 Phase 1.B: perf row's host_id is server-derived (RLS-guard parity)", async () => {
+    // §3.5.D regression-guard scope extends to perf rows. A malicious
+    // client claiming a host_id on a perf-class event must be ignored,
+    // same shape as the navigation-row adversarial cases above.
+    const svc = makeMockServiceClient();
+    mockedCreateServiceClient.mockReturnValue(svc.client);
+
+    const req = new Request("https://app.koasthq.com/api/telemetry/surface", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-host-id": "11111111-1111-1111-1111-111111111111",
+      },
+      body: JSON.stringify({
+        host_id: "22222222-2222-2222-2222-222222222222",
+        events: [
+          {
+            host_id: "33333333-3333-3333-3333-333333333333",
+            session_id: "sess-evil-perf",
+            event_kind: "fluidity_measurement",
+            pathname: "/calendar",
+            latency_ms: 50,
+            budget_class: "cmd_k_first_result",
+          },
+        ],
+      }),
+    });
+
+    const resp = await POST(req);
+    expect(resp.status).toBe(200);
+    expect(svc.inserts[0]?.rows[0]?.host_id).toBe(SERVER_DERIVED_HOST);
   });
 });

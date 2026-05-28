@@ -46,3 +46,16 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # M13 Phase 1.B Step 4 — fluidity perf gate.
+      #
+      # Runs the perf-test subset of the jest suite (a superset of what
+      # `npm test` ran above, but isolated for visibility — the CI log
+      # shows a discrete PASS/FAIL for the perceived-action contract).
+      # Budgets live in scripts/fluidity-budgets.json; assertions live
+      # in jest tests (e.g. src/lib/cmdk/__tests__/filter.test.ts under
+      # the "performance" describe block). Per operator msg 3527, hard
+      # bound is 2× the budget — production telemetry rollup is the
+      # truth source for the 1× contract.
+      - name: Fluidity check
+        run: npx tsx scripts/fluidity-check.ts
