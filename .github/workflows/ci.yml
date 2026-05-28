@@ -47,6 +47,18 @@ jobs:
       - name: Test
         run: npm test
 
+      # M13 Phase 1.B Step 6 — doctrine regression-guard.
+      #
+      # Scans src/lib/agent + src/lib/voice + src/app/api/agent +
+      # src/app/(dashboard) + src/components for anti-pattern phrases
+      # that violate the Koast Operational Doctrine (vault note
+      # milestones/M13/koast-operational-doctrine.md). Test files
+      # under __tests__/tests/fixtures are excluded. system-prompt.ts
+      # is allowed to mention the phrases inside the doctrine's own
+      # negated context. Cheap; runs in <1s.
+      - name: Doctrine lint
+        run: ./scripts/doctrine-lint.sh
+
       # M13 Phase 1.B Step 4 — fluidity perf gate.
       #
       # Runs the perf-test subset of the jest suite (a superset of what
