@@ -1,46 +1,86 @@
 "use client";
 
 /**
- * CommandPalette — overlay shell for the future global search.
+ * CommandPalette — universal nav primitive (M13 Phase 1.B Step 2).
  *
- * Self-contained: manages its own open state, handles the ⌘K /
- * Ctrl+K keyboard shortcut (document-level), traps focus, restores
- * focus to the element that opened it, and respects
- * prefers-reduced-motion.
+ * Per the Koast Operational Doctrine point 7 — "navigation is direct
+ * first, agent-assisted second; tabs are one-click reachable from
+ * anywhere" — the palette is mounted globally at the dashboard layout
+ * scope (above the chat-primary / inspect-mode branch split) so ⌘K
+ * (or Ctrl+K) opens it from every route in the app.
  *
- * Opening from outside: dispatch a "koast:open-command-palette"
- * CustomEvent (TopBarSearch does this on click). That decouples the
- * trigger from the overlay — the palette works even when the
- * trigger button is hidden (mobile).
+ * Opens via:
+ *   - ⌘K / Ctrl+K keyboard shortcut (document-level)
+ *   - `koast:open-command-palette` CustomEvent (TopBarSearch on inspect
+ *     routes; the chat ChatShell topbar's SearchAffordance on chat-
+ *     primary; future mobile FAB if it lands)
  *
- * Real search results, fuzzy indexing, and keyboard nav land in a
- * future session. For now this is a placeholder shell with copy.
+ * Data sources merged into one CmdKEntry[] index:
+ *   - Properties (id + name + city + address_line1) — fetched from
+ *     /api/cmdk/index, module-scoped cache with 5min TTL
+ *   - Recent conversations (top-20) — same fetch
+ *   - Static route catalog — STATIC_ROUTES (src/lib/cmdk/static.ts)
+ *   - Static action catalog — STATIC_ACTIONS (same file)
+ *
+ * Filter: substring + token-prefix match on entry.keywords. Per the
+ * M13 Phase 1.B STOP, no Fuse.js dependency at 1.B — plain matching
+ * is fast (<5ms steady-state on a 287-entry index per the perf test)
+ * and the field-expansion approach covers "tampa → Villa Jamaica"
+ * without typo tolerance.
+ *
+ * Keyboard:
+ *   - ⌘K / Ctrl+K opens / closes
+ *   - ESC closes
+ *   - ↑ / ↓ navigate results
+ *   - Enter triggers the selected result
+ *   - Tab cycles within the dialog (focus trap)
+ *
+ * Restores focus to the trigger element on close.
+ * Respects prefers-reduced-motion.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Search, Building2, Compass, MessageSquare, Zap } from "lucide-react";
+import type { CmdKEntry, CmdKKind } from "@/lib/cmdk/types";
+import { filterEntries } from "@/lib/cmdk/filter";
+import { useCmdKData } from "@/lib/cmdk/use-cmdk-data";
 
 export const OPEN_EVENT = "koast:open-command-palette";
 
+const MAX_RESULTS = 8;
+
 export default function CommandPalette() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIdx, setActiveIdx] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  // Initial reduced-motion detection (SSR-safe).
+  // Fetch only after first open — palette is lazy.
+  const { entries, loading, error } = useCmdKData(open);
+
+  // Filtered + capped result list. Memo so typing doesn't re-allocate
+  // when the cached entries are stable.
+  const results = useMemo<CmdKEntry[]>(() => {
+    if (!entries) return [];
+    return filterEntries(entries, query).slice(0, MAX_RESULTS);
+  }, [entries, query]);
+
+  // Reduced-motion detection.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const apply = () => setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    apply();
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReducedMotion(mq.matches);
+    apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // Global ⌘K/Ctrl+K listener + open-event listener.
+  // Global ⌘K/Ctrl+K + OPEN_EVENT listener.
   useEffect(() => {
     const openPalette = () => {
       returnFocusRef.current = (document.activeElement as HTMLElement) ?? null;
@@ -63,21 +103,62 @@ export default function CommandPalette() {
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-    // Focus returns to the trigger that opened the palette.
+    setActiveIdx(0);
     const el = returnFocusRef.current;
     if (el && typeof el.focus === "function") {
       requestAnimationFrame(() => el.focus());
     }
   }, []);
 
-  // Autofocus the input when opening.
+  // Autofocus input on open; reset active row.
   useEffect(() => {
     if (!open) return;
+    setActiveIdx(0);
     const t = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(t);
   }, [open]);
 
-  // ESC close + focus trap while open.
+  // Reset active row when query changes (new filter set means index 0
+  // is the new top match).
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [query]);
+
+  const performSelect = useCallback(
+    (entry: CmdKEntry) => {
+      close();
+      // Action dispatch FIRST — some actions need href as a fallback
+      // (e.g. add-property has both an action tag AND href).
+      if (entry.action) {
+        switch (entry.action) {
+          case "new-conversation":
+            // Naive: navigate to / and dispatch a "new conversation"
+            // event the ChatStore can listen to. At Phase 1.B the
+            // simpler path is just navigate to / — the chat empty-
+            // state surfaces if there's no active conversation. Wire
+            // a proper "new" event when conversation list management
+            // gets more sophisticated.
+            router.push("/");
+            return;
+          case "add-property":
+            router.push(entry.href ?? "/properties/new");
+            return;
+          case "show-today": {
+            // The calendar reads ?date param; default behavior already
+            // lands on today, so a plain navigate works.
+            router.push("/calendar");
+            return;
+          }
+        }
+      }
+      if (entry.href) {
+        router.push(entry.href);
+      }
+    },
+    [close, router],
+  );
+
+  // Keyboard: ESC / ↑ / ↓ / Enter / Tab.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -86,11 +167,30 @@ export default function CommandPalette() {
         close();
         return;
       }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.min(i + 1, Math.max(results.length - 1, 0)));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        const target = results[activeIdx];
+        if (target) {
+          e.preventDefault();
+          performSelect(target);
+        }
+        return;
+      }
       if (e.key !== "Tab") return;
+      // Focus trap.
       const shell = shellRef.current;
       if (!shell) return;
       const focusable = shell.querySelectorAll<HTMLElement>(
-        "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])",
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -106,7 +206,7 @@ export default function CommandPalette() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, close]);
+  }, [open, close, results, activeIdx, performSelect]);
 
   if (!open) return null;
 
@@ -114,7 +214,7 @@ export default function CommandPalette() {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Search"
+      aria-label="Command palette"
       onClick={close}
       style={{
         position: "fixed",
@@ -133,7 +233,7 @@ export default function CommandPalette() {
         style={{
           maxWidth: 640,
           width: "calc(100% - 32px)",
-          margin: "15vh auto 0",
+          margin: "12vh auto 0",
           background: "#fff",
           borderRadius: 16,
           boxShadow: "0 20px 60px rgba(19,46,32,0.25)",
@@ -147,7 +247,7 @@ export default function CommandPalette() {
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "18px 20px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--dry-sand)",
           }}
         >
@@ -157,8 +257,10 @@ export default function CommandPalette() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search properties, guests, messages…"
+            placeholder="Properties, conversations, tabs…"
             aria-label="Search query"
+            aria-controls="cmdk-results"
+            aria-activedescendant={results[activeIdx] ? `cmdk-row-${results[activeIdx].id}` : undefined}
             style={{
               flex: 1,
               border: 0,
@@ -184,23 +286,46 @@ export default function CommandPalette() {
             ESC
           </kbd>
         </header>
-        <div style={{ minHeight: 280, padding: 24, color: "var(--tideline)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {query === "" ? <EmptyState /> : <ComingSoonState query={query} />}
+        <div id="cmdk-results" role="listbox" style={{ maxHeight: "55vh", overflowY: "auto" }}>
+          {entries === null && loading ? (
+            <Empty message="Loading…" />
+          ) : results.length === 0 ? (
+            query.trim() === "" ? (
+              <Empty message="Type to search properties, conversations, or tabs." />
+            ) : (
+              <Empty message={`No matches for "${query}".`} />
+            )
+          ) : (
+            results.map((entry, idx) => (
+              <ResultRow
+                key={entry.id}
+                entry={entry}
+                active={idx === activeIdx}
+                onHover={() => setActiveIdx(idx)}
+                onClick={() => performSelect(entry)}
+              />
+            ))
+          )}
+          {error ? (
+            <div style={{ padding: "12px 20px", fontSize: 11, color: "var(--coral-reef)" }}>
+              Live data unavailable — showing tabs and actions only.
+            </div>
+          ) : null}
         </div>
         <footer
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "12px 20px",
+            padding: "10px 20px",
             background: "var(--shore-soft)",
             borderTop: "1px solid var(--dry-sand)",
             fontSize: 11,
             color: "var(--tideline)",
           }}
         >
-          <span>⌘K to open · ESC to close</span>
-          <span>Global search coming soon</span>
+          <span>↑↓ to move · Enter to open · ESC to close</span>
+          <span>⌘K from anywhere</span>
         </footer>
       </div>
       <style jsx global>{`
@@ -217,32 +342,139 @@ export default function CommandPalette() {
   );
 }
 
-function EmptyState() {
+function Empty({ message }: { message: string }) {
   return (
-    <div style={{ textAlign: "center", maxWidth: 360 }}>
-      <div
-        style={{
-          fontFamily: "var(--font-fraunces), 'Fraunces', Georgia, serif",
-          fontSize: 18,
-          fontStyle: "italic",
-          color: "var(--tideline)",
-          lineHeight: 1.3,
-          marginBottom: 10,
-        }}
-      >
-        Global search is coming.
-      </div>
-      <p style={{ fontSize: 13, color: "var(--tideline)", lineHeight: 1.5, margin: 0 }}>
-        Soon you&apos;ll be able to jump to any property, guest, message, calendar date, or setting from here. For now, use the sidebar.
-      </p>
+    <div
+      style={{
+        padding: "32px 24px",
+        textAlign: "center",
+        color: "var(--tideline)",
+        fontSize: 13,
+      }}
+    >
+      {message}
     </div>
   );
 }
 
-function ComingSoonState({ query }: { query: string }) {
+function ResultRow({
+  entry,
+  active,
+  onHover,
+  onClick,
+}: {
+  entry: CmdKEntry;
+  active: boolean;
+  onHover: () => void;
+  onClick: () => void;
+}) {
+  const Icon = ICON_BY_KIND[entry.kind];
   return (
-    <div style={{ textAlign: "center", fontSize: 13, color: "var(--tideline)", lineHeight: 1.5 }}>
-      Searching for &lsquo;{query}&rsquo;… (not yet wired up)
-    </div>
+    <button
+      id={`cmdk-row-${entry.id}`}
+      role="option"
+      aria-selected={active}
+      type="button"
+      onMouseEnter={onHover}
+      onFocus={onHover}
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        width: "100%",
+        padding: "10px 20px",
+        background: active ? "var(--shore-soft)" : "transparent",
+        border: 0,
+        textAlign: "left",
+        cursor: "pointer",
+        color: "var(--deep-sea)",
+        transition: "background 80ms ease-out",
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: KIND_TILE_BG[entry.kind],
+          color: KIND_TILE_FG[entry.kind],
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={14} strokeWidth={1.8} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            lineHeight: 1.3,
+            color: "var(--deep-sea)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {entry.label}
+        </div>
+        {entry.hint ? (
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--tideline)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              marginTop: 2,
+            }}
+          >
+            {entry.hint}
+          </div>
+        ) : null}
+      </div>
+      <span
+        style={{
+          fontSize: 10,
+          color: "var(--tideline)",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          flexShrink: 0,
+        }}
+      >
+        {KIND_LABEL[entry.kind]}
+      </span>
+    </button>
   );
 }
+
+const ICON_BY_KIND: Record<CmdKKind, typeof Building2> = {
+  property: Building2,
+  route: Compass,
+  conversation: MessageSquare,
+  action: Zap,
+};
+
+const KIND_TILE_BG: Record<CmdKKind, string> = {
+  property: "rgba(196,154,90,0.18)", // golden tint
+  route: "rgba(61,107,82,0.15)", // tideline tint
+  conversation: "rgba(26,122,90,0.15)", // lagoon tint
+  action: "rgba(212,150,11,0.18)", // amber tide tint
+};
+
+const KIND_TILE_FG: Record<CmdKKind, string> = {
+  property: "var(--coastal)",
+  route: "var(--coastal)",
+  conversation: "var(--coastal)",
+  action: "var(--coastal)",
+};
+
+const KIND_LABEL: Record<CmdKKind, string> = {
+  property: "Property",
+  route: "Tab",
+  conversation: "Chat",
+  action: "Action",
+};

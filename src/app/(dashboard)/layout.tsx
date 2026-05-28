@@ -378,11 +378,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // M13 Phase 1.A follow-on (operator msg 3521 FIX 2): chat-primary OWNS
   // the viewport. The legacy StayCommand chrome (DesktopSidebar +
-  // MobileSidebar + global topbar header + CommandPalette) is stripped
-  // on `/` and `/chat/*`. The chat surface's own ChatShell.Topbar provides
-  // the single nav affordance (hamburger opens Rail with conversation
-  // list + property dropdown + audit log + new thread). Inspect routes
-  // keep the legacy chrome unchanged.
+  // MobileSidebar + global topbar header) is stripped on `/` and
+  // `/chat/*`. The chat surface's own ChatShell.Topbar provides the
+  // single nav affordance (hamburger opens Rail with conversation
+  // list + property dropdown + audit log + new thread + SearchAffordance
+  // which dispatches the OPEN_EVENT to the globally-mounted
+  // CommandPalette below). Inspect routes keep the legacy chrome
+  // unchanged.
+  //
+  // M13 Phase 1.B Step 2: CommandPalette is mounted at the outer
+  // dashboard layout scope (not branched), so ⌘K + the OPEN_EVENT
+  // both reach the palette on every route — chat-primary AND inspect.
+  // Per the Operational Doctrine point 7 ("navigation is direct first,
+  // agent-assisted second; tabs are one-click reachable from anywhere"),
+  // the palette is the universal nav primitive. It lives OUTSIDE the
+  // ChatStoreProvider because it does not depend on chat state.
   //
   // FIX 1 (operator msg 3521): height: 100dvh on the chat-primary wrapper.
   // The prior `flex h-screen` (100vh) on mobile included the URL bar,
@@ -392,28 +402,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // env(safe-area-inset-bottom) for iPhone home-indicator clearance.
   if (chatPrimary) {
     return (
-      <ChatStoreProvider
-        initialConversationId={null}
-        initialHistory={[]}
-        initialProposals={[]}
-      >
-        <AuditPollMount />
-        <div
-          className="flex flex-col overflow-hidden"
-          style={{
-            height: "100dvh",
-            backgroundColor: "var(--shore)",
-          }}
+      <>
+        <ChatStoreProvider
+          initialConversationId={null}
+          initialHistory={[]}
+          initialProposals={[]}
         >
-          <ToastProvider>
-            <ChatPrimarySurface
-              propertyName={null}
-              monthsActive={null}
-              conversationCount={null}
-            />
-          </ToastProvider>
-        </div>
-      </ChatStoreProvider>
+          <AuditPollMount />
+          <div
+            className="flex flex-col overflow-hidden"
+            style={{
+              height: "100dvh",
+              backgroundColor: "var(--shore)",
+            }}
+          >
+            <ToastProvider>
+              <ChatPrimarySurface
+                propertyName={null}
+                monthsActive={null}
+                conversationCount={null}
+              />
+            </ToastProvider>
+          </div>
+        </ChatStoreProvider>
+        <CommandPalette />
+      </>
     );
   }
 

@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import styles from "./ChatShell.module.css";
 import {
   PropertyContext,
   type PropertyOption,
   type PropertyRef,
 } from "./PropertyContext";
+import { OPEN_EVENT as CMDK_OPEN_EVENT } from "@/components/polish/CommandPalette";
 
 export type TopbarProps = {
   property?: PropertyRef;
@@ -68,6 +70,7 @@ export function Topbar({
         onSelect={onSelectProperty}
       />
       <div className={styles["topbar-right"]}>
+        <SearchAffordance />
         <button
           type="button"
           className={styles["icon-btn"]}
@@ -131,6 +134,62 @@ export function Topbar({
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * SearchAffordance — M13 Phase 1.B Step 2.
+ *
+ * The chat-primary topbar's single-tap entry-point to the globally-
+ * mounted CommandPalette. Doctrine point 7: "Anything that takes a
+ * sentence in chat should take a tap from the shell." This is the tap.
+ *
+ * Dispatches a `koast:open-command-palette` CustomEvent — the palette
+ * listens for it at window scope (it's also opened by the ⌘K/Ctrl+K
+ * keyboard shortcut, but the chat-primary user on mobile needs a
+ * visible affordance). Desktop hover surfaces a tooltip with the ⌘K
+ * shortcut hint so power-users learn the keystroke.
+ */
+function SearchAffordance() {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+    >
+      <button
+        type="button"
+        className={styles["icon-btn"]}
+        title="Search"
+        aria-label="Search (⌘K)"
+        aria-keyshortcuts="Meta+K Control+K"
+        onClick={() => window.dispatchEvent(new CustomEvent(CMDK_OPEN_EVENT))}
+      >
+        <Search size={18} strokeWidth={1.8} />
+      </button>
+      {showTip ? (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 6,
+            padding: "4px 8px",
+            background: "var(--deep-sea)",
+            color: "var(--shore)",
+            fontSize: 11,
+            borderRadius: 4,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 50,
+          }}
+        >
+          Search · ⌘K
+        </span>
+      ) : null}
+    </span>
   );
 }
 
