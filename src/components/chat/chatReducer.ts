@@ -51,6 +51,17 @@ export type ChatState = {
   // Conversation
   activeConversationId: string | null;
   conversationHistory: ChatTurn[];
+  /**
+   * M13 Phase 1.B follow-on (switch-flash fix): true while a DIFFERENT
+   * conversation is being hydrated from the server. Distinguishes
+   * "mid-switch, content arriving" from "genuinely new/empty
+   * conversation." The chat surface renders a loading skeleton when
+   * this is true; the landing/empty state renders ONLY when
+   * activeConversationId is null AND not loading. Set true by
+   * SET_ACTIVE_CONVERSATION when its `loading` flag is passed; reset
+   * to false by HYDRATE_CONVERSATION.
+   */
+  conversationLoading: boolean;
   // Turn (REFLECTED from useAgentTurn via Step C bridge; not store-owned)
   turnState: TurnState;
   // Audit feed (store-native; Step F populates)
@@ -61,7 +72,26 @@ export type ChatState = {
 };
 
 export type ChatAction =
-  | { type: "SET_ACTIVE_CONVERSATION"; conversationId: string | null }
+  | {
+      type: "SET_ACTIVE_CONVERSATION";
+      conversationId: string | null;
+      /**
+       * When true, the surface enters the loading state (clears history
+       * + sets conversationLoading) — a genuine switch to a different
+       * conversation whose turns are about to be fetched. Omitted/false
+       * for landing (null) transitions, which render the empty state.
+       */
+      loading?: boolean;
+    }
+  // M13 Phase 1.B follow-on (fragmentation fix): anchor an in-flight
+  // conversation to its newly-assigned id WITHOUT clearing history or
+  // entering the loading state. Used when the first turn from the
+  // landing surface gets its conversation_id from turn_started — the
+  // live turn is already rendering from the local session harvest, so
+  // we must NOT clear or re-fetch. Distinct from SET_ACTIVE_CONVERSATION
+  // (which clears) so the ongoing exchange stays coherent as ONE
+  // conversation in history + Cmd+K recents.
+  | { type: "ANCHOR_CONVERSATION"; conversationId: string }
   | { type: "HYDRATE_CONVERSATION"; turns: ChatTurn[] }
   | { type: "TURN_STATE_CHANGED"; turnState: TurnState }
   | { type: "PROPOSAL_RECEIVED"; proposal: ChatProposal }
@@ -76,6 +106,7 @@ export type ChatAction =
 export const initialChatState: ChatState = {
   activeConversationId: null,
   conversationHistory: [],
+  conversationLoading: false,
   turnState: "idle",
   unreadAuditCount: 0,
   lastSeenAuditTs: null,
@@ -90,13 +121,36 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "SET_ACTIVE_CONVERSATION":
       // Switching conversation clears history pending HYDRATE_CONVERSATION.
+      // M13 Phase 1.B follow-on: when `loading` is set (a switch to a
+      // different conversation that will be hydrated from the server),
+      // enter the loading state so the surface renders a skeleton rather
+      // than the landing/empty state mid-switch.
       return {
         ...state,
         activeConversationId: action.conversationId,
         conversationHistory: [],
+        conversationLoading: action.loading === true,
+      };
+    case "ANCHOR_CONVERSATION":
+      // M13 Phase 1.B follow-on: assign the id to an in-flight
+      // conversation WITHOUT clearing history or entering loading. The
+      // live turn is rendering from the session harvest; clearing or
+      // re-fetching here would wipe it. Idempotent — anchoring the id
+      // that's already active is a no-op.
+      if (state.activeConversationId === action.conversationId) return state;
+      return {
+        ...state,
+        activeConversationId: action.conversationId,
+        conversationLoading: false,
       };
     case "HYDRATE_CONVERSATION":
-      return { ...state, conversationHistory: action.turns };
+      // Hydration always ends the loading state — the turns (possibly
+      // empty on a failed/empty fetch) are now authoritative.
+      return {
+        ...state,
+        conversationHistory: action.turns,
+        conversationLoading: false,
+      };
     case "TURN_STATE_CHANGED":
       // Dedup: if the bridged value matches the current store value,
       // return the same state object so React skips re-renders. The

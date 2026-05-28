@@ -25,6 +25,8 @@ describe("chatReducer — initial state", () => {
     expect(initialChatState).toEqual({
       activeConversationId: null,
       conversationHistory: [],
+      // M13 Phase 1.B follow-on (switch-flash fix): loading flag.
+      conversationLoading: false,
       turnState: "idle",
       unreadAuditCount: 0,
       lastSeenAuditTs: null,
@@ -92,6 +94,90 @@ describe("chatReducer — conversation state", () => {
     const next = chatReducer(start, { type: "HYDRATE_CONVERSATION", turns });
     expect(next.conversationHistory).toEqual(turns);
     expect(next.activeConversationId).toBe("conv");
+  });
+
+  // M13 Phase 1.B follow-on — fragmentation + switch-flash fixes.
+
+  test("SET_ACTIVE_CONVERSATION with loading:true enters loading state", () => {
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: "A",
+      conversationHistory: [{ id: "t1" }],
+    };
+    const next = chatReducer(start, {
+      type: "SET_ACTIVE_CONVERSATION",
+      conversationId: "B",
+      loading: true,
+    });
+    expect(next.activeConversationId).toBe("B");
+    expect(next.conversationHistory).toEqual([]);
+    expect(next.conversationLoading).toBe(true);
+  });
+
+  test("SET_ACTIVE_CONVERSATION without loading defaults conversationLoading false", () => {
+    const next = chatReducer(initialChatState, {
+      type: "SET_ACTIVE_CONVERSATION",
+      conversationId: null,
+    });
+    expect(next.conversationLoading).toBe(false);
+  });
+
+  test("ANCHOR_CONVERSATION sets id WITHOUT clearing history or loading", () => {
+    // The fragmentation fix: anchoring an in-flight conversation to its
+    // server-assigned id must preserve whatever is rendering (the live
+    // turn lives in the client's sessionHarvest, but the reducer must
+    // not clear store history or flip loading either).
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: null,
+      conversationHistory: [{ id: "live-1" }],
+    };
+    const next = chatReducer(start, {
+      type: "ANCHOR_CONVERSATION",
+      conversationId: "new-id",
+    });
+    expect(next.activeConversationId).toBe("new-id");
+    expect(next.conversationHistory).toEqual([{ id: "live-1" }]);
+    expect(next.conversationLoading).toBe(false);
+  });
+
+  test("ANCHOR_CONVERSATION is idempotent when id already active", () => {
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: "new-id",
+      conversationHistory: [{ id: "live-1" }],
+    };
+    const next = chatReducer(start, {
+      type: "ANCHOR_CONVERSATION",
+      conversationId: "new-id",
+    });
+    // Same object reference — no churn.
+    expect(next).toBe(start);
+  });
+
+  test("HYDRATE_CONVERSATION clears the loading state", () => {
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: "B",
+      conversationLoading: true,
+    };
+    const next = chatReducer(start, {
+      type: "HYDRATE_CONVERSATION",
+      turns: [{ id: "t1" }],
+    });
+    expect(next.conversationLoading).toBe(false);
+    expect(next.conversationHistory).toEqual([{ id: "t1" }]);
+  });
+
+  test("HYDRATE_CONVERSATION with empty turns still clears loading (failed/empty fetch)", () => {
+    const start: ChatState = {
+      ...initialChatState,
+      activeConversationId: "B",
+      conversationLoading: true,
+    };
+    const next = chatReducer(start, { type: "HYDRATE_CONVERSATION", turns: [] });
+    expect(next.conversationLoading).toBe(false);
+    expect(next.conversationHistory).toEqual([]);
   });
 });
 

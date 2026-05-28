@@ -37,6 +37,7 @@ import { ToolCall } from "./ToolCall";
 import { Composer, type ComposerState } from "./Composer";
 import { RespondingRow } from "./RespondingRow";
 import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
+import { ConversationLoadingSkeleton } from "./ConversationLoadingSkeleton";
 import { ReengagementBanner } from "./ReengagementBanner";
 import { AuditDrawer } from "@/components/inspect/AuditDrawer";
 import { ErrorBlock } from "./ErrorBlock";
@@ -394,17 +395,30 @@ export function ChatClient({
       : conversations;
 
   // M8 C8 Step F.3 — Bug 2 fix: reset sessionHarvest when activeConversationId
-  // changes (fresh-conversation creation transitions null → real-id, or host
-  // switches conversations). Without this, a fresh conversation's harvested
-  // user turn (with synthetic "live-user-${stamp}" id) survives the post-
-  // navigation HYDRATE_CONVERSATION dispatch — M7's id-keyed dedup at lines
-  // 853-864 fails to match the synthetic id against the server's DB-assigned
-  // id, so the user turn renders twice. Resetting on activeConversationId
-  // change clears the stale harvest just as the new server-fetched history
-  // lands. Doesn't fire on M7's router.refresh() path (host stays on same
-  // conversation; activeConversationId unchanged) so existing same-id dedup
-  // behavior is preserved.
+  // changes (host switches conversations). Without this, a stale harvested
+  // turn (with synthetic "live-user-${stamp}" id) survives the post-
+  // navigation HYDRATE_CONVERSATION dispatch — M7's id-keyed dedup fails to
+  // match the synthetic id against the server's DB-assigned id, so the user
+  // turn renders twice.
+  //
+  // M13 Phase 1.B follow-on (fragmentation fix): SKIP the reset on our own
+  // first-send ANCHOR transition (null → the id we just anchored). At anchor
+  // time the live turn lives ONLY in sessionHarvest (the server fetch is
+  // no-op'd by ChatURLSync because URL id === store id), so resetting would
+  // wipe the just-completed turn and leave the surface blank. The anchor is
+  // uniquely identified by: previous active id was null AND the new id is the
+  // one navigatedRef recorded (the id WE navigated to). Genuine switches
+  // (A→B, or returning to a conversation later when prev is non-null) still
+  // reset. router.refresh() same-id path is unaffected (id unchanged).
+  const prevActiveConversationIdRef = useRef<string | null>(activeConversationId);
   useEffect(() => {
+    const prev = prevActiveConversationIdRef.current;
+    prevActiveConversationIdRef.current = activeConversationId;
+    const isSelfAnchor =
+      prev === null &&
+      activeConversationId !== null &&
+      activeConversationId === navigatedRef.current;
+    if (isSelfAnchor) return;
     setSessionHarvest([]);
   }, [activeConversationId]);
   // Mobile drawer state (visible only at <768px via media query). Closed
@@ -716,20 +730,42 @@ export function ChatClient({
     setSessionHarvest((prev) => [...prev, ...harvested]);
     setPendingUserText(null);
 
-    // First completed turn on /chat (no active id) → navigate to the new conversation URL.
-    if (
-      !activeConversationId &&
-      state.conversation_id &&
-      navigatedRef.current !== state.conversation_id
-    ) {
-      navigatedRef.current = state.conversation_id;
-      router.replace(`/chat/${state.conversation_id}`);
-    }
+    // M13 Phase 1.B follow-on: anchoring no longer happens here. It moved
+    // to a dedicated effect on state.conversation_id (below) so the
+    // conversation id is committed to the store as soon as turn_started
+    // lands — not at turn completion. Anchoring at completion left a
+    // window where a fast second send still read activeConversationId=null
+    // and spawned a SECOND conversation (fragmentation).
 
     reset();
     // Only fire on status transitions, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.status]);
+
+  // M13 Phase 1.B follow-on (fragmentation fix): anchor the in-flight
+  // conversation to its server-assigned id AS SOON AS turn_started lands
+  // (state.conversation_id becomes known), not at turn completion. This
+  // commits the id to the store immediately so every subsequent turn —
+  // even one sent before the stream finishes — reuses it. A single
+  // exchange persists as ONE conversation.
+  //
+  // ANCHOR_CONVERSATION sets the store id WITHOUT clearing history or
+  // entering loading (the live turn renders from sessionHarvest). The
+  // router.replace updates the URL; ChatURLSync no-ops because the store
+  // id already equals the URL id (see ChatURLSync no-op guard).
+  useEffect(() => {
+    if (!chatStoreDispatch) return;
+    const newId = state.conversation_id;
+    if (
+      newId &&
+      activeConversationId === null &&
+      navigatedRef.current !== newId
+    ) {
+      navigatedRef.current = newId;
+      chatStoreDispatch({ type: "ANCHOR_CONVERSATION", conversationId: newId });
+      router.replace(`/chat/${newId}`);
+    }
+  }, [state.conversation_id, activeConversationId, chatStoreDispatch, router]);
 
   const onSubmit = useCallback(() => {
     const text = draft.trim();
@@ -829,6 +865,16 @@ export function ChatClient({
   const hasAnyTurns =
     history.length > 0 || sessionHarvest.length > 0 || pendingUserText !== null;
 
+  // M13 Phase 1.B follow-on (switch-flash fix): true while a different
+  // conversation's turns are being fetched. When true (and nothing is
+  // rendering yet), the surface shows a loading skeleton instead of the
+  // landing/empty state — so switching conversations never flashes the
+  // "new conversation" surface mid-load. Suppressed once any content is
+  // present (live stream / harvest / pending user text) so an in-flight
+  // turn is never hidden behind a skeleton.
+  const conversationLoading =
+    (chatStore?.state.conversationLoading ?? false) && !hasAnyTurns;
+
   // M13 Phase 1.A — visibility wrapper REMOVED.
   // ChatClient now renders inline as the primary surface at chat-primary
   // routes (`/` and `/chat/*`). The pathname-derived layout in
@@ -895,7 +941,9 @@ export function ChatClient({
         responding={isStreaming ? <RespondingRow onStop={cancel} /> : undefined}
       >
         <ReengagementBanner hidden={pendingUserText !== null || draft.length > 0} />
-        {!hasAnyTurns ? (
+        {conversationLoading ? (
+          <ConversationLoadingSkeleton />
+        ) : !hasAnyTurns ? (
           <EmptyState
             starters={TIER_1_STARTERS}
             onStarterSelect={(text) => setDraft(text)}

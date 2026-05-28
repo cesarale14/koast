@@ -52,10 +52,7 @@ describe("conversationIdFromPathname — pure extraction", () => {
     expect(conversationIdFromPathname(undefined)).toBeNull();
     expect(conversationIdFromPathname("")).toBeNull();
     expect(
-      conversationIdFromPathname(
-        // @ts-expect-error — adversarial non-string input
-        123 as unknown as string,
-      ),
+      conversationIdFromPathname(123 as unknown as string),
     ).toBeNull();
   });
 });
