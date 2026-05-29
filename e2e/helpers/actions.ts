@@ -33,6 +33,20 @@ export async function expectTurnVisible(page: Page, text: string): Promise<void>
   ).toBeVisible();
 }
 
+/**
+ * Wait until the composer is idle again (stream finished). The composer
+ * unlocks on the SSE `done` event, which the server emits AFTER it has
+ * finalized + committed the turn — so a re-enabled composer is a reliable
+ * "this turn is fully persisted server-side" signal. Call this before
+ * deleting a conversation (or navigating away) so cleanup can't race an
+ * in-flight insert: deleting mid-stream is what produced the FK-violation
+ * noise on the multi-send / double-send specs (the conversation row was
+ * removed while the server was still inserting the assistant turn).
+ */
+export async function expectComposerSettled(page: Page): Promise<void> {
+  await expect(page.getByTestId("composer-input")).toBeEnabled();
+}
+
 /** Open the Cmd+K palette via keyboard (Control+K works on Linux/CI chromium). */
 export async function openCmdK(page: Page): Promise<void> {
   await page.keyboard.press("Control+k");

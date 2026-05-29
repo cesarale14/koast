@@ -12,7 +12,13 @@ import {
   countConversations,
   deleteConversationsByNonce,
 } from "./helpers/supabase-admin";
-import { makeNonce, sendMessage, expectTurnVisible, delayRoute } from "./helpers/actions";
+import {
+  makeNonce,
+  sendMessage,
+  expectTurnVisible,
+  delayRoute,
+  expectComposerSettled,
+} from "./helpers/actions";
 import { TEST_HOST_1_EMAIL } from "./helpers/fixtures";
 
 const admin = adminClient();
@@ -50,6 +56,9 @@ test.describe("Create / Append", () => {
     // Persisted (one new conversation).
     await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
 
+    // Let the stream finish (server done persisting) before cleanup, so the
+    // delete can't race an in-flight insert.
+    await expectComposerSettled(page);
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
 
@@ -70,6 +79,7 @@ test.describe("Create / Append", () => {
       page.getByTestId("conversation-item").filter({ hasText: nonce }),
     ).toHaveCount(1);
 
+    await expectComposerSettled(page);
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
 
@@ -78,6 +88,7 @@ test.describe("Create / Append", () => {
     await page.goto("/");
     await sendMessage(page, `${nonce} url test`);
     await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+    await expectComposerSettled(page);
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
 
@@ -103,6 +114,7 @@ test.describe("Create / Append", () => {
     await expectTurnVisible(page, nonce);
     await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
 
+    await expectComposerSettled(page);
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
 
@@ -114,6 +126,9 @@ test.describe("Create / Append", () => {
     await expectTurnVisible(page, nonce);
     await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
 
+    // Settle the stream before reloading — reloading mid-stream would
+    // abandon the client SSE while the server is still finalizing.
+    await expectComposerSettled(page);
     await page.reload();
 
     // Still exactly one in DB + one rail entry (server reconciles optimistic).
@@ -130,6 +145,7 @@ test.describe("Create / Append", () => {
     await page.goto("/");
     await sendMessage(page, `${nonce} conv one`);
     await expectTurnVisible(page, nonce);
+    await expectComposerSettled(page);
 
     // Start a fresh conversation by returning to landing.
     await page.goto("/");
@@ -150,6 +166,7 @@ test.describe("Create / Append", () => {
     const railItem = page.getByTestId("conversation-item").filter({ hasText: nonce });
     await expect(railItem).toContainText(nonce);
 
+    await expectComposerSettled(page);
     await page.reload();
     // Label is still the first message after reload — stable, first-message-
     // derived. (We deliberately do NOT assert an auto-generated title:

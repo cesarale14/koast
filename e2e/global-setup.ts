@@ -12,7 +12,11 @@
 
 import { chromium, type FullConfig } from "@playwright/test";
 import { assertNonProdTarget } from "./helpers/prod-guard";
-import { adminClient, seedDurableFixtures } from "./helpers/supabase-admin";
+import {
+  adminClient,
+  seedDurableFixtures,
+  deleteConversationsByNonce,
+} from "./helpers/supabase-admin";
 import {
   TEST_HOST_1_EMAIL,
   TEST_PASSWORD,
@@ -26,7 +30,7 @@ async function globalSetup(_config: FullConfig): Promise<void> {
 
   // 2. Idempotent seed (seed-if-missing every run — self-heals a wipe).
   const admin = adminClient();
-  await seedDurableFixtures(admin);
+  const { host1Id } = await seedDurableFixtures(admin);
 
   // 3. Real-login → storageState. Reuses the webServer Playwright will
   //    have started (the webServer launches before globalSetup? No —
@@ -74,6 +78,32 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   } catch {
     /* warm-up only */
   }
+
+  // Warm the SEND / create path too. The first create spec otherwise pays
+  // the cold compile of /api/agent/turn + the SSE stream + the conversations
+  // refetch on its first send; under `next dev` that latency can push the
+  // optimistic rail entry past the assertion budget (the item-1 flake — the
+  // rail entry surfaces, just late). One throwaway canned send compiles the
+  // whole create path; we delete the conversation immediately after so it
+  // can't pollute counts or rails. Best-effort.
+  const WARMUP_MARKER = "e2e-warmup-send";
+  try {
+    const input = page.getByTestId("composer-input");
+    await input.waitFor({ state: "visible", timeout: 30_000 });
+    await input.fill(`${WARMUP_MARKER} warm the create path`);
+    await page.getByTestId("composer-send").click();
+    // Wait for the canned assistant turn — the full round-trip is now warm.
+    await page
+      .getByTestId("chat-turn")
+      .nth(1)
+      .waitFor({ state: "visible", timeout: 60_000 });
+  } catch {
+    /* warm-up only */
+  }
+  // Remove the throwaway conversation regardless of how the warm-up went.
+  await deleteConversationsByNonce(admin, host1Id, WARMUP_MARKER).catch(() => {
+    /* best-effort cleanup */
+  });
 
   await page.context().storageState({ path: STORAGE_STATE_PATH });
   await browser.close();
