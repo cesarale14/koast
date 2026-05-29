@@ -123,7 +123,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 
 ## 4. Cross-cutting Concerns
 
-- **Optimistic updates + reconciliation.** `mergeConversationLists`, server-wins-by-id, remount-resets-optimistic. Proven for create (R1); must extend to delete (optimistic remove + reconcile) and rename (U2).
+- **Optimistic updates + reconciliation.** `mergeConversationLists`, server-wins **per field** (not whole-row), remount-resets-optimistic. Proven for create (R1); must extend to delete (optimistic remove + reconcile) and rename (U2). **Field-level caveat (load-bearing):** a populated optimistic field is *never* clobbered by an empty server field. A whole-row server-wins reintroduces the rail-preview race — the optimistic entry carries the real preview (first user message), but a list read landing before the first user turn is visible returns that conversation with an empty preview, and whole-row server-wins overwrites the good value with `""`; the rail (fetched once) then shows an unlabeled entry until reload. The guard is general — it protects any async-populated field (preview today, auto-title next), so the next such field can't repeat the bug. A *populated* server field still wins (placeholder → real value). Covered by `mergeConversationLists.test.ts` + Playwright sweep items 1/7.
 - **Error / not-found handling (S6).** A failed/empty/404 fetch resolves URL↔content (redirect to `/`), not clear-the-skeleton-into-stale-URL-empty. Shipped in the N4/S6 PR.
 - **Concurrency / races.**
   - Anchor race (store ahead of URL) — **fixed** via URL-only ChatURLSync + ref read (08a1c33).
