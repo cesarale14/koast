@@ -126,6 +126,7 @@ export function AuthInput({
   required,
   autoComplete,
   minLength,
+  testId,
 }: {
   label: string;
   type: string;
@@ -135,6 +136,7 @@ export function AuthInput({
   required?: boolean;
   autoComplete?: string;
   minLength?: number;
+  testId?: string;
 }) {
   return (
     <div>
@@ -150,6 +152,7 @@ export function AuthInput({
       </label>
       <input
         type={type}
+        data-testid={testId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -186,15 +189,18 @@ export function GoldenButton({
   type,
   disabled,
   onClick,
+  testId,
 }: {
   children: React.ReactNode;
   type?: "button" | "submit";
   disabled?: boolean;
   onClick?: () => void;
+  testId?: string;
 }) {
   return (
     <button
       type={type ?? "button"}
+      data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       className="w-full transition-all disabled:cursor-not-allowed"

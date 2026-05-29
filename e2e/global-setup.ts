@@ -34,14 +34,47 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   //    is reachable here).
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
-  await page.fill('input[type="email"]', TEST_HOST_1_EMAIL);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
+  // waitUntil:"networkidle" (not domcontentloaded) so React has hydrated
+  // before we interact — otherwise the controlled inputs reset and the
+  // submit click is a no-op (handlers not yet attached), which silently
+  // strands us on /login.
+  await page.goto(`${BASE_URL}/login`, {
+    waitUntil: "networkidle",
+    timeout: 60_000,
+  });
+  // Robust, app-specific selectors (testids on the AuthShell primitives) —
+  // the generic CSS (input[type=email]/...) was brittle to the AuthInput
+  // wrapper.
+  await page.getByTestId("login-email").fill(TEST_HOST_1_EMAIL);
+  await page.getByTestId("login-password").fill(TEST_PASSWORD);
+  await page.getByTestId("login-submit").click();
   // On success the app redirects off /login (to chat-primary `/`).
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
     timeout: 30_000,
   });
+
+  // Warm the heavy chat-primary route ONCE here, serially, with no parallel
+  // request pressure. Under `next dev` the first hit to `/` triggers an
+  // expensive on-demand webpack compile; if a spec races that compile the
+  // chunk-request cascade overwhelms Chromium (ERR_INSUFFICIENT_RESOURCES)
+  // or times out. Pre-compiling it here means specs hit a warm route.
+  //
+  // NOT networkidle: the chat surface holds a live connection, so the
+  // network never idles. domcontentloaded + waiting for the rendered
+  // empty-state is the right warm signal (route compiled + hydrated).
+  // Best-effort — a warm-up hiccup must not fail the whole run.
+  try {
+    await page.goto(`${BASE_URL}/`, {
+      waitUntil: "domcontentloaded",
+      timeout: 90_000,
+    });
+    await page
+      .getByTestId("chat-empty-state")
+      .waitFor({ state: "visible", timeout: 60_000 });
+  } catch {
+    /* warm-up only */
+  }
+
   await page.context().storageState({ path: STORAGE_STATE_PATH });
   await browser.close();
 }

@@ -52,7 +52,21 @@ export async function ensureUser(
     });
     if (error) break;
     const found = data.users.find((u) => u.email === email);
-    if (found) return found.id;
+    if (found) {
+      // Converge the credential: a user left over from an earlier run may
+      // carry a different password than the current env value. Reset it (and
+      // re-confirm) so seeding is genuinely idempotent and login always works.
+      const { error: updErr } = await admin.auth.admin.updateUserById(found.id, {
+        password,
+        email_confirm: true,
+      });
+      if (updErr) {
+        throw new Error(
+          `[e2e] ensureUser: found ${email} but could not reset its password: ${updErr.message}`,
+        );
+      }
+      return found.id;
+    }
     if (data.users.length < 200) break; // last page
   }
   throw new Error(

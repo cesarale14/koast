@@ -23,6 +23,10 @@ loadPlaywrightEnv();
 
 const isCI = !!process.env.CI;
 
+// Single source of truth for the port — derived from BASE_URL so the
+// webServer command and the baseURL can never drift apart.
+const PORT = new URL(BASE_URL).port || "3100";
+
 // Vars passed to the spawned app server — staging, never .env.local.
 const serverEnv: Record<string, string> = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
@@ -66,8 +70,8 @@ export default defineConfig({
 
   webServer: {
     command: isCI
-      ? "next build && next start -p 3000"
-      : "next dev -p 3000",
+      ? `next build && next start -p ${PORT}`
+      : `next dev -p ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !isCI,
     timeout: 240_000,

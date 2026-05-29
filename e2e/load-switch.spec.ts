@@ -22,11 +22,13 @@ test.describe("Load / Switch", () => {
     await page.goto("/");
     await openCmdK(page);
     await page.getByTestId("cmdk-palette").getByRole("textbox").fill("occupancy");
-    // The seeded A (first message includes 'occupancy') surfaces.
-    const result = page
-      .getByTestId("cmdk-result")
-      .filter({ hasText: /occupancy|Fixture A/i })
-      .first();
+    // Target conversation A's row precisely by its cmdk id — "occupancy" is
+    // also a Market Intel keyword, so a loose hasText match would grab the
+    // route row instead. Scoping to the conversation entry keeps the spec
+    // honest (it must be the seeded conversation that loads, not a tab).
+    const result = page.locator(
+      `[data-testid="cmdk-result"][data-cmdk-id="conversation:${CONV_A_ID}"]`,
+    );
     await expect(result).toBeVisible();
     await result.click();
 

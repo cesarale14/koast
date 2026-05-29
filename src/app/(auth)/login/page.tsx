@@ -65,6 +65,7 @@ export default function LoginPage() {
           placeholder="you@example.com"
           autoComplete="email"
           required
+          testId="login-email"
         />
         <AuthInput
           label="Password"
@@ -74,11 +75,12 @@ export default function LoginPage() {
           placeholder="••••••••"
           autoComplete="current-password"
           required
+          testId="login-password"
         />
 
         {error && <AuthError message={error} />}
 
-        <GoldenButton type="submit" disabled={loading}>
+        <GoldenButton type="submit" disabled={loading} testId="login-submit">
           {loading ? "Signing in..." : "Sign in"}
         </GoldenButton>
       </form>

@@ -35,4 +35,7 @@ export const NONEXISTENT_CONV_ID = "deadbeef-0000-4000-8000-000000000000";
 /** Storage-state path for the authenticated H1 session. */
 export const STORAGE_STATE_PATH = "e2e/.auth/host1.json";
 
-export const BASE_URL = "http://localhost:3000";
+// Dedicated harness port (3100, not the dev-default 3000) so the suite never
+// collides with — or has to kill — an unrelated app a developer may already
+// be running on 3000. Playwright boots its own server here (see webServer).
+export const BASE_URL = "http://localhost:3100";
