@@ -161,74 +161,95 @@ describe("Cmd+K filter — performance (M13 Phase 1.B fluidity budget)", () => {
     return out;
   }
 
-  test("filter completes < 100ms across many queries on a 287-entry index", () => {
-    // Budget per the M13 Phase 1.B fluidity manifest:
-    // cmd_k_first_result < 100ms (perceived-action; doctrine point 7).
-    // We measure the filter step only; network fetch + cache lookup
-    // are amortized across the palette session (separate budget step).
-    //
-    // Use generous tolerance — CI runners vary and the operator
-    // sign-off note (msg 3527) is explicit: "unit-test perf can be
-    // noisy and platform-dependent — generous tolerance with
-    // production rollup as the eventual truth-source." Hard fail at
-    // 100ms guards against regressing into algorithmic O(n²); a 25ms
-    // local-dev runtime should still pass even on slow CI.
-    const index = buildLargeIndex();
-    expect(index.length).toBe(287); // 250 + 20 + 14 + 3
-
-    const queries = [
-      "tampa",
-      "rate",
-      "pric",
-      "settings",
-      "new chat",
-      "ques",
-      "p",
-      "100",
-      "main",
-      "calendar",
-    ];
-
-    // Budget is PER QUERY (cmd_k_first_result < 100ms is "the time
-    // until the first result list is rendered after the user finishes
-    // typing one query"). The doctrine concerns the steady-state path
-    // — by the time the host is typing, the JIT is warm. Warmup loop
-    // sheds the first-call JIT cost; the measured loop reflects what
-    // a host actually experiences.
-    //
-    // Operator msg 3527 sign-off: "generous tolerance with production
-    // rollup as the eventual truth-source." We assert 2× the doctrine
-    // budget (200ms) as the algorithmic-regression hard bound — that
-    // catches accidental O(n²) regressions without flaking on slow
-    // CI runners. Production telemetry rollup (via host_surface_
-    // telemetry budget_class='cmd_k_first_result') is the real truth
-    // source.
-    for (const q of queries) filterEntries(index, q); // warmup
-
-    let maxPerQuery = 0;
-    const overallStart = performance.now();
-    for (const q of queries) {
-      const start = performance.now();
-      filterEntries(index, q);
-      const elapsed = performance.now() - start;
-      if (elapsed > maxPerQuery) maxPerQuery = elapsed;
+  // Builds a small index of the same SHAPE as buildLargeIndex but ~24×
+  // smaller — the baseline for the load-invariant scaling assertion.
+  function buildSmallIndex(): CmdKEntry[] {
+    const out: CmdKEntry[] = [];
+    for (let i = 0; i < 8; i++) {
+      out.push({
+        id: `prop:${i}`,
+        kind: "property",
+        label: `Property ${i} - ${["Tampa", "Miami"][i % 2]}`,
+        hint: `${i} ${["Main", "Oak"][i % 2]} St`,
+        keywords: [
+          `Property ${i}`,
+          ["Tampa", "Miami"][i % 2],
+          `${i} ${["Main", "Oak"][i % 2]} St`,
+        ],
+        href: `/properties/${i}`,
+      });
     }
-    const overallElapsed = performance.now() - overallStart;
-    expect(maxPerQuery).toBeLessThan(200);
-    // 10 queries × 100ms budget × 5x tolerance.
-    expect(overallElapsed).toBeLessThan(500);
+    out.push(...STATIC_ROUTES.slice(0, 3), ...STATIC_ACTIONS.slice(0, 1));
+    return out;
+  }
+
+  const PERF_QUERIES = [
+    "tampa",
+    "rate",
+    "pric",
+    "settings",
+    "new chat",
+    "ques",
+    "p",
+    "100",
+    "main",
+    "calendar",
+  ];
+
+  function timeFilterPass(index: CmdKEntry[], iterations: number): number {
+    // Warm up (shed first-call JIT) then time `iterations` full query
+    // passes. Returns total elapsed ms.
+    for (const q of PERF_QUERIES) filterEntries(index, q);
+    const start = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      for (const q of PERF_QUERIES) filterEntries(index, q);
+    }
+    return performance.now() - start;
+  }
+
+  test("filter scales ~linearly — no algorithmic (O(n²)) regression", () => {
+    // M13 Phase 1.B follow-on (perf-test de-flake): the PURPOSE of this
+    // gate is to catch an algorithmic regression (e.g. an accidental
+    // O(n²) introduced into the filter), NOT to measure absolute speed.
+    // Absolute wall-clock assertions flake under machine load (the
+    // failure that triggered this rewrite happened at load avg ~7.5).
+    //
+    // Per operator msg 3527 — "generous tolerance with production rollup
+    // as the eventual truth-source; the contract in the manifest is what
+    // matters most; don't let CI noise block work" — the in-suite gate
+    // is now a LOAD-INVARIANT scaling ratio. Both the small-index and
+    // large-index passes run on the same (loaded or idle) machine, so
+    // scheduling jitter cancels in the ratio. Absolute latency lives in
+    // scripts/fluidity-budgets.json + the production host_surface_
+    // telemetry perf rows (budget_class='cmd_k_first_result').
+    //
+    // ~24× more entries (12 → 287). Linear filter → ratio ≈ 24×.
+    // O(n²) → ratio ≈ 24² ≈ 576×. Assert ratio < 100 — comfortably
+    // above linear + constant-factor + load noise, comfortably below a
+    // genuine O(n²) blow-up.
+    const small = buildSmallIndex();
+    const large = buildLargeIndex();
+    expect(large.length).toBe(287); // 250 + 20 + 14 + 3
+    const sizeRatio = large.length / small.length; // ~24×
+
+    const ITER = 200; // enough that each measurement is tens of ms (stable)
+    const smallMs = Math.max(timeFilterPass(small, ITER), 0.5); // floor: no div-by-~0
+    const largeMs = timeFilterPass(large, ITER);
+
+    const timeRatio = largeMs / smallMs;
+    // Linear would give ~sizeRatio; allow a generous 4× headroom over
+    // linear for constant factors + jitter; still far below O(n²).
+    expect(timeRatio).toBeLessThan(sizeRatio * 4);
   });
 
-  test("default-view sort (empty query) is fast on the same index", () => {
-    const index = buildLargeIndex();
-    // Per-call budget; sort is even more forgiving than filter.
-    let maxPerCall = 0;
-    for (let i = 0; i < 10; i++) {
-      const start = performance.now();
-      filterEntries(index, "");
-      const elapsed = performance.now() - start;
-      if (elapsed > maxPerCall) maxPerCall = elapsed;
-    }
-    expect(maxPerCall).toBeLessThan(100);
+  test("filter correctness holds at the 287-entry scale (the perf index)", () => {
+    // Pair the (timing-free) correctness check with the scaling test so
+    // a regression that breaks results at scale is still caught even if
+    // the timing ratio is within bounds.
+    const large = buildLargeIndex();
+    const out = filterEntries(large, "tampa");
+    // Every "Tampa" synthetic property (250/5 = 50) should surface.
+    expect(out.filter((e) => e.kind === "property").length).toBe(50);
+    expect(filterEntries(large, "zzzznope").length).toBe(0);
   });
 });

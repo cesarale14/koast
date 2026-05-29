@@ -40,6 +40,7 @@ import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
 import { ConversationLoadingSkeleton } from "./ConversationLoadingSkeleton";
 import { invalidateCmdKData } from "@/lib/cmdk/use-cmdk-data";
 import { mergeConversationLists } from "@/lib/chat/mergeConversationLists";
+import { deriveComposerState } from "@/lib/chat/deriveComposerState";
 import { ReengagementBanner } from "./ReengagementBanner";
 import { AuditDrawer } from "@/components/inspect/AuditDrawer";
 import { ErrorBlock } from "./ErrorBlock";
@@ -246,7 +247,7 @@ export function ChatClient({
   initialPropertyId = null,
 }: ChatClientProps) {
   const router = useRouter();
-  const { state, isStreaming, submit, cancel, reset } = useAgentTurn();
+  const { state, isStreaming, isPending, submit, cancel, reset } = useAgentTurn();
 
   // M8 C8 Step C — reflect useAgentTurn's TurnState into the chat store
   // per (i) MAP DOWN locked mapping. The store's 3-state enum
@@ -876,11 +877,16 @@ export function ChatClient({
     }
   }, []);
 
-  const composerState: ComposerState = (() => {
-    if (isStreaming) return "blocked";
-    if (draft.length > 0) return "typing";
-    return "empty";
-  })();
+  // M13 Phase 1.B follow-on (X1): lock on (isPending || isStreaming) so
+  // the composer is disabled from the synchronous start of submit
+  // through streaming — not just once the stream begins. Closes the
+  // double-send window. deriveComposerState is the pure, unit-tested
+  // rule.
+  const composerState: ComposerState = deriveComposerState({
+    isPending,
+    isStreaming,
+    draftLength: draft.length,
+  });
 
   // CF§10.8 — auto-scroll rule: stick to bottom while streaming IF the
   // user is within ~120px of bottom. Once they scroll up further, stop

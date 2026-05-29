@@ -50,12 +50,13 @@
  */
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useChatStore, type ChatTurn } from "./ChatStore";
 import { conversationIdFromPathname } from "@/lib/chat/conversationIdFromPathname";
 
 export function ChatURLSync() {
   const pathname = usePathname();
+  const router = useRouter();
   const { state, dispatch } = useChatStore();
   const conversationId = conversationIdFromPathname(pathname);
 
@@ -113,11 +114,20 @@ export function ChatURLSync() {
         );
         if (cancelled) return;
         if (!res.ok) {
-          // 404 / 401 / 500 — surface as empty history. HYDRATE clears
-          // the loading flag so the host sees an empty state rather than
-          // an infinite skeleton or the prior conversation under a
-          // mismatched URL.
+          // M13 Phase 1.B follow-on (N4/S6): a conversation the host
+          // can't load — deleted, foreign, or nonexistent id (404), or
+          // an auth/server failure — must RESOLVE the URL↔content
+          // desync, not strand on a stale /chat/[badId] URL rendering
+          // the landing EmptyState (which conflates S6 into S1). Redirect
+          // to `/`. This is also the primitive D1 (delete) composes on:
+          // deleting the active conversation makes its next load 404 →
+          // this redirect fires; no special delete-active path needed.
+          //
+          // Reset the store to the landing state first so the surface
+          // doesn't flash the stale loading skeleton during the nav.
+          dispatch({ type: "SET_ACTIVE_CONVERSATION", conversationId: null });
           dispatch({ type: "HYDRATE_CONVERSATION", turns: [] });
+          router.replace("/");
           return;
         }
         const body = (await res.json()) as { turns?: ChatTurn[] };
@@ -128,18 +138,26 @@ export function ChatURLSync() {
         });
       } catch {
         if (cancelled) return;
+        // Network/transport failure (not a 404 verdict) — same desync
+        // resolution: don't strand on a stale URL with empty content.
+        // Redirect to landing rather than silently showing EmptyState
+        // under /chat/[id].
+        dispatch({ type: "SET_ACTIVE_CONVERSATION", conversationId: null });
         dispatch({ type: "HYDRATE_CONVERSATION", turns: [] });
+        router.replace("/");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-    // Intentionally keyed ONLY on conversationId (the URL). See the
-    // ref note above — depending on activeConversationId would let the
-    // anchor's store update fire this effect with a stale URL and wipe
-    // the in-flight conversation.
-  }, [conversationId, dispatch]);
+    // Keyed on conversationId (the URL) + the stable router/dispatch.
+    // See the ref note above — depending on activeConversationId would
+    // let the anchor's store update fire this effect with a stale URL
+    // and wipe the in-flight conversation. router from useRouter is a
+    // stable reference (Next 14), so including it never re-runs the
+    // effect on its own.
+  }, [conversationId, dispatch, router]);
 
   return null;
 }

@@ -6,6 +6,7 @@
 3. Read `DESIGN_SYSTEM.md` before any UI work. Every component, color, shadow, animation, and spacing must match the design system exactly.
 4. Read `KOAST_POLISH_PASS_MASTER_PLAN.md` if doing polish-pass work — the 30+ spec corrections are binding.
 5. Read `KOAST_PRODUCT_SPEC.md` for feature requirements before implementation.
+5b. **Before any conversation-system work** (chat surface, conversation list, deep-link/load, create/switch/delete, the chat state machine): read `docs/conversation-lifecycle-spec.md` — the living source of truth for the Conversation entity's surface states (S1–S6), operations (create/read/update/delete/navigate), definition-of-done, and the standing §8 regression sweep. Update its statuses in the same PR that changes the behavior.
 6. Run `cat ~/koast/repomix-output.xml | head -200` for project structure. If stale: `cd ~/koast && repomix`.
 7. Never run `npm run build` on the VPS — use `npx tsc --noEmit` then `git push`. Vercel builds with 8GB RAM.
 

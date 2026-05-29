@@ -21,7 +21,7 @@
  *   - rendering the active turn from state.content
  */
 
-import { useCallback, useReducer, useRef } from "react";
+import { useCallback, useReducer, useRef, useState } from "react";
 import { parseSSEChunk } from "./parseSSEEvent";
 import { turnReducer } from "./turnReducer";
 import { initialTurnState, type TurnState } from "./types";
@@ -42,6 +42,14 @@ export type UseAgentTurnReturn = {
   state: TurnState;
   /** True while a fetch is in flight (status==='streaming' or about to be). */
   isStreaming: boolean;
+  /**
+   * M13 Phase 1.B follow-on (X1): true from the synchronous start of
+   * submit() until the fetch settles (finally). Bridges the
+   * onSubmit→turn_started gap where status is still "idle". Consumers
+   * lock the composer on (isPending || isStreaming) to close the
+   * double-send window. Clears on every exit path (success/error/abort).
+   */
+  isPending: boolean;
   submit: (message: string, options: SubmitOptions) => Promise<void>;
   cancel: () => void;
   /** Imperatively reset to idle (e.g. after harvesting a completed turn). */
@@ -63,6 +71,20 @@ export function useAgentTurn(): UseAgentTurnReturn {
   const [state, dispatch] = useReducer(reducerWithReset, initialTurnState);
   const abortRef = useRef<AbortController | null>(null);
   const isStreamingRef = useRef<boolean>(false);
+  // M13 Phase 1.B follow-on (X1 double-send fix): `isPending` is true
+  // from the synchronous start of submit() until the fetch fully
+  // settles. It BRIDGES the gap between onSubmit and the turn_started
+  // SSE event — during that gap state.status is still "idle", so
+  // isStreaming (status === "streaming") is false and the composer would
+  // otherwise stay unlocked, allowing a second send with conversation_id
+  // still null → a SECOND conversation (fragmentation).
+  //
+  // Operator caveat (msg 3555): the flag MUST clear on EVERY exit path,
+  // including error and abort, or the composer locks forever (the
+  // infinite-skeleton bug in a new spot). That is why it is cleared in
+  // the `finally` block (runs on success, error, AND abort) + in
+  // cancel()/reset() — not in scattered per-outcome branches.
+  const [isPending, setIsPending] = useState(false);
 
   const cancel = useCallback(() => {
     if (abortRef.current) {
@@ -70,6 +92,9 @@ export function useAgentTurn(): UseAgentTurnReturn {
       abortRef.current = null;
     }
     isStreamingRef.current = false;
+    // Clear pending on cancel — an Esc/abort during the pre-streaming
+    // window must unlock the composer (otherwise: locked forever).
+    setIsPending(false);
   }, []);
 
   const reset = useCallback(() => {
@@ -85,6 +110,10 @@ export function useAgentTurn(): UseAgentTurnReturn {
       const controller = new AbortController();
       abortRef.current = controller;
       isStreamingRef.current = true;
+      // Set pending SYNCHRONOUSLY (before the first await) so the
+      // composer locks on the very next render — closing the X1 window
+      // from the first send, not from turn_started.
+      setIsPending(true);
 
       // Reset reducer to a fresh active turn (turn_started will land soon).
       dispatch(RESET_ACTION);
@@ -143,6 +172,9 @@ export function useAgentTurn(): UseAgentTurnReturn {
       } finally {
         isStreamingRef.current = false;
         if (abortRef.current === controller) abortRef.current = null;
+        // ALWAYS clears — success, error, or abort. This is the
+        // single guaranteed-runs exit point (operator msg 3555 caveat).
+        setIsPending(false);
       }
     },
     [cancel],
@@ -151,6 +183,7 @@ export function useAgentTurn(): UseAgentTurnReturn {
   return {
     state,
     isStreaming: state.status === "streaming",
+    isPending,
     submit,
     cancel,
     reset,
