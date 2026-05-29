@@ -48,15 +48,15 @@ export async function GET() {
     // "Villa Jamaica" via "tampa" or "jamaica st" without re-narrowing.
     const { data: propRows, error: propErr } = await supabase
       .from("properties")
-      .select("id, name, city, address_line1")
+      .select("id, name, city, address")
       .eq("user_id", user.id)
       .order("name");
     if (propErr) throw new Error(`property fetch failed: ${propErr.message}`);
 
     const propertyEntries: CmdKEntry[] = (propRows ?? []).map((p) => {
-      const row = p as { id: string; name: string; city: string | null; address_line1: string | null };
-      const hintParts = [row.address_line1, row.city].filter(Boolean);
-      const keywords = [row.name, row.city ?? "", row.address_line1 ?? ""].filter(
+      const row = p as { id: string; name: string; city: string | null; address: string | null };
+      const hintParts = [row.address, row.city].filter(Boolean);
+      const keywords = [row.name, row.city ?? "", row.address ?? ""].filter(
         (k): k is string => Boolean(k),
       );
       return {
