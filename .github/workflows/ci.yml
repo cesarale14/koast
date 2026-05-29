@@ -71,3 +71,65 @@ jobs:
       # truth source for the 1× contract.
       - name: Fluidity check
         run: npx tsx scripts/fluidity-check.ts
+
+  # M13 Phase 2 — conversation-lifecycle Playwright E2E gate.
+  #
+  # Runs the 15 §8-sweep specs (docs/conversation-lifecycle-spec.md) against
+  # the NON-PROD staging Supabase project, on every PR + main push. Distinct
+  # job so its pass/fail is isolated from lint/tsc/jest, and run in PARALLEL
+  # (not `needs: ci`) — isolation of the signal matters more than saving a
+  # few runner-minutes on type-broken code (and `next build` below re-checks
+  # types anyway).
+  #
+  # The webServer in playwright.config.ts runs `next build && next start` in
+  # CI (prod-faithful), so this job builds the app itself. KOAST_E2E_CANNED_AGENT
+  # cans ONLY the LLM call — real rows are still persisted to staging. The
+  # prod-guard (e2e/helpers/prod-guard.ts) fails closed: it refuses to run
+  # unless NEXT_PUBLIC_SUPABASE_URL matches PLAYWRIGHT_EXPECTED_SUPABASE_REF
+  # and is not the prod ref. STAGING VALUES ONLY in the secrets below.
+  playwright:
+    name: e2e · conversation lifecycle
+    runs-on: ubuntu-24.04
+    env:
+      # Non-sensitive — safe in plain workflow env.
+      KOAST_E2E_CANNED_AGENT: '1'
+      PLAYWRIGHT_EXPECTED_SUPABASE_REF: aljowaggoulsswtxdtmf
+      NEXT_PUBLIC_SUPABASE_URL: https://aljowaggoulsswtxdtmf.supabase.co
+      # Sensitive — STAGING values, added at GitHub → Settings → Secrets.
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      DATABASE_URL_POOLED: ${{ secrets.STAGING_DATABASE_URL_POOLED }}
+      PLAYWRIGHT_TEST_PASSWORD: ${{ secrets.PLAYWRIGHT_TEST_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright chromium + OS deps
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E — conversation lifecycle (staging)
+        run: npm run test:e2e
+
+      # CI failures are blind without artifacts — keep the HTML report +
+      # retained traces/screenshots (playwright.config: trace + screenshot
+      # retain-on-failure) for download.
+      - name: Upload Playwright report + traces on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

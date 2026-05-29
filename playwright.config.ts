@@ -59,6 +59,7 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
 
   projects: [
@@ -74,7 +75,9 @@ export default defineConfig({
       : `next dev -p ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !isCI,
-    timeout: 240_000,
+    // CI runs `next build && next start` from cold — give the build room
+    // (the runner compiles the whole app). Local `next dev` is fast.
+    timeout: isCI ? 360_000 : 240_000,
     env: serverEnv,
   },
 });

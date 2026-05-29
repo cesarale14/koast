@@ -13,8 +13,19 @@ import { resolve } from "node:path";
 export function loadPlaywrightEnv(): void {
   const path = resolve(process.cwd(), ".env.playwright");
   if (!existsSync(path)) {
+    // CI path: the harness env is injected directly (workflow `env:` +
+    // `${{ secrets.* }}`), so there is no .env.playwright file to read.
+    // That's fine AS LONG AS the critical vars are already present — the
+    // prod-guard still validates the target ref downstream. Locally the
+    // file is required (and we must NEVER fall back to .env.local / prod).
+    if (
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    ) {
+      return;
+    }
     throw new Error(
-      "[e2e] .env.playwright not found. Create it from .env.staging (see docs/e2e-playwright.md). The harness must NEVER source .env.local (prod).",
+      "[e2e] .env.playwright not found and harness env is not present in the environment. Locally: create it from .env.staging (see docs/e2e-playwright.md). In CI: set the staging vars via workflow env + secrets. The harness must NEVER source .env.local (prod).",
     );
   }
   const raw = readFileSync(path, "utf8");
