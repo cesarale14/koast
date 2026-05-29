@@ -113,10 +113,22 @@ export function useCmdKData(enabled: boolean): {
   return { entries, loading, error };
 }
 
-/** Test-only — invalidates the module cache. Not exported in
- * production paths; only for jest contexts that re-mount the hook
- * with a fresh fetch sequence. */
-export function __resetCmdKCacheForTests(): void {
+/**
+ * Invalidate the module cache so the NEXT palette open refetches.
+ *
+ * M13 Phase 1.B follow-on: called when a new conversation is created
+ * (the first-send anchor) so Cmd+K recents reflect it without waiting
+ * out the 5-minute TTL. Cheap — just drops the cache; the next
+ * useCmdKData(enabled) consumer refetches on open. Does NOT trigger a
+ * fetch itself (the palette is lazy; no point fetching while it's
+ * closed).
+ */
+export function invalidateCmdKData(): void {
   cache = null;
   inFlight = null;
+}
+
+/** Test-only alias — kept for existing jest imports. */
+export function __resetCmdKCacheForTests(): void {
+  invalidateCmdKData();
 }

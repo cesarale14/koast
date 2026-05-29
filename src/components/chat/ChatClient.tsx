@@ -38,6 +38,8 @@ import { Composer, type ComposerState } from "./Composer";
 import { RespondingRow } from "./RespondingRow";
 import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
 import { ConversationLoadingSkeleton } from "./ConversationLoadingSkeleton";
+import { invalidateCmdKData } from "@/lib/cmdk/use-cmdk-data";
+import { mergeConversationLists } from "@/lib/chat/mergeConversationLists";
 import { ReengagementBanner } from "./ReengagementBanner";
 import { AuditDrawer } from "@/components/inspect/AuditDrawer";
 import { ErrorBlock } from "./ErrorBlock";
@@ -388,11 +390,21 @@ export function ChatClient({
     fetchedProperties !== null && fetchedProperties.length > properties.length
       ? fetchedProperties
       : properties;
-  const effectiveConversations =
+  // M13 Phase 1.B follow-on: optimistic conversation entries added on
+  // first-send anchor, before the server list refetches. Merged into the
+  // visible list + reconciled by id (server wins) so a new conversation
+  // appears in the rail IMMEDIATELY, then seamlessly becomes its real
+  // titled entry on the next fetch/reload — no duplicate.
+  const [optimisticConvos, setOptimisticConvos] = useState<ConvListItem[]>([]);
+  const serverConversations =
     fetchedConversations !== null &&
     fetchedConversations.length > conversations.length
       ? fetchedConversations
       : conversations;
+  const effectiveConversations =
+    optimisticConvos.length > 0
+      ? mergeConversationLists(serverConversations, optimisticConvos)
+      : serverConversations;
 
   // M8 C8 Step F.3 — Bug 2 fix: reset sessionHarvest when activeConversationId
   // changes (host switches conversations). Without this, a stale harvested
@@ -764,8 +776,42 @@ export function ChatClient({
       navigatedRef.current = newId;
       chatStoreDispatch({ type: "ANCHOR_CONVERSATION", conversationId: newId });
       router.replace(`/chat/${newId}`);
+
+      // M13 Phase 1.B follow-on (list-on-creation fix): the new
+      // conversation must appear in the rail + Cmd+K recents WITHOUT a
+      // reload. Optimistically prepend a list entry now — appearance is
+      // NOT gated on async title generation (use the first user message,
+      // or "New conversation" as a fallback). The merge in
+      // effectiveConversations reconciles this by id against the server
+      // set on the next fetch/reload (server wins → real title, no dup).
+      const preview =
+        (pendingUserText && pendingUserText.trim().length > 0
+          ? pendingUserText.trim()
+          : "New conversation");
+      setOptimisticConvos((prev) => {
+        if (prev.some((c) => c.id === newId)) return prev;
+        return [
+          {
+            id: newId,
+            last_turn_at: new Date().toISOString(),
+            preview,
+            propertyName: "",
+          },
+          ...prev,
+        ];
+      });
+
+      // Drop the Cmd+K recents cache so the next ⌘K reflects the new
+      // conversation instead of serving up-to-5-min-stale recents.
+      invalidateCmdKData();
     }
-  }, [state.conversation_id, activeConversationId, chatStoreDispatch, router]);
+  }, [
+    state.conversation_id,
+    activeConversationId,
+    chatStoreDispatch,
+    router,
+    pendingUserText,
+  ]);
 
   const onSubmit = useCallback(() => {
     const text = draft.trim();
