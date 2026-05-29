@@ -32,6 +32,7 @@ export function ConversationLoadingSkeleton() {
 
   return (
     <div
+      data-testid="conversation-loading"
       aria-busy="true"
       aria-label="Loading conversation"
       role="status"

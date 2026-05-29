@@ -9,7 +9,7 @@ export type RespondingRowProps = {
 
 export function RespondingRow({ onStop }: RespondingRowProps) {
   return (
-    <div className={styles["responding-row"]} role="status" aria-live="polite">
+    <div className={styles["responding-row"]} data-testid="responding-row" role="status" aria-live="polite">
       <KoastMark size={12} state="active" />
       <span>Koast is responding…</span>
       <button type="button" className={styles["stop-btn"]} onClick={onStop}>

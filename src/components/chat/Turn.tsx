@@ -17,7 +17,11 @@ export function Turn({
   children: ReactNode;
 }) {
   return (
-    <div className={`${styles.turn} ${styles[role]}`}>
+    <div
+      className={`${styles.turn} ${styles[role]}`}
+      data-testid="chat-turn"
+      data-role={role}
+    >
       {meta}
       {children}
     </div>

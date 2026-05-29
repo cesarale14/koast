@@ -13,7 +13,7 @@ export function RailList({
   onSelect?: (id: string) => void;
 }) {
   return (
-    <div className={styles["rail-list"]}>
+    <div className={styles["rail-list"]} data-testid="conversation-list">
       {groups.map((group) => (
         <div key={group.label}>
           <div className={styles["rail-section-label"]}>{group.label}</div>
@@ -26,6 +26,8 @@ export function RailList({
               <button
                 key={item.id}
                 type="button"
+                data-testid="conversation-item"
+                data-conversation-id={item.id}
                 className={cls}
                 onClick={() => onSelect?.(item.id)}
               >

@@ -28,6 +28,13 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# Playwright E2E (M13 Phase 1.B) — gitignored: harness env + auth state + outputs
+.env.playwright
+/e2e/.auth/
+/playwright-report/
+/test-results/
+/playwright/.cache/
+
 # vercel
 .vercel
 

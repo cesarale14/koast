@@ -215,6 +215,7 @@ export default function CommandPalette() {
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
+      data-testid="cmdk-palette"
       onClick={close}
       style={{
         position: "fixed",
@@ -372,6 +373,9 @@ function ResultRow({
   return (
     <button
       id={`cmdk-row-${entry.id}`}
+      data-testid="cmdk-result"
+      data-cmdk-kind={entry.kind}
+      data-cmdk-id={entry.id}
       role="option"
       aria-selected={active}
       type="button"

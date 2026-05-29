@@ -35,7 +35,7 @@ export function EmptyState({
   onStarterSelect,
 }: EmptyStateProps) {
   return (
-    <div className={styles.empty}>
+    <div className={styles.empty} data-testid="chat-empty-state">
       <KoastMark size={28} state="idle" />
       <p className={styles["empty-prompt"]}>{prompt}</p>
       {starters && starters.length > 0 && onStarterSelect ? (

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
+    "test:e2e": "playwright test",
     "prepare": "husky",
     "voice:scan:doctrine": "tsx scripts/voice-scan-doctrine.ts",
     "voice:scan:constitution": "tsx scripts/voice-scan-constitution.ts"
@@ -32,6 +33,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/jest": "^30.0.0",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",

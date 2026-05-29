@@ -60,6 +60,7 @@ export function Composer({
   return (
     <div className={containerCls}>
       <textarea
+        data-testid="composer-input"
         className={styles["composer-input"]}
         rows={1}
         placeholder={placeholder}
@@ -91,6 +92,7 @@ export function Composer({
           </span>
           <button
             type="button"
+            data-testid="composer-send"
             className={styles["send-btn"]}
             aria-label="Send"
             disabled={sendDisabled}

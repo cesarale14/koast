@@ -52,6 +52,7 @@ import type { AgentStreamEvent } from "./sse";
 import type { ToolHandlerContext } from "./types";
 import { classifyError } from "./error-classifier";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isCannedAgentMode, CANNED_AGENT_TEXT } from "./e2e-canned";
 
 const MODEL_ID = "claude-sonnet-4-5-20250929";
 const MAX_TOKENS = 4096;
@@ -542,7 +543,9 @@ async function* runOneRound(
 export async function* runAgentTurn(
   input: RunAgentTurnInput,
 ): AsyncGenerator<AgentStreamEvent, void, void> {
-  const client = getAnthropicClient();
+  // NOTE: the Anthropic client is initialized lazily just before the
+  // round loop (below), NOT here — so canned-agent E2E mode (which
+  // returns before the loop) doesn't require ANTHROPIC_API_KEY.
 
   // Step 1+2: get/create conversation, persist user turn, pre-insert
   // assistant stub so dispatcher's writeArtifact has a real turn_id
@@ -577,6 +580,30 @@ export async function* runAgentTurn(
   });
 
   yield { type: "turn_started", conversation_id: conversation.id };
+
+  // M13 Phase 1.B Playwright harness (Decision 7): deterministic canned
+  // agent response for E2E. Active ONLY when KOAST_E2E_CANNED_AGENT=1
+  // against a non-prod Supabase URL (isCannedAgentMode is fail-closed /
+  // prod-inert). Cans ONLY the LLM call — conversation + user turn +
+  // assistant stub are already persisted above; finalizeTurn below
+  // persists the canned text, so create/reload specs assert REAL rows.
+  // Placed after turn_started so the SSE shape (turn_started → token →
+  // done) matches production and the client anchor/list logic runs
+  // identically. No tool calls, no rounds, no model client.
+  if (isCannedAgentMode()) {
+    yield { type: "token", delta: CANNED_AGENT_TEXT };
+    await finalizeTurn({
+      turn_id: assistantTurn.id,
+      content_text: CANNED_AGENT_TEXT,
+      tool_calls: null,
+      refusal: null,
+      input_tokens: null,
+      output_tokens: null,
+      cache_read_tokens: null,
+    });
+    yield { type: "done", turn_id: assistantTurn.id, audit_ids: [] };
+    return;
+  }
 
   // Step 3: reconstruct full history (includes the user turn just persisted).
   const history = await reconstructHistory(conversation.id);
@@ -648,6 +675,9 @@ export async function* runAgentTurn(
   let refusalEnvelope: import("./refusal-envelope").RefusalEnvelope | null = null;
 
   let history_with_results: Anthropic.MessageParam[] = seedMessages;
+
+  // Lazy client init — only the real (non-canned) path needs Anthropic.
+  const client = getAnthropicClient();
 
   while (round < ROUND_CAP) {
     round += 1;
