@@ -54,6 +54,7 @@ import {
 import { useAgentTurn } from "@/lib/agent-client/useAgentTurn";
 import type { PropertyOption } from "./PropertyContext";
 import { useChatStoreOptional, type TurnState as ChatTurnState } from "./ChatStore";
+import { useToast } from "@/components/ui/Toast";
 
 type UITurnLite = {
   id: string;
@@ -247,6 +248,7 @@ export function ChatClient({
   initialPropertyId = null,
 }: ChatClientProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const { state, isStreaming, isPending, submit, cancel, reset } = useAgentTurn();
 
   // M8 C8 Step C — reflect useAgentTurn's TurnState into the chat store
@@ -855,6 +857,26 @@ export function ChatClient({
     [router],
   );
 
+  // M13 D1 undo: drop the id from the tombstone so the row reappears, then
+  // null deleted_at server-side. On failure re-tombstone (it's still deleted).
+  // (Undo of an active-delete only restores the rail row — we don't navigate
+  // back from S1.)
+  const onUndoDelete = useCallback((id: string) => {
+    setRemovedConversationIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    void fetch(`/api/agent/conversations/${id}/restore`, { method: "POST" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`restore failed: ${r.status}`);
+        invalidateCmdKData();
+      })
+      .catch(() => {
+        setRemovedConversationIds((prev) => new Set(prev).add(id));
+      });
+  }, []);
+
   const onDeleteConversation = useCallback(
     (id: string) => {
       // 1. Optimistic tombstone — drop from the rail immediately.
@@ -873,9 +895,14 @@ export function ChatClient({
       void fetch(`/api/agent/conversations/${id}`, { method: "DELETE" })
         .then((r) => {
           if (!r.ok) throw new Error(`delete failed: ${r.status}`);
-          // Gone for good: drop any optimistic entry + refresh ⌘K recents.
-          setOptimisticConvos((prev) => prev.filter((c) => c.id !== id));
+          // Keep the (tombstoned) list entry so Undo can restore it; refresh
+          // ⌘K recents. The reload-time server filter keeps it gone if the
+          // host never undoes. Offer a "Deleted · Undo" toast.
           invalidateCmdKData();
+          toast("Deleted", "success", {
+            action: { label: "Undo", onClick: () => onUndoDelete(id) },
+            durationMs: 10_000,
+          });
         })
         .catch(() => {
           setRemovedConversationIds((prev) => {
@@ -885,7 +912,7 @@ export function ChatClient({
           });
         });
     },
-    [activeConversationId, chatStoreDispatch, router],
+    [activeConversationId, chatStoreDispatch, router, toast, onUndoDelete],
   );
 
   const onNewConversation = useCallback(() => {

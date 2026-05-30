@@ -171,4 +171,35 @@ test.describe("Delete / soft-delete", () => {
     await page.unroute("**/api/agent/conversations/**");
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
+
+  test("item 18 — delete → undo → restored AND present after reload", async ({ page }) => {
+    const nonce = makeNonce("del18");
+    await page.goto("/");
+    const idX = await createConversation(page, nonce, "undo me");
+    // Background it so delete doesn't navigate (active-undo navigation is
+    // intentionally not built — restoring to the rail is enough).
+    await page.goto("/");
+    await createConversation(page, nonce, "active other");
+
+    await rowById(page, idX).hover();
+    await rowById(page, idX).getByTestId("conversation-delete").click();
+    await expect(rowById(page, idX)).toHaveCount(0);
+
+    // The success toast carries the Undo action. Click it and wait for the
+    // restore POST to land server-side before reloading.
+    const restored = page.waitForResponse(
+      (r) => r.url().includes(`/conversations/${idX}/restore`) && r.request().method() === "POST",
+    );
+    await page.getByTestId("toast-action").click();
+    await restored;
+
+    // Optimistic restore puts it back immediately...
+    await expect(rowById(page, idX)).toBeVisible();
+    // ...and after reload it's STILL there — proves the endpoint nulled
+    // deleted_at server-side, not just the optimistic un-tombstone.
+    await page.reload();
+    await expect(rowById(page, idX)).toBeVisible();
+
+    await deleteConversationsByNonce(admin, host1Id, nonce);
+  });
 });

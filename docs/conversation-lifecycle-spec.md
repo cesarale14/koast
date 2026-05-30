@@ -98,7 +98,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 
 | ID | Operation | Behavior + edges | Status | Pri |
 |---|---|---|---|---|
-| D1 | **Delete a conversation** | **SOFT delete** (`deleted_at` flag; filtered from every read via the single `notDeleted()` scope in `conversation.ts`, enforced by `scripts/conversation-reads-guard.sh`). Reversible. `DELETE /api/agent/conversations/[id]`. Rail-row hover trash. Optimistic removal via a removed-id tombstone filtered AFTER `mergeConversationLists`; failed DELETE → row restored. Deleting the ACTIVE conversation uses an explicit `router.replace("/")` → S1 (NOT the 404 path — that only covers navigate-to-deleted). Undo deferred (fast-follow). | `BUILT` (E2E: items 15/16/17/17b/17c) | **P0** |
+| D1 | **Delete a conversation** | **SOFT delete** (`deleted_at` flag; filtered from every read via the single `notDeleted()` scope in `conversation.ts`, enforced by `scripts/conversation-reads-guard.sh`). Reversible. `DELETE /api/agent/conversations/[id]`. Rail-row hover trash. Optimistic removal via a removed-id tombstone filtered AFTER `mergeConversationLists`; failed DELETE → row restored. Deleting the ACTIVE conversation uses an explicit `router.replace("/")` → S1 (NOT the 404 path — that only covers navigate-to-deleted). **Undo** shipped: `POST /api/agent/conversations/[id]/restore` nulls `deleted_at`; a "Deleted · Undo" toast (reusable Toast action affordance) optimistically un-tombstones + restores. Undo of an active-delete restores the rail row only (no navigate-back from S1). | `BUILT` (E2E: items 15/16/17/17b/17c/18) | **P0** |
 | D2 | Bulk delete / clear | Clear many at once. Minimal "clear all" for test-pile cleanup. True purge of test rows = one-off hard-delete run, not a feature. | `MISSING` | P0 (minimal) / P2 (full) |
 | D3 | Archive (soft-hide) | Hide without destroying. Near-free once D1 soft-delete exists. | `MISSING` | P2 |
 
@@ -145,7 +145,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 **P0 — must be true before a beta host touches it**
 - All `BUILT*` operations attest clean on device: C1, R1, R2, U1, N1, N2, N3, N4, S2, S5
 - UNCONFIRMED P0 items resolved: C2 (clean ✓), U3 (no-regression ✓), composer-lock + X1 (fixed ✓)
-- ~~Build: **D1** (soft delete)~~ — shipped (E2E items 15/16/17/17b/17c). Undo deferred to a fast-follow. Minimal **D2** (clear) still open.
+- ~~Build: **D1** (soft delete) + undo~~ — shipped (E2E items 15/16/17/17b/17c/18). Minimal **D2** (clear) still open.
 - ~~Build: N4/S6 unhappy path~~ — shipped
 
 **P1 — soon after beta**
@@ -217,9 +217,10 @@ Run as one pass. Green across all → spine is clean. Grouped by operation; expa
 17. Navigate to a deleted conversation's URL → N4/S6 redirect to `/`
 17b. Optimistic remove then a FAILED delete (DELETE aborted) → row restored to the rail
 17c. Delete the ACTIVE conversation then a FAILED delete → at S1 AND row restored
+18. Delete → Undo (toast action) → row restored AND present after reload (reload proves `POST .../restore` nulled `deleted_at` server-side, not just the optimistic un-tombstone)
 
 **Rename (add once U2 is built)**
-18. Rename → updates in history immediately and after reload  *(was reserved for D1 undo; undo deferred to a fast-follow, so 18 returns to U2/rename)*
+19. Rename → updates in history immediately and after reload
 
 ---
 

@@ -183,6 +183,38 @@ export async function softDeleteConversation(
 }
 
 /**
+ * Restore a soft-deleted conversation (M13 D1 undo). Nulls deleted_at if the
+ * host owns it. Same shape as softDeleteConversation: a pure WRITE with
+ * ownership in the UPDATE WHERE — it INTENTIONALLY touches a soft-deleted row,
+ * so it does NOT go through notDeleted(). Idempotent (restoring a live
+ * conversation is a harmless re-stamp that still returns the row → 200). A
+ * foreign / nonexistent id updates zero rows → throws → route maps to 404.
+ */
+export async function restoreConversation(
+  conversationId: string,
+  hostId: string,
+): Promise<void> {
+  const supabase = createServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateBuilder = supabase.from("agent_conversations") as any;
+  const { data, error } = await updateBuilder
+    .update({ deleted_at: null })
+    .eq("id", conversationId)
+    .eq("host_id", hostId)
+    .select("id");
+  if (error) {
+    throw new Error(
+      `[conversation] restoreConversation: update failed for ${conversationId}: ${error.message}`,
+    );
+  }
+  if (!data || (data as unknown[]).length === 0) {
+    throw new Error(
+      `[conversation] restoreConversation: conversation ${conversationId} not found or not owned by host ${hostId}.`,
+    );
+  }
+}
+
+/**
  * Persist a turn. Computes the next turn_index by counting existing
  * rows on the conversation. Two writers racing on the same
  * conversation could in principle collide on the unique
