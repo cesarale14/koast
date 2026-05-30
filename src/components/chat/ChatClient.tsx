@@ -397,15 +397,27 @@ export function ChatClient({
   // appears in the rail IMMEDIATELY, then seamlessly becomes its real
   // titled entry on the next fetch/reload — no duplicate.
   const [optimisticConvos, setOptimisticConvos] = useState<ConvListItem[]>([]);
+  // M13 D1: optimistic-removal tombstones. Ids deleted this session are
+  // filtered out AFTER the merge so a concurrent server list can't re-add a
+  // row mid-delete. On a failed DELETE the id is removed from the set → the
+  // row reconciles back. In-session only: a reload remounts (set resets), and
+  // the server's notDeleted() filter keeps a successfully-deleted row gone.
+  const [removedConversationIds, setRemovedConversationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const serverConversations =
     fetchedConversations !== null &&
     fetchedConversations.length > conversations.length
       ? fetchedConversations
       : conversations;
-  const effectiveConversations =
+  const mergedConversations =
     optimisticConvos.length > 0
       ? mergeConversationLists(serverConversations, optimisticConvos)
       : serverConversations;
+  const effectiveConversations =
+    removedConversationIds.size > 0
+      ? mergedConversations.filter((c) => !removedConversationIds.has(c.id))
+      : mergedConversations;
 
   // M8 C8 Step F.3 — Bug 2 fix: reset sessionHarvest when activeConversationId
   // changes (host switches conversations). Without this, a stale harvested
@@ -843,6 +855,39 @@ export function ChatClient({
     [router],
   );
 
+  const onDeleteConversation = useCallback(
+    (id: string) => {
+      // 1. Optimistic tombstone — drop from the rail immediately.
+      setRemovedConversationIds((prev) => new Set(prev).add(id));
+      // 2. Deleting the OPEN conversation → explicit redirect to S1. (The
+      //    N4/S6 404-redirect only covers navigate-to-deleted, not this.)
+      if (id === activeConversationId) {
+        if (chatStoreDispatch) {
+          chatStoreDispatch({ type: "SET_ACTIVE_CONVERSATION", conversationId: null });
+          setPendingUserText(null);
+          navigatedRef.current = null;
+        }
+        router.replace("/");
+      }
+      // 3. Soft-delete on the server; reconcile the row back on failure.
+      void fetch(`/api/agent/conversations/${id}`, { method: "DELETE" })
+        .then((r) => {
+          if (!r.ok) throw new Error(`delete failed: ${r.status}`);
+          // Gone for good: drop any optimistic entry + refresh ⌘K recents.
+          setOptimisticConvos((prev) => prev.filter((c) => c.id !== id));
+          invalidateCmdKData();
+        })
+        .catch(() => {
+          setRemovedConversationIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        });
+    },
+    [activeConversationId, chatStoreDispatch, router],
+  );
+
   const onNewConversation = useCallback(() => {
     setDrawerOpen(false);
     // M8 C8 Step F.4 — Pre-Step-E, router.push('/chat') triggered a server-
@@ -952,6 +997,7 @@ export function ChatClient({
           activeConversationId={activeConversationId ?? undefined}
           onSelectConversation={onSelectConversation}
           onNewConversation={onNewConversation}
+          onDeleteConversation={onDeleteConversation}
         />
       </div>
       {drawerOpen && (

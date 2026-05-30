@@ -77,11 +77,35 @@ export interface AgentConversationRow {
 }
 
 /**
+ * notDeleted — the SINGLE conversation READ scope (M13 D1 soft-delete).
+ *
+ * Every read that surfaces a conversation (the rail via listConversations,
+ * Cmd+K recents through the same, the [id] load via loadTurnsForConversation)
+ * or gates an append (getOrCreateConversation's existing-id branch) MUST start
+ * here. It applies `deleted_at IS NULL`, so soft-deleted rows never surface and
+ * a deleted [id] reads as not-found — which composes with the N4/S6 redirect
+ * (the turns route turns the throw into a 404 → ChatURLSync redirects to /).
+ *
+ * Writes (create/update/delete on agent_conversations) do NOT go through this.
+ * The cross-file invariant — no SELECT on agent_conversations outside this
+ * module — is enforced by scripts/conversation-reads-guard.sh in CI.
+ */
+function notDeleted(
+  supabase: ReturnType<typeof createServiceClient>,
+  columns: string,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase.from("agent_conversations") as any)
+    .select(columns)
+    .is("deleted_at", null);
+}
+
+/**
  * Returns an existing conversation if `conversationId` is provided
  * and is owned by the host; otherwise creates a new conversation
  * for the host. Defensive: if the supplied conversationId belongs
  * to a different host, throw — callers shouldn't be passing IDs
- * across hosts.
+ * across hosts. A soft-deleted id reads as not-found (append guard).
  */
 export async function getOrCreateConversation(
   host: AgentHost,
@@ -90,10 +114,10 @@ export async function getOrCreateConversation(
   const supabase = createServiceClient();
 
   if (conversationId) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fromBuilder = supabase.from("agent_conversations") as any;
-    const { data, error } = await fromBuilder
-      .select("id, host_id, status, started_at, last_turn_at")
+    const { data, error } = await notDeleted(
+      supabase,
+      "id, host_id, status, started_at, last_turn_at",
+    )
       .eq("id", conversationId)
       .single();
 
@@ -123,6 +147,39 @@ export async function getOrCreateConversation(
     );
   }
   return data as AgentConversationRow;
+}
+
+/**
+ * Soft-delete a conversation (M13 D1). Sets deleted_at if the host owns it;
+ * after this every read (rail, cmdk, [id] load, append guard) filters it out
+ * via notDeleted(). A pure WRITE — ownership is enforced in the UPDATE's WHERE
+ * (no separate read), so there's no notDeleted concern here. Idempotent:
+ * re-deleting an owned conversation just re-stamps deleted_at and still returns
+ * the row → 200. A foreign / nonexistent id updates zero rows → throws, which
+ * the route maps to 404 (composing with the N4/S6 redirect for the deep-link).
+ */
+export async function softDeleteConversation(
+  conversationId: string,
+  hostId: string,
+): Promise<void> {
+  const supabase = createServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateBuilder = supabase.from("agent_conversations") as any;
+  const { data, error } = await updateBuilder
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", conversationId)
+    .eq("host_id", hostId)
+    .select("id");
+  if (error) {
+    throw new Error(
+      `[conversation] softDeleteConversation: update failed for ${conversationId}: ${error.message}`,
+    );
+  }
+  if (!data || (data as unknown[]).length === 0) {
+    throw new Error(
+      `[conversation] softDeleteConversation: conversation ${conversationId} not found or not owned by host ${hostId}.`,
+    );
+  }
 }
 
 /**
@@ -559,10 +616,10 @@ export async function listConversations(
 ): Promise<ConversationListItem[]> {
   const supabase = createServiceClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const convBuilder = supabase.from("agent_conversations") as any;
-  const { data: convRows, error: convError } = await convBuilder
-    .select("id, status, started_at, last_turn_at")
+  const { data: convRows, error: convError } = await notDeleted(
+    supabase,
+    "id, status, started_at, last_turn_at",
+  )
     .eq("host_id", hostId)
     .order("last_turn_at", { ascending: false });
 
@@ -756,11 +813,13 @@ export async function loadTurnsForConversation(
 ): Promise<UITurn[]> {
   const supabase = createServiceClient();
 
-  // Ownership check — same shape as getOrCreateConversation.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ownerBuilder = supabase.from("agent_conversations") as any;
-  const { data: convRow, error: convError } = await ownerBuilder
-    .select("id, host_id")
+  // Ownership check — same shape as getOrCreateConversation. notDeleted()
+  // also filters soft-deleted rows, so a deleted id resolves as no-row →
+  // throws → the turns route returns 404 → N4/S6 redirect.
+  const { data: convRow, error: convError } = await notDeleted(
+    supabase,
+    "id, host_id",
+  )
     .eq("id", conversationId)
     .single();
   if (convError || !convRow) {

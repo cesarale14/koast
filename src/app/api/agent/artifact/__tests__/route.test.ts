@@ -121,7 +121,12 @@ function mockSupabase(opts: {
     data: { host_id: opts.conversationHostId ?? HOST.id },
     error: null,
   });
-  const conversationSelectEq = jest.fn(() => ({ single: conversationSingle }));
+  // M13 D1: ownership read now chains .is("deleted_at", null) after .eq().
+  const conversationSelectIs = jest.fn(() => ({ single: conversationSingle }));
+  const conversationSelectEq = jest.fn(() => ({
+    is: conversationSelectIs,
+    single: conversationSingle,
+  }));
   const conversationSelect = jest.fn(() => ({ eq: conversationSelectEq }));
 
   const fromMock = jest.fn((table: string) => {

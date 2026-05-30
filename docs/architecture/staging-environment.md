@@ -114,6 +114,10 @@ From this session forward, every new migration follows the staging-first flow:
 
 If a migration is asymmetric (applies to staging only — see the recovery migration `20260407990000_drop_pre_408010000_dupe_policies.sql` for the canonical example), production gets a `koast_migration_history` row marked as already-applied with a note explaining why it isn't run via SQL on production.
 
+### Migration-tooling debt (Windows dev box, noted M13 D1)
+
+On the Windows dev box, `.env.staging` is absent (staging creds live in `.env.playwright`, sourced from staging) and `psql` isn't installed. Worse, the **direct** connection host `db.<ref>.supabase.co` is IPv6-only and does not resolve from that box (`ENOTFOUND`). The working migration path there is therefore: a small Node script using the app's `postgres.js` driver over the **transaction pooler** (`DATABASE_URL_POOLED`, `prepare: false`), with a two-sided hard gate (reject the prod ref, require the target ref) before any DDL. This runs single, non-concurrent DDL statements fine (each in its own implicit transaction) — adequate while `agent_conversations` and friends are tiny and a momentary index lock is harmless. **Debt:** the pooler path cannot do `CREATE INDEX CONCURRENTLY` or multi-statement transactions, so a future migration on a large table that needs a non-locking index build will need a real direct-connection path (IPv4 add-on, a session-pooler endpoint, or running it from a host that can reach the direct host). Don't fix until a migration actually needs it.
+
 ### Migration immutability
 
 Once a migration has been applied to either environment, **the file is locked**. Further changes require a new migration. This is the "migrations are append-only" principle. Editing an applied migration creates drift: staging has the original, production has the edit (or vice versa), and the next replay diverges from production.

@@ -46,7 +46,9 @@ function mockSupabase(opts: MockOpts): {
     error: null,
   });
   const ownerEq = jest.fn(() => ({ single: ownerSingle }));
-  const ownerSelect = jest.fn(() => ({ eq: ownerEq }));
+  // notDeleted() chains `.is("deleted_at", null)` after .select() (M13 D1).
+  const ownerIs = jest.fn(() => ({ eq: ownerEq }));
+  const ownerSelect = jest.fn(() => ({ is: ownerIs, eq: ownerEq }));
 
   // Turns query (return one assistant stub turn so the parallel query
   // shape is right; assistants without content_text are filtered out

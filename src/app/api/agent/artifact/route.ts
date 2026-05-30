@@ -145,9 +145,15 @@ async function resolveArtifact(
   // RLS — the explicit check is the defense-in-depth layer).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const convBuilder = supabase.from("agent_conversations") as any;
+  // M13 D1: MANUAL deleted_at filter (this read is allowlisted in
+  // scripts/conversation-reads-guard.sh, so the guard does NOT enforce it
+  // here — keep this .is() in sync by hand). A soft-deleted conversation's
+  // artifacts must 404 too, consistent with the conversation itself 404ing
+  // (and with undo later restoring them).
   const { data: conv, error: convError } = await convBuilder
     .select("host_id")
     .eq("id", artifact.conversation_id)
+    .is("deleted_at", null)
     .single();
 
   if (convError || !conv) {

@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 // M10 Phase D STEP 6 (S3): typed JSONB envelope column on messages.
 // Import-direction note: db schema → agent envelope schema is one-way (the
 // envelope schema is Zod-only, no DB deps, so no circularity).
@@ -906,9 +906,17 @@ export const agentConversations = pgTable("agent_conversations", {
   title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // M13 D1 soft-delete: NULL = live; non-NULL = soft-deleted. Filtered from
+  // every conversation read via the notDeleted() helper in
+  // src/lib/agent/conversation.ts (enforced by scripts/conversation-reads-guard.sh).
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (t) => [
   index("idx_agent_conversations_host_recent").on(t.hostId, t.lastTurnAt),
   index("idx_agent_conversations_host_status").on(t.hostId, t.status),
+  // Partial recency index over LIVE rows only — the rail's hot path.
+  index("idx_agent_conversations_host_active")
+    .on(t.hostId, t.lastTurnAt)
+    .where(sql`${t.deletedAt} IS NULL`),
 ]);
 
 export const agentConversationsRelations = relations(agentConversations, ({ many }) => ({

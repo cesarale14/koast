@@ -27,11 +27,14 @@ function setSupabaseMock(mocks: {
   );
   const order = jest.fn().mockResolvedValue(mocks.orderResult ?? { data: [], error: null });
   const eq = jest.fn().mockReturnValue({ single, order });
+  // notDeleted() inserts `.is("deleted_at", null)` between .select() and the
+  // filters (M13 D1). The read chain is now select().is().eq().single()/order().
+  const is = jest.fn().mockReturnValue({ eq, single, order });
   const select = jest.fn().mockImplementation((_cols: string, opts?: { count?: string; head?: boolean }) => {
     if (opts?.count === "exact" && opts.head) {
       return { eq: jest.fn().mockResolvedValue(mocks.countResult ?? { count: 0, error: null }) };
     }
-    return { eq, single, order };
+    return { eq, single, order, is };
   });
   const insert = jest.fn().mockReturnValue({ select });
   const update = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });

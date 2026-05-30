@@ -179,6 +179,18 @@ export async function deleteConversationsByNonce(
     .in("id", ids);
 }
 
+/** Soft-delete a conversation by id (sets deleted_at) — server-side, for the
+ * deleted-deep-link spec (item 17). Idempotent. */
+export async function softDeleteConversationById(
+  admin: SupabaseClient,
+  id: string,
+): Promise<void> {
+  await admin
+    .from("agent_conversations")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
 /** Count a host's conversations (for create/dup assertions). */
 export async function countConversations(
   admin: SupabaseClient,

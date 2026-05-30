@@ -33,6 +33,7 @@ export type RailProps = {
   activeConversationId?: string;
   onSelectConversation?: (id: string) => void;
   onNewConversation?: () => void;
+  onDeleteConversation?: (id: string) => void;
 };
 
 export function Rail({
@@ -41,6 +42,7 @@ export function Rail({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
+  onDeleteConversation,
 }: RailProps) {
   return (
     <aside className={styles.rail} aria-label="Conversations">
@@ -49,6 +51,7 @@ export function Rail({
         groups={groups}
         activeId={activeConversationId}
         onSelect={onSelectConversation}
+        onDelete={onDeleteConversation}
       />
       <RailFoot user={user} />
     </aside>

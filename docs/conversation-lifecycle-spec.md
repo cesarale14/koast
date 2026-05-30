@@ -98,7 +98,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 
 | ID | Operation | Behavior + edges | Status | Pri |
 |---|---|---|---|---|
-| D1 | **Delete a conversation** | **SOFT delete** (`deleted_at` flag, filtered from list/load, RLS-scoped). Reversible. Deleting the active conversation → next load 404 → N4/S6 redirect fires (composes; no special delete-active path). Optimistic remove + reconcile. | `MISSING` (approved; soft-delete) | **P0** |
+| D1 | **Delete a conversation** | **SOFT delete** (`deleted_at` flag; filtered from every read via the single `notDeleted()` scope in `conversation.ts`, enforced by `scripts/conversation-reads-guard.sh`). Reversible. `DELETE /api/agent/conversations/[id]`. Rail-row hover trash. Optimistic removal via a removed-id tombstone filtered AFTER `mergeConversationLists`; failed DELETE → row restored. Deleting the ACTIVE conversation uses an explicit `router.replace("/")` → S1 (NOT the 404 path — that only covers navigate-to-deleted). Undo deferred (fast-follow). | `BUILT` (E2E: items 15/16/17/17b/17c) | **P0** |
 | D2 | Bulk delete / clear | Clear many at once. Minimal "clear all" for test-pile cleanup. True purge of test rows = one-off hard-delete run, not a feature. | `MISSING` | P0 (minimal) / P2 (full) |
 | D3 | Archive (soft-hide) | Hide without destroying. Near-free once D1 soft-delete exists. | `MISSING` | P2 |
 
@@ -123,7 +123,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 
 ## 4. Cross-cutting Concerns
 
-- **Optimistic updates + reconciliation.** `mergeConversationLists`, server-wins **per field** (not whole-row), remount-resets-optimistic. Proven for create (R1); must extend to delete (optimistic remove + reconcile) and rename (U2). **Field-level caveat (load-bearing):** a populated optimistic field is *never* clobbered by an empty server field. A whole-row server-wins reintroduces the rail-preview race — the optimistic entry carries the real preview (first user message), but a list read landing before the first user turn is visible returns that conversation with an empty preview, and whole-row server-wins overwrites the good value with `""`; the rail (fetched once) then shows an unlabeled entry until reload. The guard is general — it protects any async-populated field (preview today, auto-title next), so the next such field can't repeat the bug. A *populated* server field still wins (placeholder → real value). Covered by `mergeConversationLists.test.ts` + Playwright sweep items 1/7.
+- **Optimistic updates + reconciliation.** `mergeConversationLists`, server-wins **per field** (not whole-row), remount-resets-optimistic. Proven for create (R1) and delete (D1: optimistic remove via a removed-id tombstone filtered after the merge; failed DELETE drops the id → row reconciles back); must still extend to rename (U2). **Field-level caveat (load-bearing):** a populated optimistic field is *never* clobbered by an empty server field. A whole-row server-wins reintroduces the rail-preview race — the optimistic entry carries the real preview (first user message), but a list read landing before the first user turn is visible returns that conversation with an empty preview, and whole-row server-wins overwrites the good value with `""`; the rail (fetched once) then shows an unlabeled entry until reload. The guard is general — it protects any async-populated field (preview today, auto-title next), so the next such field can't repeat the bug. A *populated* server field still wins (placeholder → real value). Covered by `mergeConversationLists.test.ts` + Playwright sweep items 1/7.
 - **Error / not-found handling (S6).** A failed/empty/404 fetch resolves URL↔content (redirect to `/`), not clear-the-skeleton-into-stale-URL-empty. Shipped in the N4/S6 PR.
 - **Concurrency / races.**
   - Anchor race (store ahead of URL) — **fixed** via URL-only ChatURLSync + ref read (08a1c33).
@@ -145,7 +145,7 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 **P0 — must be true before a beta host touches it**
 - All `BUILT*` operations attest clean on device: C1, R1, R2, U1, N1, N2, N3, N4, S2, S5
 - UNCONFIRMED P0 items resolved: C2 (clean ✓), U3 (no-regression ✓), composer-lock + X1 (fixed ✓)
-- Build: **D1** (soft delete) + minimal **D2** (clear)
+- ~~Build: **D1** (soft delete)~~ — shipped (E2E items 15/16/17/17b/17c). Undo deferred to a fast-follow. Minimal **D2** (clear) still open.
 - ~~Build: N4/S6 unhappy path~~ — shipped
 
 **P1 — soon after beta**
@@ -211,13 +211,15 @@ Run as one pass. Green across all → spine is clean. Grouped by operation; expa
 **Error / unhappy**
 14. Bad deep-link (deleted / foreign / nonexistent id) → redirect to `/`, NOT stale-URL + empty content (N4 / S6)
 
-**Delete (add once D1 is built)**
-15. Delete a non-active conversation → gone from list immediately, gone after reload
-16. Delete the active conversation → redirect to `/` (not stranded on a dead URL)
-17. Delete → no resurrection on next list fetch (optimistic remove reconciles)
+**Delete (D1 — BUILT; `e2e/delete.spec.ts`)**
+15. Delete a background (non-active) conversation → drops from rail immediately, active unchanged, gone after reload (proves the server filter, not just the tombstone)
+16. Delete the active conversation → explicit `router.replace("/")` → S1, gone after reload
+17. Navigate to a deleted conversation's URL → N4/S6 redirect to `/`
+17b. Optimistic remove then a FAILED delete (DELETE aborted) → row restored to the rail
+17c. Delete the ACTIVE conversation then a FAILED delete → at S1 AND row restored
 
 **Rename (add once U2 is built)**
-18. Rename → updates in history immediately and after reload
+18. Rename → updates in history immediately and after reload  *(was reserved for D1 undo; undo deferred to a fast-follow, so 18 returns to U2/rename)*
 
 ---
 

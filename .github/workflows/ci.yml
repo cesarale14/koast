@@ -72,6 +72,12 @@ jobs:
       - name: Fluidity check
         run: npx tsx scripts/fluidity-check.ts
 
+      # M13 D1 — conversation read-invariant guard. Fails if a SELECT on
+      # agent_conversations appears outside the notDeleted() helper, so a
+      # soft-deleted row can never leak into a conversation surface.
+      - name: Conversation reads guard
+        run: bash scripts/conversation-reads-guard.sh
+
   # M13 Phase 2 — conversation-lifecycle Playwright E2E gate.
   #
   # Runs the 15 §8-sweep specs (docs/conversation-lifecycle-spec.md) against
