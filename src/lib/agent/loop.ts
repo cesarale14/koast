@@ -44,6 +44,7 @@ import {
   type ToolCallRecord,
 } from "./conversation";
 import { buildSystemPrompt } from "./system-prompt";
+import { buildAgendaRollup, agendaPreamble } from "./agenda";
 import {
   dispatchToolCall,
   getToolsForAnthropicSDK,
@@ -608,17 +609,12 @@ export async function* runAgentTurn(
   // Step 3: reconstruct full history (includes the user turn just persisted).
   const history = await reconstructHistory(conversation.id);
 
-  // Step 3.5 (D19): use the property resolved at step 1+2 to inject
-  // the active-context preamble into the LAST user message in the
-  // SDK-call messages array. The preamble is NEVER persisted — agent_turns
-  // keeps the host's verbatim text. Unauthorized ids logged at warn
-  // when resolveActiveProperty returned null for a non-empty input.
-  const seedMessages: Anthropic.MessageParam[] = activeProperty
-    ? prependActiveContextToLastUserMessage(
-        history,
-        buildActivePropertyPreamble({ name: activeProperty.name, id: activeProperty.id }),
-      )
-    : history;
+  // Step 3.5 (D19) + 3.6 (D-agenda): per-turn POST-PREFIX preambles — the
+  // active-property context AND the operational agenda — are injected into the
+  // LAST user message BELOW, after the sufficiency rollup is computed (the
+  // agenda reuses its supabase client + the gap counts). Both preambles are
+  // NEVER persisted (agent_turns keeps the host's verbatim text) and NEVER go
+  // in the cached system prefix (a daily-changing agenda would bust the cache).
 
   // M8 Phase F C3 (D11): per-turn minimal sufficiency rollup.
   // Computed once per turn; passed into buildSystemPrompt so the model
@@ -651,6 +647,35 @@ export async function* runAgentTurn(
       `[loop] C3 sufficiency snapshot skipped: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+
+  // Step 3.6 (D-agenda): build the operational-agenda preamble (defensive —
+  // agenda failure must NOT block the turn) and combine it with the D19
+  // active-property preamble in a single prepend onto the last user message.
+  let agendaPre = "";
+  try {
+    if (supabaseForSufficiency) {
+      const rollup = await buildAgendaRollup(supabaseForSufficiency, input.host.id);
+      const gaps = sufficiencyContext
+        ? {
+            missing: sufficiencyContext.total_properties - sufficiencyContext.rich_properties,
+            total: sufficiencyContext.total_properties,
+          }
+        : undefined;
+      agendaPre = agendaPreamble(rollup, gaps);
+    }
+  } catch (err) {
+    console.warn(
+      `[loop] agenda preamble skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const d19Pre = activeProperty
+    ? buildActivePropertyPreamble({ name: activeProperty.name, id: activeProperty.id })
+    : "";
+  const combinedPreamble = agendaPre + d19Pre;
+  const seedMessages: Anthropic.MessageParam[] =
+    combinedPreamble.length > 0
+      ? prependActiveContextToLastUserMessage(history, combinedPreamble)
+      : history;
 
   // Step 4: system prompt + tools.
   const systemPrompt = buildSystemPrompt({
