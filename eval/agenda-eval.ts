@@ -42,7 +42,11 @@ interface PromptSpec {
 
 const PROMPTS: PromptSpec[] = [
   { id: "prioritize-today", host: "erwin", prompt: "What should I prioritize today?", grounding: ["Erwin", "Sara"] },
-  { id: "anything-missing", host: "erwin", prompt: "Anything I'm missing today?", grounding: ["Erwin", "Sara"] },
+  // "Anything I'm missing" is a GAP question (per the hardened anti-deflection
+  // rule): a good answer centers on the agenda's gap signals — the unstaffed
+  // turnover, Erwin awaiting a reply, the missing parking essential — and need
+  // NOT re-list the no-gap roster (Sara). Assert it engages a gap, not deflects.
+  { id: "anything-missing", host: "erwin", prompt: "Anything I'm missing today?", groundingAny: ["cleaner", "turnover", "waiting", "parking", "reply", "Erwin"] },
   { id: "this-week", host: "erwin", prompt: "What's happening this week?", groundingAny: ["Erwin", "Sara", "Mike"] },
   { id: "guests-waiting", host: "erwin", prompt: "Any guests waiting on me?", grounding: ["Erwin"] },
   // Grounded answer names the checkout's guest OR property (a deflecting one
@@ -231,13 +235,37 @@ async function main() {
   console.log(`   TODAY fragment: "${(sTodaySection.match(/(Harbor House|Dockside Flat):[^\n]*/g)?.join(" || ") ?? "(none)").slice(0, 220)}"`);
   console.log(`   UPCOMING fragment: "${(sUpSection.match(/(Harbor House|Dockside Flat):[^\n]*/)?.[0] ?? "(none)").slice(0, 160)}"\n`);
 
+  // ANTI-DEFLECTION SWEEP (multi-run): the visibility-deflection failure is
+  // INTERMITTENT, so a once-per-run assertion is a weak net for it. Run the
+  // gap-asking prompts N times each against the erwin host (which has a real
+  // "Property gaps" line + an unstaffed turnover) and require ALL to ground.
+  // N is sized to the historical intermittency (~7%), not to 1 — at N=10/prompt
+  // a single reintroduced flake has a real chance of tripping. Override with
+  // DEFLECT_N (e.g. a deeper validation pass at N=30).
+  const DEFLECT_N = parseInt(process.env.DEFLECT_N ?? "10", 10);
+  const DEFLECT_PROMPTS = ["Anything I'm missing today?", "What am I forgetting today?"];
+  let deflectFails = 0;
+  const deflectRuns = DEFLECT_PROMPTS.length * DEFLECT_N;
+  for (const dp of DEFLECT_PROMPTS) {
+    for (let i = 0; i < DEFLECT_N; i++) {
+      const run = await runPromptThroughLoop(erwinHostId, dp);
+      if (run.error || !run.text || deflectsVisibility(run.text)) {
+        deflectFails++;
+        console.log(`   [deflect] FAIL "${dp}" #${i + 1}: ${(run.error ?? run.text).replace(/\s+/g, " ").slice(0, 200)}`);
+      }
+    }
+  }
+  const deflectPass = deflectFails === 0;
+  if (deflectPass) hardPass++;
+  console.log(`[anti-deflection-sweep] (${deflectRuns} runs, N=${DEFLECT_N}/prompt)  ${deflectPass ? "PASS" : "FAIL"} — deflections: ${deflectFails}/${deflectRuns}\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
   await cleanupEvalConversations(admin, emptyHostId);
   await cleanupEvalConversations(admin, boundaryHostId);
   await cleanupEvalConversations(admin, namelessHostId);
   await cleanupEvalConversations(admin, splitHostId);
 
-  const TOTAL = PROMPTS.length + 3; // + day-boundary + nameless-preamble + split-preamble
+  const TOTAL = PROMPTS.length + 4; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep
   console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
   process.exit(hardPass === TOTAL ? 0 : 1);

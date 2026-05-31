@@ -94,20 +94,13 @@ export async function runChatJudges(
 
 // ---------- deterministic assertions (hard pass/fail) ----------
 
-const VISIBILITY_DEFLECTION =
-  /\b(?:i (?:don'?t|do not) have|i (?:can'?t|cannot)|no|lack(?:ing)?|without)\b[^.?!]{0,60}\b(?:visibility|access|insight|connect(?:ion|ed)?|integrat\w+|sync\w*)\b[^.?!]{0,60}\b(?:calendar|booking|reservation|message|inbox|turnover|task|agenda|schedule)/i;
-
-const ALSO_DEFLECTION =
-  /\b(?:i (?:can'?t|cannot) (?:pull|see|access|view)|don'?t have (?:that|this|it) (?:yet|on file)|not (?:connected|integrated|hooked up))\b/i;
+// The deflection detector (regexes + deflectsVisibility) lives in ./deflection —
+// a PURE, zero-dependency module so it can be canaried with a deterministic unit
+// test (eval/lib/deflection.test.ts). Re-exported here so callers are unchanged.
+export { deflectsVisibility } from "./deflection";
 
 const UUID =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-/** True if the text disclaims visibility/access into the host's own data
- * (the doctrine-point-1 violation). */
-export function deflectsVisibility(text: string): boolean {
-  return VISIBILITY_DEFLECTION.test(text) || ALSO_DEFLECTION.test(text);
-}
 
 /** True if any UUID leaked into host-facing text (no-ids rule). */
 export function leaksUuid(text: string): boolean {
