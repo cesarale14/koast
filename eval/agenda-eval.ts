@@ -259,13 +259,56 @@ async function main() {
   if (deflectPass) hardPass++;
   console.log(`[anti-deflection-sweep] (${deflectRuns} runs, N=${DEFLECT_N}/prompt)  ${deflectPass ? "PASS" : "FAIL"} — deflections: ${deflectFails}/${deflectRuns}\n`);
 
+  // WHEN-TO-CARD SWEEP (multi-run): the card-vs-prose decision is the agent's
+  // judgment, so run each prompt N times and require ALL to hold — OVER-carding
+  // (a card on a narrow ask) AND UNDER-carding (no card on an overview) both
+  // fail. render_agenda is registered + the when-to-card rule is in the prompt
+  // (KOAST_ENABLE_RENDER_AGENDA forced on in load-env). Erwin host (real agenda).
+  // ASYMMETRIC gate. Over-carding (a card on a narrow ask) is the HARMFUL
+  // direction — it clutters / rebuilds the dashboard — so it is STRICT 0: any
+  // over-card fails. Under-carding (no card on an overview) is graceful
+  // degradation — the host still gets a correct prose answer — so it gets a
+  // FLOOR, not all-N: "always-card" is an always-do judgment with a sub-100%
+  // true rate (~85%), and a tight floor (80%) hugs that estimate and itself
+  // false-fails ~1 run in 6. The 70% floor (14/20 at N=20) passes ~98% of runs
+  // at true 85% and only fires if the rate genuinely collapses — a regression
+  // alarm, not the target. The target is the true ~85% (the host experience).
+  const CARD_N = parseInt(process.env.CARD_N ?? "10", 10);
+  const OVERVIEW_FLOOR_PCT = 0.70;
+  const isAgendaRender = (p: unknown): boolean =>
+    !!p && typeof p === "object" && (p as { kind?: unknown }).kind === "agenda";
+  const OVERVIEW_PROMPTS = ["What's on today?", "What should I prioritize today?"]; // → card
+  const NARROW_PROMPTS = ["When does Erwin check out?", "Draft Erwin a quick reply about the parking question."]; // → prose only
+  let overCardFails = 0; // narrow asks that wrongly rendered — strict 0
+  let overviewCarded = 0;
+  let narrowCarded = 0;
+  for (const op of OVERVIEW_PROMPTS) {
+    for (let i = 0; i < CARD_N; i++) {
+      const run = await runPromptThroughLoop(erwinHostId, op);
+      if (isAgendaRender(run.renderPayload)) overviewCarded++;
+      else console.log(`   [under-card] "${op}" #${i + 1} — no agenda render (graceful: prose answered)`);
+    }
+  }
+  for (const np of NARROW_PROMPTS) {
+    for (let i = 0; i < CARD_N; i++) {
+      const run = await runPromptThroughLoop(erwinHostId, np);
+      if (run.renderPayload) { overCardFails++; narrowCarded++; console.log(`   [OVER-CARD] "${np}" #${i + 1} — rendered a card (HARMFUL)`); }
+    }
+  }
+  const overviewTotal = OVERVIEW_PROMPTS.length * CARD_N;
+  const narrowTotal = NARROW_PROMPTS.length * CARD_N;
+  const overviewFloor = Math.ceil(overviewTotal * OVERVIEW_FLOOR_PCT);
+  const cardPass = overCardFails === 0 && overviewCarded >= overviewFloor;
+  if (cardPass) hardPass++;
+  console.log(`[when-to-card-sweep] (${overviewTotal + narrowTotal} runs, N=${CARD_N}/prompt)  ${cardPass ? "PASS" : "FAIL"} — over-card ${narrowCarded}/${narrowTotal} (STRICT 0), overview carded ${overviewCarded}/${overviewTotal} (floor ${overviewFloor})\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
   await cleanupEvalConversations(admin, emptyHostId);
   await cleanupEvalConversations(admin, boundaryHostId);
   await cleanupEvalConversations(admin, namelessHostId);
   await cleanupEvalConversations(admin, splitHostId);
 
-  const TOTAL = PROMPTS.length + 4; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep
+  const TOTAL = PROMPTS.length + 5; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep + when-to-card-sweep
   console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
   process.exit(hardPass === TOTAL ? 0 : 1);

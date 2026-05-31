@@ -26,6 +26,10 @@ export interface LoopRunResult {
   conversationId: string | null;
   toolCalls: string[];
   error: string | null;
+  /** Phase D: the render payload emitted this turn (a `render` SSE event), or
+   * null if the turn produced no card. Used by the when-to-card behavior eval
+   * (overview → present, narrow → absent). */
+  renderPayload: unknown | null;
 }
 
 /** Run one prompt through the real loop; collect token text + tool-call names. */
@@ -38,6 +42,7 @@ export async function runPromptThroughLoop(
   const toolCalls: string[] = [];
   let conversationId: string | null = null;
   let error: string | null = null;
+  let renderPayload: unknown | null = null;
   try {
     for await (const ev of runAgentTurn({
       host: { id: hostId },
@@ -45,16 +50,17 @@ export async function runPromptThroughLoop(
       user_message_text: prompt,
       ui_context: uiContext,
     })) {
-      const e = ev as { type: string; delta?: string; conversation_id?: string; tool_name?: string };
+      const e = ev as { type: string; delta?: string; conversation_id?: string; tool_name?: string; payload?: unknown };
       if (e.type === "turn_started" && e.conversation_id) conversationId = e.conversation_id;
       else if (e.type === "token" && e.delta) parts.push(e.delta);
       else if (e.type === "tool_call_started" && e.tool_name) toolCalls.push(e.tool_name);
+      else if (e.type === "render") renderPayload = e.payload ?? null;
       else if (e.type === "error") error = JSON.stringify(ev);
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  return { text: parts.join("").trim(), conversationId, toolCalls, error };
+  return { text: parts.join("").trim(), conversationId, toolCalls, error, renderPayload };
 }
 
 /**

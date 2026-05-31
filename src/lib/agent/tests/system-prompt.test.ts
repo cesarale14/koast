@@ -203,4 +203,37 @@ describe("system prompt", () => {
     expect(doctrineIdx).toBeGreaterThan(identityIdx);
     expect(toolsIdx).toBeGreaterThan(doctrineIdx);
   });
+
+  // --------- Phase D: render-system flag-conditional prompt ---------
+  // The render_agenda tool, its catalog entry, and the when-to-card rule are
+  // ALL gated on KOAST_ENABLE_RENDER_AGENDA (the same flag as tool
+  // registration), so the prompt never advertises an unregistered tool in
+  // EITHER state. This is the CI-gated proof.
+  describe("render-system flag (KOAST_ENABLE_RENDER_AGENDA)", () => {
+    const KEY = "KOAST_ENABLE_RENDER_AGENDA";
+    const prev = process.env[KEY];
+    afterEach(() => {
+      if (prev === undefined) delete process.env[KEY];
+      else process.env[KEY] = prev;
+    });
+
+    test("flag OFF: four-tool catalog, NO render_agenda entry, NO when-to-card rule", () => {
+      delete process.env[KEY];
+      const p = buildSystemPrompt();
+      expect(p).toBe(SYSTEM_PROMPT_TEXT); // unchanged base prompt
+      expect(p).toMatch(/You have four tools across two capabilities/);
+      expect(p).not.toMatch(/render_agenda/);
+    });
+
+    test("flag ON: five-tool catalog + render_agenda entry + when-to-card rule", () => {
+      process.env[KEY] = "1";
+      const p = buildSystemPrompt();
+      expect(p).toMatch(/You have five tools across three capabilities/);
+      expect(p).not.toMatch(/You have four tools/);
+      expect(p).toMatch(/ {2}- render_agenda —/); // catalog entry
+      expect(p).toMatch(/MUST call render_agenda/); // when-to-card rule (overview)
+      expect(p).toMatch(/Do NOT call render_agenda for anything narrower/); // narrow exclusion
+      expect(p).toMatch(/Prose is the default/);
+    });
+  });
 });

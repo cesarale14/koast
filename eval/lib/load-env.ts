@@ -43,6 +43,11 @@ export function loadEvalEnv(): void {
   // The chat-quality eval MUST run the real model (canned mode returns a fixed
   // string and never exercises grounding) — force it off.
   delete process.env.KOAST_E2E_CANNED_AGENT;
+  // Phase D: the eval rig tests the RENDER-ENABLED agent (render_agenda tool +
+  // the when-to-card prompt rule). Force the flag ON before the tool registry
+  // module loads, so render_agenda is registered and buildSystemPrompt splices
+  // in the catalog entry + rule. Mirrors the prod go-live state.
+  process.env.KOAST_ENABLE_RENDER_AGENDA = "1";
   // Hard guard: NEVER run the eval against prod. The seeding writes rows.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   if (url.includes("wxxpbgbfebpkvsxhpphb")) {

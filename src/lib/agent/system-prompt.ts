@@ -301,13 +301,42 @@ After surfacing the offer once, proceed with whatever the host actually asked fo
 
 When sufficiency is thin or lean, do NOT preface answers with hedging like "I don't have much to go on yet" — that's apology theater. Just answer with what's available and use the open-elicitation conversation style to surface gaps as they become relevant.`;
 
+// Phase D — render-system go-live. The render_agenda tool, its tool-catalog
+// entry, and the when-to-card rule are ALL gated on KOAST_ENABLE_RENDER_AGENDA
+// (the SAME flag that gates tool registration in tools/index.ts), so the prompt
+// never advertises an unregistered tool: flag ON → tool + catalog + rule
+// together; OFF → none of them. The flag is constant within a deploy, so the
+// spliced prefix stays prompt-cache-safe (it only changes when the deploy's env
+// changes). No static "five" — the count is conditional and matches the
+// registered tool set in each state.
+const RENDER_CATALOG_ENTRY =
+  "\n  - render_agenda — render the host's operational agenda (today + the next 48h) as a structured card. Read tool; not gated. You also answer in prose; the card is an enhancement.";
+
+const WHEN_TO_CARD_RULE =
+  "\n  - When the host asks for an agenda OVERVIEW — the whole picture of today / the next 48h, OR what to prioritize or focus on for the day (\"what's on today\", \"anything I'm missing\", \"what should I prioritize\", \"what should I focus on\", \"what's happening\", \"how's my day looking\") — you MUST call render_agenda FIRST, before you answer, to render the structured card; only THEN give a short prose summary leading with what needs the host (and, for a prioritization ask, which item to do first). The card is REQUIRED for EVERY overview — a prioritization ask (\"what should I prioritize / focus on\") is an overview too, so render the card and then prioritize in prose; the prose never replaces the card. Do NOT call render_agenda for anything narrower — a single-fact lookup (\"when does Jeremy check out\"), a drafted message, a yes/no, or a follow-up about one item — those stay prose-only. Prose is the default everywhere else; the genuine overview is the one ask that always earns the card. Keep the prose a summary that leads with what needs the host, not a restatement of every card row.";
+
+function applyRenderToggle(text: string): string {
+  if (process.env.KOAST_ENABLE_RENDER_AGENDA !== "1") return text;
+  return text
+    .replace(
+      "You have four tools across two capabilities. Both gate proposed writes through the action substrate so the host approves before any side effect.",
+      "You have five tools across three capabilities. Two of them — write_memory_fact and propose_guest_message — gate proposed writes through the action substrate so the host approves before any side effect; the rest are read-only.",
+    )
+    .replace(
+      "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest.",
+      "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest." + RENDER_CATALOG_ENTRY,
+    )
+    .replace("\n\n# Tools available", WHEN_TO_CARD_RULE + "\n\n# Tools available");
+}
+
 /**
- * Build the system prompt. v1 returns the constant text as-is;
- * the function shape exists so per-host customization can land
- * later without changing call sites.
+ * Build the system prompt. Render-system additions (tool catalog entry +
+ * when-to-card rule) are spliced in only when KOAST_ENABLE_RENDER_AGENDA=1.
+ * The function shape also carries the per-turn sufficiency snapshot.
  */
 export function buildSystemPrompt(context: SystemPromptContext = {}): string {
-  if (!context.sufficiency) return SYSTEM_PROMPT_TEXT;
+  const base = applyRenderToggle(SYSTEM_PROMPT_TEXT);
+  if (!context.sufficiency) return base;
   const s = context.sufficiency;
   const offered =
     s.completion_offered_at == null ? "null" : `"${s.completion_offered_at}"`;
@@ -318,5 +347,5 @@ rich_properties: ${s.rich_properties} of ${s.total_properties}
 completion_offered_at: ${offered}
 
 Read the Onboarding context section above for what to do with this snapshot.`;
-  return SYSTEM_PROMPT_TEXT + snippet;
+  return base + snippet;
 }
