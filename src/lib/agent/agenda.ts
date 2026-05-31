@@ -20,14 +20,17 @@ type Supa = any;
 
 export interface AgendaCheckIn {
   property: string;
-  guest: string;
+  /** First name when the booking carries a real one; null for OTA placeholders
+   * ("Airbnb Guest") or feed-sourced bookings with no name — rendered by
+   * property + action instead. */
+  guest: string | null;
   date: string;
   numGuests: number | null;
   bookingId: string;
 }
 export interface AgendaCheckOut {
   property: string;
-  guest: string;
+  guest: string | null;
   date: string;
   turnoverScheduled: boolean;
   bookingId: string;
@@ -40,7 +43,7 @@ export interface AgendaTurnover {
 }
 export interface AgendaPendingMessage {
   property: string;
-  guest: string;
+  guest: string | null;
   preview: string;
   bookingId: string;
 }
@@ -77,10 +80,25 @@ function addDaysStr(dateStr: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
-function firstName(full: string | null | undefined, fallback: string | null | undefined): string {
-  if (full && full.trim()) return full.trim().split(/\s+/)[0];
-  if (fallback && fallback.trim()) return fallback.trim().split(/\s+/)[0];
-  return "a guest";
+/** OTA / feed placeholder names that are NOT real guest names: "Airbnb Guest",
+ * "Booking.com Guest", bare "Guest", etc. iCal-sourced bookings carry these
+ * (the majority case in prod), so splitting on whitespace would surface the
+ * platform token ("Airbnb") as if it were the guest's name. */
+const PLACEHOLDER_NAME = /^(?:airbnb|booking(?:\.com|_com)?|bdc|abb|vrbo|hma|expedia|homeaway)?[\s.]*guest$/i;
+function isPlaceholderName(s: string | null | undefined): boolean {
+  if (!s) return true;
+  const t = s.trim();
+  return t.length === 0 || PLACEHOLDER_NAME.test(t);
+}
+/** First name when the booking carries a REAL one; null for OTA placeholders or
+ * empty. A nameless booking is referred to by property + action downstream —
+ * never a fabricated name or "a guest". */
+function realFirstName(full: string | null | undefined, fallback: string | null | undefined): string | null {
+  const pick = (s: string | null | undefined): string | null => {
+    if (!s || !s.trim() || isPlaceholderName(s)) return null;
+    return s.trim().split(/\s+/)[0];
+  };
+  return pick(full) ?? pick(fallback);
 }
 function truncate(s: string | null | undefined, n = 80): string {
   if (!s) return "";
@@ -227,7 +245,7 @@ export async function buildAgendaRollup(
     .filter((b) => inWindow(b.property_id, b.check_in))
     .map((b) => ({
       property: propName.get(b.property_id) ?? "a property",
-      guest: firstName(b.guest_first_name, b.guest_name),
+      guest: realFirstName(b.guest_first_name, b.guest_name),
       date: b.check_in,
       numGuests: b.num_guests,
       bookingId: b.id,
@@ -237,7 +255,7 @@ export async function buildAgendaRollup(
     .filter((b) => inWindow(b.property_id, b.check_out))
     .map((b) => ({
       property: propName.get(b.property_id) ?? "a property",
-      guest: firstName(b.guest_first_name, b.guest_name),
+      guest: realFirstName(b.guest_first_name, b.guest_name),
       date: b.check_out,
       turnoverScheduled: turnoverByBooking.has(b.id),
       bookingId: b.id,
@@ -253,7 +271,7 @@ export async function buildAgendaRollup(
     if (m.sender === "guest" && m.booking_id) {
       pendingMessages.push({
         property: propName.get(m.property_id) ?? "a property",
-        guest: firstName(m.sender_name, null),
+        guest: realFirstName(m.sender_name, null),
         preview: truncate(m.content),
         bookingId: m.booking_id,
       });
@@ -291,46 +309,84 @@ export function agendaPreamble(
   // NOTE: plain prose, NOT XML/angle-bracket tags — a tag-wrapped block primes
   // the model to express tool calls as XML text (and leak the ids). Keep ids as
   // labelled prose the model reads but is told never to surface.
+  //
+  // Relative-day label for UPCOMING items (today's items live under a TODAY
+  // header, so they need no per-item date). "tomorrow" / "on <date>".
+  const relDay = (date: string): string =>
+    date === rollup.today ? "today" : date === addDaysStr(rollup.today, 1) ? "tomorrow" : `on ${date}`;
+  const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  // Per-item detail renderers. The property is the LINE prefix (see dayLines),
+  // so the item detail omits it. `withDate` is FALSE under TODAY (all today)
+  // and TRUE under UPCOMING (each item carries its own day).
+  const coDetail = (c: AgendaCheckOut, withDate: boolean): string =>
+    `${c.guest ? `${c.guest} checking out` : "a checkout"}${withDate ? ` ${relDay(c.date)}` : ""}${c.turnoverScheduled ? ", turnover scheduled" : ", no turnover scheduled"} (internal booking id for tools: ${c.bookingId})`;
+  const ciDetail = (c: AgendaCheckIn, withDate: boolean): string =>
+    `${c.guest ? `${c.guest} arriving` : "a check-in"}${c.numGuests ? ` (${c.numGuests} guests)` : ""}${withDate ? ` ${relDay(c.date)}` : ""} (internal booking id for tools: ${c.bookingId})`;
+  const toDetail = (t: AgendaTurnover, withDate: boolean): string =>
+    `${withDate ? relDay(t.date) : "scheduled"}${t.time ? ` at ${t.time}` : ""}${t.cleanerAssigned ? ", cleaner assigned" : ", NO cleaner assigned"}`;
+
+  // Stable property order across all dated items.
+  const isToday = (d: string) => d === rollup.today;
+  const propOrder: string[] = [];
+  const seenProp = new Set<string>();
+  for (const p of [
+    ...rollup.checkOuts.map((c) => c.property),
+    ...rollup.checkIns.map((c) => c.property),
+    ...rollup.turnovers.map((t) => t.property),
+  ]) {
+    if (!seenProp.has(p)) { seenProp.add(p); propOrder.push(p); }
+  }
+
+  // Pre-bucket by DAY then by PROPERTY with per-property counts, so the model
+  // READS "Villa Jamaica: 2 check-outs today" straight off the line instead of
+  // re-tallying a day total across properties (which folds counts/days).
+  const dayLines = (today: boolean): string[] => {
+    const out: string[] = [];
+    for (const p of propOrder) {
+      const cos = rollup.checkOuts.filter((c) => c.property === p && isToday(c.date) === today);
+      const cis = rollup.checkIns.filter((c) => c.property === p && isToday(c.date) === today);
+      const tos = rollup.turnovers.filter((t) => t.property === p && isToday(t.date) === today);
+      if (!cos.length && !cis.length && !tos.length) continue;
+      const parts: string[] = [];
+      if (cos.length) parts.push(`${plural(cos.length, "check-out")} (${cos.map((c) => coDetail(c, !today)).join("; ")})`);
+      if (cis.length) parts.push(`${plural(cis.length, "check-in")} (${cis.map((c) => ciDetail(c, !today)).join("; ")})`);
+      if (tos.length) parts.push(`${plural(tos.length, "turnover")} (${tos.map((t) => toDetail(t, !today)).join("; ")})`);
+      out.push(`${p}: ${parts.join("; ")}`);
+    }
+    return out;
+  };
+
   const lines: string[] = [];
   lines.push(
     `[OPERATIONAL AGENDA — live Koast data for this host. Koast IS the operating layer; this is in-house. The booking ids below are AGENT-INTERNAL: use them only as tool-call arguments, and NEVER show an id to the host. Refer to guests by first name and properties by nickname.]`,
   );
-  lines.push(`Today: ${rollup.today}. Window: today + next 48h.`);
+  lines.push(
+    `Today is ${rollup.today}; the window is today + the next 48h. Items are grouped TODAY vs UPCOMING and listed per property, each property carrying its OWN counts — read each property's line as written. Never re-tally across properties, never move an item between days, and never report an UPCOMING item as today.`,
+  );
 
   if (rollup.empty) {
     lines.push(
       `Nothing on the calendar in the next 48h — no check-ins, check-outs, turnovers, or guests awaiting reply.`,
     );
   } else {
-    if (rollup.checkIns.length) {
-      lines.push(
-        `Check-ins (${rollup.checkIns.length}): ` +
-          rollup.checkIns
-            .map((c) => `${c.guest} arriving at ${c.property}${c.numGuests ? ` (${c.numGuests} guests)` : ""} on ${c.date} (internal booking id for tools: ${c.bookingId})`)
-            .join("; "),
-      );
+    const today = dayLines(true);
+    lines.push(`TODAY (${rollup.today}):`);
+    lines.push(...(today.length ? today : [`Nothing scheduled today.`]));
+
+    const upcoming = dayLines(false);
+    if (upcoming.length) {
+      lines.push(`UPCOMING (rest of the next 48h, after today):`);
+      lines.push(...upcoming);
     }
-    if (rollup.checkOuts.length) {
-      lines.push(
-        `Check-outs (${rollup.checkOuts.length}): ` +
-          rollup.checkOuts
-            .map((c) => `${c.guest} leaving ${c.property} on ${c.date}${c.turnoverScheduled ? " (turnover scheduled)" : " (no turnover scheduled)"} (internal booking id for tools: ${c.bookingId})`)
-            .join("; "),
-      );
-    }
-    if (rollup.turnovers.length) {
-      lines.push(
-        `Turnovers (${rollup.turnovers.length}): ` +
-          rollup.turnovers
-            .map((t) => `${t.property} on ${t.date}${t.time ? ` at ${t.time}` : ""}${t.cleanerAssigned ? ", cleaner assigned" : ", NO cleaner assigned"}`)
-            .join("; "),
-      );
-    }
+
+    // Pending messages — not date-bucketed (a "may be waiting" signal, fetched
+    // regardless of date), so it sits outside the TODAY/UPCOMING groups.
     if (rollup.pendingMessages.length) {
       lines.push(
         `Guests who may be awaiting a reply (${rollup.pendingMessages.length}; heuristic — present softly, e.g. "looks like X may be waiting"): ` +
           rollup.pendingMessages
-            .map((m) => `${m.guest} at ${m.property} — "${m.preview}" (internal booking id for tools: ${m.bookingId})`)
+            .map((m) => `${m.guest ? `${m.guest} at ${m.property}` : `an unanswered guest message at ${m.property}`} — "${m.preview}" (internal booking id for tools: ${m.bookingId})`)
             .join("; "),
       );
     }
