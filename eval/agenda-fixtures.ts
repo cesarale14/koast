@@ -32,6 +32,23 @@ const CT_TURN = "e0000000-0000-4000-8000-0000000000f1"; // turnover for Mike's c
 // Day-boundary fixture (deterministic tz test).
 const P_BND = "e0000000-0000-4000-8000-0000000000b9"; // EDT property
 const B_BND = "e0000000-0000-4000-8000-0000000000c9"; // check-in on the EDT-local "today"
+// Nameless / today-only fixture (iCal-shaped, the real-prod majority case).
+const P_NAMELESS = "e0000000-0000-4000-8000-0000000000ba"; // Seaside Cottage (EDT)
+const B_NL1 = "e0000000-0000-4000-8000-0000000000cd"; // nameless checkout today
+const B_NL2 = "e0000000-0000-4000-8000-0000000000ce"; // nameless checkout today
+/** Property nickname the GROUNDED answer must surface for the nameless host. */
+export const NAMELESS_PROPERTY = "Seaside Cottage";
+// Checkout-split fixture (mirrors prod: MULTI-property + mixed days under one
+// window "Check-outs (N)" header). Property A: 2 checkouts today + 1 on
+// today+2. Property B: 1 checkout today. Nothing tomorrow.
+const P_SPLIT_A = "e0000000-0000-4000-8000-0000000000bb"; // Harbor House (EDT)
+const P_SPLIT_B = "e0000000-0000-4000-8000-0000000000bc"; // Dockside Flat (EDT)
+const B_SP1 = "e0000000-0000-4000-8000-0000000000d5"; // A: Jeremy, checkout today (named)
+const B_SP2 = "e0000000-0000-4000-8000-0000000000d6"; // A: nameless, checkout today
+const B_SP3 = "e0000000-0000-4000-8000-0000000000d7"; // B: nameless, checkout today
+const B_SP4 = "e0000000-0000-4000-8000-0000000000d8"; // A: nameless, checkout on today+2
+export const SPLIT_PROPERTY_A = "Harbor House";
+export const SPLIT_PROPERTY_B = "Dockside Flat";
 /** Injected "now": 00:30 UTC = 8:30pm EDT the PREVIOUS day. The window must
  * resolve to the EDT-local date (BOUNDARY_LOCAL_TODAY), not the UTC date. */
 export const BOUNDARY_NOW_ISO = "2026-05-31T00:30:00.000Z";
@@ -174,6 +191,71 @@ export async function seedBoundaryFixture(admin: SupabaseClient): Promise<string
   ], { onConflict: "id" }));
   must("booking", await admin.from("bookings").upsert([
     { id: B_BND, property_id: P_BND, platform: "airbnb", guest_name: "Dana Cole", guest_first_name: "Dana", check_in: BOUNDARY_LOCAL_TODAY, check_out: "2026-06-02", num_guests: 2, status: "confirmed" },
+  ], { onConflict: "id" }));
+  return hostId;
+}
+
+/**
+ * Seed the nameless / today-only fixture: one property with TWO iCal-sourced
+ * checkouts TODAY (guest_name "Airbnb Guest", null first_name — the real-prod
+ * majority shape) and NOTHING tomorrow. Exercises (i) graceful no-name
+ * rendering (refer by property + action, never a fabricated name or "a guest")
+ * and (ii) the today-vs-tomorrow split (today has items, tomorrow is empty —
+ * state today's count, don't manufacture an empty "tomorrow" line). Idempotent.
+ */
+export async function seedNamelessFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-nameless@koast-eval.local");
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval nameless seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const today = dateStr(0);
+  const twoAgo = dateStr(-2);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  must("property", await admin.from("properties").upsert([
+    { id: P_NAMELESS, user_id: hostId, name: NAMELESS_PROPERTY, city: "Tampa", state: "FL", timezone: "America/New_York" },
+  ], { onConflict: "id" }));
+  // Two nameless iCal checkouts today; no tomorrow item.
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_NL1, property_id: P_NAMELESS, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: twoAgo, check_out: today, num_guests: 2, status: "confirmed" },
+    { id: B_NL2, property_id: P_NAMELESS, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: twoAgo, check_out: today, num_guests: 3, status: "confirmed" },
+  ], { onConflict: "id" }));
+  return hostId;
+}
+
+/**
+ * Seed the checkout-split fixture (mirrors the real-prod shape): MULTI-property
+ * + mixed days under one window "Check-outs (4)" header.
+ *   Property A (Harbor House): 2 checkouts TODAY (named "Jeremy" + 1 nameless)
+ *                              + 1 nameless checkout on today+2.
+ *   Property B (Dockside Flat): 1 nameless checkout TODAY.
+ *   Nothing tomorrow.
+ * Today's checkouts = 3 (2 at A incl. Jeremy, 1 at B); the today+2 item is
+ * UPCOMING. The model must state A-today=2, B-today=1, total-today=3, and
+ * report the today+2 item as upcoming — never folded into today. This is the
+ * shape that broke prod (single-property fixtures don't reproduce the
+ * property-level re-bucketing). Idempotent.
+ */
+export async function seedSplitFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-split@koast-eval.local");
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval split seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const today = dateStr(0);
+  const twoAhead = dateStr(2);
+  const threeAgo = dateStr(-3);
+  const yesterday = dateStr(-1);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  must("properties", await admin.from("properties").upsert([
+    { id: P_SPLIT_A, user_id: hostId, name: SPLIT_PROPERTY_A, city: "Tampa", state: "FL", timezone: "America/New_York" },
+    { id: P_SPLIT_B, user_id: hostId, name: SPLIT_PROPERTY_B, city: "Tampa", state: "FL", timezone: "America/New_York" },
+  ], { onConflict: "id" }));
+  // All check_ins are before today so none is an in-window check-in (isolates
+  // the checkout split). Nothing tomorrow (today+1).
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_SP1, property_id: P_SPLIT_A, platform: "airbnb", source: "channex", guest_name: "Jeremy Sexton", guest_first_name: "Jeremy", check_in: threeAgo, check_out: today, num_guests: 2, status: "confirmed" },
+    { id: B_SP2, property_id: P_SPLIT_A, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: threeAgo, check_out: today, num_guests: 3, status: "confirmed" },
+    { id: B_SP3, property_id: P_SPLIT_B, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: threeAgo, check_out: today, num_guests: 2, status: "confirmed" },
+    { id: B_SP4, property_id: P_SPLIT_A, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: yesterday, check_out: twoAhead, num_guests: 4, status: "confirmed" },
   ], { onConflict: "id" }));
   return hostId;
 }

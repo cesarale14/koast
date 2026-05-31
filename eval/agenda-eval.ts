@@ -17,7 +17,7 @@ import { loadEvalEnv } from "./lib/load-env";
 
 interface PromptSpec {
   id: string;
-  host: "erwin" | "empty";
+  host: "erwin" | "empty" | "nameless" | "split";
   prompt: string;
   grounding?: string[]; // ALL must appear (real seeded items)
   groundingAny?: string[]; // at least ONE must appear
@@ -27,6 +27,17 @@ interface PromptSpec {
   // The surface-form judges (emoji/exclamation) false-positive on the guest's
   // own punctuation; skip them so the rig self-reports a clean verdict.
   quotedContent?: boolean;
+  // NONE of these substrings may appear (case-insensitive). Used for the
+  // no-name case (never "a guest") and the today-only case (never a
+  // manufactured "tomorrow" / "next two days" line).
+  forbid?: string[];
+  // At least ONE must appear (case-insensitive) — e.g. an action word for a
+  // nameless booking ("checkout"), so the answer carries property + action.
+  mentionAny?: string[];
+  // A regex (source string, matched case-insensitive) that must NOT match —
+  // used for the checkout-split case to catch the window total stated as
+  // today's count ("four checkouts today" / folding the later-day item in).
+  forbidRegex?: string;
 }
 
 const PROMPTS: PromptSpec[] = [
@@ -43,6 +54,18 @@ const PROMPTS: PromptSpec[] = [
   // Composition: the agenda preview is one line, so this must reach into the
   // full thread — agent resolves "Erwin" → internal booking_id → read_guest_thread.
   { id: "drilldown-erwin", host: "erwin", prompt: "Pull up my full message thread with Erwin — show me everything he's sent.", grounding: ["Erwin"], mustCallTool: "read_guest_thread", quotedContent: true },
+  // (i) Nameless iCal booking: the answer names the property + an action and
+  // does NOT invent a name or fall back to "a guest" / the OTA placeholder.
+  { id: "nameless-ical", host: "nameless", prompt: "What's checking out today?", grounding: ["Seaside"], mentionAny: ["checkout", "check-out", "checking out", "check out"], forbid: ["a guest", "airbnb guest"] },
+  // (ii) Today has items, tomorrow is empty: state today's count cleanly; never
+  // manufacture a "tomorrow" line or lump it as "over the next two days".
+  { id: "today-only-split", host: "nameless", prompt: "What should I prioritize today?", grounding: ["Seaside"], forbid: ["tomorrow", "next two days", "over the next two"] },
+  // Checkout split (prod shape): MULTI-property + mixed days under one window
+  // "Check-outs (4)" header. A (Harbor) has 2 today + 1 on today+2; B (Dockside)
+  // has 1 today. The answer must name both properties + Jeremy, state A's
+  // today-count as 2 (not 3), and NOT fold the today+2 item into today —
+  // i.e. never "three checkouts at Harbor ... today".
+  { id: "checkout-split-multi", host: "split", prompt: "What's on for today?", grounding: ["Jeremy", "Harbor", "Dockside"], mentionAny: ["two", "2 "], forbidRegex: "(?:three|3)\\b[^.?!]{0,25}harbor[^.?!]{0,20}today|harbor[^.?!]{0,20}(?:three|3)\\b[^.?!]{0,20}check|today[^.?!]{0,25}(?:three|3)\\b[^.?!]{0,25}harbor" },
 ];
 
 const EMPTY_ACK =
@@ -66,17 +89,25 @@ async function main() {
     adminClient,
     seedAgendaFixtures,
     seedBoundaryFixture,
+    seedNamelessFixture,
+    seedSplitFixture,
     cleanupEvalConversations,
     BOUNDARY_NOW_ISO,
     BOUNDARY_LOCAL_TODAY,
     BOUNDARY_UTC_TODAY,
   } = await import("./agenda-fixtures");
-  const { buildAgendaRollup } = await import("@/lib/agent/agenda");
+  const { buildAgendaRollup, agendaPreamble } = await import("@/lib/agent/agenda");
 
   const admin = adminClient();
   console.log("seeding agenda fixtures (staging)…");
   const { erwinHostId, emptyHostId } = await seedAgendaFixtures(admin);
-  const hostId = (h: PromptSpec["host"]) => (h === "erwin" ? erwinHostId : emptyHostId);
+  const namelessHostId = await seedNamelessFixture(admin);
+  const splitHostId = await seedSplitFixture(admin);
+  const hostId = (h: PromptSpec["host"]) =>
+    h === "erwin" ? erwinHostId
+    : h === "nameless" ? namelessHostId
+    : h === "split" ? splitHostId
+    : emptyHostId;
 
   console.log(`\n=== AGENDA EVAL${mode !== "RUN" ? ` (${mode})` : ""} — ${PROMPTS.length} prompts ===\n`);
 
@@ -106,6 +137,17 @@ async function main() {
       failures.push(`tool-not-called[${spec.mustCallTool}]`);
     }
     if (spec.emptyAck && !EMPTY_ACK.test(text)) failures.push("no-empty-acknowledgment");
+    if (spec.forbid) {
+      const hit = spec.forbid.filter((p) => text.toLowerCase().includes(p.toLowerCase()));
+      if (hit.length) failures.push(`forbidden-phrase[${hit.join(",")}]`);
+    }
+    if (spec.mentionAny) {
+      const ok = spec.mentionAny.some((p) => text.toLowerCase().includes(p.toLowerCase()));
+      if (!ok) failures.push(`mention-any-missing[${spec.mentionAny.join("|")}]`);
+    }
+    if (spec.forbidRegex && new RegExp(spec.forbidRegex, "i").test(text)) {
+      failures.push(`forbid-regex-matched[${spec.forbidRegex}]`);
+    }
 
     // Judges (reported signal, not a hard gate). Surface-form judges are
     // skipped on quoted-content prompts (the guest's punctuation isn't the
@@ -143,11 +185,59 @@ async function main() {
   if (!bPass) console.log(`   hard-fails: ${bFailures.join(" | ")}`);
   console.log(`   rollup.today=${bRollup.today}  EDT-today check-ins=[${bRollup.checkIns.filter((c) => c.date === BOUNDARY_LOCAL_TODAY).map((c) => c.guest).join(",")}]\n`);
 
+  // NAMELESS / NO-NAME (deterministic, no LLM): an OTA-placeholder booking
+  // ("Airbnb Guest", null first_name) must render BY PROPERTY + ACTION — its
+  // rollup guest is null and the preamble says "a checkout at <property>",
+  // never the placeholder token as a name ("Airbnb …") or "a guest".
+  const nRollup = await buildAgendaRollup(admin, namelessHostId, new Date());
+  const nPre = agendaPreamble(nRollup);
+  const nFailures: string[] = [];
+  if (nRollup.checkOuts.some((c) => c.guest !== null)) {
+    nFailures.push(`nameless checkout guest should be null (got [${nRollup.checkOuts.map((c) => String(c.guest)).join(", ")}])`);
+  }
+  if (/\bairbnb\b/i.test(nPre)) nFailures.push("placeholder 'Airbnb' leaked into the preamble as a name");
+  if (/\ba guest\b/i.test(nPre)) nFailures.push("'a guest' phrasing in the preamble (want property + action)");
+  if (!/Seaside Cottage: \d+ check-?out/i.test(nPre)) nFailures.push("nameless checkouts not on a per-property 'Seaside Cottage: N check-outs' line");
+  const nPass = nFailures.length === 0;
+  if (nPass) hardPass++;
+  console.log(`[nameless-preamble] (deterministic)  ${nPass ? "PASS" : "FAIL"}`);
+  if (!nPass) console.log(`   hard-fails: ${nFailures.join(" | ")}`);
+  console.log(`   today fragment: "${(nPre.match(/Seaside Cottage:[^\n]*/)?.[0] ?? "(none)").slice(0, 200)}"\n`);
+
+  // SPLIT PREAMBLE STRUCTURE (deterministic, no LLM): the multi-property split
+  // (A: 2 today + 1 on today+2; B: 1 today) must pre-bucket into a TODAY group
+  // with Check-outs (3) and an UPCOMING group with Check-outs (1) — so the model
+  // reads today's set rather than re-tallying across properties.
+  const sRollup = await buildAgendaRollup(admin, splitHostId, new Date());
+  const sPre = agendaPreamble(sRollup);
+  const [sTodaySection, sUpSection = ""] = sPre.split(/\nUPCOMING/i);
+  const sFailures: string[] = [];
+  const coToday = sRollup.checkOuts.filter((c) => c.date === sRollup.today).length;
+  const coUpcoming = sRollup.checkOuts.filter((c) => c.date !== sRollup.today).length;
+  if (coToday !== 3) sFailures.push(`rollup today check-outs=${coToday} (expected 3)`);
+  if (coUpcoming !== 1) sFailures.push(`rollup upcoming check-outs=${coUpcoming} (expected 1)`);
+  if (!/\nTODAY \(/.test(sPre)) sFailures.push("no TODAY group header");
+  if (!/\nUPCOMING \(/i.test(sPre)) sFailures.push("no UPCOMING group header");
+  // TODAY must carry per-property counts: A=2 check-outs, B=1 check-out.
+  if (!/Harbor House: 2 check-outs/.test(sTodaySection)) sFailures.push("TODAY: Harbor House not '2 check-outs' (per-property today count)");
+  if (!/Dockside Flat: 1 check-out\b/.test(sTodaySection)) sFailures.push("TODAY: Dockside Flat not '1 check-out'");
+  // The later-day Harbor checkout must be UPCOMING (1), never in TODAY.
+  if (!/Harbor House: 1 check-out\b/.test(sUpSection)) sFailures.push("UPCOMING: Harbor House later checkout not '1 check-out'");
+  if (/Harbor House: 3 check-outs/.test(sTodaySection)) sFailures.push("TODAY folds the later-day item into Harbor (3 check-outs)");
+  const sPass = sFailures.length === 0;
+  if (sPass) hardPass++;
+  console.log(`[split-preamble] (deterministic)  ${sPass ? "PASS" : "FAIL"}`);
+  if (!sPass) console.log(`   hard-fails: ${sFailures.join(" | ")}`);
+  console.log(`   TODAY fragment: "${(sTodaySection.match(/(Harbor House|Dockside Flat):[^\n]*/g)?.join(" || ") ?? "(none)").slice(0, 220)}"`);
+  console.log(`   UPCOMING fragment: "${(sUpSection.match(/(Harbor House|Dockside Flat):[^\n]*/)?.[0] ?? "(none)").slice(0, 160)}"\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
   await cleanupEvalConversations(admin, emptyHostId);
   await cleanupEvalConversations(admin, boundaryHostId);
+  await cleanupEvalConversations(admin, namelessHostId);
+  await cleanupEvalConversations(admin, splitHostId);
 
-  const TOTAL = PROMPTS.length + 1; // + the day-boundary check
+  const TOTAL = PROMPTS.length + 3; // + day-boundary + nameless-preamble + split-preamble
   console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
   process.exit(hardPass === TOTAL ? 0 : 1);
