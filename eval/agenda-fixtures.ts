@@ -29,6 +29,14 @@ const M_ERWIN = "e0000000-0000-4000-8000-0000000000e1"; // Erwin guest msg 1 (ea
 const M_ERWIN_2 = "e0000000-0000-4000-8000-0000000000e2"; // host reply
 const M_ERWIN_3 = "e0000000-0000-4000-8000-0000000000e3"; // Erwin guest msg 2 (latest)
 const CT_TURN = "e0000000-0000-4000-8000-0000000000f1"; // turnover for Mike's checkout
+// Day-boundary fixture (deterministic tz test).
+const P_BND = "e0000000-0000-4000-8000-0000000000b9"; // EDT property
+const B_BND = "e0000000-0000-4000-8000-0000000000c9"; // check-in on the EDT-local "today"
+/** Injected "now": 00:30 UTC = 8:30pm EDT the PREVIOUS day. The window must
+ * resolve to the EDT-local date (BOUNDARY_LOCAL_TODAY), not the UTC date. */
+export const BOUNDARY_NOW_ISO = "2026-05-31T00:30:00.000Z";
+export const BOUNDARY_LOCAL_TODAY = "2026-05-30"; // EDT-local date at BOUNDARY_NOW
+export const BOUNDARY_UTC_TODAY = "2026-05-31"; // the WRONG (UTC) date
 
 export const ERWIN = {
   email: "e2e-erwin@koast-eval.local",
@@ -105,9 +113,9 @@ export async function seedAgendaFixtures(admin: SupabaseClient): Promise<SeededH
 
   // Properties.
   must("properties", await admin.from("properties").upsert([
-    { id: P_VILLA, user_id: erwinHostId, name: ERWIN.villaName, city: "Tampa", state: "FL" },
-    { id: P_BAYSIDE, user_id: erwinHostId, name: "Bayside Bungalow", city: "Tampa", state: "FL" },
-    { id: P_EMPTY, user_id: emptyHostId, name: "Quiet Cabin", city: "Asheville", state: "NC" },
+    { id: P_VILLA, user_id: erwinHostId, name: ERWIN.villaName, city: "Tampa", state: "FL", timezone: "America/New_York" },
+    { id: P_BAYSIDE, user_id: erwinHostId, name: "Bayside Bungalow", city: "Tampa", state: "FL", timezone: "America/New_York" },
+    { id: P_EMPTY, user_id: emptyHostId, name: "Quiet Cabin", city: "Asheville", state: "NC", timezone: "America/New_York" },
   ], { onConflict: "id" }));
 
   // Bookings: 2 check-ins today (Erwin, Sara), 1 checkout tomorrow (Mike).
@@ -146,6 +154,28 @@ export async function seedAgendaFixtures(admin: SupabaseClient): Promise<SeededH
   console.log(`seeded: erwin=${erwinHostId} (properties=${count ?? 0}), empty=${emptyHostId}`);
 
   return { erwinHostId, emptyHostId };
+}
+
+/**
+ * Seed the day-boundary fixture: an EDT (America/New_York) property + a booking
+ * checking in on the EDT-local "today" (2026-05-30). buildAgendaRollup(now=
+ * BOUNDARY_NOW) must window in the property's tz and include this booking; UTC
+ * windowing (the bug) would label "today" as 2026-05-31 and miss it. Returns
+ * the boundary host id. Idempotent.
+ */
+export async function seedBoundaryFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-boundary@koast-eval.local");
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval boundary seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  must("property", await admin.from("properties").upsert([
+    { id: P_BND, user_id: hostId, name: "Eastern Edge", city: "Tampa", state: "FL", timezone: "America/New_York" },
+  ], { onConflict: "id" }));
+  must("booking", await admin.from("bookings").upsert([
+    { id: B_BND, property_id: P_BND, platform: "airbnb", guest_name: "Dana Cole", guest_first_name: "Dana", check_in: BOUNDARY_LOCAL_TODAY, check_out: "2026-06-02", num_guests: 2, status: "confirmed" },
+  ], { onConflict: "id" }));
+  return hostId;
 }
 
 /** Delete the agent_conversations the eval created for a host (turns cascade).

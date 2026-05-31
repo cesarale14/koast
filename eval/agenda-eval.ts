@@ -57,11 +57,21 @@ async function main() {
     runChatJudges,
     deflectsVisibility,
     leaksUuid,
+    rawMarkdown,
     groundedIn,
     looksLikeGenericChecklist,
     judgeVerdicts,
   } = await import("./lib/chat-eval");
-  const { adminClient, seedAgendaFixtures, cleanupEvalConversations } = await import("./agenda-fixtures");
+  const {
+    adminClient,
+    seedAgendaFixtures,
+    seedBoundaryFixture,
+    cleanupEvalConversations,
+    BOUNDARY_NOW_ISO,
+    BOUNDARY_LOCAL_TODAY,
+    BOUNDARY_UTC_TODAY,
+  } = await import("./agenda-fixtures");
+  const { buildAgendaRollup } = await import("@/lib/agent/agenda");
 
   const admin = adminClient();
   console.log("seeding agenda fixtures (staging)…");
@@ -82,6 +92,8 @@ async function main() {
     if (!text) failures.push("empty-output");
     if (deflectsVisibility(text)) failures.push("VISIBILITY-DEFLECTION");
     if (leaksUuid(text)) failures.push("UUID-LEAK");
+    const md = rawMarkdown(text);
+    if (md.length) failures.push(`RAW-MARKDOWN[${md.join(",")}]`);
     if (spec.grounding) {
       const g = groundedIn(text, spec.grounding);
       if (!g.ok) failures.push(`grounding-missing[${g.missing.join(",")}]`);
@@ -113,12 +125,32 @@ async function main() {
     console.log(`   out: "${snippet}"\n`);
   }
 
+  // DAY-BOUNDARY (deterministic, no LLM): inject now = 00:30 UTC + an EDT
+  // property; the window must resolve to the property-LOCAL date, not the UTC
+  // date. Catches the tz bug that mislabeled an 8:30pm EDT moment as the next day.
+  const boundaryHostId = await seedBoundaryFixture(admin);
+  const bRollup = await buildAgendaRollup(admin, boundaryHostId, new Date(BOUNDARY_NOW_ISO));
+  const bFailures: string[] = [];
+  if (bRollup.today !== BOUNDARY_LOCAL_TODAY) {
+    bFailures.push(`window-today=${bRollup.today} (expected EDT-local ${BOUNDARY_LOCAL_TODAY}, not UTC ${BOUNDARY_UTC_TODAY})`);
+  }
+  if (!bRollup.checkIns.some((c) => c.date === BOUNDARY_LOCAL_TODAY)) {
+    bFailures.push("EDT-today check-in missing (UTC windowing would drop it)");
+  }
+  const bPass = bFailures.length === 0;
+  if (bPass) hardPass++;
+  console.log(`[day-boundary] (deterministic)  ${bPass ? "PASS" : "FAIL"}`);
+  if (!bPass) console.log(`   hard-fails: ${bFailures.join(" | ")}`);
+  console.log(`   rollup.today=${bRollup.today}  EDT-today check-ins=[${bRollup.checkIns.filter((c) => c.date === BOUNDARY_LOCAL_TODAY).map((c) => c.guest).join(",")}]\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
   await cleanupEvalConversations(admin, emptyHostId);
+  await cleanupEvalConversations(admin, boundaryHostId);
 
-  console.log(`SUMMARY: ${hardPass}/${PROMPTS.length} hard-pass`);
+  const TOTAL = PROMPTS.length + 1; // + the day-boundary check
+  console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
-  process.exit(hardPass === PROMPTS.length ? 0 : 1);
+  process.exit(hardPass === TOTAL ? 0 : 1);
 }
 
 main().catch((err) => {

@@ -114,6 +114,17 @@ export function leaksUuid(text: string): boolean {
   return UUID.test(text);
 }
 
+/** Raw markdown the plain-text chat surface would render literally. The judges
+ * check semantics, not structure — this deterministic check catches the class
+ * (** bold, # headers, "- "/"* " bullet lists). Returns the kinds found. */
+export function rawMarkdown(text: string): string[] {
+  const found: string[] = [];
+  if (/\*\*/.test(text)) found.push("bold(**)");
+  if (/^\s{0,3}#{1,6}\s/m.test(text)) found.push("header(#)");
+  if (/^\s*[-*]\s+\S/m.test(text)) found.push("bullet(-/*)");
+  return found;
+}
+
 /** True if EVERY required natural-reference term appears (grounding). */
 export function groundedIn(text: string, requiredTerms: string[]): { ok: boolean; missing: string[] } {
   const lower = text.toLowerCase();
