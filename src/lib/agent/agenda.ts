@@ -53,9 +53,28 @@ export interface AgendaRollup {
   turnovers: AgendaTurnover[];
   pendingMessages: AgendaPendingMessage[];
   empty: boolean;
+  /** Properties with no timezone set — their date-windowed events are SKIPPED
+   * (a missing item beats a wrong-day one) and the count is surfaced so the
+   * agent can flag it rather than silently imply nothing is scheduled. */
+  nullTzPropertyCount: number;
 }
 
 function utcDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+/** YYYY-MM-DD in the given IANA timezone. Node ships full ICU, so Intl applies
+ * the tz offset incl. DST. Throws on an invalid tz (caller treats as null-tz). */
+function localDateStr(now: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+function addDaysStr(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 function firstName(full: string | null | undefined, fallback: string | null | undefined): string {
@@ -70,19 +89,23 @@ function truncate(s: string | null | undefined, n = 80): string {
 }
 
 /**
- * Build the host's agenda for [today, today+2d]. Host-scoped via
- * properties.user_id. Returns natural handles + agent-internal booking ids.
- * The caller wraps in try/catch; this also fails soft to an empty agenda on
- * a query error rather than throwing.
+ * Build the host's agenda for today + the next 48h, windowed PER PROPERTY in
+ * that property's own IANA timezone (properties.timezone). A property with no
+ * timezone is SKIPPED, never UTC-fallback — a wrong-day item is worse than a
+ * missing one — and counted so the agent can flag it. Host-scoped via
+ * properties.user_id; returns natural handles + agent-internal booking ids.
+ * The caller wraps in try/catch; this also fails soft to an empty agenda.
  */
 export async function buildAgendaRollup(
   supabase: Supa,
   hostId: string,
   now: Date = new Date(),
 ): Promise<AgendaRollup> {
-  const today = utcDateStr(now);
-  const windowEnd = utcDateStr(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
-  const empty: AgendaRollup = {
+  const emptyRollup = (
+    today: string,
+    windowEnd: string,
+    nullTzPropertyCount = 0,
+  ): AgendaRollup => ({
     today,
     windowEnd,
     checkIns: [],
@@ -90,54 +113,107 @@ export async function buildAgendaRollup(
     turnovers: [],
     pendingMessages: [],
     empty: true,
-  };
+    nullTzPropertyCount,
+  });
 
-  // 1. Host's properties → id→nickname map.
+  // 1. Host's properties WITH timezone.
   const { data: propRows, error: propErr } = await supabase
     .from("properties")
-    .select("id, name")
+    .select("id, name, timezone")
     .eq("user_id", hostId);
-  if (propErr || !propRows || propRows.length === 0) return empty;
-  const propName = new Map<string, string>();
-  for (const p of propRows as Array<{ id: string; name: string }>) propName.set(p.id, p.name);
-  const propIds = Array.from(propName.keys());
+  if (propErr || !propRows || propRows.length === 0) {
+    return emptyRollup(utcDateStr(now), addDaysStr(utcDateStr(now), 2));
+  }
 
-  // 2-4. Bookings (check-ins + check-outs in window), turnovers, pending msgs.
+  // Per-property window in each property's own tz. Null/invalid tz → SKIP + log
+  // + count (never UTC-fallback).
+  const propName = new Map<string, string>();
+  const propWindow = new Map<string, { today: string; end: string }>();
+  let nullTzPropertyCount = 0;
+  for (const p of propRows as Array<{ id: string; name: string; timezone: string | null }>) {
+    propName.set(p.id, p.name);
+    let localToday: string | null = null;
+    if (p.timezone) {
+      try {
+        localToday = localDateStr(now, p.timezone);
+      } catch {
+        localToday = null;
+      }
+    }
+    if (!localToday) {
+      nullTzPropertyCount++;
+      console.warn(
+        `[agenda] property ${p.id} (${p.name}) has no/invalid timezone ('${p.timezone}') — skipping its date-windowed events.`,
+      );
+      continue;
+    }
+    propWindow.set(p.id, { today: localToday, end: addDaysStr(localToday, 2) });
+  }
+
+  const windowedIds = Array.from(propWindow.keys());
+  // Representative "today" for the summary label; per-property windows still
+  // applied below. Single-tz hosts (the common case) get the right date — a
+  // single-"today" framing for a genuinely multi-region host is a later refinement.
+  const repToday = windowedIds.length
+    ? propWindow.get(windowedIds[0])!.today
+    : utcDateStr(now);
+  const repEnd = windowedIds.length
+    ? propWindow.get(windowedIds[0])!.end
+    : addDaysStr(utcDateStr(now), 2);
+  if (windowedIds.length === 0) {
+    return emptyRollup(repToday, repEnd, nullTzPropertyCount);
+  }
+
+  // Fetch bound: union of the per-property windows (tz offsets shift the local
+  // date by at most ±1 day, so this is a tight superset). Per-property windows
+  // are then applied in-app via inWindow().
+  const sortedTodays = windowedIds.map((id) => propWindow.get(id)!.today).sort();
+  const sortedEnds = windowedIds.map((id) => propWindow.get(id)!.end).sort();
+  const globalMin = sortedTodays[0];
+  const globalMax = sortedEnds[sortedEnds.length - 1];
+
   const [ciRes, coRes, toRes, msgRes] = await Promise.all([
     supabase
       .from("bookings")
       .select("id, property_id, guest_first_name, guest_name, check_in, num_guests")
-      .in("property_id", propIds)
+      .in("property_id", windowedIds)
       .neq("status", "cancelled")
-      .gte("check_in", today)
-      .lte("check_in", windowEnd),
+      .gte("check_in", globalMin)
+      .lte("check_in", globalMax),
     supabase
       .from("bookings")
       .select("id, property_id, guest_first_name, guest_name, check_out")
-      .in("property_id", propIds)
+      .in("property_id", windowedIds)
       .neq("status", "cancelled")
-      .gte("check_out", today)
-      .lte("check_out", windowEnd),
+      .gte("check_out", globalMin)
+      .lte("check_out", globalMax),
     supabase
       .from("cleaning_tasks")
       .select("property_id, booking_id, scheduled_date, scheduled_time, cleaner_id, status")
-      .in("property_id", propIds)
+      .in("property_id", windowedIds)
       .neq("status", "completed")
-      .gte("scheduled_date", today)
-      .lte("scheduled_date", windowEnd),
+      .gte("scheduled_date", globalMin)
+      .lte("scheduled_date", globalMax),
     // Fuzzy "awaiting reply": recent inbound guest messages; keep the latest
-    // per thread and flag those whose latest is from the guest.
+    // per thread and flag those whose latest is from the guest. NOT date-
+    // windowed, so it doesn't need per-property tz handling.
     supabase
       .from("messages")
       .select("id, property_id, booking_id, thread_id, sender, sender_name, content, created_at, channex_inserted_at")
-      .in("property_id", propIds)
+      .in("property_id", windowedIds)
       .order("created_at", { ascending: false })
       .limit(200),
   ]);
 
+  const inWindow = (propId: string, date: string): boolean => {
+    const w = propWindow.get(propId);
+    return !!w && date >= w.today && date <= w.end;
+  };
+
   const turnoverByBooking = new Set<string>();
   const turnovers: AgendaTurnover[] = [];
   for (const t of (toRes.data ?? []) as Array<{ property_id: string; booking_id: string | null; scheduled_date: string; scheduled_time: string | null; cleaner_id: string | null }>) {
+    if (!inWindow(t.property_id, t.scheduled_date)) continue;
     if (t.booking_id) turnoverByBooking.add(t.booking_id);
     turnovers.push({
       property: propName.get(t.property_id) ?? "a property",
@@ -147,21 +223,25 @@ export async function buildAgendaRollup(
     });
   }
 
-  const checkIns: AgendaCheckIn[] = ((ciRes.data ?? []) as Array<{ id: string; property_id: string; guest_first_name: string | null; guest_name: string | null; check_in: string; num_guests: number | null }>).map((b) => ({
-    property: propName.get(b.property_id) ?? "a property",
-    guest: firstName(b.guest_first_name, b.guest_name),
-    date: b.check_in,
-    numGuests: b.num_guests,
-    bookingId: b.id,
-  }));
+  const checkIns: AgendaCheckIn[] = ((ciRes.data ?? []) as Array<{ id: string; property_id: string; guest_first_name: string | null; guest_name: string | null; check_in: string; num_guests: number | null }>)
+    .filter((b) => inWindow(b.property_id, b.check_in))
+    .map((b) => ({
+      property: propName.get(b.property_id) ?? "a property",
+      guest: firstName(b.guest_first_name, b.guest_name),
+      date: b.check_in,
+      numGuests: b.num_guests,
+      bookingId: b.id,
+    }));
 
-  const checkOuts: AgendaCheckOut[] = ((coRes.data ?? []) as Array<{ id: string; property_id: string; guest_first_name: string | null; guest_name: string | null; check_out: string }>).map((b) => ({
-    property: propName.get(b.property_id) ?? "a property",
-    guest: firstName(b.guest_first_name, b.guest_name),
-    date: b.check_out,
-    turnoverScheduled: turnoverByBooking.has(b.id),
-    bookingId: b.id,
-  }));
+  const checkOuts: AgendaCheckOut[] = ((coRes.data ?? []) as Array<{ id: string; property_id: string; guest_first_name: string | null; guest_name: string | null; check_out: string }>)
+    .filter((b) => inWindow(b.property_id, b.check_out))
+    .map((b) => ({
+      property: propName.get(b.property_id) ?? "a property",
+      guest: firstName(b.guest_first_name, b.guest_name),
+      date: b.check_out,
+      turnoverScheduled: turnoverByBooking.has(b.id),
+      bookingId: b.id,
+    }));
 
   // Latest message per thread; flag threads whose latest is from the guest.
   const seenThread = new Set<string>();
@@ -186,7 +266,16 @@ export async function buildAgendaRollup(
     turnovers.length === 0 &&
     pendingMessages.length === 0;
 
-  return { today, windowEnd, checkIns, checkOuts, turnovers, pendingMessages, empty: isEmpty };
+  return {
+    today: repToday,
+    windowEnd: repEnd,
+    checkIns,
+    checkOuts,
+    turnovers,
+    pendingMessages,
+    empty: isEmpty,
+    nullTzPropertyCount,
+  };
 }
 
 /**
@@ -245,6 +334,12 @@ export function agendaPreamble(
             .join("; "),
       );
     }
+  }
+
+  if (rollup.nullTzPropertyCount > 0) {
+    lines.push(
+      `Note: ${rollup.nullTzPropertyCount} ${rollup.nullTzPropertyCount === 1 ? "property has" : "properties have"} no timezone set, so ${rollup.nullTzPropertyCount === 1 ? "its" : "their"} schedule is NOT included above — if the host asks about ${rollup.nullTzPropertyCount === 1 ? "that property" : "those"}, say its location/timezone needs setting first (don't imply nothing is scheduled there).`,
+    );
   }
 
   if (gaps && gaps.total > 0 && gaps.missing > 0) {

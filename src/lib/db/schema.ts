@@ -28,6 +28,10 @@ export const properties = pgTable("properties", {
   city: text("city"),
   state: text("state"),
   zip: text("zip"),
+  // M13 agenda — IANA timezone (e.g. 'America/New_York'). Nullable; the agenda
+  // windows each property's "today" in its own tz and SKIPS null-tz properties
+  // (never UTC-fallback). New-property auto-defaulting is deferred.
+  timezone: text("timezone"),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   bedrooms: integer("bedrooms"),
