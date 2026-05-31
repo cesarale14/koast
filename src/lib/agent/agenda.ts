@@ -296,6 +296,66 @@ export async function buildAgendaRollup(
   };
 }
 
+/** One property's items within a single day bucket (today or upcoming). */
+export interface AgendaPropertyBucket {
+  property: string;
+  checkIns: AgendaCheckIn[];
+  checkOuts: AgendaCheckOut[];
+  turnovers: AgendaTurnover[];
+}
+
+/**
+ * The rollup pre-bucketed by DAY (today vs the rest of the 48h window) then by
+ * PROPERTY, each property carrying its OWN items. This presentation transform
+ * is SHARED by the prose preamble (agendaPreamble) and the typed render payload
+ * (toAgendaRenderPayload) so the two can never disagree — drift is killed by
+ * construction, not by a test. It does NOT touch the rollup's data/windowing/tz.
+ */
+export interface GroupedAgenda {
+  today: string;
+  windowEnd: string;
+  todayGroups: AgendaPropertyBucket[];
+  upcomingGroups: AgendaPropertyBucket[];
+  pendingMessages: AgendaPendingMessage[];
+  empty: boolean;
+  nullTzPropertyCount: number;
+}
+
+export function groupAgenda(rollup: AgendaRollup): GroupedAgenda {
+  const isToday = (d: string) => d === rollup.today;
+  // Stable property order across all dated items (check-outs, then check-ins,
+  // then turnovers) — preserves the preamble's existing ordering.
+  const propOrder: string[] = [];
+  const seenProp = new Set<string>();
+  for (const p of [
+    ...rollup.checkOuts.map((c) => c.property),
+    ...rollup.checkIns.map((c) => c.property),
+    ...rollup.turnovers.map((t) => t.property),
+  ]) {
+    if (!seenProp.has(p)) { seenProp.add(p); propOrder.push(p); }
+  }
+  const bucketsFor = (today: boolean): AgendaPropertyBucket[] => {
+    const out: AgendaPropertyBucket[] = [];
+    for (const p of propOrder) {
+      const checkOuts = rollup.checkOuts.filter((c) => c.property === p && isToday(c.date) === today);
+      const checkIns = rollup.checkIns.filter((c) => c.property === p && isToday(c.date) === today);
+      const turnovers = rollup.turnovers.filter((t) => t.property === p && isToday(t.date) === today);
+      if (!checkOuts.length && !checkIns.length && !turnovers.length) continue;
+      out.push({ property: p, checkIns, checkOuts, turnovers });
+    }
+    return out;
+  };
+  return {
+    today: rollup.today,
+    windowEnd: rollup.windowEnd,
+    todayGroups: bucketsFor(true),
+    upcomingGroups: bucketsFor(false),
+    pendingMessages: rollup.pendingMessages,
+    empty: rollup.empty,
+    nullTzPropertyCount: rollup.nullTzPropertyCount,
+  };
+}
+
 /**
  * Render the agenda as the POST-PREFIX preamble prepended to the turn's last
  * user message. `gaps` (optional) carries the sufficiency-derived count the
@@ -326,35 +386,16 @@ export function agendaPreamble(
   const toDetail = (t: AgendaTurnover, withDate: boolean): string =>
     `${withDate ? relDay(t.date) : "scheduled"}${t.time ? ` at ${t.time}` : ""}${t.cleanerAssigned ? ", cleaner assigned" : ", NO cleaner assigned"}`;
 
-  // Stable property order across all dated items.
-  const isToday = (d: string) => d === rollup.today;
-  const propOrder: string[] = [];
-  const seenProp = new Set<string>();
-  for (const p of [
-    ...rollup.checkOuts.map((c) => c.property),
-    ...rollup.checkIns.map((c) => c.property),
-    ...rollup.turnovers.map((t) => t.property),
-  ]) {
-    if (!seenProp.has(p)) { seenProp.add(p); propOrder.push(p); }
-  }
-
-  // Pre-bucket by DAY then by PROPERTY with per-property counts, so the model
-  // READS "Villa Jamaica: 2 check-outs today" straight off the line instead of
-  // re-tallying a day total across properties (which folds counts/days).
-  const dayLines = (today: boolean): string[] => {
-    const out: string[] = [];
-    for (const p of propOrder) {
-      const cos = rollup.checkOuts.filter((c) => c.property === p && isToday(c.date) === today);
-      const cis = rollup.checkIns.filter((c) => c.property === p && isToday(c.date) === today);
-      const tos = rollup.turnovers.filter((t) => t.property === p && isToday(t.date) === today);
-      if (!cos.length && !cis.length && !tos.length) continue;
-      const parts: string[] = [];
-      if (cos.length) parts.push(`${plural(cos.length, "check-out")} (${cos.map((c) => coDetail(c, !today)).join("; ")})`);
-      if (cis.length) parts.push(`${plural(cis.length, "check-in")} (${cis.map((c) => ciDetail(c, !today)).join("; ")})`);
-      if (tos.length) parts.push(`${plural(tos.length, "turnover")} (${tos.map((t) => toDetail(t, !today)).join("; ")})`);
-      out.push(`${p}: ${parts.join("; ")}`);
-    }
-    return out;
+  // Day → property buckets (SHARED with toAgendaRenderPayload). Render each
+  // bucket as "Villa Jamaica: 2 check-outs (...)", so the model READS the
+  // per-property count straight off the line.
+  const grouped = groupAgenda(rollup);
+  const renderBucket = (b: AgendaPropertyBucket, today: boolean): string => {
+    const parts: string[] = [];
+    if (b.checkOuts.length) parts.push(`${plural(b.checkOuts.length, "check-out")} (${b.checkOuts.map((c) => coDetail(c, !today)).join("; ")})`);
+    if (b.checkIns.length) parts.push(`${plural(b.checkIns.length, "check-in")} (${b.checkIns.map((c) => ciDetail(c, !today)).join("; ")})`);
+    if (b.turnovers.length) parts.push(`${plural(b.turnovers.length, "turnover")} (${b.turnovers.map((t) => toDetail(t, !today)).join("; ")})`);
+    return `${b.property}: ${parts.join("; ")}`;
   };
 
   const lines: string[] = [];
@@ -370,11 +411,11 @@ export function agendaPreamble(
       `Nothing on the calendar in the next 48h — no check-ins, check-outs, turnovers, or guests awaiting reply.`,
     );
   } else {
-    const today = dayLines(true);
+    const today = grouped.todayGroups.map((b) => renderBucket(b, true));
     lines.push(`TODAY (${rollup.today}):`);
     lines.push(...(today.length ? today : [`Nothing scheduled today.`]));
 
-    const upcoming = dayLines(false);
+    const upcoming = grouped.upcomingGroups.map((b) => renderBucket(b, false));
     if (upcoming.length) {
       lines.push(`UPCOMING (rest of the next 48h, after today):`);
       lines.push(...upcoming);

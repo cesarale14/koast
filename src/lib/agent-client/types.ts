@@ -19,6 +19,9 @@
  */
 
 import { z } from "zod";
+// Pure contract module (Zod + types only, no server deps) — safe to import
+// client-side, and the single source of truth for the render payload shape.
+import { renderPayloadSchema, type RenderPayload } from "@/lib/agent/render/types";
 
 /* ============================================================
    Active SSE events (M4 + M6 + M7)
@@ -156,6 +159,12 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
       missing_inputs: z.array(z.string()).optional(),
       suggested_inputs: z.array(z.string()).optional(),
     }),
+  }),
+  // Generative-UI render (Phase A): turn-level typed render payload (v1:
+  // agenda). Mirrors the server SSE schema; turnReducer stores it on the turn.
+  z.object({
+    type: z.literal("render"),
+    payload: renderPayloadSchema,
   }),
 ]);
 
@@ -300,6 +309,12 @@ export type TurnState = {
    * the right field. UI rendering checks both.
    */
   refusalEnvelope?: import("../agent/refusal-envelope").RefusalEnvelope;
+  /**
+   * Generative-UI render payload (Phase A). Set when a `render` SSE event
+   * arrives mid-stream; harvested onto the turn at `done` (and hydrated from
+   * the server on reload). Drives the <RenderCard>. undefined = prose-only.
+   */
+  renderPayload?: RenderPayload;
 };
 
 export const initialTurnState: TurnState = {

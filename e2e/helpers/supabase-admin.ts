@@ -179,6 +179,38 @@ export async function deleteConversationsByNonce(
     .in("id", ids);
 }
 
+/**
+ * Seed a conversation whose assistant turn carries a generative-UI `render`
+ * payload (typed JSONB) — for the render-card reload spec. Proves the
+ * column → loadTurns → <RenderCard> → reload path deterministically, with NO
+ * loop-side test code (the live-stream emission is proven in the agent layer).
+ * The assistant turn carries prose too, so it isn't filtered as a stub.
+ */
+export async function seedConversationWithRender(
+  admin: SupabaseClient,
+  opts: { id: string; hostId: string; firstMessage: string; assistantReply: string; render: unknown },
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error: convErr } = await admin.from("agent_conversations").upsert(
+    { id: opts.id, host_id: opts.hostId, status: "active", started_at: now, last_turn_at: now },
+    { onConflict: "id" },
+  );
+  if (convErr) throw new Error(`[e2e] seedConversationWithRender ${opts.id}: ${convErr.message}`);
+  const { error: turnErr } = await admin.from("agent_turns").upsert(
+    [
+      { conversation_id: opts.id, turn_index: 0, role: "user", content_text: opts.firstMessage },
+      { conversation_id: opts.id, turn_index: 1, role: "assistant", content_text: opts.assistantReply, render: opts.render },
+    ],
+    { onConflict: "conversation_id,turn_index" },
+  );
+  if (turnErr) throw new Error(`[e2e] seedConversationWithRender turns ${opts.id}: ${turnErr.message}`);
+}
+
+/** Delete a conversation by id (turns cascade). For spec-local cleanup. */
+export async function deleteConversationById(admin: SupabaseClient, id: string): Promise<void> {
+  await admin.from("agent_conversations").delete().eq("id", id);
+}
+
 /** Soft-delete a conversation by id (sets deleted_at) — server-side, for the
  * deleted-deep-link spec (item 17). Idempotent. */
 export async function softDeleteConversationById(

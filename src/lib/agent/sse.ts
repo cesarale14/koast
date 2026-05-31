@@ -49,6 +49,7 @@
  */
 
 import { z } from "zod";
+import { renderPayloadSchema } from "./render/types";
 
 // Action-kind-specific payload schemas. Reused by the AgentStreamEventSchema
 // nested discriminated union below. Memory-write payload preserves the 8
@@ -187,6 +188,14 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
       missing_inputs: z.array(z.string()).optional(),
       suggested_inputs: z.array(z.string()).optional(),
     }),
+  }),
+  // Generative-UI render (Phase A): a turn-level typed render payload (v1:
+  // agenda). Read-only, host-facing, one per turn — emitted live and finalized
+  // onto agent_turns.render, exactly like refusal_envelope. NOT an
+  // action_proposed (that is a gated, approvable artifact).
+  z.object({
+    type: z.literal("render"),
+    payload: renderPayloadSchema,
   }),
 ]);
 

@@ -45,6 +45,7 @@ import {
 } from "./conversation";
 import { buildSystemPrompt } from "./system-prompt";
 import { buildAgendaRollup, agendaPreamble } from "./agenda";
+import type { RenderPayload } from "./render/types";
 import {
   dispatchToolCall,
   getToolsForAnthropicSDK,
@@ -238,6 +239,13 @@ interface RoundResult {
    * runAgentTurn() can persist it on the assistant turn and finalize.
    */
   refusalEnvelope?: import("./refusal-envelope").RefusalEnvelope;
+  /**
+   * Generative-UI (Phase B): the typed render payload produced by the
+   * render_agenda tool this round. Bubbles up to runAgentTurn, which emits the
+   * `render` event live, then finalizes it onto agent_turns.render. One per
+   * turn (a later render overrides an earlier one), mirroring refusalEnvelope.
+   */
+  renderPayload?: RenderPayload | null;
 }
 
 /**
@@ -285,6 +293,8 @@ async function* runOneRound(
   let roundRefusalEnvelope:
     | import("./refusal-envelope").RefusalEnvelope
     | undefined;
+  // Generative-UI (Phase B): set when render_agenda dispatches successfully.
+  let roundRenderPayload: RenderPayload | null = null;
 
   // M9 Phase D A4 (D27 Option ε): post-stream refusal classifier.
   // Catches generic LLM-refusal phrases ("I can't help with that",
@@ -309,6 +319,7 @@ async function* runOneRound(
       toolCallRecords,
       auditIds,
       refusalEnvelope: roundRefusalEnvelope,
+      renderPayload: roundRenderPayload,
     };
   }
 
@@ -438,6 +449,16 @@ async function* runOneRound(
           result_summary: summary,
         };
 
+        // Generative-UI (Phase B): render_agenda is non-gated and its result
+        // IS the typed render payload (dispatcher already Zod-validated it
+        // against renderPayloadSchema). Emit the `render` event live and stash
+        // it for finalize. NOT an action_proposed — no host approval.
+        if (block.name === "render_agenda") {
+          const payload = result.value as RenderPayload;
+          roundRenderPayload = payload;
+          yield { type: "render", payload };
+        }
+
         // D35 fork side-channel (M6 + M7 D39): when a gated tool's
         // proposal returns successfully, the dispatcher already wrote
         // the agent_artifacts row. Emit `action_proposed` so the chat
@@ -534,6 +555,7 @@ async function* runOneRound(
     toolCallRecords,
     auditIds,
     refusalEnvelope: roundRefusalEnvelope,
+    renderPayload: roundRenderPayload,
   };
 }
 
@@ -698,6 +720,9 @@ export async function* runAgentTurn(
   // JSONB `refusal` column alongside the legacy {reason, suggested_next_step}
   // path; turnReducer discriminates on the `kind` field at hydration.
   let refusalEnvelope: import("./refusal-envelope").RefusalEnvelope | null = null;
+  // Generative-UI (Phase B): the turn's render payload (from render_agenda).
+  // One per turn — a later round's render overrides an earlier one.
+  let turnRenderPayload: RenderPayload | null = null;
 
   let history_with_results: Anthropic.MessageParam[] = seedMessages;
 
@@ -749,6 +774,7 @@ export async function* runAgentTurn(
     }
     collectedToolCalls.push(...roundResult.toolCallRecords);
     collectedAuditIds.push(...roundResult.auditIds);
+    if (roundResult.renderPayload) turnRenderPayload = roundResult.renderPayload;
 
     // M8 Phase D P4: pre-dispatch refusal short-circuits the round.
     // The envelope was already yielded as a refusal_envelope event; we
@@ -893,6 +919,8 @@ export async function* runAgentTurn(
       : refusalReason
         ? { reason: refusalReason.reason }
         : null,
+    // Generative-UI: the turn's render payload, set by the render_agenda tool.
+    render: turnRenderPayload,
     input_tokens: lastFinalMessage?.usage.input_tokens ?? null,
     output_tokens: lastFinalMessage?.usage.output_tokens ?? null,
     cache_read_tokens: lastFinalMessage?.usage.cache_read_input_tokens ?? null,

@@ -66,6 +66,8 @@ The chat surface is a state machine. **Cardinal rule (the flash bug violated it)
 | S5 | **Loading** | `ConversationLoadingSkeleton` while hydrating an existing conversation — distinct from S1 | `BUILT*` |
 | S6 | **Error / Not-found** | Redirect to `/` (resolves the URL↔content desync) | `BUILT*` — **was MISSING**, shipped in the N4/S6 PR (ChatURLSync redirects on unloadable conversation) |
 
+**Turn-level render payloads (generative-UI).** A turn may carry a typed, read-only `render` payload (`agent_turns.render` JSONB; v1 = the agenda) *alongside* its prose — a fourth turn-level payload beside `content_text` / `tool_calls` / `refusal`, modeled on `refusal` (typed JSONB, emitted live, finalized on the turn, rehydrated by `loadTurnsForConversation`, one component for stream + reload). It surfaces in **S3** (emitted live via the `render` SSE event) and **S4** (rehydrated → `<RenderCard>` → `<AgendaCard>`), so it must render identically on stream and reload. It is **NOT** an `agent_artifacts` proposal (those are gated / actionable / host-approved); a render is read-only, non-actionable, and exactly one per turn. **Prose is the canonical content** — an unknown/missing/invalid render degrades to prose (the card is an enhancement, never the only path). The agent emits SEMANTIC, TYPED data only — the frontend composes all presentation; no pre-rendered English crosses the wire. Contract + builder in `src/lib/agent/render/`.
+
 ---
 
 ## 3. Operations
@@ -222,6 +224,10 @@ Run as one pass. Green across all → spine is clean. Grouped by operation; expa
 **Rename (add once U2 is built)**
 19. Rename → updates in history immediately and after reload
 
+**Generative-UI render (agenda render type — `e2e/render-card.spec.ts`)**
+20. A turn carrying a `render` payload → its `<RenderCard>` (agenda) renders in S4 AND re-renders after reload (proves `agent_turns.render` round-trips through `loadTurnsForConversation`, not a one-time stream); a composed gap sentence — frontend-rendered from structured fields — survives the round-trip
+21. A turn with no render → no card (prose is the default; the card is the earned exception)
+
 ---
 
 ## 9. Test harness
@@ -241,3 +247,4 @@ Status: scoped Playwright harness — see the M13 Phase 1.B follow-on work. Firs
 - Composer lock rule: `src/lib/chat/deriveComposerState.ts` + `useAgentTurn.isPending`
 - Server: `src/lib/agent/conversation.ts` (`loadTurnsForConversation`, `listConversations`), `src/app/api/agent/conversations/[conversation_id]/turns/route.ts`, `src/app/api/agent/turn/route.ts` (SSE)
 - Loading skeleton: `src/components/chat/ConversationLoadingSkeleton.tsx`
+- Generative-UI render: `src/lib/agent/render/` (contract `types.ts` + `toAgendaRenderPayload`), `src/lib/agent/tools/render-agenda.ts` (non-gated; deploy-gated by `KOAST_ENABLE_RENDER_AGENDA`), `render` SSE event in `src/lib/agent/sse.ts`, `agent_turns.render` JSONB (finalized + hydrated in `conversation.ts`), `src/components/chat/RenderCard.tsx` + `AgendaCard.tsx`, `e2e/render-card.spec.ts`. `groupAgenda` (shared prose+payload transform) in `src/lib/agent/agenda.ts`.

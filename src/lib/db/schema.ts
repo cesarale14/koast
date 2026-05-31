@@ -945,6 +945,11 @@ export const agentTurns = pgTable("agent_turns", {
   // Refusal-fallback metadata when the assistant turn produced a
   // structured refusal: { "reason": "...", "missing_data": "...", "next_step": "..." }
   refusal: jsonb("refusal"),
+  // Generative-UI render payload (Phase A): typed, host-facing, READ-ONLY
+  // structured render for the chat surface (v1: agenda). One per turn; mirrors
+  // the `refusal` column pattern (turn-level typed JSONB, NOT an agent_artifacts
+  // row). NULL = prose-only turn. Migration 20260531030000.
+  render: jsonb("render"),
   modelId: text("model_id"),
   inputTokens: integer("input_tokens"),
   outputTokens: integer("output_tokens"),

@@ -27,6 +27,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { AgentTurnRole, AgentConversationStatus } from "@/lib/db/schema";
+import { renderPayloadSchema, type RenderPayload } from "./render/types";
 
 export interface AgentHost {
   id: string;
@@ -252,6 +253,8 @@ export interface FinalizeTurnInput {
   content_text?: string | null;
   tool_calls?: ToolCallRecord[] | null;
   refusal?: Record<string, unknown> | null;
+  /** Generative-UI render payload (Phase A) — turn-level, mirrors `refusal`. */
+  render?: RenderPayload | null;
   input_tokens?: number | null;
   output_tokens?: number | null;
   cache_read_tokens?: number | null;
@@ -356,6 +359,7 @@ export async function finalizeTurn(input: FinalizeTurnInput): Promise<void> {
   if (input.content_text !== undefined) update.content_text = input.content_text;
   if (input.tool_calls !== undefined) update.tool_calls = input.tool_calls;
   if (input.refusal !== undefined) update.refusal = input.refusal;
+  if (input.render !== undefined) update.render = input.render;
   if (input.input_tokens !== undefined) update.input_tokens = input.input_tokens;
   if (input.output_tokens !== undefined) update.output_tokens = input.output_tokens;
   if (input.cache_read_tokens !== undefined) update.cache_read_tokens = input.cache_read_tokens;
@@ -725,6 +729,10 @@ export interface UITurn {
   /** M8 Phase D F4 + P4 structured RefusalEnvelope (hydrates from
    * JSONB `refusal` column when kind field is present). */
   refusalEnvelope?: import("./refusal-envelope").RefusalEnvelope;
+  /** Generative-UI render payload (Phase A) — typed, read-only structured
+   * render (v1: agenda), hydrated from the JSONB `render` column. Drives the
+   * <RenderCard> on both stream and reload. undefined = prose-only turn. */
+  renderPayload?: RenderPayload;
   /**
    * M6 D23 + M7 D45 — artifacts attached to this turn. Loads
    * agent_artifacts rows for the conversation in lifecycle states
@@ -879,7 +887,7 @@ export async function loadTurnsForConversation(
 
   const [turnsResult, artifactsResult] = await Promise.all([
     turnBuilder
-      .select("id, turn_index, role, content_text, tool_calls, refusal, created_at")
+      .select("id, turn_index, role, content_text, tool_calls, refusal, render, created_at")
       .eq("conversation_id", conversationId)
       .order("turn_index", { ascending: true }),
     artifactBuilder
@@ -905,6 +913,7 @@ export async function loadTurnsForConversation(
     content_text: string | null;
     tool_calls: ToolCallRecord[] | null;
     refusal: Record<string, unknown> | null;
+    render: unknown;
     created_at: string;
   }>;
 
@@ -1064,6 +1073,11 @@ export async function loadTurnsForConversation(
     const refusalEnvelope = isF4Envelope
       ? (t.refusal as unknown as import("./refusal-envelope").RefusalEnvelope)
       : undefined;
+    // Generative-UI render payload — Zod-validate on read (drop a malformed or
+    // future-shaped render so the prose stands; forward-compatible by design).
+    const renderParsed = t.render == null ? null : renderPayloadSchema.safeParse(t.render);
+    const renderPayload =
+      renderParsed && renderParsed.success ? renderParsed.data : undefined;
     return {
       id: t.id,
       role,
@@ -1072,6 +1086,7 @@ export async function loadTurnsForConversation(
       tool_calls,
       refusal,
       refusalEnvelope,
+      renderPayload,
       pendingArtifacts: artifactsByTurnId.get(t.id) ?? [],
     };
   });

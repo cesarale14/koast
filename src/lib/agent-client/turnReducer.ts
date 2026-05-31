@@ -127,6 +127,16 @@ export function turnReducer(
         refusalEnvelope: event.envelope,
       };
 
+    case "render":
+      // Generative-UI render (Phase A): a turn-level typed render payload
+      // arrived. Status stays 'streaming' until 'done'; it sits on the turn and
+      // is harvested into the UITurn (where <RenderCard> picks it up), exactly
+      // like refusal_envelope.
+      return {
+        ...state,
+        renderPayload: event.payload,
+      };
+
     default: {
       // TS exhaustiveness — adding any forward-looking event to
       // AgentStreamEventSchema without a matching `case` will fail compile.

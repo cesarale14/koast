@@ -47,6 +47,7 @@ import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
 import { RefusalEnvelopeRenderer } from "./RefusalEnvelopeRenderer";
+import { RenderCard } from "./RenderCard";
 import {
   GuestMessageProposal,
   type GuestMessageProposalState,
@@ -77,6 +78,12 @@ type UITurnLite = {
    * host_input_needed envelopes when M9 broadens generation.
    */
   refusalEnvelope?: import("@/lib/agent/refusal-envelope").RefusalEnvelope;
+  /**
+   * Generative-UI render payload (Phase A) — typed, read-only structured
+   * render (v1: agenda). Harvested from the live stream and hydrated from the
+   * server on reload; drives the inline <RenderCard>. undefined = prose-only.
+   */
+  renderPayload?: import("@/lib/agent/render/types").RenderPayload;
   /**
    * M6 D23 + M7 D45 — artifacts attached to this turn (history-visible
    * states: emitted | edited | confirmed | superseded). 'dismissed' is
@@ -751,6 +758,7 @@ export function ChatClient({
         }),
       refusal: state.refusal,
       refusalEnvelope: state.refusalEnvelope,
+      renderPayload: state.renderPayload,
       pendingArtifacts: liveArtifacts.length > 0 ? liveArtifacts : undefined,
     };
     harvested.push(koastTurn);
@@ -1365,6 +1373,7 @@ function HistoryTurnView({
         {turn.refusalEnvelope && (
           <RefusalEnvelopeRenderer envelope={turn.refusalEnvelope} />
         )}
+        {turn.renderPayload && <RenderCard payload={turn.renderPayload} />}
         {(turn.pendingArtifacts ?? []).map((a) => {
           // M7 D43 — kind-specific component routing. M6's only kind
           // was 'property_knowledge_confirmation' (MemoryArtifact);
