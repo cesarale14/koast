@@ -1,0 +1,155 @@
+/**
+ * agenda-fixtures — seed two synthetic hosts for the agenda eval, idempotently
+ * in STAGING. NOT a generic harness file (agenda-specific); the reusable rig
+ * is eval/lib/*.
+ *
+ *   ERWIN — a busy host: 2 check-ins today, 1 checkout tomorrow, 1 guest
+ *           message awaiting reply (with a thread, for the drill-down/
+ *           read_guest_thread composition test), 1 scheduled turnover.
+ *   EMPTY — a host with a property but NO upcoming activity in the window
+ *           (the "nothing in the next 48h, NOT 'I don't have visibility'" case).
+ *
+ * Dynamic-imported after loadEvalEnv(). All ids fixed for idempotent upsert;
+ * the host ids are resolved from auth (stable per email).
+ */
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+const PW = "Koast-Eval-pw-7f2a9c1b3d";
+
+// Fixed row ids (idempotent upsert).
+const P_VILLA = "e0000000-0000-4000-8000-0000000000a1"; // Villa Erwin (Tampa)
+const P_BAYSIDE = "e0000000-0000-4000-8000-0000000000a2"; // Bayside Bungalow
+const P_EMPTY = "e0000000-0000-4000-8000-0000000000b1"; // Quiet Cabin (empty host)
+const B_ERWIN = "e0000000-0000-4000-8000-0000000000c1"; // check-in today, has thread
+const B_SARA = "e0000000-0000-4000-8000-0000000000c2"; // check-in today
+const B_MIKE = "e0000000-0000-4000-8000-0000000000c3"; // checkout tomorrow
+const T_ERWIN = "e0000000-0000-4000-8000-0000000000d1"; // Erwin's message thread
+const M_ERWIN = "e0000000-0000-4000-8000-0000000000e1"; // Erwin guest msg 1 (earliest)
+const M_ERWIN_2 = "e0000000-0000-4000-8000-0000000000e2"; // host reply
+const M_ERWIN_3 = "e0000000-0000-4000-8000-0000000000e3"; // Erwin guest msg 2 (latest)
+const CT_TURN = "e0000000-0000-4000-8000-0000000000f1"; // turnover for Mike's checkout
+
+export const ERWIN = {
+  email: "e2e-erwin@koast-eval.local",
+  // Natural-reference terms the GROUNDED answer must surface (no ids):
+  groundingTerms: ["Erwin", "Sara"], // the two check-ins-today guests by first name
+  villaName: "Villa Erwin",
+  bookingErwin: B_ERWIN,
+};
+
+export const EMPTY = {
+  email: "e2e-empty@koast-eval.local",
+};
+
+export function adminClient(): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+async function ensureUser(admin: SupabaseClient, email: string): Promise<string> {
+  const created = await admin.auth.admin.createUser({ email, password: PW, email_confirm: true });
+  if (created.data.user) return created.data.user.id;
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) break;
+    const found = data.users.find((u) => u.email === email);
+    if (found) return found.id;
+    if (data.users.length < 200) break;
+  }
+  throw new Error(`[eval] ensureUser failed for ${email}: ${created.error?.message ?? "unknown"}`);
+}
+
+function dateStr(offsetDays: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+export interface SeededHosts {
+  erwinHostId: string;
+  emptyHostId: string;
+}
+
+export async function seedAgendaFixtures(admin: SupabaseClient): Promise<SeededHosts> {
+  const erwinHostId = await ensureUser(admin, ERWIN.email);
+  const emptyHostId = await ensureUser(admin, EMPTY.email);
+
+  const today = dateStr(0);
+  const tomorrow = dateStr(1);
+  const threeAgo = dateStr(-3);
+  const inThree = dateStr(3);
+  const inFour = dateStr(4);
+  const nowIso = new Date().toISOString();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const must = (label: string, res: { error: any }) => {
+    if (res.error) throw new Error(`[eval seed] ${label} failed: ${res.error.message ?? JSON.stringify(res.error)}`);
+  };
+
+  // Both hosts → business tier. The enforce_property_quota trigger is a
+  // BEFORE-INSERT that counts existing rows, so re-upserting even a free host's
+  // single property trips `count >= limit` on the 2nd run (works once at 0,
+  // fails after). business = unlimited makes re-seeding idempotent. Tier is
+  // irrelevant to the empty-agenda assertion (no bookings either way).
+  must("user_subscriptions", await admin.from("user_subscriptions").upsert(
+    [
+      { user_id: erwinHostId, tier: "business" },
+      { user_id: emptyHostId, tier: "business" },
+    ],
+    { onConflict: "user_id" },
+  ));
+
+  // Properties.
+  must("properties", await admin.from("properties").upsert([
+    { id: P_VILLA, user_id: erwinHostId, name: ERWIN.villaName, city: "Tampa", state: "FL" },
+    { id: P_BAYSIDE, user_id: erwinHostId, name: "Bayside Bungalow", city: "Tampa", state: "FL" },
+    { id: P_EMPTY, user_id: emptyHostId, name: "Quiet Cabin", city: "Asheville", state: "NC" },
+  ], { onConflict: "id" }));
+
+  // Bookings: 2 check-ins today (Erwin, Sara), 1 checkout tomorrow (Mike).
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_ERWIN, property_id: P_VILLA, platform: "airbnb", guest_name: "Erwin Brandt", guest_first_name: "Erwin", guest_last_name: "Brandt", check_in: today, check_out: inFour, num_guests: 3, status: "confirmed" },
+    { id: B_SARA, property_id: P_BAYSIDE, platform: "airbnb", guest_name: "Sara Lopez", guest_first_name: "Sara", guest_last_name: "Lopez", check_in: today, check_out: inThree, num_guests: 2, status: "confirmed" },
+    { id: B_MIKE, property_id: P_VILLA, platform: "airbnb", guest_name: "Mike Jones", guest_first_name: "Mike", guest_last_name: "Jones", check_in: threeAgo, check_out: tomorrow, num_guests: 4, status: "confirmed" },
+  ], { onConflict: "id" }));
+
+  // Erwin's message thread + a pending inbound guest message (latest = guest).
+  must("message_threads", await admin.from("message_threads").upsert([
+    { id: T_ERWIN, property_id: P_VILLA, booking_id: B_ERWIN, channex_thread_id: "eval-thread-erwin", channel_code: "abb", provider_raw: "AirBNB", message_count: 3, unread_count: 1, last_message_preview: "Also — is parking included?", last_message_received_at: nowIso },
+  ], { onConflict: "id" }));
+  // A 3-message back-and-forth. The LATEST is the guest (keeps Erwin flagged
+  // as awaiting reply for the pending-message heuristic), and the earlier
+  // messages are NOT in the one-line agenda preview — so "show me the full
+  // thread" genuinely requires read_guest_thread (the composition test).
+  const t = (minsAgo: number) => new Date(Date.now() - minsAgo * 60_000).toISOString();
+  must("messages", await admin.from("messages").upsert([
+    { id: M_ERWIN, property_id: P_VILLA, booking_id: B_ERWIN, thread_id: T_ERWIN, platform: "airbnb", direction: "inbound", sender: "guest", sender_name: "Erwin", content: "Hi! What time can we check in? We're landing around 1pm.", created_at: t(120), channex_inserted_at: t(120) },
+    { id: M_ERWIN_2, property_id: P_VILLA, booking_id: B_ERWIN, thread_id: T_ERWIN, platform: "airbnb", direction: "outbound", sender: "property", sender_name: "Host", content: "Hi Erwin! Standard check-in is 4pm — I'll see if an earlier arrival works and confirm.", created_at: t(60), channex_inserted_at: t(60) },
+    { id: M_ERWIN_3, property_id: P_VILLA, booking_id: B_ERWIN, thread_id: T_ERWIN, platform: "airbnb", direction: "inbound", sender: "guest", sender_name: "Erwin", content: "Great, thanks! Also — is parking included at the villa?", created_at: t(5), channex_inserted_at: t(5) },
+  ], { onConflict: "id" }));
+
+  // Turnover scheduled for Mike's checkout tomorrow (pending).
+  must("cleaning_tasks", await admin.from("cleaning_tasks").upsert([
+    { id: CT_TURN, property_id: P_VILLA, booking_id: B_MIKE, status: "pending", scheduled_date: tomorrow, scheduled_time: "11:00:00" },
+  ], { onConflict: "id" }));
+
+  // Verify the seed actually landed under the resolved host id (the silent-
+  // failure guard that bit the first GREEN run).
+  const { count } = await admin
+    .from("properties")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", erwinHostId);
+  console.log(`seeded: erwin=${erwinHostId} (properties=${count ?? 0}), empty=${emptyHostId}`);
+
+  return { erwinHostId, emptyHostId };
+}
+
+/** Delete the agent_conversations the eval created for a host (turns cascade).
+ * The fixtures themselves are durable (idempotent re-seed). */
+export async function cleanupEvalConversations(admin: SupabaseClient, hostId: string): Promise<void> {
+  await admin.from("agent_conversations").delete().eq("host_id", hostId);
+}
