@@ -70,6 +70,7 @@ Phase 1 — Today home (immersion; read-mostly; lower risk → slice one)
 - Open-the-app ambient surface: the agent’s already triaged the day, no typing required.
 - People + places: guest avatars, property photos.
 - Shell quality lift so the surface matches the card’s polish.
+- AgendaCard UPCOMING day-split: group UPCOMING by DAY (mirroring TODAY’s per-day structure), with dated turnovers and a block per day, so a multi-day group is scannable per day. The Phase 0 minimal fix put the items’ distinct dates on the count line ("2 check-outs · Jun 2, Jun 3") to kill the false-date display; this per-day restructure is the clean end-state that minimal fix defers to.
 - Proof: open the app cold and see your operation — what needs you, today — without asking. It feels like a product.
 
 Phase 2 — Nav spine + persistent copilot shell

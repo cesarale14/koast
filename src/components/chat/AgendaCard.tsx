@@ -22,6 +22,7 @@ import type {
   AgendaPropertyGroup,
   AgendaRenderPayload,
 } from "@/lib/agent/render/types";
+import { fmtDate, propertyBlockLines, gapSentence } from "./agendaCardLines";
 
 const GAP_TONE: Record<AgendaGap["kind"], "ok" | "warn" | "alert" | "muted"> = {
   no_cleaner: "alert",
@@ -29,37 +30,8 @@ const GAP_TONE: Record<AgendaGap["kind"], "ok" | "warn" | "alert" | "muted"> = {
   awaiting_reply: "warn",
 };
 
-function fmtDate(iso: string): string {
-  // iso = YYYY-MM-DD. Parse + format in UTC so the label never shifts by tz.
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function entryLine(
-  label: string,
-  entries: { guest: string | null }[],
-  withDate?: { date: string },
-): string | null {
-  if (entries.length === 0) return null;
-  const named = entries.filter((e) => e.guest).map((e) => e.guest as string);
-  const nameless = entries.length - named.length;
-  const detail = named.length
-    ? ` (${named.join(", ")}${nameless ? `, +${nameless}` : ""})`
-    : "";
-  const date = withDate ? ` · ${fmtDate(withDate.date)}` : "";
-  return `${entries.length} ${label}${entries.length === 1 ? "" : "s"}${detail}${date}`;
-}
-
 function PropertyBlock({ g, upcoming }: { g: AgendaPropertyGroup; upcoming?: boolean }) {
-  const dateOf = (arr: { date: string }[]) => (upcoming && arr[0] ? { date: arr[0].date } : undefined);
-  const lines = [
-    entryLine("check-out", g.checkOuts, dateOf(g.checkOuts)),
-    entryLine("check-in", g.checkIns, dateOf(g.checkIns)),
-    g.turnovers.length ? `${g.turnovers.length} turnover${g.turnovers.length === 1 ? "" : "s"}` : null,
-  ].filter((l): l is string => l !== null);
+  const lines = propertyBlockLines(g, !!upcoming);
   return (
     <div data-testid="agenda-property" className="mb-1.5 last:mb-0">
       <div className="font-medium text-[var(--deep-sea)]">{g.property}</div>
@@ -68,27 +40,6 @@ function PropertyBlock({ g, upcoming }: { g: AgendaPropertyGroup; upcoming?: boo
       ))}
     </div>
   );
-}
-
-function relTurnover(iso: string, today: string): string {
-  if (iso === today) return "today's";
-  const t = new Date(`${today}T00:00:00Z`);
-  t.setUTCDate(t.getUTCDate() + 1);
-  if (iso === t.toISOString().slice(0, 10)) return "tomorrow's";
-  return `the ${fmtDate(iso)}`;
-}
-
-function gapSentence(gap: AgendaGap, today: string): string {
-  switch (gap.kind) {
-    case "no_cleaner":
-      return gap.date
-        ? `${gap.property}: no cleaner for ${relTurnover(gap.date, today)} turnover`
-        : `${gap.property}: no cleaner assigned`;
-    case "missing_essentials":
-      return `${gap.property}: missing check-in essentials`;
-    case "awaiting_reply":
-      return `${gap.guest ?? "A guest"} at ${gap.property} may be awaiting a reply`;
-  }
 }
 
 function Eyebrow({ children }: { children: ReactNode }) {
