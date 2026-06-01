@@ -88,8 +88,20 @@ async function ensureUser(admin: SupabaseClient, email: string): Promise<string>
   throw new Error(`[eval] ensureUser failed for ${email}: ${created.error?.message ?? "unknown"}`);
 }
 
+// All fixture properties are America/New_York, and the agenda windows per
+// property tz — so "today" must be the property-LOCAL date, not the UTC date.
+// (Using UTC made the eval fragile to the hour: in the evening UTC, UTC-today is
+// EDT-tomorrow, so the seeded "today" items landed on the agenda's UPCOMING and
+// TODAY was empty — emptying overviews and suppressing the card.)
+const FIXTURE_TZ = "America/New_York";
 function dateStr(offsetDays: number): string {
-  const d = new Date();
+  const todayLocal = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FIXTURE_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const d = new Date(`${todayLocal}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d.toISOString().slice(0, 10);
 }

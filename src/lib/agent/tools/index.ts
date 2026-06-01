@@ -9,12 +9,13 @@
  * boot to populate the registry before processing requests.
  */
 
-import { registerTool } from "../dispatcher";
+import { registerTool, getToolsForAnthropicSDK } from "../dispatcher";
 import { readMemoryTool } from "./read-memory";
 import { writeMemoryFactTool } from "./write-memory-fact";
 import { readGuestThreadTool } from "./read-guest-thread";
 import { proposeGuestMessageTool } from "./propose-guest-message";
 import { renderAgendaTool } from "./render-agenda";
+import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
 registerTool(writeMemoryFactTool);
@@ -26,12 +27,21 @@ registerTool(proposeGuestMessageTool);
 // Generative-UI: render_agenda — non-gated render of the operational agenda as
 // a typed card payload (drives the `render` SSE event + agent_turns.render).
 //
-// DEPLOY GATE: registered ONLY when KOAST_ENABLE_RENDER_AGENDA=1, so landing
-// the code (column + tool) is decoupled from enabling the behavior. Off in prod
-// (flag unset) → the model never sees the tool → no un-eval-hardened,
-// catalog-inconsistent tool in front of real hosts. On in dev / staging / eval
-// / E2E. Phase D flips the prod flag on alongside the when-to-card system-prompt
-// rule + the corrected tool catalog (and re-runs the anti-deflection sweep).
-if (process.env.KOAST_ENABLE_RENDER_AGENDA === "1") {
-  registerTool(renderAgendaTool);
+// Registered UNCONDITIONALLY. The deploy gate (KOAST_ENABLE_RENDER_AGENDA) is
+// read PER REQUEST in activeAnthropicTools() below — NOT here at module
+// top-level. A module-level conditional registration froze at build/cold-start
+// and diverged from the prompt's live gate (prod advertised a tool the registry
+// never added). Gating EXPOSURE live, the same way the prompt gates the catalog
+// + rule, keeps the two in lockstep.
+registerTool(renderAgendaTool);
+
+/**
+ * The per-request tool array handed to the model. Reads the render flag LIVE
+ * (via isRenderAgendaEnabled) so render_agenda is exposed only when enabled —
+ * in lockstep with the prompt's applyRenderToggle. Filtering EXPOSURE (not
+ * registration) means the gate can't freeze at module-load.
+ */
+export function activeAnthropicTools(): ReturnType<typeof getToolsForAnthropicSDK> {
+  const all = getToolsForAnthropicSDK();
+  return isRenderAgendaEnabled() ? all : all.filter((t) => t.name !== "render_agenda");
 }

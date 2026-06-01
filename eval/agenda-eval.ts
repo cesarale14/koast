@@ -121,6 +121,11 @@ async function main() {
   for (const spec of PROMPTS) {
     const run = await runPromptThroughLoop(hostId(spec.host), spec.prompt);
     const text = run.text;
+    // Grounding checks the FULL host-facing surface — prose AND the rendered
+    // card. When an overview cards, the prose is a brief summary (the "summary,
+    // not card-dump" rule) and the named items live in the card; the host sees
+    // both. Forbid / mentionAny / deflection / markdown stay on the prose only.
+    const surface = run.renderPayload ? `${text} ${JSON.stringify(run.renderPayload)}` : text;
 
     const failures: string[] = [];
     if (run.error) failures.push(`loop-error: ${run.error}`);
@@ -130,11 +135,11 @@ async function main() {
     const md = rawMarkdown(text);
     if (md.length) failures.push(`RAW-MARKDOWN[${md.join(",")}]`);
     if (spec.grounding) {
-      const g = groundedIn(text, spec.grounding);
+      const g = groundedIn(surface, spec.grounding);
       if (!g.ok) failures.push(`grounding-missing[${g.missing.join(",")}]`);
     }
     if (spec.groundingAny) {
-      const hit = spec.groundingAny.some((t) => text.toLowerCase().includes(t.toLowerCase()));
+      const hit = spec.groundingAny.some((t) => surface.toLowerCase().includes(t.toLowerCase()));
       if (!hit) failures.push(`grounding-any-missing[${spec.groundingAny.join("|")}]`);
     }
     if (spec.mustCallTool && !run.toolCalls.includes(spec.mustCallTool)) {

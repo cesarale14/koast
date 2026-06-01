@@ -48,6 +48,8 @@
  *         note.
  */
 
+import { isRenderAgendaEnabled } from "./render/flag";
+
 export interface SystemPromptContext {
   // v1: empty. Future milestones add per-host context (voice_mode,
   // owned property names, etc.) — placeholder is here so callers
@@ -316,7 +318,7 @@ const WHEN_TO_CARD_RULE =
   "\n  - When the host asks for an agenda OVERVIEW — the whole picture of today / the next 48h, OR what to prioritize or focus on for the day (\"what's on today\", \"anything I'm missing\", \"what should I prioritize\", \"what should I focus on\", \"what's happening\", \"how's my day looking\") — you MUST call render_agenda FIRST, before you answer, to render the structured card; only THEN give a short prose summary leading with what needs the host (and, for a prioritization ask, which item to do first). The card is REQUIRED for EVERY overview — a prioritization ask (\"what should I prioritize / focus on\") is an overview too, so render the card and then prioritize in prose; the prose never replaces the card. Do NOT call render_agenda for anything narrower — a single-fact lookup (\"when does Jeremy check out\"), a drafted message, a yes/no, or a follow-up about one item — those stay prose-only. Prose is the default everywhere else; the genuine overview is the one ask that always earns the card. Keep the prose a summary that leads with what needs the host, not a restatement of every card row.";
 
 function applyRenderToggle(text: string): string {
-  if (process.env.KOAST_ENABLE_RENDER_AGENDA !== "1") return text;
+  if (!isRenderAgendaEnabled()) return text;
   return text
     .replace(
       "You have four tools across two capabilities. Both gate proposed writes through the action substrate so the host approves before any side effect.",

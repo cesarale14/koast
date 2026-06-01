@@ -46,10 +46,11 @@ import {
 import { buildSystemPrompt } from "./system-prompt";
 import { buildAgendaRollup, agendaPreamble } from "./agenda";
 import type { RenderPayload } from "./render/types";
-import {
-  dispatchToolCall,
-  getToolsForAnthropicSDK,
-} from "./dispatcher";
+import { dispatchToolCall } from "./dispatcher";
+// activeAnthropicTools() reads the render flag LIVE (per request) to gate
+// render_agenda's EXPOSURE — in lockstep with the prompt's applyRenderToggle.
+// Importing this module also registers all tools (idempotent module singleton).
+import { activeAnthropicTools } from "./tools";
 import type { AgentStreamEvent } from "./sse";
 import type { ToolHandlerContext } from "./types";
 import { classifyError } from "./error-classifier";
@@ -258,7 +259,7 @@ interface RoundResult {
 async function* runOneRound(
   client: Anthropic,
   systemPrompt: string,
-  tools: ReturnType<typeof getToolsForAnthropicSDK>,
+  tools: ReturnType<typeof activeAnthropicTools>,
   history: Anthropic.MessageParam[],
   toolContext: ToolHandlerContext,
 ): AsyncGenerator<AgentStreamEvent, RoundResult, void> {
@@ -704,7 +705,7 @@ export async function* runAgentTurn(
     host: input.host,
     sufficiency: sufficiencyContext,
   });
-  const tools = getToolsForAnthropicSDK();
+  const tools = activeAnthropicTools();
 
   const accumulatedText: string[] = [];
   const collectedToolCalls: ToolCallRecord[] = [];
