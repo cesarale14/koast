@@ -28,6 +28,9 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# MCP server config — carries the Supabase connection config; keep local-only
+.mcp.json
+
 # Playwright E2E (M13 Phase 1.B) — gitignored: harness env + auth state + outputs
 .env.playwright
 /e2e/.auth/
