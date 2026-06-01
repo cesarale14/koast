@@ -45,6 +45,7 @@ import {
 } from "./conversation";
 import { buildSystemPrompt } from "./system-prompt";
 import { buildAgendaRollup, agendaPreamble } from "./agenda";
+import { createMarkdownStripStream } from "@/lib/text/strip-markdown";
 import type { RenderPayload } from "./render/types";
 import { dispatchToolCall } from "./dispatcher";
 // activeAnthropicTools() reads the render flag LIVE (per request) to gate
@@ -274,14 +275,21 @@ async function* runOneRound(
   });
 
   let accumulatedText = "";
+  // The chat surface renders PLAIN TEXT — strip markdown off the DISPLAY stream
+  // so it's clean live (not only after the persist-strip on reload). accumulatedText
+  // stays RAW: it feeds classification, history-append, and the persist-time strip.
+  const displayStrip = createMarkdownStripStream();
   for await (const event of stream) {
     if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
       accumulatedText += event.delta.text;
-      yield { type: "token", delta: event.delta.text };
+      const visible = displayStrip.push(event.delta.text);
+      if (visible) yield { type: "token", delta: visible };
     }
     // tool_use input deltas are merged by the SDK; we get the full
     // tool_use block from finalMessage() below. No per-delta handling.
   }
+  const visibleTail = displayStrip.flush();
+  if (visibleTail) yield { type: "token", delta: visibleTail };
 
   const finalMessage = await stream.finalMessage();
 
@@ -917,6 +925,11 @@ export async function* runAgentTurn(
   }
 
   // Finalize the pre-inserted assistant stub with the loop's outputs.
+  // content_text is RAW here — finalizeTurn is the chokepoint that markdown-
+  // strips it at PERSIST (so stored prose is plain, reconstructHistory feeds
+  // clean text back, and the format-priming loop that defeats the prompt-only
+  // rule — the 823dafd2 leak — can't form). The streamed-display strip above is
+  // the live half; the Format prompt rule is defense in depth.
   const finalText = accumulatedText.join("");
   await finalizeTurn({
     turn_id: assistantTurn.id,

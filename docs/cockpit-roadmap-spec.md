@@ -22,6 +22,7 @@ Carried from the render system:
 - The card is ground truth. Prose summarizes and prioritizes; it never re-serializes the data. When prose and card disagree, the card wins.
 - Grounded & trustworthy: never hallucinate state, never miss a gap. Eval-gate behavior. eval-green ≠ prod-correct — verify on the real path.
 - Smallest verifiable slice first; spec/plan before code; eval-first RED→GREEN; isolate prod-behavior commits from test-infra; flags read per-request, never frozen at module load.
+- Persisted prose is always clean. The chat surface renders plain text, so `finalizeTurn` markdown-strips assistant `content_text` at the chokepoint — stored prose stays plain and can't prime the model to re-emit markdown via reconstructed history. FORWARD INVARIANT: every new assistant-prose-persist surface the cockpit adds MUST route through `finalizeTurn` (or a stripped equivalent), or "persisted prose is always clean" breaks for that writer.
 
 New for the cockpit:
 

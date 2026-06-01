@@ -140,20 +140,23 @@ describe("runAgentTurn — happy path (text-only response)", () => {
       user_message_text: "hi",
     });
 
-    expect(events.map((e) => e.type)).toEqual([
-      "turn_started",
-      "token",
-      "token",
-      "done",
-    ]);
+    // The display stream is markdown-stripped, which re-chunks tokens (settled
+    // prefixes + a flush) — so assert the structural sequence and the
+    // CONCATENATED token text, not an exact per-delta token count.
+    const types = events.map((e) => e.type);
+    expect(types[0]).toBe("turn_started");
+    expect(types[types.length - 1]).toBe("done");
+    expect(types.filter((t) => t !== "token")).toEqual(["turn_started", "done"]);
+    const tokenText = events
+      .filter((e) => e.type === "token")
+      .map((e) => (e as { delta: string }).delta)
+      .join("");
+    expect(tokenText).toBe("Hello, how can I help?");
 
     const turnStarted = events[0] as { type: "turn_started"; conversation_id: string };
     expect(turnStarted.conversation_id).toBe(CONV_ID);
 
-    expect((events[1] as { type: "token"; delta: string }).delta).toBe("Hello, ");
-    expect((events[2] as { type: "token"; delta: string }).delta).toBe("how can I help?");
-
-    const done = events[3] as { type: "done"; turn_id: string; audit_ids: string[] };
+    const done = events[events.length - 1] as { type: "done"; turn_id: string; audit_ids: string[] };
     expect(done.turn_id).toBe(ASSISTANT_TURN_ID);
     expect(done.audit_ids).toEqual([]);
 
@@ -223,25 +226,32 @@ describe("runAgentTurn — tool path", () => {
       user_message_text: "what's the wifi password?",
     });
 
-    // Expected sequence:
-    //   turn_started → token(round 1 text)
-    //   tool_call_started → tool_call_completed (round 1 tool dispatch)
-    //   token(round 2 text) → done
-    expect(events.map((e) => e.type)).toEqual([
+    // Expected structural sequence (markdown-stripped display re-chunks the
+    // token events, so assert non-token order + round-1 text BEFORE the tool
+    // call and round-2 text AFTER it, by the concatenated deltas):
+    //   turn_started → token(s)(round 1) → tool_call_started →
+    //   tool_call_completed → token(s)(round 2) → done
+    const types = events.map((e) => e.type);
+    expect(types.filter((t) => t !== "token")).toEqual([
       "turn_started",
-      "token",
       "tool_call_started",
       "tool_call_completed",
-      "token",
       "done",
     ]);
+    const deltaOf = (e: (typeof events)[number]) => (e as { delta: string }).delta;
+    const tcStartAt = types.indexOf("tool_call_started");
+    const tcDoneAt = types.indexOf("tool_call_completed");
+    const round1Text = events.slice(0, tcStartAt).filter((e) => e.type === "token").map(deltaOf).join("");
+    const round2Text = events.slice(tcDoneAt + 1).filter((e) => e.type === "token").map(deltaOf).join("");
+    expect(round1Text).toBe("Let me check. ");
+    expect(round2Text).toBe("The password is hunter2.");
 
-    const tcStarted = events[2] as { type: "tool_call_started"; tool_use_id: string; tool_name: string; input_summary: string };
+    const tcStarted = events[tcStartAt] as { type: "tool_call_started"; tool_use_id: string; tool_name: string; input_summary: string };
     expect(tcStarted.tool_use_id).toBe(toolUseId);
     expect(tcStarted.tool_name).toBe("read_memory");
     expect(tcStarted.input_summary).toMatch(/wifi/);
 
-    const tcCompleted = events[3] as { type: "tool_call_completed"; success: boolean; result_summary: string };
+    const tcCompleted = events[tcDoneAt] as { type: "tool_call_completed"; success: boolean; result_summary: string };
     expect(tcCompleted.success).toBe(true);
     expect(tcCompleted.result_summary).toMatch(/Found 1 fact/);
 
@@ -259,7 +269,7 @@ describe("runAgentTurn — tool path", () => {
     expect(finalizeCall.content_text).toBe("Let me check. The password is hunter2.");
 
     // done event includes the audit id
-    const done = events[5] as { type: "done"; audit_ids: string[] };
+    const done = events[events.length - 1] as { type: "done"; audit_ids: string[] };
     expect(done.audit_ids).toEqual([AUDIT_ID]);
   });
 });

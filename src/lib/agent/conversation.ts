@@ -28,6 +28,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { AgentTurnRole, AgentConversationStatus } from "@/lib/db/schema";
 import { renderPayloadSchema, type RenderPayload } from "./render/types";
+import { stripMarkdown } from "@/lib/text/strip-markdown";
 
 export interface AgentHost {
   id: string;
@@ -351,12 +352,26 @@ export async function insertTurn(input: InsertTurnInput): Promise<PersistedTurn>
  * Finalize a stub turn with the loop's outputs. UPDATE-only; the row
  * already exists from insertTurn. Idempotent in shape: re-running with
  * the same payload writes the same values.
+ *
+ * CHOKEPOINT — assistant prose is markdown-STRIPPED here. finalizeTurn is the
+ * only prod path that writes an assistant turn's content_text, so stripping at
+ * the FUNCTION (not the call site) means every current and future caller
+ * inherits clean persistence: the chat surface renders plain text, and clean
+ * stored prose keeps reconstructHistory from priming the model to re-emit
+ * markdown (the 823dafd2 leak). FORWARD INVARIANT for the cockpit: every new
+ * assistant-prose-persist surface MUST route through finalizeTurn (or a stripped
+ * equivalent) — that is how "persisted prose is always clean" survives the new
+ * writers the cockpit adds. Stripping a clean string is a no-op, so this is safe
+ * for non-prose callers (e.g. the canned-mode constant).
  */
 export async function finalizeTurn(input: FinalizeTurnInput): Promise<void> {
   const supabase = createServiceClient();
 
   const update: Record<string, unknown> = {};
-  if (input.content_text !== undefined) update.content_text = input.content_text;
+  if (input.content_text !== undefined) {
+    update.content_text =
+      input.content_text === null ? null : stripMarkdown(input.content_text);
+  }
   if (input.tool_calls !== undefined) update.tool_calls = input.tool_calls;
   if (input.refusal !== undefined) update.refusal = input.refusal;
   if (input.render !== undefined) update.render = input.render;

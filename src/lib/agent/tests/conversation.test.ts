@@ -296,6 +296,35 @@ describe("finalizeTurn — M6 turn_id-ordering fix", () => {
       finalizeTurn({ turn_id: TURN_ID, content_text: "x" }),
     ).rejects.toThrow(/row not found/);
   });
+
+  // The chokepoint: finalizeTurn markdown-strips content_text at PERSIST so
+  // stored prose is plain and reconstructHistory can't prime markdown.
+  test("strips markdown from content_text before persisting (the chokepoint)", async () => {
+    const eq = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq });
+    const supabase = { from: jest.fn().mockReturnValue({ update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    await finalizeTurn({
+      turn_id: TURN_ID,
+      content_text: "**Today:**\n- Two checkouts at Villa Jamaica",
+    });
+
+    expect(update.mock.calls[0][0].content_text).toBe(
+      "Today:\nTwo checkouts at Villa Jamaica",
+    );
+  });
+
+  test("leaves null content_text as null (no strip on absence)", async () => {
+    const eq = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq });
+    const supabase = { from: jest.fn().mockReturnValue({ update }) };
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    await finalizeTurn({ turn_id: TURN_ID, content_text: null });
+
+    expect(update.mock.calls[0][0].content_text).toBeNull();
+  });
 });
 
 describe("reconstructHistory", () => {
