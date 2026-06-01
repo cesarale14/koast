@@ -650,6 +650,10 @@ export async function* runAgentTurn(
   let sufficiencyContext:
     | NonNullable<Parameters<typeof buildSystemPrompt>[0]>["sufficiency"]
     | undefined;
+  // Property nicknames missing check-in essentials (classifySufficiency
+  // per-property) — fed to agendaPreamble so the TODAY-URGENT missing-essentials
+  // gaps are derived from the SAME source the card uses (no drift).
+  let missingEssentialsProperties: string[] = [];
   try {
     supabaseForSufficiency = createServiceClient();
     const { classifySufficiency } = await import("./sufficiency");
@@ -665,6 +669,9 @@ export async function* runAgentTurn(
       total_properties: classification.rollup.properties,
       completion_offered_at: offeredAt,
     };
+    missingEssentialsProperties = classification.per_property
+      .filter((p) => p.missing_count > 0)
+      .map((p) => p.property_name ?? "a property");
   } catch (err) {
     console.warn(
       `[loop] C3 sufficiency snapshot skipped: ${err instanceof Error ? err.message : String(err)}`,
@@ -684,7 +691,7 @@ export async function* runAgentTurn(
             total: sufficiencyContext.total_properties,
           }
         : undefined;
-      agendaPre = agendaPreamble(rollup, gaps);
+      agendaPre = agendaPreamble(rollup, gaps, missingEssentialsProperties);
     }
   } catch (err) {
     console.warn(

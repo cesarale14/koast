@@ -365,6 +365,11 @@ export function groupAgenda(rollup: AgendaRollup): GroupedAgenda {
 export function agendaPreamble(
   rollup: AgendaRollup,
   gaps?: { missing: number; total: number },
+  /** Property nicknames missing check-in essentials, from
+   * classifySufficiency.per_property (same source as the card). Used to derive
+   * the TODAY-URGENT missing-essentials gaps (a property with a check-in today
+   * that lacks door/wifi/parking). */
+  missingEssentialsProperties: string[] = [],
 ): string {
   // NOTE: plain prose, NOT XML/angle-bracket tags — a tag-wrapped block primes
   // the model to express tool calls as XML text (and leak the ids). Keep ids as
@@ -405,6 +410,34 @@ export function agendaPreamble(
   lines.push(
     `Today is ${rollup.today}; the window is today + the next 48h. Items are grouped TODAY vs UPCOMING and listed per property, each property carrying its OWN counts — read each property's line as written. Never re-tally across properties, never move an item between days, and never report an UPCOMING item as today.`,
   );
+
+  // TODAY-URGENT gaps (prose SAFETY FLOOR): time-sensitive gaps the prose must
+  // ALWAYS state, even when the card doesn't render. Derived deterministically
+  // from the already-grouped data (NOT buildAgendaRollup): a turnover TODAY with
+  // no cleaner, and a property with a check-in TODAY that is missing check-in
+  // essentials (a guest arrives today and the property lacks door/wifi/parking;
+  // missingEssentialsProperties is the same source the card uses). Non-urgent
+  // gaps (a future turnover's cleaner, essentials with no arrival today) are NOT
+  // listed here — they defer to the card / a brief summary.
+  const missingEssentialsSet = new Set(missingEssentialsProperties);
+  const urgentGaps: string[] = [];
+  for (const b of grouped.todayGroups) {
+    for (const t of b.turnovers) {
+      if (!t.cleanerAssigned) urgentGaps.push(`${b.property}: a turnover is scheduled TODAY with NO cleaner assigned`);
+    }
+  }
+  for (const b of grouped.todayGroups) {
+    if (b.checkIns.length > 0 && missingEssentialsSet.has(b.property)) {
+      const guests = b.checkIns.map((c) => c.guest).filter((g): g is string => !!g);
+      const who = guests.length ? `${guests.join(", ")} arriving today` : "a guest arriving today";
+      urgentGaps.push(`${b.property}: missing check-in essentials (door/access, wifi, or parking) for ${who}`);
+    }
+  }
+  if (urgentGaps.length > 0) {
+    lines.push(
+      `TODAY'S URGENT GAPS (${urgentGaps.length}) — you MUST state EVERY one of these to the host, in plain terms (the property, what's missing, who's affected today); they are time-sensitive and must never be dropped${urgentGaps.length > 1 ? `. There are ${urgentGaps.length}, so never call it "the one thing" or describe a single item when more than one needs attention` : ""}: ${urgentGaps.join("; ")}`,
+    );
+  }
 
   if (rollup.empty) {
     lines.push(
