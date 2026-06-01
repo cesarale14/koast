@@ -30,37 +30,45 @@ export interface LoopRunResult {
    * null if the turn produced no card. Used by the when-to-card behavior eval
    * (overview → present, narrow → absent). */
   renderPayload: unknown | null;
+  /** The finalized assistant turn id (from the `done` event), so a caller can
+   * read back the PERSISTED content_text — the markdown-strip eval checks the
+   * stored prose (the priming vector), not just the streamed display. */
+  turnId: string | null;
 }
 
-/** Run one prompt through the real loop; collect token text + tool-call names. */
+/** Run one prompt through the real loop; collect token text + tool-call names.
+ * `opts.conversationId` continues an existing conversation (so its prior turns
+ * prime the model — the markdown-strip leak vector); default starts fresh. */
 export async function runPromptThroughLoop(
   hostId: string,
   prompt: string,
-  uiContext?: { active_property_id?: string },
+  opts?: { uiContext?: { active_property_id?: string }; conversationId?: string | null },
 ): Promise<LoopRunResult> {
   const parts: string[] = [];
   const toolCalls: string[] = [];
   let conversationId: string | null = null;
   let error: string | null = null;
   let renderPayload: unknown | null = null;
+  let turnId: string | null = null;
   try {
     for await (const ev of runAgentTurn({
       host: { id: hostId },
-      conversation_id: null,
+      conversation_id: opts?.conversationId ?? null,
       user_message_text: prompt,
-      ui_context: uiContext,
+      ui_context: opts?.uiContext,
     })) {
-      const e = ev as { type: string; delta?: string; conversation_id?: string; tool_name?: string; payload?: unknown };
+      const e = ev as { type: string; delta?: string; conversation_id?: string; tool_name?: string; payload?: unknown; turn_id?: string };
       if (e.type === "turn_started" && e.conversation_id) conversationId = e.conversation_id;
       else if (e.type === "token" && e.delta) parts.push(e.delta);
       else if (e.type === "tool_call_started" && e.tool_name) toolCalls.push(e.tool_name);
       else if (e.type === "render") renderPayload = e.payload ?? null;
+      else if (e.type === "done" && e.turn_id) turnId = e.turn_id;
       else if (e.type === "error") error = JSON.stringify(ev);
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  return { text: parts.join("").trim(), conversationId, toolCalls, error, renderPayload };
+  return { text: parts.join("").trim(), conversationId, toolCalls, error, renderPayload, turnId };
 }
 
 /**

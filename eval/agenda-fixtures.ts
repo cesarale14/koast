@@ -329,3 +329,33 @@ export async function seedUrgentGapsFixture(admin: SupabaseClient): Promise<stri
 export async function cleanupEvalConversations(admin: SupabaseClient, hostId: string): Promise<void> {
   await admin.from("agent_conversations").delete().eq("host_id", hostId);
 }
+
+/**
+ * Seed a conversation whose history ALREADY contains an assistant turn formatted
+ * in MARKDOWN — the format-priming leak vector (the prod 823dafd2 turn mirrored
+ * its own prior markdown answer). Running the same overview as a continuation of
+ * this conversation tempts the model to mirror the bold-header dash-list, which
+ * is exactly what a prompt-only "no markdown" rule can't stop. Returns the
+ * conversation id to pass as runPromptThroughLoop's opts.conversationId.
+ */
+export async function seedPrimedMarkdownConversation(hostId: string): Promise<string> {
+  const { getOrCreateConversation, persistTurn } = await import("@/lib/agent/conversation");
+  const conv = await getOrCreateConversation({ id: hostId }, null);
+  await persistTurn({
+    conversation_id: conv.id,
+    role: "user",
+    content_text: "What's on today?",
+  });
+  await persistTurn({
+    conversation_id: conv.id,
+    role: "assistant",
+    content_text:
+      "Here's the breakdown:\n\n" +
+      "**Today:**\n" +
+      "- **Two check-ins** at Villa Erwin — Erwin and Sara\n" +
+      "- **One checkout** (Mike)\n" +
+      "- **Parking question** from Erwin still open\n\n" +
+      "Want me to draft the check-in messages?",
+  });
+  return conv.id;
+}
