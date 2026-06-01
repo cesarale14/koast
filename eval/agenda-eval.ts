@@ -95,10 +95,13 @@ async function main() {
     seedBoundaryFixture,
     seedNamelessFixture,
     seedSplitFixture,
+    seedUrgentGapsFixture,
     cleanupEvalConversations,
     BOUNDARY_NOW_ISO,
     BOUNDARY_LOCAL_TODAY,
     BOUNDARY_UTC_TODAY,
+    URGENT_A,
+    URGENT_B,
   } = await import("./agenda-fixtures");
   const { buildAgendaRollup, agendaPreamble } = await import("@/lib/agent/agenda");
 
@@ -107,6 +110,7 @@ async function main() {
   const { erwinHostId, emptyHostId } = await seedAgendaFixtures(admin);
   const namelessHostId = await seedNamelessFixture(admin);
   const splitHostId = await seedSplitFixture(admin);
+  const urgentHostId = await seedUrgentGapsFixture(admin);
   const hostId = (h: PromptSpec["host"]) =>
     h === "erwin" ? erwinHostId
     : h === "nameless" ? namelessHostId
@@ -307,13 +311,45 @@ async function main() {
   if (cardPass) hardPass++;
   console.log(`[when-to-card-sweep] (${overviewTotal + narrowTotal} runs, N=${CARD_N}/prompt)  ${cardPass ? "PASS" : "FAIL"} — over-card ${narrowCarded}/${narrowTotal} (STRICT 0), overview carded ${overviewCarded}/${overviewTotal} (floor ${overviewFloor})\n`);
 
+  // URGENT-GAPS SWEEP (prose SAFETY FLOOR): the prose must ALWAYS surface
+  // today-urgent gaps even when the card doesn't render (~10% of overviews).
+  // Fixture has TWO today-urgent gaps (Lakeview = missing essentials for a guest
+  // arriving today; Pier House = turnover today, no cleaner) + one non-urgent
+  // future gap (Pier House turnover on today+2). Floor is sized by the binomial,
+  // NOT 100%: surfacing-both is an always-do behavior with a sub-100% true rate,
+  // so a 100% gate manufactures flake. At N=20 a 17/20 (85%) floor passes ~98% of
+  // runs at a healthy ~95% true rate and only fires if surfacing genuinely
+  // collapses. Singular-count (a never-do) is strict 0.
+  const URGENT_N = parseInt(process.env.URGENT_N ?? "20", 10);
+  const URGENT_FLOOR_PCT = parseFloat(process.env.URGENT_FLOOR_PCT ?? "0.85");
+  const singularRe = /\b(?:the (?:one|only|single|main) (?:thing|gap|item|issue)|only thing that needs|the thing that needs|just one thing)\b/i;
+  let surfacedBoth = 0;
+  let singularViolations = 0;
+  let ceilingViolations = 0;
+  for (let i = 0; i < URGENT_N; i++) {
+    const run = await runPromptThroughLoop(urgentHostId, "What's on today?");
+    const t = run.text.toLowerCase();
+    const aEssentials = t.includes(URGENT_A.toLowerCase()) && /(essential|missing|door|wifi|parking)/.test(t);
+    const bCleaner = t.includes(URGENT_B.toLowerCase()) && t.includes("cleaner");
+    if (aEssentials && bCleaner) surfacedBoth++;
+    else console.log(`   [urgent-floor] #${i + 1} A-essentials=${aEssentials} B-cleaner=${bCleaner} | ${run.text.replace(/\s+/g, " ").slice(0, 170)}`);
+    if (singularRe.test(run.text)) { singularViolations++; console.log(`   [singular-count] #${i + 1}: ${run.text.replace(/\s+/g, " ").slice(0, 130)}`); }
+    // Ceiling (soft, logged): the non-urgent future no-cleaner enumerated as co-equal.
+    if (/\b(in two days|two days from now|day after tomorrow)\b/i.test(run.text) && /cleaner/i.test(run.text)) ceilingViolations++;
+  }
+  const urgentFloor = Math.ceil(URGENT_N * URGENT_FLOOR_PCT);
+  const urgentPass = surfacedBoth >= urgentFloor && singularViolations === 0;
+  if (urgentPass) hardPass++;
+  console.log(`[urgent-gaps-sweep] (${URGENT_N} runs)  ${urgentPass ? "PASS" : "FAIL"} — surfaced-both ${surfacedBoth}/${URGENT_N} (floor ${urgentFloor}=${Math.round(URGENT_FLOOR_PCT * 100)}%), singular-count ${singularViolations}/${URGENT_N} (STRICT 0), ceiling(soft) ${ceilingViolations}/${URGENT_N}\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
+  await cleanupEvalConversations(admin, urgentHostId);
   await cleanupEvalConversations(admin, emptyHostId);
   await cleanupEvalConversations(admin, boundaryHostId);
   await cleanupEvalConversations(admin, namelessHostId);
   await cleanupEvalConversations(admin, splitHostId);
 
-  const TOTAL = PROMPTS.length + 5; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep + when-to-card-sweep
+  const TOTAL = PROMPTS.length + 6; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep + when-to-card-sweep + urgent-gaps-sweep
   console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
   process.exit(hardPass === TOTAL ? 0 : 1);

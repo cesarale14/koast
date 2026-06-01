@@ -272,6 +272,58 @@ export async function seedSplitFixture(admin: SupabaseClient): Promise<string> {
   return hostId;
 }
 
+// Urgent-gaps fixture (prose safety floor): TWO today-urgent gaps + one
+// non-urgent (deferrable) future gap. The prose must surface both urgent ones
+// even when the card doesn't render.
+const P_URG_A = "e0000000-0000-4000-8000-0000000000be"; // Lakeview Cabin — check-in TODAY, missing essentials
+const P_URG_B = "e0000000-0000-4000-8000-0000000000bf"; // Pier House — turnover TODAY no cleaner (+ a future one)
+const B_URG_A = "e0000000-0000-4000-8000-0000000000da"; // Nora arriving TODAY at Lakeview
+const B_URG_B1 = "e0000000-0000-4000-8000-0000000000db"; // checkout TODAY at Pier House
+const B_URG_B2 = "e0000000-0000-4000-8000-0000000000dc"; // checkout today+2 at Pier House (non-urgent turnover)
+const CT_URG_B1 = "e0000000-0000-4000-8000-0000000000ea"; // turnover TODAY, no cleaner (URGENT)
+const CT_URG_B2 = "e0000000-0000-4000-8000-0000000000eb"; // turnover today+2, no cleaner (non-urgent)
+export const URGENT_A = "Lakeview Cabin";
+export const URGENT_A_GUEST = "Nora";
+export const URGENT_B = "Pier House";
+
+/**
+ * Seed the urgent-gaps fixture. Property A (Lakeview Cabin) has a check-in TODAY
+ * (Nora) and no memory facts -> missing check-in essentials = a TODAY-URGENT gap
+ * (a guest arrives today and the property lacks door/wifi/parking). Property B
+ * (Pier House) has a turnover TODAY with no cleaner = a TODAY-URGENT gap, PLUS a
+ * turnover on today+2 with no cleaner = a NON-URGENT (deferrable) gap. The prose
+ * must always surface BOTH urgent gaps; the future one is the card's job.
+ * Idempotent.
+ */
+export async function seedUrgentGapsFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-urgent@koast-eval.local");
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval urgent seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const today = dateStr(0);
+  const twoAhead = dateStr(2);
+  const threeAgo = dateStr(-3);
+  const inFour = dateStr(4);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  // NO memory facts seeded for either property -> classifySufficiency reports
+  // both as missing essentials. Only A has a check-in TODAY, so only A's
+  // missing-essentials is TODAY-URGENT.
+  must("properties", await admin.from("properties").upsert([
+    { id: P_URG_A, user_id: hostId, name: URGENT_A, city: "Tampa", state: "FL", timezone: "America/New_York" },
+    { id: P_URG_B, user_id: hostId, name: URGENT_B, city: "Tampa", state: "FL", timezone: "America/New_York" },
+  ], { onConflict: "id" }));
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_URG_A, property_id: P_URG_A, platform: "airbnb", source: "channex", guest_name: "Nora Vance", guest_first_name: URGENT_A_GUEST, check_in: today, check_out: inFour, num_guests: 2, status: "confirmed" },
+    { id: B_URG_B1, property_id: P_URG_B, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: threeAgo, check_out: today, num_guests: 3, status: "confirmed" },
+    { id: B_URG_B2, property_id: P_URG_B, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: today, check_out: twoAhead, num_guests: 2, status: "confirmed" },
+  ], { onConflict: "id" }));
+  must("cleaning_tasks", await admin.from("cleaning_tasks").upsert([
+    { id: CT_URG_B1, property_id: P_URG_B, booking_id: B_URG_B1, status: "pending", scheduled_date: today, scheduled_time: "11:00:00" },
+    { id: CT_URG_B2, property_id: P_URG_B, booking_id: B_URG_B2, status: "pending", scheduled_date: twoAhead, scheduled_time: "11:00:00" },
+  ], { onConflict: "id" }));
+  return hostId;
+}
+
 /** Delete the agent_conversations the eval created for a host (turns cascade).
  * The fixtures themselves are durable (idempotent re-seed). */
 export async function cleanupEvalConversations(admin: SupabaseClient, hostId: string): Promise<void> {
