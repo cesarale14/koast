@@ -57,7 +57,14 @@ describe("toAgendaRenderPayload — payload canary", () => {
     expect(renderPayloadSchema.safeParse(p).success).toBe(true);
   });
 
-  it("groups TODAY per property with that property's own counts", () => {
+  // This is the DETERMINISTIC gate for per-property COUNT correctness on the
+  // multi-property mixed-day split shape (A=2-today-not-3 + 1-upcoming, B=1-today)
+  // — the count the agent-eval "checkout-split-multi" case used to assert against
+  // the model's PROSE token ("two"), which false-failed on correct phrasing. The
+  // count is gated HERE; the model's prose CONVEYANCE of it is best-effort
+  // presentation and is no longer hard-asserted anywhere. Flip a toBe() below to
+  // confirm this gate is live (it characterizes groupAgenda's bucketing).
+  it("groups TODAY per property with that property's own counts (count-correctness gate)", () => {
     const villa = p.groups.today.find((g) => g.property === "Villa Jamaica");
     const cozy = p.groups.today.find((g) => g.property === "Cozy Loft - Tampa");
     expect(villa?.checkOuts.length).toBe(2); // Jeremy + 1 nameless — NOT 3
