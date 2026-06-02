@@ -88,6 +88,21 @@ async function ensureUser(admin: SupabaseClient, email: string): Promise<string>
   throw new Error(`[eval] ensureUser failed for ${email}: ${created.error?.message ?? "unknown"}`);
 }
 
+/** Full reset of a host's agenda state — delete its properties and their child
+ * rows (bookings, cleaning_tasks, memory_facts) before re-seeding. Guards against
+ * accumulated/colliding staging state (a reused property id once left a previous
+ * fixture's bookings on a "clean" host). Idempotent. */
+async function resetHost(admin: SupabaseClient, hostId: string): Promise<void> {
+  const { data: props } = await admin.from("properties").select("id").eq("user_id", hostId);
+  const pids = ((props ?? []) as Array<{ id: string }>).map((p) => p.id);
+  if (pids.length) {
+    await admin.from("cleaning_tasks").delete().in("property_id", pids);
+    await admin.from("bookings").delete().in("property_id", pids);
+    await admin.from("memory_facts").delete().in("entity_id", pids);
+    await admin.from("properties").delete().eq("user_id", hostId);
+  }
+}
+
 // All fixture properties are America/New_York, and the agenda windows per
 // property tz — so "today" must be the property-LOCAL date, not the UTC date.
 // (Using UTC made the eval fragile to the hour: in the evening UTC, UTC-today is
@@ -358,4 +373,124 @@ export async function seedPrimedMarkdownConversation(hostId: string): Promise<st
       "Want me to draft the check-in messages?",
   });
   return conv.id;
+}
+
+// ── Carding-boundary fixtures (Phase 0) ──────────────────────────────────────
+// Pin "card every overview whose WINDOW has content (today OR upcoming); an
+// empty window stays prose." The empty-window case reuses the existing EMPTY host.
+
+// (a) NO-GAP host WITH content: a RICH property (all four required capabilities
+// filled → no missing_essentials gap) with a check-in + check-out TODAY and NO
+// turnovers / messages — content, zero gaps. Confirms the "gaps pull toward the
+// card" reframe didn't crater carding on a clean overview. Should CARD.
+const P_NOGAP = "e0000000-0000-4000-8000-0000000000d0";
+const B_NG_CI = "e0000000-0000-4000-8000-0000000000c4"; // check-in today
+const B_NG_CO = "e0000000-0000-4000-8000-0000000000c5"; // check-out today
+const MF_NG_DOOR = "e0000000-0000-4000-8000-000000000a01";
+const MF_NG_WIFI_N = "e0000000-0000-4000-8000-000000000a02";
+const MF_NG_WIFI_P = "e0000000-0000-4000-8000-000000000a03";
+const MF_NG_PARK = "e0000000-0000-4000-8000-000000000a04";
+export const NOGAP_PROPERTY = "Cedar Lodge";
+
+export async function seedNoGapFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-nogap@koast-eval.local");
+  await resetHost(admin, hostId);
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval nogap seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const today = dateStr(0);
+  const threeAgo = dateStr(-3);
+  const inFour = dateStr(4);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  must("property", await admin.from("properties").upsert([
+    { id: P_NOGAP, user_id: hostId, name: NOGAP_PROPERTY, city: "Tampa", state: "FL", timezone: "America/New_York", property_type: "entire_home" },
+  ], { onConflict: "id" }));
+  // RICH: all four required capabilities present → classifySufficiency reports
+  // missing_count 0 → no missing_essentials gap.
+  must("memory_facts", await admin.from("memory_facts").upsert([
+    { id: MF_NG_DOOR, host_id: hostId, entity_type: "property", entity_id: P_NOGAP, sub_entity_type: "front_door", attribute: "access_code", value: "4417", source: "host_taught", status: "active" },
+    { id: MF_NG_WIFI_N, host_id: hostId, entity_type: "property", entity_id: P_NOGAP, sub_entity_type: "wifi", attribute: "network_name", value: "CedarGuest", source: "host_taught", status: "active" },
+    { id: MF_NG_WIFI_P, host_id: hostId, entity_type: "property", entity_id: P_NOGAP, sub_entity_type: "wifi", attribute: "password", value: "welcome123", source: "host_taught", status: "active" },
+    { id: MF_NG_PARK, host_id: hostId, entity_type: "property", entity_id: P_NOGAP, sub_entity_type: "parking", attribute: "instructions", value: "Driveway, two spots", source: "host_taught", status: "active" },
+  ], { onConflict: "id" }));
+  // Content, zero gaps: a check-in + a check-out TODAY; NO turnovers, NO messages.
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_NG_CI, property_id: P_NOGAP, platform: "airbnb", source: "channex", guest_name: "Maya Cole", guest_first_name: "Maya", check_in: today, check_out: inFour, num_guests: 2, status: "confirmed" },
+    { id: B_NG_CO, property_id: P_NOGAP, platform: "airbnb", source: "ical", guest_name: "Airbnb Guest", guest_first_name: null, check_in: threeAgo, check_out: today, num_guests: 3, status: "confirmed" },
+  ], { onConflict: "id" }));
+  return hostId;
+}
+
+// (b) EMPTY-today + GAPPY-upcoming: NOTHING today; tomorrow has a check-in AND a
+// turnover with NO cleaner (and the property isn't rich → missing-essentials).
+// The window is non-empty + gappy → it should CARD. The current rule under-cards
+// when today is empty (the live "What's on today?" prose-only turn). RED.
+const P_EMPTYGAP = "e0000000-0000-4000-8000-0000000000c6";
+const B_EG_CI = "e0000000-0000-4000-8000-0000000000c7"; // check-in TOMORROW
+const CT_EG = "e0000000-0000-4000-8000-0000000000d9";    // turnover TOMORROW, no cleaner
+export const EMPTYGAP_PROPERTY = "Harbor Watch";
+
+export async function seedEmptyTodayGappyFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-emptygap@koast-eval.local");
+  await resetHost(admin, hostId);
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval emptygap seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const tomorrow = dateStr(1);
+  const inFive = dateStr(5);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  // Non-rich (no memory_facts) → missing_essentials gap on the upcoming arrival.
+  must("property", await admin.from("properties").upsert([
+    { id: P_EMPTYGAP, user_id: hostId, name: EMPTYGAP_PROPERTY, city: "Tampa", state: "FL", timezone: "America/New_York" },
+  ], { onConflict: "id" }));
+  // Nothing today; a check-in TOMORROW (upcoming content).
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_EG_CI, property_id: P_EMPTYGAP, platform: "airbnb", source: "channex", guest_name: "Owen Diaz", guest_first_name: "Owen", check_in: tomorrow, check_out: inFive, num_guests: 2, status: "confirmed" },
+  ], { onConflict: "id" }));
+  // A turnover TOMORROW with NO cleaner — the upcoming gap.
+  must("cleaning_tasks cleanup", await admin.from("cleaning_tasks").delete().eq("property_id", P_EMPTYGAP));
+  must("cleaning_tasks", await admin.from("cleaning_tasks").upsert([
+    { id: CT_EG, property_id: P_EMPTYGAP, booking_id: null, status: "pending", scheduled_date: tomorrow, scheduled_time: "11:00:00" },
+  ], { onConflict: "id" }));
+  return hostId;
+}
+
+// (b-clean) EMPTY today + CLEAN upcoming (content, NO gap): the flag's NEGATIVE
+// bound. A RICH property (no missing-essentials) with a check-in TOMORROW and NO
+// turnover / NO messages → today empty, upcoming has content but ZERO gaps, so
+// the gap-gated flag must NOT fire → PROSE (FYI heads-up). Proves the flag is
+// gated on a GAP, not on "any upcoming content".
+const P_EMPTYCLEAN = "e0000000-0000-4000-8000-0000000000c8";
+const B_EC_CI = "e0000000-0000-4000-8000-0000000000ca"; // check-in TOMORROW
+const MF_EC_DOOR = "e0000000-0000-4000-8000-000000000a05";
+const MF_EC_WIFI_N = "e0000000-0000-4000-8000-000000000a06";
+const MF_EC_WIFI_P = "e0000000-0000-4000-8000-000000000a07";
+const MF_EC_PARK = "e0000000-0000-4000-8000-000000000a08";
+export const EMPTYCLEAN_PROPERTY = "Birch Cabin";
+
+export async function seedEmptyTodayCleanFixture(admin: SupabaseClient): Promise<string> {
+  const hostId = await ensureUser(admin, "e2e-emptyclean@koast-eval.local");
+  await resetHost(admin, hostId);
+  const must = (label: string, res: { error: unknown }) => {
+    if (res.error) throw new Error(`[eval emptyclean seed] ${label}: ${JSON.stringify(res.error)}`);
+  };
+  const tomorrow = dateStr(1);
+  const inFive = dateStr(5);
+  must("subscription", await admin.from("user_subscriptions").upsert([{ user_id: hostId, tier: "business" }], { onConflict: "user_id" }));
+  must("property", await admin.from("properties").upsert([
+    { id: P_EMPTYCLEAN, user_id: hostId, name: EMPTYCLEAN_PROPERTY, city: "Tampa", state: "FL", timezone: "America/New_York", property_type: "entire_home" },
+  ], { onConflict: "id" }));
+  // RICH → no missing_essentials gap.
+  must("memory_facts", await admin.from("memory_facts").upsert([
+    { id: MF_EC_DOOR, host_id: hostId, entity_type: "property", entity_id: P_EMPTYCLEAN, sub_entity_type: "front_door", attribute: "access_code", value: "8890", source: "host_taught", status: "active" },
+    { id: MF_EC_WIFI_N, host_id: hostId, entity_type: "property", entity_id: P_EMPTYCLEAN, sub_entity_type: "wifi", attribute: "network_name", value: "BirchGuest", source: "host_taught", status: "active" },
+    { id: MF_EC_WIFI_P, host_id: hostId, entity_type: "property", entity_id: P_EMPTYCLEAN, sub_entity_type: "wifi", attribute: "password", value: "birch4567", source: "host_taught", status: "active" },
+    { id: MF_EC_PARK, host_id: hostId, entity_type: "property", entity_id: P_EMPTYCLEAN, sub_entity_type: "parking", attribute: "instructions", value: "Street parking, free", source: "host_taught", status: "active" },
+  ], { onConflict: "id" }));
+  // Nothing today; a check-in TOMORROW; NO turnover, NO messages → zero gaps.
+  must("cleaning_tasks cleanup", await admin.from("cleaning_tasks").delete().eq("property_id", P_EMPTYCLEAN));
+  must("bookings", await admin.from("bookings").upsert([
+    { id: B_EC_CI, property_id: P_EMPTYCLEAN, platform: "airbnb", source: "channex", guest_name: "Ruth Vale", guest_first_name: "Ruth", check_in: tomorrow, check_out: inFive, num_guests: 2, status: "confirmed" },
+  ], { onConflict: "id" }));
+  return hostId;
 }
