@@ -370,6 +370,10 @@ export function agendaPreamble(
    * the TODAY-URGENT missing-essentials gaps (a property with a check-in today
    * that lacks door/wifi/parking). */
   missingEssentialsProperties: string[] = [],
+  /** Whether render_agenda is exposed this turn (isRenderAgendaEnabled). Gates
+   * the empty-today card directive — the flag instructs calling render_agenda,
+   * so it must not appear when the tool isn't available. */
+  renderEnabled: boolean = false,
 ): string {
   // NOTE: plain prose, NOT XML/angle-bracket tags — a tag-wrapped block primes
   // the model to express tool calls as XML text (and leak the ids). Keep ids as
@@ -437,6 +441,38 @@ export function agendaPreamble(
     lines.push(
       `TODAY'S URGENT GAPS (${urgentGaps.length}) — you MUST state EVERY one of these to the host, in plain terms (the property, what's missing, who's affected today); they are time-sensitive and must never be dropped${urgentGaps.length > 1 ? `. There are ${urgentGaps.length}, so never call it "the one thing" or describe a single item when more than one needs attention` : ""}: ${urgentGaps.join("; ")}`,
     );
+  }
+
+  // Gap-gated card directive — the deterministic must-card FLOOR for the ENTIRE
+  // must-card set. When the window has REAL activity (!rollup.empty) AND a gap (an
+  // uncovered turnover / a missing-essentials property / a guest awaiting reply),
+  // an overview MUST card — its needs-attention section is doing real work. Fires
+  // regardless of whether today is busy or empty (an active gappy host like erwin,
+  // an urgent host, and an empty-today+gap host all qualify), so gappy hosts never
+  // depend on how forceful the soft rule text is — the guarantee lives in code.
+  // `!rollup.empty` is LOAD-BEARING: a gap is a must-card attention item only when
+  // there's activity it threatens; a bare property carrying only a standing
+  // missing-essentials gap with ZERO bookings (the empty-window boundary) is
+  // background, not a windowed item, so it's suppressed and proses. Fires ONLY when
+  // render is enabled (the tool exists), names the REAL gap so it's salient, and
+  // binds only on overview intent (a narrow single-item question never force-cards).
+  // The soft rule text handles the clean set (light → prose, heavy → card).
+  if (renderEnabled && !rollup.empty) {
+    const uncovered = rollup.turnovers.find((t) => !t.cleanerAssigned);
+    let gapDesc: string | null = null;
+    if (uncovered) {
+      gapDesc = `an uncovered turnover at ${uncovered.property} ${relDay(uncovered.date)}`;
+    } else if (missingEssentialsProperties.length > 0) {
+      gapDesc = `${missingEssentialsProperties[0]} is missing check-in essentials`;
+    } else if (rollup.pendingMessages.length > 0) {
+      const m = rollup.pendingMessages[0];
+      gapDesc = `${m.guest ? `${m.guest} at ${m.property}` : `a guest at ${m.property}`} may be awaiting a reply`;
+    }
+    if (gapDesc) {
+      lines.push(
+        `NOTE: The window has an attention item — ${gapDesc}. If you are giving an OVERVIEW of the agenda ("what's on today", "how's the next couple days", "anything I'm missing", "what should I prioritize"), this overview MUST card — call render_agenda before you answer. (This binds on the attention item + overview intent only: a window with no gap, or a genuinely empty window, stays prose, and a narrow single-item question stays prose.)`,
+      );
+    }
   }
 
   if (rollup.empty) {

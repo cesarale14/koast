@@ -46,6 +46,7 @@ import {
 import { buildSystemPrompt } from "./system-prompt";
 import { buildAgendaRollup, agendaPreamble } from "./agenda";
 import { createMarkdownStripStream } from "@/lib/text/strip-markdown";
+import { isRenderAgendaEnabled } from "@/lib/agent/render/flag";
 import type { RenderPayload } from "./render/types";
 import { dispatchToolCall } from "./dispatcher";
 // activeAnthropicTools() reads the render flag LIVE (per request) to gate
@@ -699,7 +700,7 @@ export async function* runAgentTurn(
             total: sufficiencyContext.total_properties,
           }
         : undefined;
-      agendaPre = agendaPreamble(rollup, gaps, missingEssentialsProperties);
+      agendaPre = agendaPreamble(rollup, gaps, missingEssentialsProperties, isRenderAgendaEnabled());
     }
   } catch (err) {
     console.warn(
