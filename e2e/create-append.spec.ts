@@ -9,7 +9,7 @@
 import { test, expect } from "@playwright/test";
 import {
   adminClient,
-  countConversations,
+  countConversationsByNonce,
   deleteConversationsByNonce,
 } from "./helpers/supabase-admin";
 import {
@@ -38,7 +38,6 @@ test.beforeAll(async () => {
 test.describe("Create / Append", () => {
   test("item 1 — new chat + first prompt persists + appears in history, no reload", async ({ page }) => {
     const nonce = makeNonce("item1");
-    const before = await countConversations(admin, host1Id);
     await page.goto("/");
     await expect(page.getByTestId("chat-empty-state")).toBeVisible();
 
@@ -53,8 +52,8 @@ test.describe("Create / Append", () => {
       page.getByTestId("conversation-item").filter({ hasText: nonce }),
     ).toBeVisible();
 
-    // Persisted (one new conversation).
-    await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
+    // Persisted as EXACTLY ONE conversation (nonce-scoped — parallel-safe).
+    await expect.poll(() => countConversationsByNonce(admin, host1Id, nonce)).toBe(1);
 
     // Let the stream finish (server done persisting) before cleanup, so the
     // delete can't race an in-flight insert.
@@ -64,7 +63,6 @@ test.describe("Create / Append", () => {
 
   test("item 2 — several turns from landing → ONE conversation", async ({ page }) => {
     const nonce = makeNonce("item2");
-    const before = await countConversations(admin, host1Id);
     await page.goto("/");
     await sendMessage(page, `${nonce} first`);
     await expectTurnVisible(page, "first");
@@ -73,8 +71,8 @@ test.describe("Create / Append", () => {
     await sendMessage(page, `${nonce} third`);
     await expectTurnVisible(page, "third");
 
-    // Exactly one conversation, one rail entry.
-    await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
+    // Exactly one conversation (nonce-scoped — parallel-safe), one rail entry.
+    await expect.poll(() => countConversationsByNonce(admin, host1Id, nonce)).toBe(1);
     await expect(
       page.getByTestId("conversation-item").filter({ hasText: nonce }),
     ).toHaveCount(1);
@@ -94,7 +92,6 @@ test.describe("Create / Append", () => {
 
   test("item 4 — rapid double-send → exactly ONE conversation + composer locks instantly", async ({ page }) => {
     const nonce = makeNonce("item4");
-    const before = await countConversations(admin, host1Id);
     // Delay the turn POST so the composer's disabled window is reliably
     // observable (isPending set synchronously at submit → stays disabled
     // for the whole in-flight period).
@@ -110,17 +107,28 @@ test.describe("Create / Append", () => {
     // A second send attempt cannot fire (button/input disabled) — try anyway.
     await page.getByTestId("composer-send").click({ force: true }).catch(() => {});
 
-    // After the turn settles, exactly ONE conversation exists.
+    // After the turn settles, exactly ONE conversation exists (nonce-scoped).
     await expectTurnVisible(page, nonce);
-    await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
+    await expect.poll(() => countConversationsByNonce(admin, host1Id, nonce)).toBe(1);
 
     await expectComposerSettled(page);
     await deleteConversationsByNonce(admin, host1Id, nonce);
   });
 
-  test("item 5 — after reload, no duplicate; reconciles by id", async ({ page }) => {
+  // COVERAGE MAP (read before trusting this name): this gates PERSISTENCE —
+  // exactly one conversation is DB-created and survives a reload, no duplicate
+  // row. It does NOT exercise the live reconcile-by-id rail MERGE: the
+  // optimistic-prepend effect is gated on activeConversationId === null
+  // (ChatClient.tsx), and a reload sets that from the URL, so the effect never
+  // re-fires post-reload and the merge isn't run. Proven by breaking
+  // ChatClient.tsx:818 (optimistic id → temp id): this test stayed green.
+  // The reconcile-by-id MERGE is covered at the unit layer instead, where it's
+  // deterministic: mergeConversationLists.test.ts (dedup-by-id + server-wins
+  // logic) and optimisticConvEntry.test.ts (the :818 wiring — that the prepend
+  // carries the SERVER id). Don't re-add an e2e of the transient merge window;
+  // that's the flake this capstone escaped.
+  test("item 5 — after reload, no duplicate PERSISTED conversation (reconcile-by-id merge covered at unit layer)", async ({ page }) => {
     const nonce = makeNonce("item5");
-    const before = await countConversations(admin, host1Id);
     await page.goto("/");
     await sendMessage(page, `${nonce} reload test`);
     await expectTurnVisible(page, nonce);
@@ -131,8 +139,10 @@ test.describe("Create / Append", () => {
     await expectComposerSettled(page);
     await page.reload();
 
-    // Still exactly one in DB + one rail entry (server reconciles optimistic).
-    await expect.poll(() => countConversations(admin, host1Id)).toBe(before + 1);
+    // Still exactly ONE conversation with this nonce + one rail entry. Nonce-
+    // scoped so a concurrent spec sharing the host can't inflate the count — the
+    // host-wide count was the gate that flaked on correct behavior (workers>1).
+    await expect.poll(() => countConversationsByNonce(admin, host1Id, nonce)).toBe(1);
     await expect(
       page.getByTestId("conversation-item").filter({ hasText: nonce }),
     ).toHaveCount(1);

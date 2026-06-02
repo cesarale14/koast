@@ -180,6 +180,37 @@ export async function deleteConversationsByNonce(
 }
 
 /**
+ * Count conversations created by a spec, scoped to its NONCE (same predicate as
+ * deleteConversationsByNonce: turn_index=0 content_text contains the nonce). This
+ * is the parallel-safe "exactly one conversation" assertion — host-wide
+ * countConversations() races concurrent specs that share the host (workers>1 in
+ * CI: create-append / delete / render-card all use H1), so a concurrent spec's
+ * conversation inflates the host count and the "no duplicate" gate fails on
+ * correct behavior. A nonce-scoped count asserts only THIS test's state.
+ */
+export async function countConversationsByNonce(
+  admin: SupabaseClient,
+  hostId: string,
+  nonce: string,
+): Promise<number> {
+  const { data: turns } = await admin
+    .from("agent_turns")
+    .select("conversation_id, content_text")
+    .eq("turn_index", 0)
+    .ilike("content_text", `%${nonce}%`);
+  const ids = Array.from(
+    new Set((turns ?? []).map((t) => (t as { conversation_id: string }).conversation_id)),
+  );
+  if (ids.length === 0) return 0;
+  const { count } = await admin
+    .from("agent_conversations")
+    .select("id", { count: "exact", head: true })
+    .eq("host_id", hostId)
+    .in("id", ids);
+  return count ?? 0;
+}
+
+/**
  * Seed a conversation whose assistant turn carries a generative-UI `render`
  * payload (typed JSONB) — for the render-card reload spec. Proves the
  * column → loadTurns → <RenderCard> → reload path deterministically, with NO
