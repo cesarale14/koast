@@ -40,6 +40,7 @@ import { EmptyState, TIER_1_STARTERS } from "./EmptyState";
 import { ConversationLoadingSkeleton } from "./ConversationLoadingSkeleton";
 import { invalidateCmdKData } from "@/lib/cmdk/use-cmdk-data";
 import { mergeConversationLists } from "@/lib/chat/mergeConversationLists";
+import { buildOptimisticConvEntry } from "./optimisticConvEntry";
 import { deriveComposerState } from "@/lib/chat/deriveComposerState";
 import { ReengagementBanner } from "./ReengagementBanner";
 import { AuditDrawer } from "@/components/inspect/AuditDrawer";
@@ -813,15 +814,9 @@ export function ChatClient({
           : "New conversation");
       setOptimisticConvos((prev) => {
         if (prev.some((c) => c.id === newId)) return prev;
-        return [
-          {
-            id: newId,
-            last_turn_at: new Date().toISOString(),
-            preview,
-            propertyName: "",
-          },
-          ...prev,
-        ];
+        // The optimistic entry's id MUST be the server conversation id so the
+        // merge reconciles it by id (no rail duplicate) — see optimisticConvEntry.
+        return [buildOptimisticConvEntry(newId, preview), ...prev];
       });
 
       // Drop the Cmd+K recents cache so the next ⌘K reflects the new
