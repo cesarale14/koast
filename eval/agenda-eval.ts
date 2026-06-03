@@ -96,6 +96,7 @@ async function main() {
     looksLikeGenericChecklist,
     judgeVerdicts,
   } = await import("./lib/chat-eval");
+  const { detectsSplitFold } = await import("./lib/splitFold");
   const {
     adminClient,
     seedAgendaFixtures,
@@ -349,6 +350,38 @@ async function main() {
   if (urgentPass) hardPass++;
   console.log(`[urgent-gaps-sweep] (${URGENT_N} runs)  ${urgentPass ? "PASS" : "FAIL"} — surfaced-both ${surfacedBoth}/${URGENT_N} (floor ${urgentFloor}=${Math.round(URGENT_FLOOR_PCT * 100)}%), singular-count ${singularViolations}/${URGENT_N} (STRICT 0), ceiling(soft) ${ceilingViolations}/${URGENT_N}\n`);
 
+  // PROSE SPLIT-CORRECTNESS SWEEP (fold-rate). The model must convey the
+  // today/upcoming SPLIT right in PROSE — not fold Harbor's UPCOMING checkout
+  // into today's count ("three at Harbor today" when it's 2 today + 1 upcoming).
+  // This is DISTINCT from the rollup count gate (eval/lib/agenda-render.test.ts):
+  //   - rollup count gate = the count is computed right AT THE SOURCE (groupAgenda).
+  //   - this sweep        = the model conveys the split right DOWNSTREAM in prose.
+  // The rollup is correct even when the model folds, so the rollup gate can't
+  // catch it. A fold-RATE sweep, NOT the N=1 token-match that flaked: measured
+  // baseline 1/40 (2.5%); k=3 over N=30 sits ABOVE the baseline noise band
+  // (P(>=4 folds | 2.5%) ~ 0.6%, so a genuine rare fold won't flake it) and BELOW
+  // a regression spike (folds up to ~20% -> ~6/30 -> reds ~97%). The detector
+  // detectsSplitFold is unit-gated in eval/lib/splitFold.test.ts (catches the
+  // fold; ignores correct/varied phrasing incl. the ones that broke mentionAny["two"]).
+  const FOLD_N = parseInt(process.env.FOLD_N ?? "30", 10);
+  const FOLD_K = parseInt(process.env.FOLD_K ?? "3", 10);
+  let folds = 0;
+  for (let i = 0; i < FOLD_N; i++) {
+    const run = await runPromptThroughLoop(splitHostId, "What's on for today?");
+    if (detectsSplitFold(run.text)) { folds++; console.log(`   [split-fold] #${i + 1}: ${run.text.replace(/\s+/g, " ").slice(0, 150)}`); }
+  }
+  // The 2.5% baseline is a KNOWN small correctness error, not a clean zero — the
+  // model folds ~1-in-40 on splits. This gate catches a REGRESSION (a spike / a
+  // persistent drift), not every introducing commit: a big spike (~20%) reds per
+  // run, but a moderate 2x-4x bump only reds a fraction of the time at N=30, so in
+  // Phase 1 if you suspect a prompt change nudged folds, run the sweep a few times
+  // — don't trust one green. The detector is pattern-based (recall < 100%). To
+  // drive the baseline lower is a prompt task; this sweep is the instrument to
+  // measure it against.
+  const foldPass = folds <= FOLD_K;
+  if (foldPass) hardPass++;
+  console.log(`[split-fold-sweep] (${FOLD_N} runs)  ${foldPass ? "PASS" : "FAIL"} — folds ${folds}/${FOLD_N} (<= ${FOLD_K}; baseline ~2.5% — a known small error, gating regressions not eliminating)\n`);
+
   await cleanupEvalConversations(admin, erwinHostId);
   await cleanupEvalConversations(admin, urgentHostId);
   await cleanupEvalConversations(admin, emptyHostId);
@@ -356,7 +389,7 @@ async function main() {
   await cleanupEvalConversations(admin, namelessHostId);
   await cleanupEvalConversations(admin, splitHostId);
 
-  const TOTAL = PROMPTS.length + 6; // + day-boundary + nameless-preamble + split-preamble + anti-deflection-sweep + when-to-card-sweep + urgent-gaps-sweep
+  const TOTAL = PROMPTS.length + 7; // 6 prior + the split-fold-sweep (prose split-correctness)
   console.log(`SUMMARY: ${hardPass}/${TOTAL} hard-pass`);
   console.log(`JUDGE FAILS (of ${PROMPTS.length}): ${Object.keys(judgeFailTally).length ? Object.entries(judgeFailTally).map(([k, n]) => `${k}=${n}`).join(" ") : "none"}`);
   process.exit(hardPass === TOTAL ? 0 : 1);
