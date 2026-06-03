@@ -130,6 +130,12 @@ export type ChatClientProps = {
   properties?: PropertyOption[];
   /** Initial property selection id — typically null on landing; restored by sessionStorage hint. */
   initialPropertyId?: string | null;
+  /** Cold-state slot: rendered in the no-turns branch INSTEAD of the generic
+   * EmptyState. On "/" this is the server-streamed Today-home surface (passed as
+   * an RSC node through the chat-primary layout branch). Falls back to EmptyState
+   * when absent (every other chat-primary route). The Composer stays mounted
+   * outside this switch, so the cold→first-message swap is body-only. */
+  coldSlot?: React.ReactNode;
 };
 
 /** Format an ISO timestamp into the rail's "2:14 pm" / "mon" / "sun" / "May 2" label. */
@@ -254,6 +260,7 @@ export function ChatClient({
   user = { initials: "K", name: "Host", org: "koast" },
   properties = [],
   initialPropertyId = null,
+  coldSlot,
 }: ChatClientProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -1072,10 +1079,12 @@ export function ChatClient({
         {conversationLoading ? (
           <ConversationLoadingSkeleton />
         ) : !hasAnyTurns ? (
-          <EmptyState
-            starters={TIER_1_STARTERS}
-            onStarterSelect={(text) => setDraft(text)}
-          />
+          coldSlot ?? (
+            <EmptyState
+              starters={TIER_1_STARTERS}
+              onStarterSelect={(text) => setDraft(text)}
+            />
+          )
         ) : (
           <>
             {(() => {

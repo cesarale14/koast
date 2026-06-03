@@ -27,12 +27,16 @@ export type ChatPrimarySurfaceProps = {
   propertyName: string | null;
   monthsActive?: number | null;
   conversationCount?: number | null;
+  /** Cold-state slot threaded to ChatClient — the server-streamed Today-home
+   * surface on "/" (RSC node). Absent ⇒ ChatClient falls back to EmptyState. */
+  coldSlot?: React.ReactNode;
 };
 
 export function ChatPrimarySurface({
   propertyName,
   monthsActive,
   conversationCount,
+  coldSlot,
 }: ChatPrimarySurfaceProps) {
   // Parent (`(dashboard)/layout.tsx` chat-primary branch) sets
   // height: 100dvh and overflow: hidden. This surface fills the parent.
@@ -47,7 +51,7 @@ export function ChatPrimarySurface({
     >
       <PropertyContextBar propertyName={propertyName} />
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ChatClient />
+        <ChatClient coldSlot={coldSlot} />
       </div>
       <FooterLine
         monthsActive={monthsActive}

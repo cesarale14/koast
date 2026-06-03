@@ -371,7 +371,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // M13 Phase 1.A: /chat routes now render via pathname-derived layout
   // (chat-primary surface displaces children; inspect routes wrap children
   // in InspectSurface). The reducer no longer tracks `expanded`.
-  if (pathname?.startsWith("/_preview/m5-states")) {
+  if (pathname?.startsWith("/_preview/")) {
     return <>{children}</>;
   }
 
@@ -431,6 +431,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 propertyName={null}
                 monthsActive={null}
                 conversationCount={null}
+                /* On "/", the page's server-streamed Today-home node is passed
+                   as the cold slot (RSC-through-client-tree). On /chat/*, children
+                   are the conversation hydrator and stay dropped (ChatURLSync
+                   drives those), so no coldSlot → ChatClient falls back to
+                   EmptyState on the /chat landing. */
+                coldSlot={pathname === "/" ? children : undefined}
               />
             </ToastProvider>
           </div>
