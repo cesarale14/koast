@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+// SPIKE (throwaway): push-alerts de-risking proof. Remove with the spike branch.
+import EnableAlerts from "@/components/spike/EnableAlerts";
 
 interface ChecklistItem {
   id: string;
@@ -144,6 +146,9 @@ export default function CleanerMobilePage({
       </div>
 
       <div className="px-4 py-4 space-y-4">
+        {/* SPIKE (throwaway): push-alerts proof. Remove with the spike branch. */}
+        <EnableAlerts taskId={params.taskId} token={params.token} />
+
         {/* Time window */}
         <div className="bg-neutral-0 rounded-lg p-4 shadow-sm border border-[var(--border)]">
           <div className="grid grid-cols-2 gap-4">

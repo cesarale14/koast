@@ -7,6 +7,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // SPIKE (throwaway): `sw\.js` added so an unauthenticated cleaner can fetch
+    // the root service worker. Without it, middleware redirects /sw.js to
+    // /login and SW registration fails. A real S2 dispatch build needs this
+    // exemption (or serves the SW from a public path) too.
+    "/((?!_next/static|_next/image|favicon.ico|api/|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
