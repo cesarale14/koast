@@ -102,11 +102,14 @@ export default function CleanerMobilePage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4">
-        <div className="text-center">
+      <div className="min-h-screen bg-neutral-50 p-4 space-y-4">
+        <div className="text-center pt-8">
           <p className="text-lg font-semibold text-red-600 mb-2">Access Denied</p>
           <p className="text-sm text-neutral-500">{error ?? "Invalid link"}</p>
         </div>
+        {/* SPIKE (throwaway): render the push proof even when task data didn't
+            load, so the kill-shot doesn't depend on Supabase/token being valid. */}
+        <EnableAlerts taskId={params.taskId} token={params.token} />
       </div>
     );
   }
