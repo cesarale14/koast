@@ -68,7 +68,7 @@ function renderDelta(delta: number, currency: string, tone: Tone) {
   const mag = NUMBER_FMT.format(Math.abs(Math.round(delta)));
   if (delta > 0) {
     return (
-      <span style={{ ...baseStyle, color: "var(--golden)" }}>
+      <span style={{ ...baseStyle, color: "var(--koast-trench)" }}>
         <span style={{ fontSize: 10, lineHeight: 1 }}>▲</span>
         {currency}{mag}
       </span>

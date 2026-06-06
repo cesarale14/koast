@@ -404,7 +404,7 @@ function PopoverContent({
             <MiniStat
               label="Rating"
               value={data?.stats.rating ? data.stats.rating.toFixed(1) : "—"}
-              icon={data?.stats.rating ? <Star size={10} style={{ color: "var(--golden)" }} fill="var(--golden)" /> : undefined}
+              icon={data?.stats.rating ? <Star size={10} style={{ color: "var(--koast-trench)" }} fill="var(--koast-trench)" /> : undefined}
             />
           </div>
         )}
@@ -475,7 +475,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <div
       className="mb-3 text-[10px] font-bold tracking-[0.08em] uppercase"
-      style={{ color: "var(--golden)" }}
+      style={{ color: "var(--koast-trench)" }}
     >
       {label}
     </div>
@@ -502,7 +502,7 @@ function MiniStat({
       </div>
       <div
         className="text-[10px] font-bold uppercase mt-0.5"
-        style={{ color: "var(--golden)", letterSpacing: "0.06em" }}
+        style={{ color: "var(--koast-trench)", letterSpacing: "0.06em" }}
       >
         {label}
       </div>
@@ -656,8 +656,8 @@ function ActionButton({
       disabled={disabled}
       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-50"
       style={{
-        color: highlight ? "var(--golden)" : "var(--coastal)",
-        backgroundColor: highlight ? "rgba(196,154,90,0.1)" : "transparent",
+        color: highlight ? "var(--koast-trench)" : "var(--coastal)",
+        backgroundColor: highlight ? "rgba(76,196,204,0.1)" : "transparent",
       }}
       onMouseEnter={(e) => {
         if (!highlight) e.currentTarget.style.backgroundColor = "rgba(237,231,219,0.4)";
@@ -666,7 +666,7 @@ function ActionButton({
         if (!highlight) e.currentTarget.style.backgroundColor = "transparent";
       }}
     >
-      <span style={{ color: highlight ? "var(--golden)" : "var(--tideline)" }}>{icon}</span>
+      <span style={{ color: highlight ? "var(--koast-trench)" : "var(--tideline)" }}>{icon}</span>
       {label}
     </button>
   );

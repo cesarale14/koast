@@ -88,7 +88,7 @@ function buttonStyle(active: boolean, s: { height: number; padX: number; fontSiz
     fontWeight: active ? 600 : 500,
     letterSpacing: "-0.005em",
     cursor: "pointer",
-    boxShadow: active ? "0 1px 3px rgba(19,46,32,0.08)" : "none",
+    boxShadow: active ? "0 1px 3px rgba(15,24,21,0.08)" : "none",
     transition:
       "background-color 160ms cubic-bezier(0.4,0,0.2,1), color 160ms cubic-bezier(0.4,0,0.2,1), box-shadow 160ms cubic-bezier(0.4,0,0.2,1)",
   };

@@ -26,7 +26,7 @@ export function GuideTabBar() {
             className={[
               "px-4 py-1.5 rounded-[8px] text-[13px] font-medium transition-colors",
               isActive
-                ? "bg-white text-[var(--coastal)] shadow-[0_1px_2px_rgba(19,46,32,0.06)]"
+                ? "bg-white text-[var(--coastal)] shadow-[0_1px_2px_rgba(15,24,21,0.06)]"
                 : "text-[var(--tideline)] hover:text-[var(--coastal)]",
             ].join(" ")}
             aria-current={isActive ? "page" : undefined}

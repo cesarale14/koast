@@ -310,7 +310,7 @@ function Metric({ label, value }: { label: string; value: string }) {
       </div>
       <div
         className="text-[9px] font-bold uppercase mt-0.5"
-        style={{ color: "var(--golden)", letterSpacing: "0.06em" }}
+        style={{ color: "var(--koast-trench)", letterSpacing: "0.06em" }}
       >
         {label}
       </div>
@@ -336,8 +336,8 @@ function AddPropertyTile({ onClick, index }: { onClick: () => void; index: numbe
         animation: `koast-card-reveal 0.55s ease-out ${200 + index * 100}ms both`,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--golden)";
-        e.currentTarget.style.backgroundColor = "rgba(196,154,90,0.04)";
+        e.currentTarget.style.borderColor = "var(--koast-trench)";
+        e.currentTarget.style.backgroundColor = "rgba(76,196,204,0.04)";
         e.currentTarget.style.transform = "translateY(-3px)";
       }}
       onMouseLeave={(e) => {
@@ -352,9 +352,9 @@ function AddPropertyTile({ onClick, index }: { onClick: () => void; index: numbe
           width: 56,
           height: 56,
           borderRadius: 16,
-          background: "linear-gradient(135deg, rgba(196,154,90,0.12), rgba(196,154,90,0.04))",
-          color: "var(--golden)",
-          border: "1px solid rgba(196,154,90,0.15)",
+          background: "linear-gradient(135deg, rgba(76,196,204,0.12), rgba(76,196,204,0.04))",
+          color: "var(--koast-trench)",
+          border: "1px solid rgba(76,196,204,0.15)",
         }}
       >
         <Plus size={24} strokeWidth={2} />

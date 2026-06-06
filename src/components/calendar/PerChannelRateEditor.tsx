@@ -32,7 +32,7 @@ export function PerChannelRateEditor({ propertyId, dates, baseRate }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--golden)" }}>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--koast-trench)" }}>
           Channel rates
         </h3>
         <button
@@ -263,7 +263,7 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
         <a
           href="/settings"
           className="inline-flex items-center justify-center text-[11px] font-semibold rounded-[8px] px-3 py-1.5 relative z-[1] transition-colors"
-          style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)" }}
+          style={{ backgroundColor: "var(--koast-trench)", color: "var(--deep-sea)" }}
         >
           Connect rate plan
         </a>
@@ -330,8 +330,8 @@ function ChannelCard({ propertyId, channel, dates, baseRate, onSaved }: CardProp
               letterSpacing: "-0.02em",
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = "var(--golden)";
-              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)";
+              e.currentTarget.style.borderColor = "var(--koast-trench)";
+              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(76,196,204,0.12)";
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = "var(--dry-sand)";

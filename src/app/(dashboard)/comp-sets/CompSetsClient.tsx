@@ -23,7 +23,7 @@ interface Props {
   propertyAvgRate: number;
 }
 
-const BG_COLORS = ["bg-[var(--coastal)]", "bg-[var(--tideline)]", "bg-[var(--golden)]", "bg-[var(--deep-water)]", "bg-[var(--lagoon)]", "bg-[var(--amber-tide)]"];
+const BG_COLORS = ["bg-[var(--coastal)]", "bg-[var(--tideline)]", "bg-[var(--koast-trench)]", "bg-[var(--deep-water)]", "bg-[var(--lagoon)]", "bg-[var(--amber-tide)]"];
 function letterBg(name: string | null): string {
   const s = name ?? "L";
   let hash = 0;
@@ -54,7 +54,7 @@ function CompGlassCard({ label, value, prefix, suffix, delay }: { label: string;
       <p className="relative font-bold font-mono" style={{ fontSize: 26, color: "var(--coastal)", letterSpacing: "-0.03em" }}>
         {prefix ?? ""}{Math.round(animated)}{suffix ?? ""}
       </p>
-      <p className="relative mt-1" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)" }}>{label}</p>
+      <p className="relative mt-1" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>{label}</p>
     </div>
   );
 }
@@ -139,7 +139,7 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Summary</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Summary</div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -150,7 +150,7 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Competitive Set</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Competitive Set</div>
 
       {/* Comp table */}
       <div className={`koast-anim rounded-2xl overflow-hidden ${loading ? "opacity-50" : ""}`} style={{ background: "white", boxShadow: "var(--shadow-card)", animationDelay: "400ms" }}>
@@ -177,13 +177,13 @@ export default function CompSetsClient({ properties, initialPropertyId, initialC
             <tbody>
               {/* Your property row */}
               {currentProp && (
-                <tr style={{ background: "rgba(196,154,90,0.05)", borderLeft: "3px solid var(--golden)" }}>
+                <tr style={{ background: "rgba(76,196,204,0.05)", borderLeft: "3px solid var(--koast-trench)" }}>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2.5">
                       <PropertyAvatar name={currentProp.name} photoUrl={currentProp.cover_photo_url} size={32} />
                       <div>
                         <p className="font-semibold" style={{ fontSize: 13, color: "var(--coastal)" }}>{currentProp.name}</p>
-                        <p style={{ fontSize: 10, color: "var(--golden)" }}>Your Property</p>
+                        <p style={{ fontSize: 10, color: "var(--koast-trench)" }}>Your Property</p>
                       </div>
                     </div>
                   </td>

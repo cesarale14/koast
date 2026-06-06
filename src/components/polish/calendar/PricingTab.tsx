@@ -445,7 +445,7 @@ export default function PricingTab({
             const inherits = summary == null ? false : baseSummaryMatch ?? false;
             const platformKey = toPlatformKey(code);
             const platform = platformKey ? PLATFORMS[platformKey] : null;
-            const tileColor = platform?.tileColor ?? "#3d6b52";
+            const tileColor = platform?.tileColor ?? "#6e7976"; // neutral-gray fallback (was tideline green)
             const platformName = platformKey === "airbnb" ? "Airbnb" : platformKey === "booking_com" ? "Booking.com" : code;
             return (
               <div

@@ -34,7 +34,7 @@ export function MiniChatBack() {
       <span
         className="ml-2 min-w-[20px] h-[20px] px-1.5 rounded-full inline-flex items-center justify-center text-[11px] font-semibold"
         style={{
-          backgroundColor: "var(--golden)",
+          backgroundColor: "var(--koast-trench)",
           color: "var(--deep-sea)",
         }}
         aria-hidden="true"
@@ -87,7 +87,7 @@ export function MiniChatBack() {
           <span
             className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full inline-flex items-center justify-center text-[10px] font-bold"
             style={{
-              backgroundColor: "var(--golden)",
+              backgroundColor: "var(--koast-trench)",
               color: "var(--deep-sea)",
               boxShadow: "0 0 0 2px var(--deep-sea)",
             }}

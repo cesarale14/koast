@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
 import { BarChart3 } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
+import { BRAND_PALETTE } from "@/lib/brand/palette";
 
 const CompMap = dynamic(() => import("./CompMap"), { ssr: false });
 const IntelMap = dynamic(() => import("./IntelMap"), { ssr: false });
@@ -117,7 +118,7 @@ function GlassStatCard({ label, value, prefix, suffix, delay }: { label: string;
     >
       {/* Reflection overlay */}
       <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-2xl pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), transparent)" }} />
-      <p className="relative" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)", marginTop: 4 }}>{label}</p>
+      <p className="relative" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--koast-trench)", marginTop: 4 }}>{label}</p>
       <p className="relative font-bold font-mono mt-1" style={{ fontSize: 26, color: "var(--coastal)", letterSpacing: "-0.03em" }}>
         {value != null ? `${prefix ?? ""}${Math.round(animated)}${suffix ?? ""}` : "\u2014"}
       </p>
@@ -293,9 +294,9 @@ export default function AnalyticsDashboard({
         <div className="rounded-2xl p-16 text-center" style={{ background: "linear-gradient(165deg, rgba(255,255,255,0.95), rgba(247,243,236,0.85) 50%, rgba(237,231,219,0.7))", border: "1px solid rgba(255,255,255,0.6)", boxShadow: "var(--shadow-glass)" }}>
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{ background: "var(--shore)" }}>
             {isLoading ? (
-              <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: "var(--dry-sand)", borderTopColor: "var(--golden)" }} />
+              <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: "var(--dry-sand)", borderTopColor: "var(--koast-trench)" }} />
             ) : (
-              <BarChart3 className="w-8 h-8" style={{ color: "var(--golden)" }} />
+              <BarChart3 className="w-8 h-8" style={{ color: "var(--koast-trench)" }} />
             )}
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--coastal)" }}>
@@ -314,7 +315,7 @@ export default function AnalyticsDashboard({
               <a
                 href={`/properties/${propertyId}`}
                 className="text-sm hover:underline font-medium"
-                style={{ color: "var(--golden)" }}
+                style={{ color: "var(--koast-trench)" }}
               >
                 Go to Property Settings
               </a>
@@ -363,7 +364,7 @@ export default function AnalyticsDashboard({
           <select
             value={propertyId}
             onChange={(e) => handlePropertyChange(e.target.value)}
-            className="px-3 py-2 text-sm rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[var(--golden)]"
+            className="px-3 py-2 text-sm rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[var(--koast-trench)]"
             style={{ background: "var(--shore)", border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
           >
             {properties.map((p) => (
@@ -374,7 +375,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Market Overview</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Market Overview</div>
 
       {/* Market Overview Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -393,7 +394,7 @@ export default function AnalyticsDashboard({
           {/* Reflection overlay */}
           <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-2xl pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), transparent)" }} />
           <div className="relative flex items-center justify-between">
-            <p className="mt-1" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)" }}>Demand Score</p>
+            <p className="mt-1" style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>Demand Score</p>
             <button
               onClick={refresh}
               disabled={isLoading}
@@ -403,7 +404,7 @@ export default function AnalyticsDashboard({
               {isLoading ? "..." : "Refresh"}
             </button>
           </div>
-          <p className="relative font-bold font-mono mt-1" style={{ fontSize: 26, color: "var(--golden)", letterSpacing: "-0.03em" }}>
+          <p className="relative font-bold font-mono mt-1" style={{ fontSize: 26, color: "var(--koast-trench)", letterSpacing: "-0.03em" }}>
             {snapshot?.market_demand_score != null ? <DemandScoreValue target={Math.round(snapshot.market_demand_score)} /> : "—"}
           </p>
           <p className="relative mt-1" style={{ fontSize: 11, color: "var(--tideline)" }}>
@@ -417,12 +418,12 @@ export default function AnalyticsDashboard({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)" }}>Your Occupancy</p>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>Your Occupancy</p>
               <p className="font-bold font-mono" style={{ fontSize: 26, color: "var(--coastal)", letterSpacing: "-0.03em" }}>{propertyStats.occupancy}%</p>
             </div>
             <div style={{ color: "var(--shell)" }} className="text-lg">|</div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--golden)" }}>Market Average</p>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>Market Average</p>
               <p className="font-bold font-mono" style={{ fontSize: 26, color: "var(--tideline)", letterSpacing: "-0.03em" }}>{marketOcc}%</p>
             </div>
           </div>
@@ -458,7 +459,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Your Property vs Market */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Your Property vs Market</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Your Property vs Market</div>
       <div className="koast-anim rounded-2xl p-6 mb-6" style={{ background: "white", boxShadow: "var(--shadow-card)", animationDelay: "400ms" }}>
         <div className="space-y-4">
           {[
@@ -508,7 +509,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Market Intelligence</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Market Intelligence</div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Scatter plot */}
@@ -520,13 +521,13 @@ export default function AnalyticsDashboard({
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--dry-sand)" />
                 <XAxis
                   dataKey="x" type="number" name="ADR"
-                  tick={{ fontSize: 11, fill: "#3d6b52" }}
-                  label={{ value: "ADR ($)", position: "bottom", fontSize: 11, fill: "#3d6b52" }}
+                  tick={{ fontSize: 11, fill: BRAND_PALETTE.ink3 }}
+                  label={{ value: "ADR ($)", position: "bottom", fontSize: 11, fill: BRAND_PALETTE.ink3 }}
                 />
                 <YAxis
                   dataKey="y" type="number" name="Occupancy"
-                  tick={{ fontSize: 11, fill: "#3d6b52" }}
-                  label={{ value: "Occ %", angle: -90, position: "insideLeft", fontSize: 11, fill: "#3d6b52" }}
+                  tick={{ fontSize: 11, fill: BRAND_PALETTE.ink3 }}
+                  label={{ value: "Occ %", angle: -90, position: "insideLeft", fontSize: 11, fill: BRAND_PALETTE.ink3 }}
                 />
                 <Tooltip
                   formatter={(value, name) => [
@@ -539,9 +540,9 @@ export default function AnalyticsDashboard({
                   {scatterData.map((entry, i) => (
                     <Cell
                       key={i}
-                      fill={entry.isYours ? "#1a7a5a" : "#c49a5a"}
+                      fill={entry.isYours ? BRAND_PALETTE.success : BRAND_PALETTE.reef}
                       r={entry.isYours ? 8 : 4}
-                      stroke={entry.isYours ? "#17392a" : "none"}
+                      stroke={entry.isYours ? BRAND_PALETTE.trench : "none"}
                       strokeWidth={entry.isYours ? 2 : 0}
                     />
                   ))}
@@ -559,7 +560,7 @@ export default function AnalyticsDashboard({
               Your Property
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full" style={{ background: "var(--golden)" }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: "var(--koast-trench)" }} />
               Comps
             </div>
           </div>
@@ -568,13 +569,13 @@ export default function AnalyticsDashboard({
         {/* Revenue opportunity — AI dark card */}
         <div className="koast-anim rounded-2xl p-[22px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, var(--deep-sea), var(--abyss))", color: "var(--shore)", animationDelay: "600ms" }}>
           {/* Ambient golden glow */}
-          <div className="absolute pointer-events-none" style={{ top: "-50%", right: "-30%", width: "70%", height: "120%", background: "radial-gradient(ellipse, rgba(196,154,90,0.08), transparent 70%)", animation: "koast-breathe 4s ease-in-out infinite" }} />
+          <div className="absolute pointer-events-none" style={{ top: "-50%", right: "-30%", width: "70%", height: "120%", background: "radial-gradient(ellipse, rgba(76,196,204,0.08), transparent 70%)", animation: "koast-breathe 4s ease-in-out infinite" }} />
           <style>{`@keyframes koast-breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }`}</style>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(196,154,90,0.15)" }}>
-              <div className="w-2 h-2 rounded-full" style={{ background: "var(--golden)" }} />
-              <span className="text-xs font-semibold" style={{ color: "var(--golden)" }}>Koast AI</span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(76,196,204,0.15)" }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: "var(--koast-trench)" }} />
+              <span className="text-xs font-semibold" style={{ color: "var(--koast-trench)" }}>Koast AI</span>
             </div>
           </div>
 
@@ -583,14 +584,14 @@ export default function AnalyticsDashboard({
             <div className="space-y-4 relative">
               <div className="rounded-xl p-4" style={{ background: "rgba(196,64,64,0.12)" }}>
                 <p className="text-xs font-medium" style={{ color: "var(--coral-reef)" }}>Left on the Table ({currentMonthName})</p>
-                <p className="font-bold font-mono mt-1" style={{ fontSize: 28, color: "var(--golden)", letterSpacing: "-0.03em" }}>${revenueStats.leftOnTable}</p>
+                <p className="font-bold font-mono mt-1" style={{ fontSize: 28, color: "var(--koast-trench)", letterSpacing: "-0.03em" }}>${revenueStats.leftOnTable}</p>
                 <p className="text-xs mt-1" style={{ color: "rgba(247,243,236,0.6)" }}>
                   Dates where applied rate was below engine suggestion
                 </p>
               </div>
               <div className="rounded-xl p-4" style={{ background: "rgba(26,122,90,0.15)" }}>
                 <p className="text-xs font-medium" style={{ color: "var(--lagoon)" }}>Potential Upside (Rest of {currentMonthName})</p>
-                <p className="font-bold font-mono mt-1" style={{ fontSize: 28, color: "var(--golden)", letterSpacing: "-0.03em" }}>${revenueStats.opportunityForward}</p>
+                <p className="font-bold font-mono mt-1" style={{ fontSize: 28, color: "var(--koast-trench)", letterSpacing: "-0.03em" }}>${revenueStats.opportunityForward}</p>
                 <p className="text-xs mt-1" style={{ color: "rgba(247,243,236,0.6)" }}>
                   If all pricing suggestions are accepted
                 </p>
@@ -599,7 +600,7 @@ export default function AnalyticsDashboard({
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center relative">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "rgba(247,243,236,0.1)" }}>
-                <BarChart3 className="w-6 h-6" style={{ color: "var(--golden)" }} />
+                <BarChart3 className="w-6 h-6" style={{ color: "var(--koast-trench)" }} />
               </div>
               <p className="text-sm mb-1" style={{ color: "var(--shore)" }}>Connect Channex for revenue tracking</p>
               <p className="text-xs" style={{ color: "rgba(247,243,236,0.5)" }}>Revenue data will appear here once rate information is available</p>
@@ -639,7 +640,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Competitive Set</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Competitive Set</div>
 
       {/* Comp Set */}
       <div className="koast-anim rounded-2xl p-6 mb-6" style={{ background: "white", boxShadow: "var(--shadow-card)", animationDelay: "600ms" }}>
@@ -707,7 +708,7 @@ export default function AnalyticsDashboard({
               </thead>
               <tbody>
                 {/* Your property row */}
-                <tr style={{ background: "rgba(196,154,90,0.05)", borderLeft: "3px solid var(--golden)" }}>
+                <tr style={{ background: "rgba(76,196,204,0.05)", borderLeft: "3px solid var(--koast-trench)" }}>
                   <td className="py-2.5 px-3 font-bold" style={{ color: "var(--coastal)" }}>Your Property</td>
                   <td className="py-2.5 px-3" style={{ color: "var(--coastal)" }}>{"\u2014"}</td>
                   <td className="py-2.5 px-3 font-bold font-mono" style={{ color: "var(--coastal)" }}>${Math.round(propertyStats.avgRate)}</td>
@@ -755,7 +756,7 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Section Label */}
-      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--golden)" }}>Demand Outlook</div>
+      <div className="mb-[14px]" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--koast-trench)" }}>Demand Outlook</div>
 
       {/* 30-Day Demand Outlook — compact strip */}
       <div className="koast-anim rounded-2xl p-4 mb-6" style={{ background: "white", boxShadow: "var(--shadow-card)", animationDelay: "600ms" }}>
@@ -857,7 +858,7 @@ function MarketHealthCard({ snapshot }: { snapshot: MarketSnapshot | null }) {
           <div className="flex flex-wrap gap-4">
             {score.strengths.length > 0 && (
               <div>
-                <p className="uppercase mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: "var(--golden)" }}>Strengths</p>
+                <p className="uppercase mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>Strengths</p>
                 <div className="flex flex-wrap gap-1">{score.strengths.map((s) => (
                   <span key={s} className="px-2 py-0.5 text-xs rounded-full" style={{ background: "rgba(26,122,90,0.1)", color: "var(--lagoon)" }}>{s}</span>
                 ))}</div>
@@ -865,7 +866,7 @@ function MarketHealthCard({ snapshot }: { snapshot: MarketSnapshot | null }) {
             )}
             {score.risks.length > 0 && (
               <div>
-                <p className="uppercase mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: "var(--golden)" }}>Risks</p>
+                <p className="uppercase mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: "var(--koast-trench)" }}>Risks</p>
                 <div className="flex flex-wrap gap-1">{score.risks.map((r) => (
                   <span key={r} className="px-2 py-0.5 text-xs rounded-full" style={{ background: "rgba(196,64,64,0.1)", color: "var(--coral-reef)" }}>{r}</span>
                 ))}</div>
@@ -992,7 +993,7 @@ function RevenueScenariosSection({ propertyId }: { propertyId: string }) {
           <p className="text-sm" style={{ color: "var(--tideline)" }}>What-if scenarios based on your data</p>
         </div>
         <div className="text-right">
-          <p className="text-xs" style={{ color: "var(--golden)" }}>Total potential</p>
+          <p className="text-xs" style={{ color: "var(--koast-trench)" }}>Total potential</p>
           <p className="text-2xl font-bold font-mono" style={{ color: "var(--coastal)" }}>+${data.total_opportunity.toLocaleString()}<span className="text-sm font-normal" style={{ color: "var(--tideline)" }}>/yr</span></p>
         </div>
       </div>

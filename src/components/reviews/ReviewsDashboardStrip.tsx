@@ -106,7 +106,7 @@ function Tile({ label, value, sublabel }: { label: string; value: React.ReactNod
       className="bg-white p-4 flex flex-col gap-1"
       style={{ borderRadius: 14, border: "1px solid var(--dry-sand)", boxShadow: "var(--shadow-card)" }}
     >
-      <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--golden)" }}>
+      <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--koast-trench)" }}>
         {label}
       </div>
       <div className="text-[24px] font-semibold leading-none" style={{ color: "var(--coastal)" }}>

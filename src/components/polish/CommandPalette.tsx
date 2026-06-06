@@ -221,7 +221,7 @@ export default function CommandPalette() {
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        background: "rgba(19,46,32,0.35)",
+        background: "rgba(15,24,21,0.35)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         opacity: reducedMotion ? 1 : 0,
@@ -237,7 +237,7 @@ export default function CommandPalette() {
           margin: "12vh auto 0",
           background: "#fff",
           borderRadius: 16,
-          boxShadow: "0 20px 60px rgba(19,46,32,0.25)",
+          boxShadow: "0 20px 60px rgba(15,24,21,0.25)",
           overflow: "hidden",
           transform: reducedMotion ? "scale(1)" : "scale(0.98)",
           animation: reducedMotion ? undefined : "koast-cp-scale-in 220ms cubic-bezier(0.4,0,0.2,1) forwards",
@@ -463,7 +463,7 @@ const ICON_BY_KIND: Record<CmdKKind, typeof Building2> = {
 };
 
 const KIND_TILE_BG: Record<CmdKKind, string> = {
-  property: "rgba(196,154,90,0.18)", // golden tint
+  property: "rgba(76,196,204,0.18)", // golden tint
   route: "rgba(61,107,82,0.15)", // tideline tint
   conversation: "rgba(26,122,90,0.15)", // lagoon tint
   action: "rgba(212,150,11,0.18)", // amber tide tint

@@ -48,7 +48,7 @@ export function MemoryVoiceSection({ voicePayload }: Props) {
         <div>
           <div
             className="text-[11px] font-bold uppercase tracking-[0.08em]"
-            style={{ color: "var(--golden)" }}
+            style={{ color: "var(--koast-trench)" }}
           >
             Voice memory
           </div>

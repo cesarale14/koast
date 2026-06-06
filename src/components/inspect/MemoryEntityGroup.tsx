@@ -9,7 +9,7 @@ export function MemoryEntityGroupSection({
   return (
     <section>
       <h2
-        className="text-[11px] font-bold tracking-[0.08em] text-[var(--golden)] mb-3"
+        className="text-[11px] font-bold tracking-[0.08em] text-[var(--koast-trench)] mb-3"
         aria-label={group.entity_type_label}
       >
         {group.entity_type_label}

@@ -41,9 +41,9 @@ export default function PropertyThumbStrip({
               style={{
                 width: 56,
                 height: 56,
-                border: isActive ? "2px solid var(--golden)" : "2px solid transparent",
+                border: isActive ? "2px solid var(--koast-trench)" : "2px solid transparent",
                 boxShadow: isActive
-                  ? "0 0 0 3px rgba(196,154,90,0.2), 0 2px 8px rgba(0,0,0,0.1)"
+                  ? "0 0 0 3px rgba(76,196,204,0.2), 0 2px 8px rgba(0,0,0,0.1)"
                   : "0 1px 4px rgba(0,0,0,0.08)",
                 animationDelay: `${80 * i}ms`,
               }}
@@ -116,7 +116,7 @@ export default function PropertyThumbStrip({
       <div className="mt-auto w-full px-2 pb-5 pt-6 flex flex-col items-center">
         <div
           className="text-[9px] font-bold tracking-[0.1em] uppercase mb-2 text-center"
-          style={{ color: "var(--golden)" }}
+          style={{ color: "var(--koast-trench)" }}
         >
           Quick stats
         </div>

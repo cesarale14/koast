@@ -61,10 +61,10 @@ export function TextInput({
         backgroundColor: "rgba(255,255,255,0.7)",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = error ? "var(--coral-reef)" : "var(--golden)";
+        e.currentTarget.style.borderColor = error ? "var(--coral-reef)" : "var(--koast-trench)";
         e.currentTarget.style.boxShadow = error
           ? "0 0 0 3px rgba(196,64,64,0.12)"
-          : "0 0 0 3px rgba(196,154,90,0.12)";
+          : "0 0 0 3px rgba(76,196,204,0.12)";
       }}
       onBlur={(e) => {
         e.currentTarget.style.borderColor = idleBorder;

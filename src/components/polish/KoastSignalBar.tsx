@@ -10,7 +10,7 @@ interface KoastSignalBarProps {
 export function KoastSignalBar({ label, score, weight, confidence }: KoastSignalBarProps) {
   const clamped = Math.max(0, Math.min(1, score));
   const highConf = confidence >= 0.6;
-  const fillColor = highConf ? "var(--golden)" : "rgba(196,154,90,0.4)";
+  const fillColor = highConf ? "var(--koast-trench)" : "rgba(76,196,204,0.4)";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>

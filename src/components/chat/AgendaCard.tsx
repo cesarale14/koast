@@ -44,7 +44,7 @@ function PropertyBlock({ g, upcoming }: { g: AgendaPropertyGroup; upcoming?: boo
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--golden)]">
+    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--koast-trench)]">
       {children}
     </div>
   );

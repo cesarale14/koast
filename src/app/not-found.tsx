@@ -6,7 +6,7 @@ export default function NotFound() {
       <div className="text-center max-w-sm">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-3 h-3 rounded-full bg-golden" />
+          <div className="w-3 h-3 rounded-full bg-coastal" />
           <span className="text-xl font-bold text-coastal tracking-tight">
             Koast
           </span>

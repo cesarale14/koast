@@ -35,16 +35,29 @@
   /* ============ KOAST DESIGN SYSTEM (April 2026) ============ */
   /* See DESIGN_SYSTEM.md Section 1 for the canonical spec.     */
 
-  /* Primary — coastal greens */
-  --deep-sea: #132e20;       /* marketing bg, hero, login */
-  --coastal: #17392a;        /* sidebar bg, headings, stat values */
-  --mangrove: #1f4d38;       /* sidebar hover, secondary dark */
-  --tideline: #3d6b52;       /* icons, muted text, secondary text */
+  /* ============================================================
+     BRAND RECOLOR (2026-06-06): forest-green → cool-teal ramp.
+     The --koast-* ramp (defined in the second :root block below) is
+     now the single source of truth. These legacy names are remapped
+     onto it BY ROLE so the ~300 `bg-coastal` / `text-tideline` /
+     `deep-sea` utility usages recolor with no class renames.
+     Contrast rule: filled elements that carry white text map to
+     trench/reef (dark teal), never light tide. No green anywhere.
+     ============================================================ */
 
-  /* Accent — golden hour warmth */
-  --golden: #c49a5a;         /* primary accent, CTAs, section labels */
-  --driftwood: #d4b47a;      /* light accent, gold hover */
-  --sandbar: #e8d5b0;        /* accent backgrounds */
+  /* Primary — was coastal greens, now cool teal.
+   * Dark substrate is a trench-derived cool near-black (NOT green). */
+  --deep-sea: #0a262c;       /* dark bg substrate — cool near-black (sidebar, login, hero) */
+  --coastal: #0e7a8a;        /* primary brand fill (trench) — white text safe (contrast ~5.1) */
+  --mangrove: #176d7a;       /* secondary dark / hover — white text safe */
+  --tideline: #6e7976;       /* muted text / icons / secondary text → neutral gray (legible on light) */
+
+  /* Accent — golden retained as a token but reserved for the primary
+   * CTA + logo glow ONLY. Its structural feeders are remapped to teal
+   * below (section labels, sidebar-active, focus → tide; ink → near-black). */
+  --golden: #c49a5a;         /* gold — primary CTA + logo glow ONLY (rare warm pop) */
+  --driftwood: #a8e0e3;      /* light accent → shoal teal */
+  --sandbar: #d4eef0;        /* accent backgrounds → shore-mist blueish-white */
 
   /* Neutral — sandy shore */
   --shore: #f7f3ec;          /* product page background */
@@ -70,13 +83,13 @@
   --positive: #1a3a2a;
 
   /* Abyss — gradient terminus (paired with --deep-sea in radial/linear stops) */
-  --abyss: #0e2218;
+  --abyss: #06181c;          /* cool near-black terminus (was green #0e2218) */
 
-  /* Koast shadows — all use rgba(19,46,32) coastal tint */
-  --shadow-card: 0 1px 3px rgba(19,46,32,0.08), 0 8px 32px rgba(19,46,32,0.04);
-  --shadow-card-hover: 0 4px 12px rgba(19,46,32,0.1), 0 20px 60px rgba(19,46,32,0.12);
-  --shadow-glass: 0 1px 1px rgba(19,46,32,0.02), 0 4px 8px rgba(19,46,32,0.04), 0 12px 36px rgba(19,46,32,0.06), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(19,46,32,0.04);
-  --shadow-glass-hover: 0 2px 4px rgba(19,46,32,0.03), 0 8px 16px rgba(19,46,32,0.06), 0 24px 56px rgba(19,46,32,0.1), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(19,46,32,0.04);
+  /* Koast shadows — all use rgba(15,24,21) coastal tint */
+  --shadow-card: 0 1px 3px rgba(15,24,21,0.08), 0 8px 32px rgba(15,24,21,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(15,24,21,0.1), 0 20px 60px rgba(15,24,21,0.12);
+  --shadow-glass: 0 1px 1px rgba(15,24,21,0.02), 0 4px 8px rgba(15,24,21,0.04), 0 12px 36px rgba(15,24,21,0.06), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(15,24,21,0.04);
+  --shadow-glass-hover: 0 2px 4px rgba(15,24,21,0.03), 0 8px 16px rgba(15,24,21,0.06), 0 24px 56px rgba(15,24,21,0.1), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(15,24,21,0.04);
   --shadow-sidebar: 4px 0 40px rgba(0,0,0,0.3);
   --shadow-logo-glow: 0 2px 12px rgba(196,154,90,0.4);
 
@@ -89,16 +102,17 @@
   --forest: var(--coastal);
   --forest-light: var(--mangrove);
   --forest-muted: var(--tideline);
-  --brass: var(--golden);
-  --brass-light: var(--driftwood);
-  --brass-dark: #b08f52;
+  /* brass fed section labels + accents everywhere → remapped to teal (de-gilded). */
+  --brass: var(--koast-trench);
+  --brass-light: var(--koast-reef);
+  --brass-dark: #0c6675;
   --linen: var(--shore);
   --linen-dark: var(--dry-sand);
 
-  /* Ink — text */
-  --ink: var(--coastal);
-  --ink-secondary: #4a6355;
-  --ink-muted: #8a9e92;
+  /* Ink — text. Primary text is near-black ink, NOT teal. */
+  --ink: var(--koast-ink);
+  --ink-secondary: var(--koast-ink-2);
+  --ink-muted: var(--koast-ink-3);
 
   /* Neutrals — point at shore/dry-sand/shell tones */
   --neutral-0: var(--white);
@@ -114,14 +128,15 @@
   --neutral-800: #2a2520;
   --neutral-900: #1a1614;
 
-  /* Sidebar — deep-sea gradient stops live in the layout.tsx style */
-  --sidebar-bg: var(--coastal);
+  /* Sidebar — deep-sea gradient stops live in the layout.tsx style.
+   * Active state is now tide-teal (was golden); tints are teal. */
+  --sidebar-bg: var(--deep-sea);
   --sidebar-text: rgba(168,191,174,0.6);
-  --sidebar-text-active: var(--golden);
+  --sidebar-text-active: var(--koast-tide);
   --sidebar-hover: var(--mangrove);
-  --sidebar-active-bg: rgba(196,154,90,0.1);
-  --sidebar-active-text: var(--golden);
-  --sidebar-border: rgba(196,154,90,0.1);
+  --sidebar-active-bg: rgba(76,196,204,0.12);
+  --sidebar-active-text: var(--koast-tide);
+  --sidebar-border: rgba(76,196,204,0.12);
 
   /* Legacy semantic aliases */
   --success: var(--lagoon);
@@ -140,15 +155,15 @@
   --direct: var(--golden);
 
   /* Legacy shadow aliases — point at the card shadow by default */
-  --shadow-sm: 0 1px 2px rgba(19,46,32,0.04);
-  --shadow-md: 0 2px 8px rgba(19,46,32,0.06), 0 1px 2px rgba(19,46,32,0.04);
+  --shadow-sm: 0 1px 2px rgba(15,24,21,0.04);
+  --shadow-md: 0 2px 8px rgba(15,24,21,0.06), 0 1px 2px rgba(15,24,21,0.04);
   --shadow-lg: var(--shadow-card);
   --shadow-xl: var(--shadow-card-hover);
 
   /* Borders */
   --border: var(--dry-sand);
   --border-hover: var(--shell);
-  --border-focus: var(--golden);
+  --border-focus: var(--koast-tide);   /* focus ring → tide teal (was golden) */
 
   /* Radius */
   --radius-sm: 6px;
@@ -196,7 +211,7 @@
 :root {
   /* Palette */
   --koast-shore:        #f7f3ec;
-  --koast-deep-sea:     #132e20;
+  --koast-deep-sea:     #0a262c;   /* BRAND RECOLOR: cool near-black dark substrate (was green #132e20) */
   --koast-ink:          #0f1815;
   --koast-shore-mist:   #d4eef0;
   --koast-shoal:        #a8e0e3;
@@ -379,16 +394,16 @@ body {
 .stat-card {
   position: relative;
   box-shadow:
-    0 1px 3px rgba(26,58,42,0.06),
-    0 4px 12px rgba(26,58,42,0.04);
+    0 1px 3px rgba(15,24,21,0.06),
+    0 4px 12px rgba(15,24,21,0.04);
   transition: all var(--transition-base);
 }
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 2px 4px rgba(26,58,42,0.04),
-    0 8px 16px rgba(26,58,42,0.06),
-    0 16px 32px rgba(26,58,42,0.04);
+    0 2px 4px rgba(15,24,21,0.04),
+    0 8px 16px rgba(15,24,21,0.06),
+    0 16px 32px rgba(15,24,21,0.04);
 }
 .stat-card::before {
   content: '';
@@ -405,45 +420,45 @@ body {
 /* Key highlight cards */
 .card-elevated {
   box-shadow:
-    0 2px 4px rgba(26,58,42,0.04),
-    0 8px 24px rgba(26,58,42,0.06);
+    0 2px 4px rgba(15,24,21,0.04),
+    0 8px 24px rgba(15,24,21,0.06);
   transition: all var(--transition-base);
 }
 
 /* Primary buttons — forest green with press effect */
 .btn-primary-3d {
   box-shadow:
-    0 1px 2px rgba(26,58,42,0.3),
-    0 2px 4px rgba(26,58,42,0.2),
+    0 1px 2px rgba(15,24,21,0.3),
+    0 2px 4px rgba(15,24,21,0.2),
     inset 0 1px 0 rgba(255,255,255,0.1);
   transition: all var(--transition-fast);
 }
 .btn-primary-3d:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow:
-    0 2px 4px rgba(26,58,42,0.3),
-    0 4px 8px rgba(26,58,42,0.2),
+    0 2px 4px rgba(15,24,21,0.3),
+    0 4px 8px rgba(15,24,21,0.2),
     inset 0 1px 0 rgba(255,255,255,0.1);
 }
 .btn-primary-3d:active:not(:disabled) {
   transform: translateY(0px);
   box-shadow:
-    0 1px 2px rgba(26,58,42,0.2),
+    0 1px 2px rgba(15,24,21,0.2),
     inset 0 2px 4px rgba(0,0,0,0.1);
 }
 
 /* Secondary/outlined buttons */
 .btn-secondary-3d {
-  box-shadow: 0 1px 2px rgba(26,58,42,0.05);
+  box-shadow: 0 1px 2px rgba(15,24,21,0.05);
   transition: all var(--transition-fast);
 }
 .btn-secondary-3d:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(26,58,42,0.08);
+  box-shadow: 0 2px 4px rgba(15,24,21,0.08);
 }
 .btn-secondary-3d:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: inset 0 1px 2px rgba(26,58,42,0.08);
+  box-shadow: inset 0 1px 2px rgba(15,24,21,0.08);
 }
 
 /* Revenue check hero CTA — brass accent */

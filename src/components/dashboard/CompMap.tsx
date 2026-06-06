@@ -69,7 +69,7 @@ function approximatePosition(
 }
 
 export default function CompMap({ center, propertyName, comps, medianOccupancy }: CompMapProps) {
-  const propertyIcon = createIcon("var(--golden)", 20);
+  const propertyIcon = createIcon("var(--koast-trench)", 20);
 
   return (
     <div className="h-[400px] rounded-lg overflow-hidden border border-[var(--border)]">

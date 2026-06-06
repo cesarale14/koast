@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
 ];
 
 const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, var(--abyss) 100%)";
-const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(196,154,90,0.15)";
+const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(76,196,204,0.15)";
 const INACTIVE_TEXT = "rgba(168,191,174,0.6)";
 
 /* ---- Collapsed nav link with tooltip ---- */
@@ -68,12 +68,12 @@ function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean
       onMouseLeave={() => { if (timerRef.current) clearTimeout(timerRef.current); setShowTip(false); }}
       className="relative flex items-center justify-center w-11 h-11 rounded-lg transition-colors duration-150"
       style={{
-        color: isActive ? "var(--golden)" : INACTIVE_TEXT,
-        backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
+        color: isActive ? "var(--koast-tide)" : INACTIVE_TEXT,
+        backgroundColor: isActive ? "rgba(76,196,204,0.1)" : "transparent",
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--golden)" }} />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--koast-tide)" }} />
       )}
       <Icon size={20} strokeWidth={1.5} />
       {item.badge != null && item.badge > 0 && (
@@ -107,14 +107,14 @@ function NavLinkExpanded({ item, isActive, onClick }: { item: NavItem; isActive:
       {...linkProps}
       className="relative flex items-center gap-3 px-3 h-11 text-sm font-medium rounded-lg transition-colors duration-150"
       style={{
-        color: isActive ? "var(--golden)" : INACTIVE_TEXT,
-        backgroundColor: isActive ? "rgba(196,154,90,0.1)" : "transparent",
+        color: isActive ? "var(--koast-tide)" : INACTIVE_TEXT,
+        backgroundColor: isActive ? "rgba(76,196,204,0.1)" : "transparent",
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--golden)" }} />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r" style={{ backgroundColor: "var(--koast-tide)" }} />
       )}
-      <Icon size={20} strokeWidth={1.5} className="flex-shrink-0" style={{ color: isActive ? "var(--golden)" : INACTIVE_TEXT }} />
+      <Icon size={20} strokeWidth={1.5} className="flex-shrink-0" style={{ color: isActive ? "var(--koast-tide)" : INACTIVE_TEXT }} />
       <span className="truncate">{item.name}</span>
       {item.badge != null && item.badge > 0 && (
         <span
@@ -140,14 +140,14 @@ function GroupLabel({ label }: { label: string }) {
   );
 }
 
-/* ---- Logo mark "K" with gold glow ---- */
+/* ---- Logo mark "K" with gold glow — gold KEEPER (logo glow per recolor decision) ---- */
 function LogoMark() {
   return (
     <div
       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
       style={{
         backgroundColor: "var(--golden)",
-        boxShadow: "0 2px 12px rgba(196,154,90,0.4)",
+        boxShadow: "var(--shadow-logo-glow)",
       }}
     >
       <span className="text-white text-base font-bold tracking-tight">K</span>
@@ -185,11 +185,11 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
                 </div>
               ))}
             </nav>
-            <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}>
+            <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(76,196,204,0.1)" }}>
               <div className="flex items-center gap-3">
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-                  style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
+                  style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
                 >
                   C
                 </div>
@@ -211,7 +211,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
             </Link>
             <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto w-full px-2">
               {groups.map((group, gi) => (
-                <div key={gi} className={`w-full flex flex-col items-center ${gi > 0 ? "mt-2 pt-2" : ""}`} style={gi > 0 ? { borderTop: "1px solid rgba(196,154,90,0.1)" } : {}}>
+                <div key={gi} className={`w-full flex flex-col items-center ${gi > 0 ? "mt-2 pt-2" : ""}`} style={gi > 0 ? { borderTop: "1px solid rgba(76,196,204,0.1)" } : {}}>
                   <div className="flex flex-col items-center gap-0.5">
                     {group.items.map((item) => {
                       const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -223,12 +223,12 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
             </nav>
             <div
               className="mt-3 pt-3 w-10 flex flex-col items-center pb-3"
-              style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}
+              style={{ borderTop: "1px solid rgba(76,196,204,0.1)" }}
             >
               <Link
                 href="/settings"
                 className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold transition-colors"
-                style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
+                style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
               >
                 C
               </Link>
@@ -288,11 +288,11 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
             </div>
           ))}
         </nav>
-        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(196,154,90,0.1)" }}>
+        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(76,196,204,0.1)" }}>
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-              style={{ backgroundColor: "rgba(196,154,90,0.2)", color: "var(--golden)" }}
+              style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
             >
               C
             </div>

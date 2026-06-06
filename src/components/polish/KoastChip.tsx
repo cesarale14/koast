@@ -20,7 +20,7 @@ function styleFor(variant: Variant): React.CSSProperties {
     case "danger":
       return { color: "var(--coral-reef)", background: "rgba(196,64,64,0.1)" };
     case "koast":
-      return { color: "var(--golden)", background: "rgba(196,154,90,0.1)" };
+      return { color: "var(--koast-trench)", background: "rgba(76,196,204,0.1)" };
   }
 }
 
