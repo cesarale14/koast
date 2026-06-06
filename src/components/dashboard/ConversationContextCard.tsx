@@ -82,7 +82,7 @@ export default function ConversationContextCard({ context }: { context: Conversa
           <div className="flex items-center gap-2 flex-wrap">
             <span
               className="text-[10px] font-bold tracking-[0.08em] uppercase"
-              style={{ color: "var(--golden)" }}
+              style={{ color: "var(--koast-trench)" }}
             >
               Booking
             </span>
@@ -144,10 +144,10 @@ export default function ConversationContextCard({ context }: { context: Conversa
       }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <MessageCircle size={13} strokeWidth={2} style={{ color: "var(--golden)" }} />
+        <MessageCircle size={13} strokeWidth={2} style={{ color: "var(--koast-trench)" }} />
         <span
           className="text-[10px] font-bold tracking-[0.08em] uppercase"
-          style={{ color: "var(--golden)" }}
+          style={{ color: "var(--koast-trench)" }}
         >
           Inquiry
         </span>

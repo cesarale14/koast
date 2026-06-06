@@ -725,7 +725,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <div
       className="mb-3 text-[10px] font-bold tracking-[0.08em] uppercase"
-      style={{ color: "var(--golden)" }}
+      style={{ color: "var(--koast-trench)" }}
     >
       {label}
     </div>
@@ -756,7 +756,7 @@ function BookingInfoSection({
   return (
     <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(237,231,219,0.5)" }}>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-[10px] font-bold tracking-[0.08em] uppercase" style={{ color: "var(--golden)" }}>
+        <div className="text-[10px] font-bold tracking-[0.08em] uppercase" style={{ color: "var(--koast-trench)" }}>
           Current booking
         </div>
         <button

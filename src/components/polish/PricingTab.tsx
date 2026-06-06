@@ -22,6 +22,7 @@ import { usePricingTab, type PricingRecommendation, type PricingRules, type Perf
 import KoastButton from "./KoastButton";
 import KoastCard from "./KoastCard";
 import KoastChip from "./KoastChip";
+import { BRAND_PALETTE } from "@/lib/brand/palette";
 import KoastRate from "./KoastRate";
 import KoastRail from "./KoastRail";
 import KoastSignalBar from "./KoastSignalBar";
@@ -288,7 +289,7 @@ export default function PricingTab({ propertyId, compSetQuality = "unknown" }: P
             borderRadius: 999,
             fontSize: 13,
             fontWeight: 600,
-            boxShadow: "0 8px 24px rgba(19,46,32,0.25)",
+            boxShadow: "0 8px 24px rgba(15,24,21,0.25)",
             zIndex: 50,
           }}
         >
@@ -374,19 +375,19 @@ function Scorecard({
             right: -60,
             width: 240,
             height: 240,
-            background: "radial-gradient(circle, rgba(196,154,90,0.28), rgba(196,154,90,0) 70%)",
+            background: "radial-gradient(circle, rgba(76,196,204,0.28), rgba(76,196,204,0) 70%)",
             pointerEvents: "none",
           }}
         />
       )}
       <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Sparkles size={14} color="var(--golden)" />
+          <Sparkles size={14} color="var(--koast-trench)" />
           <span
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: "var(--golden)",
+              color: "var(--koast-trench)",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
             }}
@@ -1294,7 +1295,7 @@ function AccuracyChart({ performance }: { performance: PerformanceSummary | null
     const y = (v: number) => pad.t + H - ((v - yMin) / (yMax - yMin)) * H;
 
     // Grid
-    ctx.strokeStyle = "#EDE7DB";
+    ctx.strokeStyle = BRAND_PALETTE.rule;
     ctx.lineWidth = 1;
     for (let i = 0; i <= 3; i++) {
       const yy = pad.t + (H * i) / 3;
@@ -1340,7 +1341,7 @@ function AccuracyChart({ performance }: { performance: PerformanceSummary | null
       const p = Math.min(1, elapsed / duration);
       ctx.clearRect(0, 0, rect.width, rect.height);
       // redraw grid each frame
-      ctx.strokeStyle = "#EDE7DB";
+      ctx.strokeStyle = BRAND_PALETTE.rule;
       ctx.lineWidth = 1;
       for (let i = 0; i <= 3; i++) {
         const yy = pad.t + (H * i) / 3;
@@ -1349,9 +1350,9 @@ function AccuracyChart({ performance }: { performance: PerformanceSummary | null
         ctx.lineTo(pad.l + W, yy);
         ctx.stroke();
       }
-      drawLine(suggested, "#17392A", p);
-      drawLine(applied, "#C49A5A", p);
-      drawLine(actual, "#1A7A5A", p);
+      drawLine(suggested, BRAND_PALETTE.trench, p);
+      drawLine(applied, BRAND_PALETTE.warning, p);
+      drawLine(actual, BRAND_PALETTE.success, p);
       if (p < 1) rafId = requestAnimationFrame(frame);
     };
     rafId = requestAnimationFrame(frame);
@@ -1375,9 +1376,9 @@ function AccuracyChart({ performance }: { performance: PerformanceSummary | null
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <span style={sectionLabel}>Last 30 days accuracy</span>
           <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--tideline)" }}>
-            <LegendSwatch color="#17392A" label="Suggested" />
-            <LegendSwatch color="#C49A5A" label="Applied" />
-            <LegendSwatch color="#1A7A5A" label="Actual (booked)" />
+            <LegendSwatch color={BRAND_PALETTE.trench} label="Suggested" />
+            <LegendSwatch color={BRAND_PALETTE.warning} label="Applied" />
+            <LegendSwatch color={BRAND_PALETTE.success} label="Actual (booked)" />
           </div>
         </div>
         <canvas ref={canvasRef} style={{ width: "100%", height: 240, display: "block" }} />
@@ -1516,7 +1517,7 @@ function PreviewModal({
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(19,46,32,0.35)",
+          background: "rgba(15,24,21,0.35)",
           border: "none",
           padding: 0,
           cursor: "pointer",
@@ -1535,7 +1536,7 @@ function PreviewModal({
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          boxShadow: "0 30px 80px rgba(19,46,32,0.25)",
+          boxShadow: "0 30px 80px rgba(15,24,21,0.25)",
         }}
       >
         <header

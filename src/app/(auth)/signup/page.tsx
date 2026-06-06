@@ -84,12 +84,12 @@ export default function SignupPage() {
             style={{ fontSize: 13, color: "rgba(168,191,174,0.7)" }}
           >
             We sent a confirmation link to{" "}
-            <span style={{ color: "var(--golden)", fontWeight: 600 }}>{email}</span>
+            <span style={{ color: "var(--koast-tide)", fontWeight: 600 }}>{email}</span>
           </p>
           <Link
             href="/login"
             className="mt-6 font-semibold transition-colors text-[13px]"
-            style={{ color: "var(--golden)" }}
+            style={{ color: "var(--koast-tide)" }}
           >
             Back to sign in
           </Link>
@@ -146,7 +146,7 @@ export default function SignupPage() {
         <Link
           href="/login"
           className="font-semibold transition-colors"
-          style={{ color: "var(--golden)" }}
+          style={{ color: "var(--koast-tide)" }}
         >
           Sign in
         </Link>

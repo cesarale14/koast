@@ -99,7 +99,7 @@ export default function LoginPage() {
         <Link
           href="/signup"
           className="font-semibold transition-colors"
-          style={{ color: "var(--golden)" }}
+          style={{ color: "var(--koast-tide)" }}
         >
           Create an account
         </Link>

@@ -75,7 +75,7 @@ export default function ReviewsSettingsModal({ propertyName, open, onClose }: Re
   const node = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(19,46,32,0.4)" }}
+      style={{ background: "rgba(15,24,21,0.4)" }}
       onClick={onClose}
     >
       <div
@@ -85,7 +85,7 @@ export default function ReviewsSettingsModal({ propertyName, open, onClose }: Re
       >
         <div className="flex items-center justify-between p-5" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--golden)" }}>
+            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--koast-trench)" }}>
               Review preferences
             </div>
             <div className="text-[14px] font-semibold" style={{ color: "var(--coastal)" }}>

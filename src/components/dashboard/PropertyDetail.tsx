@@ -303,7 +303,7 @@ function HeroSection({
           className="w-full h-full flex items-center justify-center"
           style={{
             background: "linear-gradient(135deg, var(--deep-sea), var(--abyss) 50%, var(--abyss))",
-            color: "rgba(196,154,90,0.25)",
+            color: "rgba(76,196,204,0.25)",
           }}
         >
           <Home size={72} strokeWidth={1.2} />
@@ -675,7 +675,7 @@ function GlassStatCard({
       </div>
       <div
         className="text-[10px] font-bold uppercase mt-1 relative z-[1]"
-        style={{ color: "var(--golden)", letterSpacing: "0.06em" }}
+        style={{ color: "var(--koast-trench)", letterSpacing: "0.06em" }}
       >
         {label}
       </div>
@@ -719,7 +719,7 @@ function UpcomingBookings({ bookings, propertyId }: { bookings: Booking[]; prope
                   backgroundColor: i % 2 === 0 ? "#fff" : "var(--shore)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(196,154,90,0.05)";
+                  e.currentTarget.style.backgroundColor = "rgba(76,196,204,0.05)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = i % 2 === 0 ? "#fff" : "var(--shore)";
@@ -859,7 +859,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <div
       className="mb-3 text-[11px] font-bold tracking-[0.08em] uppercase"
-      style={{ color: "var(--golden)" }}
+      style={{ color: "var(--koast-trench)" }}
     >
       {label}
     </div>
@@ -980,7 +980,7 @@ function PropertySettingsModal({
         style={{
           borderRadius: 16,
           width: 520,
-          boxShadow: "0 8px 40px rgba(19,46,32,0.2), 0 2px 8px rgba(19,46,32,0.1)",
+          boxShadow: "0 8px 40px rgba(15,24,21,0.2), 0 2px 8px rgba(15,24,21,0.1)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1151,7 +1151,7 @@ function PropertySettingsModal({
         >
           <div
             className="bg-white rounded-2xl w-full max-w-md p-6"
-            style={{ boxShadow: "0 8px 40px rgba(19,46,32,0.25)" }}
+            style={{ boxShadow: "0 8px 40px rgba(15,24,21,0.25)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3 mb-4">

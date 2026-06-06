@@ -396,7 +396,7 @@ function CriticalAlertRow({ alert, vp }: { alert: Alert; vp: { isMobile: boolean
           transition: "color 160ms cubic-bezier(0.4,0,0.2,1)",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLAnchorElement).style.color = "var(--golden)";
+          (e.currentTarget as HTMLAnchorElement).style.color = "var(--koast-trench)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLAnchorElement).style.color = "var(--coastal)";
@@ -457,7 +457,7 @@ function PropertyCardTile({ card, pending, vp }: { card: PropertyCard; pending: 
         borderRadius: 16,
         background: "#fff",
         boxShadow: hover
-          ? "0 10px 30px rgba(19,46,32,0.08), 0 0 0 1px var(--shell)"
+          ? "0 10px 30px rgba(15,24,21,0.08), 0 0 0 1px var(--shell)"
           : "0 0 0 1px var(--hairline)",
         transform: hover ? "translateY(-2px)" : "translateY(0)",
         transition: "box-shadow 300ms cubic-bezier(0.4,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1)",
@@ -618,7 +618,7 @@ function GhostAddCard() {
       style={{
         borderRadius: 16,
         border: `1.5px dashed ${hover ? "var(--driftwood)" : "var(--hairline)"}`,
-        background: hover ? "rgba(196,154,90,0.03)" : "transparent",
+        background: hover ? "rgba(76,196,204,0.03)" : "transparent",
         color: hover ? "var(--coastal)" : "var(--tideline)",
         display: "flex",
         flexDirection: "column",
@@ -750,7 +750,7 @@ function PricingIntelligenceCard({
           right: "-15%",
           width: 500,
           height: 500,
-          background: "radial-gradient(circle, rgba(196,154,90,0.2) 0%, rgba(196,154,90,0) 55%)",
+          background: "radial-gradient(circle, rgba(76,196,204,0.2) 0%, rgba(76,196,204,0) 55%)",
           pointerEvents: "none",
         }}
       />
@@ -786,7 +786,7 @@ function PricingIntelligenceCard({
         <Link
           href="/properties"
           style={{
-            background: "var(--golden)",
+            background: "var(--koast-trench)",
             color: "var(--deep-sea)",
             fontWeight: 600,
             fontSize: 13,

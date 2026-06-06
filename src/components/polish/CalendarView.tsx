@@ -584,7 +584,7 @@ export default function CalendarView({
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(19,46,32,0.3)",
+              background: "rgba(15,24,21,0.3)",
               border: "none",
               padding: 0,
               cursor: "pointer",
@@ -606,7 +606,7 @@ export default function CalendarView({
                   top: 56,
                   bottom: 0,
                   zIndex: 40,
-                  boxShadow: railOpen ? "-12px 0 32px rgba(19,46,32,0.18)" : "none",
+                  boxShadow: railOpen ? "-12px 0 32px rgba(15,24,21,0.18)" : "none",
                 }
               : {}),
           }}
@@ -666,7 +666,7 @@ export default function CalendarView({
             borderRadius: 999,
             fontSize: 13,
             fontWeight: 600,
-            boxShadow: "0 8px 24px rgba(19,46,32,0.25)",
+            boxShadow: "0 8px 24px rgba(15,24,21,0.25)",
             zIndex: 50,
           }}
         >
@@ -870,7 +870,7 @@ function PropertyMenu({
         minWidth: 240,
         maxWidth: 320,
         zIndex: 20,
-        boxShadow: "0 8px 24px rgba(19,46,32,0.12)",
+        boxShadow: "0 8px 24px rgba(15,24,21,0.12)",
       }}
     >
       {properties.map((p) => (
@@ -1421,7 +1421,7 @@ function DayCellContents({
               style={{
                 width: 8,
                 height: 1.5,
-                background: "var(--golden)",
+                background: "var(--koast-trench)",
                 borderRadius: 1,
                 display: "block",
               }}

@@ -16,9 +16,9 @@ export default function EmptyState({ icon: Icon, title, description, action }: E
     <div className="flex flex-col items-center justify-center py-16">
       <div
         className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-        style={{ backgroundColor: "rgba(196,154,90,0.1)" }}
+        style={{ backgroundColor: "rgba(76,196,204,0.1)" }}
       >
-        <Icon size={24} style={{ color: "var(--golden)" }} />
+        <Icon size={24} style={{ color: "var(--koast-trench)" }} />
       </div>
       <h3 className="text-base font-bold mb-1" style={{ color: "var(--coastal)" }}>
         {title}

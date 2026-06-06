@@ -23,7 +23,7 @@ export default function PortfolioSignalSummary({ recommendations, topN = 5 }: Pr
     <KoastCard variant="elevated">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Sparkles size={14} color="var(--golden)" />
+          <Sparkles size={14} color="var(--koast-trench)" />
           <span
             style={{
               fontSize: 11,

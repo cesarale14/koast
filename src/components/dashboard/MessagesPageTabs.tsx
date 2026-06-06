@@ -31,7 +31,7 @@ export default function MessagesPageTabs({ inboxContent, templatesContent }: Mes
               className="pb-3 text-[13px] font-semibold transition-colors"
               style={{
                 color: active ? "var(--coastal)" : "var(--tideline)",
-                borderBottom: active ? "2px solid var(--golden)" : "2px solid transparent",
+                borderBottom: active ? "2px solid var(--koast-trench)" : "2px solid transparent",
                 marginBottom: -1,
               }}
               onMouseEnter={(e) => {

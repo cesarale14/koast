@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BRAND_PALETTE } from "@/lib/brand/palette";
 
 interface DailyPoint {
   date: string;
@@ -16,8 +17,9 @@ interface RevenueChartProps {
 }
 
 // Animated, Canvas-drawn revenue chart per DESIGN_SYSTEM.md Section 16.
-// Lagoon line (#1a7a5a) with gradient area fill, dry-sand grid lines,
-// tideline labels. No chart library — all rAF. Redraws on resize.
+// Success-green line (BRAND_PALETTE.success) with gradient area fill,
+// rule grid lines, muted-ink labels. Colors come from the shared brand
+// palette (canvas can't read CSS vars). No chart library — all rAF.
 export default function RevenueChart({ data, delay = 900 }: RevenueChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
@@ -64,10 +66,10 @@ export default function RevenueChart({ data, delay = 900 }: RevenueChartProps) {
         ctx.clearRect(0, 0, w, h);
 
         // Grid lines + y-axis labels
-        ctx.strokeStyle = "#ede7db"; // dry-sand
+        ctx.strokeStyle = BRAND_PALETTE.rule; // grid lines
         ctx.lineWidth = 0.5;
         ctx.font = "10px 'Plus Jakarta Sans', system-ui, sans-serif";
-        ctx.fillStyle = "#3d6b52"; // tideline
+        ctx.fillStyle = BRAND_PALETTE.ink3; // muted labels
         ctx.textAlign = "right";
         for (let i = 0; i < 5; i++) {
           const y = PAD_T + (ch / 4) * i;
@@ -109,7 +111,7 @@ export default function RevenueChart({ data, delay = 900 }: RevenueChartProps) {
           ctx.beginPath();
           ctx.moveTo(getX(0), getY(data[0].revenue));
           for (let i = 1; i < pts; i++) ctx.lineTo(getX(i), getY(data[i].revenue));
-          ctx.strokeStyle = "#1a7a5a"; // lagoon
+          ctx.strokeStyle = BRAND_PALETTE.success; // revenue line stays success-green
           ctx.lineWidth = 2;
           ctx.lineJoin = "round";
           ctx.lineCap = "round";
@@ -121,11 +123,11 @@ export default function RevenueChart({ data, delay = 900 }: RevenueChartProps) {
           const dotY = getY(data[lastI].revenue);
           ctx.beginPath();
           ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
-          ctx.fillStyle = "#1a7a5a";
+          ctx.fillStyle = BRAND_PALETTE.success;
           ctx.fill();
           ctx.beginPath();
           ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = BRAND_PALETTE.white;
           ctx.fill();
         }
 

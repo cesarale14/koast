@@ -119,7 +119,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
   const node = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(19,46,32,0.45)" }}
+      style={{ background: "rgba(15,24,21,0.45)" }}
       onClick={tryClose}
     >
       <div
@@ -129,7 +129,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
       >
         <div className="flex items-start justify-between p-5" style={{ borderBottom: "1px solid var(--dry-sand)" }}>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--golden)" }}>
+            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--koast-trench)" }}>
               Guest review
             </div>
             <div className="text-[16px] font-semibold mt-0.5" style={{ color: "var(--coastal)" }}>
@@ -200,7 +200,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
                           type="button"
                           onClick={() => setScores({ ...scores, [cat]: n })}
                           className="text-[18px] font-mono cursor-pointer"
-                          style={{ color: active ? "var(--golden)" : "var(--shell)" }}
+                          style={{ color: active ? "var(--koast-trench)" : "var(--shell)" }}
                           aria-label={`${CATEGORY_LABELS[cat]} ${n} of 5`}
                         >
                           ★
@@ -224,11 +224,11 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
                 onClick={generateDraft}
                 disabled={generating}
                 className="inline-flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
-                style={{ color: "var(--golden)" }}
+                style={{ color: "var(--koast-trench)" }}
               >
                 {generating ? (
                   <>
-                    <span className="inline-block w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--golden)", borderTopColor: "transparent" }} />
+                    <span className="inline-block w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--koast-trench)", borderTopColor: "transparent" }} />
                     Generating…
                   </>
                 ) : (
@@ -317,7 +317,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
       {confirmOpen && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-          style={{ background: "rgba(19,46,32,0.55)" }}
+          style={{ background: "rgba(15,24,21,0.55)" }}
           onClick={() => !submitting && setConfirmOpen(false)}
         >
           <div

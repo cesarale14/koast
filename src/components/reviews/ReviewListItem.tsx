@@ -48,7 +48,7 @@ function Stars({ rating }: { rating: number | null }) {
   if (rating == null) return null;
   const r = Math.round(rating);
   return (
-    <span className="font-mono text-[12px]" style={{ color: "var(--golden)" }}>
+    <span className="font-mono text-[12px]" style={{ color: "var(--koast-trench)" }}>
       {"★".repeat(Math.max(0, Math.min(5, r)))}
       <span style={{ color: "var(--shell)" }}>{"☆".repeat(Math.max(0, 5 - r))}</span>
     </span>
@@ -65,7 +65,7 @@ function statusBadge(review: ReviewListEntry): React.ReactNode {
     return (
       <span
         className="text-[10px] font-semibold px-2 py-0.5"
-        style={{ borderRadius: 999, background: "rgba(196,154,90,0.1)", color: "var(--golden)" }}
+        style={{ borderRadius: 999, background: "rgba(76,196,204,0.1)", color: "var(--koast-trench)" }}
       >
         Awaiting guest review
       </span>

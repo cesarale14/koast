@@ -432,14 +432,14 @@ export default function MonthlyView({
                   backgroundColor: isConflict
                     ? "rgba(196,64,64,0.06)"
                     : isSelected
-                    ? "rgba(196,154,90,0.06)"
+                    ? "rgba(76,196,204,0.06)"
                     : "transparent",
-                  boxShadow: isSelected ? "inset 0 0 0 2px var(--golden)" : undefined,
+                  boxShadow: isSelected ? "inset 0 0 0 2px var(--koast-trench)" : undefined,
                   opacity: day.inMonth ? 1 : 0.25,
                   zIndex: isSelected ? 2 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected && day.inMonth) e.currentTarget.style.backgroundColor = "rgba(196,154,90,0.03)";
+                  if (!isSelected && day.inMonth) e.currentTarget.style.backgroundColor = "rgba(76,196,204,0.03)";
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) {

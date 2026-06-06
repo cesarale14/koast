@@ -321,7 +321,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
       {/* scrim */}
       <div
         className="absolute inset-0"
-        style={{ background: "rgba(19,46,32,0.4)" }}
+        style={{ background: "rgba(15,24,21,0.4)" }}
         onClick={onClose}
       />
 
@@ -331,7 +331,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
         aria-modal="true"
         aria-label="Review detail"
         className="relative ml-auto w-full sm:w-[520px] h-full bg-white overflow-y-auto"
-        style={{ boxShadow: "-12px 0 32px rgba(19,46,32,0.18)" }}
+        style={{ boxShadow: "-12px 0 32px rgba(15,24,21,0.18)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -450,7 +450,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
 
           {/* Rating + flags */}
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1" style={{ color: "var(--golden)" }}>
+            <div className="flex items-center gap-1" style={{ color: "var(--koast-trench)" }}>
               <span className="font-mono text-[14px]">
                 {review.incoming_rating != null
                   ? "★".repeat(Math.max(0, Math.min(5, Math.round(review.incoming_rating))))
@@ -485,7 +485,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
 
           {/* Public review */}
           <section>
-            <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--golden)" }}>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--koast-trench)" }}>
               Guest review
             </h3>
             {review.incoming_text ? (
@@ -519,7 +519,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
           {/* Subratings */}
           {Array.isArray(review.subratings) && review.subratings.length > 0 && (
             <section>
-              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--golden)" }}>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--koast-trench)" }}>
                 Subratings
               </h3>
               <div className="space-y-2">
@@ -545,7 +545,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
               AND the host hasn't already replied. */}
           {!review.is_hidden && !review.response_sent && (
             <section>
-              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--golden)" }}>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--koast-trench)" }}>
                 Public reply on {cleanPropertyName(review.property_name)}
               </h3>
               {channelRule && (
@@ -621,7 +621,7 @@ export default function ReviewSlideOver({ review, open, onClose, onRefresh }: Re
               already-sent / window-expired gates inside guestReviewBlock). */}
           {guestReviewBlock && (
             <section>
-              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--golden)" }}>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--koast-trench)" }}>
                 Submit a review for {review.display_guest_name}
               </h3>
               <p className="text-[11px] mb-3" style={{ color: "var(--tideline)" }}>

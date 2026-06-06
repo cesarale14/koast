@@ -138,7 +138,7 @@ const GAP_DOT: Record<AgendaGap["kind"], string> = {
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--golden)", marginBottom: 12 }}>
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--koast-trench)", marginBottom: 12 }}>
       {children}
     </div>
   );

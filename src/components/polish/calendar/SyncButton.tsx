@@ -64,7 +64,7 @@ export default function SyncButton({
     if (state === "pending" && pendingCount > 0) {
       return {
         label: `Sync ${pendingCount} change${pendingCount === 1 ? "" : "s"}`,
-        bg: "var(--golden)",
+        bg: "var(--koast-trench)",
         fg: "var(--deep-sea)",
         icon: <RefreshCw size={14} />,
         disabled: false,

@@ -290,7 +290,7 @@ function SyncBadge({ label, color }: { label: string; color: "lagoon" | "amber-t
 function SectionLabel({ label, delay }: { label: string; delay: number }) {
   return (
     <div
-      className="text-[11px] font-bold tracking-[0.08em] uppercase text-golden mb-[14px] koast-anim-sm"
+      className="text-[11px] font-bold tracking-[0.08em] uppercase text-coastal mb-[14px] koast-anim-sm"
       style={{ animationDelay: `${delay}ms` }}
     >
       {label}
@@ -464,7 +464,7 @@ function Metric({
       <div className="text-[16px] font-bold text-coastal" style={{ letterSpacing: "-0.03em" }}>
         {display}
       </div>
-      <div className="text-[9px] font-bold uppercase tracking-[0.06em] text-golden mt-[1px]">
+      <div className="text-[9px] font-bold uppercase tracking-[0.06em] text-coastal mt-[1px]">
         {label}
       </div>
     </div>
@@ -611,7 +611,7 @@ function GlassCard({
       >
         {display}
       </div>
-      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-golden mt-1 relative z-[1]">
+      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-coastal mt-1 relative z-[1]">
         {label}
       </div>
       <div className={`text-[11px] font-semibold mt-1.5 flex items-center gap-1 relative z-[1] ${trendColor}`}>
@@ -727,7 +727,7 @@ function FeedIconCircle({ tone, Icon }: { tone: string; Icon: typeof Check }) {
   const palette: Record<string, { from: string; to: string; fg: string }> = {
     lagoon: { from: "rgba(26,122,90,0.12)", to: "rgba(26,122,90,0.04)", fg: "var(--lagoon)" },
     "deep-water": { from: "rgba(42,90,138,0.12)", to: "rgba(42,90,138,0.04)", fg: "var(--deep-water)" },
-    golden: { from: "rgba(196,154,90,0.15)", to: "rgba(196,154,90,0.04)", fg: "var(--golden)" },
+    golden: { from: "rgba(76,196,204,0.15)", to: "rgba(76,196,204,0.04)", fg: "var(--koast-trench)" },
     "amber-tide": { from: "rgba(212,150,11,0.12)", to: "rgba(212,150,11,0.04)", fg: "var(--amber-tide)" },
   };
   const p = palette[tone] ?? palette.lagoon;
@@ -758,7 +758,7 @@ function AIInsights({ actions }: { actions: ActionItem[] }) {
         <div
           className="absolute -top-[40%] -right-[20%] w-[250px] h-[250px] rounded-full pointer-events-none"
           style={{
-            background: "radial-gradient(circle, rgba(196,154,90,0.08), transparent 70%)",
+            background: "radial-gradient(circle, rgba(76,196,204,0.08), transparent 70%)",
             animation: "koast-glow 4s ease-in-out infinite",
           }}
         />
@@ -784,14 +784,14 @@ function AIBadge() {
     <div
       className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-[14px] mb-2.5 relative z-[1]"
       style={{
-        backgroundColor: "rgba(196,154,90,0.15)",
-        color: "var(--golden)",
-        border: "1px solid rgba(196,154,90,0.2)",
+        backgroundColor: "rgba(76,196,204,0.15)",
+        color: "var(--koast-trench)",
+        border: "1px solid rgba(76,196,204,0.2)",
         fontSize: 10,
         fontWeight: 600,
       }}
     >
-      <span className="w-[5px] h-[5px] rounded-full bg-golden" />
+      <span className="w-[5px] h-[5px] rounded-full bg-lume" />
       Koast AI
     </div>
   );
@@ -818,7 +818,7 @@ function AIInsightCard({ action, index }: { action: ActionItem; index: number })
       <div
         className="absolute -top-[40%] -right-[20%] w-[250px] h-[250px] rounded-full pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(196,154,90,0.08), transparent 70%)",
+          background: "radial-gradient(circle, rgba(76,196,204,0.08), transparent 70%)",
           animation: "koast-glow 4s ease-in-out infinite",
         }}
       />
@@ -829,7 +829,7 @@ function AIInsightCard({ action, index }: { action: ActionItem; index: number })
       </div>
       {dollarValue > 0 && (
         <div
-          className="text-[22px] font-bold text-golden mb-3 relative z-[1]"
+          className="text-[22px] font-bold text-lume mb-3 relative z-[1]"
           style={{ letterSpacing: "-0.03em" }}
         >
           +${Math.round(animatedDollar).toLocaleString("en-US")} potential
@@ -839,7 +839,7 @@ function AIInsightCard({ action, index }: { action: ActionItem; index: number })
         <Link
           href={primaryHref}
           className="px-4 py-2 rounded-lg text-[11px] font-semibold transition-colors"
-          style={{ backgroundColor: "var(--golden)", color: "var(--deep-sea)" }}
+          style={{ backgroundColor: "var(--koast-trench)", color: "var(--deep-sea)" }}
         >
           {primaryLabel}
         </Link>

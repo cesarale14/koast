@@ -570,7 +570,7 @@ function ConversationList({
             placeholder="Search guests..."
             className="w-full outline-none transition-all"
             style={{ padding: "9px 12px 9px 34px", border: "1.5px solid var(--dry-sand)", borderRadius: 10, fontSize: 13, fontWeight: 500, color: "var(--coastal)", backgroundColor: "rgba(255,255,255,0.7)" }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--golden)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)"; }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--koast-trench)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(76,196,204,0.12)"; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dry-sand)"; e.currentTarget.style.boxShadow = ""; }}
           />
         </div>
@@ -652,8 +652,8 @@ function ConversationItem({ t, active, index, onSelect }: {
       className="koast-convo-item w-full text-left flex items-start gap-3 px-4 py-3 transition-colors"
       style={{
         borderBottom: "1px solid rgba(237,231,219,0.5)",
-        backgroundColor: active ? "rgba(196,154,90,0.06)" : "transparent",
-        borderLeft: active ? "3px solid var(--golden)" : "3px solid transparent",
+        backgroundColor: active ? "rgba(76,196,204,0.06)" : "transparent",
+        borderLeft: active ? "3px solid var(--koast-trench)" : "3px solid transparent",
         animationDelay: `${index * 50}ms`,
       }}
       onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = "rgba(237,231,219,0.3)"; }}
@@ -696,7 +696,7 @@ function ConversationItem({ t, active, index, onSelect }: {
           </p>
           {isUnread && (
             <span className="flex-shrink-0 mt-[5px] rounded-full"
-              style={{ width: 8, height: 8, backgroundColor: "var(--golden)" }} />
+              style={{ width: 8, height: 8, backgroundColor: "var(--koast-trench)" }} />
           )}
         </div>
       </div>
@@ -764,7 +764,7 @@ function ThreadColumn({
             type="button"
             onClick={onBack}
             className="md:hidden flex items-center justify-center flex-shrink-0 rounded-lg transition-colors"
-            style={{ width: 34, height: 34, color: "var(--coastal)", backgroundColor: "rgba(196,154,90,0.08)" }}
+            style={{ width: 34, height: 34, color: "var(--coastal)", backgroundColor: "rgba(76,196,204,0.08)" }}
             aria-label="Back to inbox"
           >
             <ChevronLeft size={18} strokeWidth={2.25} />
@@ -873,11 +873,11 @@ function ThreadColumn({
                 className="flex items-center justify-center flex-shrink-0 self-center transition-opacity"
                 style={{
                   width: 40, height: 40, borderRadius: "50%",
-                  background: "linear-gradient(135deg, var(--golden), #a87d3a)",
+                  background: "linear-gradient(135deg, var(--koast-trench), #a87d3a)",
                   color: "var(--deep-sea)", fontWeight: 800, fontSize: 15,
                   opacity: drafting ? 0.65 : canDraft ? 1 : 0.45,
                   cursor: canDraft ? "pointer" : "not-allowed",
-                  boxShadow: "0 2px 8px rgba(196,154,90,0.25)",
+                  boxShadow: "0 2px 8px rgba(76,196,204,0.25)",
                 }}
                 title={
                   drafting
@@ -905,7 +905,7 @@ function ThreadColumn({
               backgroundColor: "rgba(255,255,255,0.7)",
               minHeight: 44, maxHeight: 160, fontFamily: "inherit",
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--golden)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.12)"; }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--koast-trench)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(76,196,204,0.12)"; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dry-sand)"; e.currentTarget.style.boxShadow = ""; }}
             onInput={(e) => {
               const el = e.currentTarget;
@@ -1142,7 +1142,7 @@ function GuestContextPanel({ thread, property, mounted }: {
           <div className="mt-3">
             <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold"
               style={{
-                backgroundColor: statusColor === "lagoon" ? "rgba(26,122,90,0.1)" : statusColor === "golden" ? "rgba(196,154,90,0.1)" : "rgba(61,107,82,0.1)",
+                backgroundColor: statusColor === "lagoon" ? "rgba(26,122,90,0.1)" : statusColor === "golden" ? "rgba(76,196,204,0.1)" : "rgba(61,107,82,0.1)",
                 color: `var(--${statusColor})`,
               }}
             >
@@ -1193,7 +1193,7 @@ function GuestContextPanel({ thread, property, mounted }: {
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <div className="mb-3 text-[10px] font-bold tracking-[0.08em] uppercase" style={{ color: "var(--golden)" }}>
+    <div className="mb-3 text-[10px] font-bold tracking-[0.08em] uppercase" style={{ color: "var(--koast-trench)" }}>
       {label}
     </div>
   );
@@ -1203,7 +1203,7 @@ function EmptyThreadState() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-8" style={{ backgroundColor: "var(--shore)" }}>
       <div className="flex items-center justify-center mb-5"
-        style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: "rgba(196,154,90,0.1)", color: "var(--golden)" }}
+        style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: "rgba(76,196,204,0.1)", color: "var(--koast-trench)" }}
       >
         <MessageCircle size={30} strokeWidth={1.5} />
       </div>

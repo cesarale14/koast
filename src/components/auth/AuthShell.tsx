@@ -19,7 +19,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           right: "-120px",
           width: 600,
           height: 600,
-          background: "radial-gradient(circle, rgba(196,154,90,0.06), transparent 70%)",
+          background: "radial-gradient(circle, rgba(76,196,204,0.07), transparent 70%)",
         }}
       />
       <div
@@ -29,7 +29,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           left: "-100px",
           width: 400,
           height: 400,
-          background: "radial-gradient(circle, rgba(26,122,90,0.05), transparent 70%)",
+          background: "radial-gradient(circle, rgba(14,122,138,0.06), transparent 70%)",
         }}
       />
 
@@ -82,7 +82,7 @@ function LogoRow() {
           style={{
             fontSize: 32,
             fontWeight: 800,
-            color: "var(--golden)",
+            color: "#fff",
             letterSpacing: "-0.03em",
             lineHeight: 1,
           }}
@@ -170,8 +170,8 @@ export function AuthInput({
           color: "#fff",
         }}
         onFocus={(e) => {
-          e.currentTarget.style.borderColor = "var(--golden)";
-          e.currentTarget.style.boxShadow = "0 0 0 3px rgba(196,154,90,0.15)";
+          e.currentTarget.style.borderColor = "var(--koast-tide)";
+          e.currentTarget.style.boxShadow = "0 0 0 3px rgba(76,196,204,0.18)";
           e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)";
         }}
         onBlur={(e) => {

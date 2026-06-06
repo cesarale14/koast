@@ -75,7 +75,7 @@ export default function TodayHomePreview({ searchParams }: { searchParams: { sta
   return (
     <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--shore)" }}>
       <div style={{ flexShrink: 0, display: "flex", gap: 16, alignItems: "center", padding: "10px 16px", borderBottom: "1px solid var(--hairline)", fontSize: 12 }}>
-        <span style={{ color: "var(--golden)", fontWeight: 700, letterSpacing: "0.08em" }}>PREVIEW</span>
+        <span style={{ color: "var(--koast-trench)", fontWeight: 700, letterSpacing: "0.08em" }}>PREVIEW</span>
         {tab("Busy", "/_preview/today-home?state=busy", !isClear)}
         {tab("All-clear", "/_preview/today-home?state=clear", isClear)}
       </div>

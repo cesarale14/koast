@@ -76,7 +76,7 @@ export default function AvailabilityTab({
                   fontSize: 12,
                   fontWeight: active ? 600 : 500,
                   cursor: disabled ? "not-allowed" : "pointer",
-                  boxShadow: active ? "0 1px 3px rgba(19,46,32,0.08)" : "none",
+                  boxShadow: active ? "0 1px 3px rgba(15,24,21,0.08)" : "none",
                   transition: "background-color 160ms ease, color 160ms ease, box-shadow 160ms ease",
                   textTransform: "capitalize",
                 }}

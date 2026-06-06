@@ -325,8 +325,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
         <Header stats={stats} cleanerCount={cleaners.length} onShowCleaners={() => setShowCleaners(!showCleaners)} onBackfill={backfill} backfilling={backfilling} />
         <div className="flex items-center justify-center py-20">
           <div className="text-center max-w-sm">
-            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: "rgba(196,154,90,0.12)" }}>
-              <Sparkles className="w-8 h-8" style={{ color: "var(--golden)" }} />
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: "rgba(76,196,204,0.12)" }}>
+              <Sparkles className="w-8 h-8" style={{ color: "var(--koast-trench)" }} />
             </div>
             <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--coastal)" }}>No upcoming turnovers</h2>
             <p className="text-sm mb-6" style={{ color: "var(--tideline)" }}>
@@ -354,7 +354,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       {/* Cleaners management panel */}
       {showCleaners && (
         <div className="mb-6 bg-white p-5" style={{ borderRadius: 14, boxShadow: "var(--shadow-card)", border: "1px solid var(--dry-sand)" }}>
-          <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--golden)" }}>MANAGE CLEANERS</div>
+          <div className="text-[11px] font-bold tracking-[0.08em] uppercase mb-[14px]" style={{ color: "var(--koast-trench)" }}>MANAGE CLEANERS</div>
           <div className="space-y-2 mb-4">
             {cleaners.map((c) => {
               const sms = smsState[c.id];
@@ -408,7 +408,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             className="flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap border-b-2 -mb-px"
             style={
               activeTab === tab.key
-                ? { color: "var(--coastal)", borderColor: "var(--golden)" }
+                ? { color: "var(--coastal)", borderColor: "var(--koast-trench)" }
                 : { color: "var(--tideline)", borderColor: "transparent" }
             }
           >
@@ -418,7 +418,7 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
                 className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                 style={
                   activeTab === tab.key
-                    ? { backgroundColor: "rgba(196,154,90,0.12)", color: "var(--golden)" }
+                    ? { backgroundColor: "rgba(76,196,204,0.12)", color: "var(--koast-trench)" }
                     : { backgroundColor: "var(--shore)", color: "var(--tideline)" }
                 }
               >{tab.count}</span>
@@ -430,8 +430,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       {/* Content */}
       {filteredTasks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: "rgba(196,154,90,0.12)" }}>
-            <CheckCircle2 size={20} style={{ color: "var(--golden)" }} />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: "rgba(76,196,204,0.12)" }}>
+            <CheckCircle2 size={20} style={{ color: "var(--koast-trench)" }} />
           </div>
           <p className="text-sm" style={{ color: "var(--tideline)" }}>
             {activeTab === "today" ? "No turnovers today" : activeTab === "completed" ? "No completed tasks yet" : "No tasks found"}
