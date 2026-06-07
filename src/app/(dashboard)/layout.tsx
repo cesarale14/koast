@@ -22,6 +22,7 @@ import {
   Bell, Settings, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { KoastMark } from "@/components/chat/KoastMark";
 
 interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; badge?: number | null; }
 interface NavGroup { label?: string; items: NavItem[]; }
@@ -140,19 +141,10 @@ function GroupLabel({ label }: { label: string }) {
   );
 }
 
-/* ---- Logo mark "K" with gold glow — gold KEEPER (logo glow per recolor decision) ---- */
+/* ---- Logo mark — canonical teal KoastMark (logo unification; replaces the
+       old gold "K" tile). Single source: src/components/chat/KoastMark.tsx. ---- */
 function LogoMark() {
-  return (
-    <div
-      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-      style={{
-        backgroundColor: "var(--golden)",
-        boxShadow: "var(--shadow-logo-glow)",
-      }}
-    >
-      <span className="text-white text-base font-bold tracking-tight">K</span>
-    </div>
-  );
+  return <KoastMark size={36} />;
 }
 
 /* ---- Desktop sidebar ---- */

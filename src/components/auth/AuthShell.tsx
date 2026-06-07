@@ -3,6 +3,8 @@
 // Shared layout/helpers for the login + signup pages — Koast dark theme
 // per DESIGN_SYSTEM.md Section 17.10.
 
+import { KoastMark } from "@/components/chat/KoastMark";
+
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -57,27 +59,8 @@ function LogoRow() {
   return (
     <div className="flex flex-col items-center mb-9">
       <div className="flex items-center gap-3 mb-4">
-        <div
-          className="flex items-center justify-center"
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            background: "linear-gradient(135deg, var(--golden), #a87d3a)",
-            boxShadow: "0 4px 24px rgba(196,154,90,0.4)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: "var(--deep-sea)",
-              lineHeight: 1,
-            }}
-          >
-            K
-          </span>
-        </div>
+        {/* Logo unification — canonical teal KoastMark (was gold K-tile). */}
+        <KoastMark size={44} />
         <span
           style={{
             fontSize: 32,

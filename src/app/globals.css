@@ -53,9 +53,11 @@
   --tideline: #6e7976;       /* muted text / icons / secondary text → neutral gray (legible on light) */
 
   /* Accent — golden retained as a token but reserved for the primary
-   * CTA + logo glow ONLY. Its structural feeders are remapped to teal
-   * below (section labels, sidebar-active, focus → tide; ink → near-black). */
-  --golden: #c49a5a;         /* gold — primary CTA + logo glow ONLY (rare warm pop) */
+   * CTA ONLY (logo glow retired with the gold K-tile in the logo
+   * unification; --shadow-logo-glow below is now unused). Structural
+   * feeders are remapped to teal below (section labels, sidebar-active,
+   * focus → tide; ink → near-black). */
+  --golden: #c49a5a;         /* gold — primary CTA ONLY (rare warm pop) */
   --driftwood: #a8e0e3;      /* light accent → shoal teal */
   --sandbar: #d4eef0;        /* accent backgrounds → shore-mist blueish-white */
 
