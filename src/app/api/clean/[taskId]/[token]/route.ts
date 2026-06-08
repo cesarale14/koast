@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getVapidPublicKey } from "@/lib/push/vapid";
 
 export async function GET(
   _request: Request,
@@ -11,7 +12,7 @@ export async function GET(
     // Validate token
     const { data: tasks } = await supabase
       .from("cleaning_tasks")
-      .select("id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, checklist, notes, cleaner_token")
+      .select("id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, checklist, notes, cleaner_token, cleaner_id")
       .eq("id", params.taskId)
       .eq("cleaner_token", params.token)
       .limit(1);
@@ -62,6 +63,11 @@ export async function GET(
       property,
       checkoutGuest,
       nextGuest,
+      // TURN-S2-send: cleaner_id gates the enable-alerts UI (only an assigned
+      // task can bind a device); vapidPublicKey is the browser
+      // applicationServerKey. Null when push isn't configured (env unset).
+      cleanerId: task.cleaner_id ?? null,
+      vapidPublicKey: getVapidPublicKey(),
     });
   } catch (err) {
     return NextResponse.json(

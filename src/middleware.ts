@@ -7,6 +7,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // sw.js + manifest.webmanifest exempted (TURN-S2-send): the root-scoped
+    // service worker and PWA manifest must be served without auth-session
+    // middleware so the cleaner PWA registers cleanly at scope "/".
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
