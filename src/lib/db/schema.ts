@@ -579,6 +579,22 @@ export const cleaners = pgTable("cleaners", {
   index("idx_cleaners_user").on(t.userId),
 ]);
 
+// ==================== Cleaner Push Subscriptions (TURN-S2-send) ====================
+// Web-push subscriptions for the cleaner PWA. Service-role access only
+// (RLS enabled, no policies). Migration 20260608010000.
+export const cleanerPushSubscriptions = pgTable("cleaner_push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cleanerId: uuid("cleaner_id").notNull().references(() => cleaners.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_cleaner_push_subscriptions_cleaner").on(t.cleanerId),
+]);
+
 // ==================== SMS Log ====================
 
 export const smsLog = pgTable("sms_log", {

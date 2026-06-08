@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { notifyCleanerAssigned } from "@/lib/notifications";
+import { sendAssignmentPush } from "@/lib/push/send";
 
 export async function POST(request: NextRequest) {
   const auth = createAuthClient();
@@ -79,16 +79,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No rows updated" }, { status: 500 });
   }
 
-  // Send SMS notification (best-effort)
+  // TURN-S2-send — notify the cleaner via web-push (replaces the abandoned
+  // SMS path). Best-effort: the assignment is already committed above, so a
+  // push failure must not fail the request. sendAssignmentPush fans out to all
+  // of the cleaner's installed devices and prunes any 410-Gone endpoints.
+  let push;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await notifyCleanerAssigned(svc as any, task, prop.name, cleaner, {
-      checkoutTime: task.scheduled_time ?? undefined,
-      userId: user.id,
+    const dateLabel = new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    push = await sendAssignmentPush(svc, {
+      cleanerId: cleanerId,
+      url: `/clean/${task.id}/${task.cleaner_token}`,
+      title: "New cleaning job",
+      body: `${prop.name} · ${dateLabel}`,
     });
   } catch (err) {
-    console.warn("[turnover/assign] SMS notify failed:", err);
+    console.warn("[turnover/assign] push notify failed:", err);
   }
 
-  return NextResponse.json({ assigned: true, cleanerName: cleaner.name });
+  return NextResponse.json({ assigned: true, cleanerName: cleaner.name, push: push ?? null });
 }

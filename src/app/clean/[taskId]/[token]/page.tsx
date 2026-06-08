@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import EnableAlerts from "@/components/clean/EnableAlerts";
 
 interface ChecklistItem {
   id: string;
@@ -20,6 +21,8 @@ interface TaskData {
   property: { name: string; address: string; city: string; state: string; zip: string };
   checkoutGuest: { guest_name: string; check_out: string } | null;
   nextGuest: { guest_name: string; check_in: string } | null;
+  cleanerId: string | null;
+  vapidPublicKey: string | null;
 }
 
 export default function CleanerMobilePage({
@@ -171,6 +174,12 @@ export default function CleanerMobilePage({
             </div>
           )}
         </div>
+
+        {/* Enable job alerts (TURN-S2-send) — only for an assigned task, since
+            the subscription binds to the task's cleaner. */}
+        {data.cleanerId && (
+          <EnableAlerts taskId={params.taskId} token={params.token} vapidPublicKey={data.vapidPublicKey} />
+        )}
 
         {/* Notes */}
         {task.notes && (
