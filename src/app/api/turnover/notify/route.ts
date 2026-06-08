@@ -1,23 +1,23 @@
-// TURN-S1a — POST /api/turnover/notify
+// POST /api/turnover/notify — manual "notify the cleaner about this job".
 //
-// Replaces the placeholder `alert("SMS notifications coming soon...")`
-// in TurnoverBoard.tsx (was at :571-577 desktop and :747-755 expanded
-// panel). Real Twilio send via the existing notifyCleanerReminder
-// helper at src/lib/notifications/index.ts:56-81.
+// TURN-S2-send: fires the SAME web-push dispatch as the assign path
+// (sendAssignmentPush) and returns its summary. SMS (notifyCleanerReminder)
+// is retired — the toll-free number is unverified and never delivered, so the
+// old path was both the wrong channel and a false-success toast.
 //
-// Auth: getAuthenticatedUser + property-ownership double-check (same
-// shape as /api/turnover/update).
+// Auth: getUser + property-ownership double-check (same shape as
+// /api/turnover/update).
 // Body: { taskId: uuid }
-// Response: 200 { notified: true, sid }; 400 if no cleaner assigned;
-//   404 task/cleaner missing; 403 not your property; 500 Twilio error.
+// Response: 200 { notified: true, cleaner_name, push: { configured, total,
+//   sent, pruned, failed } }; 400 if no cleaner assigned; 404 task/cleaner
+//   missing; 403 not your property.
 //
-// Logs every 4xx/5xx to stderr so Vercel logs surface failures
-// (Amendment 3).
+// Logs every 4xx/5xx to stderr so Vercel logs surface failures.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { notifyCleanerReminder } from "@/lib/notifications";
+import { sendAssignmentPush } from "@/lib/push/send";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -85,17 +85,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Cleaner not found" }, { status: 404 });
     }
 
-    try {
-      await notifyCleanerReminder(svc, task, prop.name, prop.address ?? "", cleaner, {
-        checkoutTime: task.scheduled_time ?? undefined,
-        userId: user.id,
-      });
-      return NextResponse.json({ notified: true, cleaner_name: cleaner.name });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Twilio send failed";
-      console.error("[turnover/notify] FAILED 500 (Twilio)", { taskId, error: msg });
-      return NextResponse.json({ error: msg }, { status: 500 });
-    }
+    // TURN-S2-send wiring — Notify now fires the SAME web-push dispatch as the
+    // assign path (SMS retired). Reuses sendAssignmentPush: sends to all of the
+    // cleaner's cleaner_push_subscriptions, deep-links to the job, 410-prunes
+    // dead endpoints. Returns the send summary so the UI gives honest feedback
+    // (devices reached / none subscribed / not configured) instead of a fake
+    // "SMS sent" toast.
+    const dateLabel = new Date(task.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const push = await sendAssignmentPush(svc, {
+      cleanerId: task.cleaner_id,
+      url: `/clean/${task.id}/${task.cleaner_token}`,
+      title: "Cleaning job",
+      body: `${prop.name} · ${dateLabel}`,
+    });
+    return NextResponse.json({ notified: true, cleaner_name: cleaner.name, push });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[turnover/notify] FAILED 500 (outer)", { error: msg });
