@@ -245,7 +245,18 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      toast(`SMS sent to ${cleanerName}`);
+      // Honest feedback from the web-push send summary (S2-send). No more
+      // fake "SMS sent" — report devices reached / none subscribed / unconfigured.
+      const push = data.push as { configured: boolean; total: number; sent: number } | undefined;
+      if (!push || !push.configured) {
+        toast("Push not configured", "error");
+      } else if (push.total === 0) {
+        toast(`No devices subscribed yet — ${cleanerName} needs to enable alerts`, "error");
+      } else if (push.sent === 0) {
+        toast(`Couldn't reach ${cleanerName}'s device(s) — they may need to re-enable alerts`, "error");
+      } else {
+        toast(`Pushed to ${push.sent} device${push.sent === 1 ? "" : "s"}`);
+      }
     } catch (err) {
       toast(err instanceof Error ? err.message : "Notify failed", "error");
     } finally {
