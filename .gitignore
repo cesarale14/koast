@@ -76,6 +76,11 @@ __pycache__/
 .m*-cp5-draft.txt
 .m*-checkpoint*.md
 
+# Koast v1 End-to-End Execution Program working files (P1-P7 phases).
+# Same STOP/plan-scratch discipline as the .m* milestone files above —
+# authored during phase ultraplanning, removed before/after the phase report.
+.koast-v1-*.md
+
 # Intentionally untracked (project-specific, do NOT stage):
 # - KOAST_METHOD.md           method document, integrated separately
 # - KOAST_METHOD_IN_CODE.md   method-in-code document, integrated separately

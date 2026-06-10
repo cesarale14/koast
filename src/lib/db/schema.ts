@@ -378,6 +378,22 @@ export const cleaningTasksRelations = relations(cleaningTasks, ({ one }) => ({
   property: one(properties, { fields: [cleaningTasks.propertyId], references: [properties.id] }),
 }));
 
+/**
+ * cleaning_tasks.status — mirrors the DB CHECK in 001_initial_schema.sql:159
+ * (`status IN ('pending','assigned','in_progress','completed','issue')`). Per the
+ * CLAUDE.md CHECK-constrained-text-column convention, app callers that branch on
+ * status get compile-time enforcement matching the database constraint. There is
+ * deliberately no 'cancelled' member — a cancelled booking hard-deletes its
+ * UNSTARTED turnover task (P1.1 `teardownTaskOnCancel`) rather than introducing a
+ * soft-cancel state.
+ */
+export type CleaningTaskStatus =
+  | "pending"
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "issue";
+
 // ==================== Review Rules (DROPPED) ====================
 // M9 Phase G E3 (v2.6): review_rules table dropped via migration
 // 20260517030000_drop_review_rules.sql. Review preferences migrated to

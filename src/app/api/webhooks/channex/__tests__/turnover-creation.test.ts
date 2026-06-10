@@ -41,7 +41,7 @@ function makeStatefulSupabase(seed: Record<string, Row[]>) {
   function from(name: string) {
     if (!tables[name]) tables[name] = [];
     const state: {
-      op: "select" | "insert" | "update";
+      op: "select" | "insert" | "update" | "delete";
       filters: Array<(r: Row) => boolean>;
       insertRows: Row[] | null;
       updateVals: Row | null;
@@ -74,6 +74,10 @@ function makeStatefulSupabase(seed: Record<string, Row[]>) {
         for (const r of matched) Object.assign(r, state.updateVals);
         return { data: state.returning ? matched : null, error: null };
       }
+      if (state.op === "delete") {
+        tables[name] = tables[name].filter((r) => !state.filters.every((f) => f(r)));
+        return { data: state.returning ? matched : null, error: null };
+      }
       // select
       let rows = matched.slice();
       if (state.orderCol) rows.sort((a, b) => String(a[state.orderCol as string] ?? "").localeCompare(String(b[state.orderCol as string] ?? "")));
@@ -86,6 +90,7 @@ function makeStatefulSupabase(seed: Record<string, Row[]>) {
       select() { state.returning = true; return builder; },
       insert(rows: Row | Row[]) { state.op = "insert"; state.insertRows = Array.isArray(rows) ? rows : [rows]; return builder; },
       update(vals: Row) { state.op = "update"; state.updateVals = vals; return builder; },
+      delete() { state.op = "delete"; return builder; },
       eq(c: string, v: unknown) { state.filters.push((r) => r[c] === v); return builder; },
       in(c: string, arr: unknown[]) { state.filters.push((r) => arr.includes(r[c])); return builder; },
       is(c: string, v: unknown) { state.filters.push((r) => (v === null ? r[c] == null : r[c] === v)); return builder; },
@@ -229,5 +234,73 @@ describe("TURN-S1 — createCleaningTask idempotency across webhook + iCal calle
     expect(id2).toBe(id1); // same task returned, not a new one
     expect(tables.cleaning_tasks).toHaveLength(1);
     expect(tables.cleaning_tasks[0].next_booking_id).toBe(FUTURE_BOOKING_ID);
+  });
+});
+
+describe("P1.1 — webhook turnover lifecycle (modification drift + cancellation teardown)", () => {
+  test("booking_modification re-points an unstarted task when the checkout drifts", async () => {
+    const seed = seedTables();
+    // Existing booking + task at the OLD checkout (2026-07-12); the Channex
+    // mock returns departure_date 2026-07-14 → a 2-day drift to reconcile.
+    seed.bookings.push({
+      id: "row-mod-1", property_id: PROP_ID, channex_booking_id: "chx-mod-1",
+      platform: "airbnb", check_in: "2026-07-08", check_out: "2026-07-12",
+      status: "confirmed", guest_name: "Drift Guest",
+    });
+    seed.cleaning_tasks.push({
+      id: "task-mod-1", property_id: PROP_ID, booking_id: "row-mod-1",
+      next_booking_id: null, scheduled_date: "2026-07-12", scheduled_time: "11:30:00",
+      status: "pending", cleaner_id: null, cleaner_token: "tok-mod-1", checklist: [],
+    });
+    const { client, tables } = makeStatefulSupabase(seed);
+    (createServiceClient as jest.Mock).mockReturnValue(client);
+
+    const res = await (await POST(bookingEnvelope("booking_modification", "chx-mod-1", "rev-mod-1"))).json();
+    expect(res.action).toBe("modified");
+
+    const task = tables.cleaning_tasks.find((t) => t.id === "task-mod-1")!;
+    expect(task.scheduled_date).toBe("2026-07-14");          // re-pointed to the modified checkout
+    expect(task.next_booking_id).toBe(FUTURE_BOOKING_ID);    // cleaning window re-resolved
+    expect(tables.cleaning_tasks).toHaveLength(1);           // no duplicate created
+  });
+
+  test("booking_cancellation tears down an UNSTARTED task", async () => {
+    const seed = seedTables();
+    seed.bookings.push({
+      id: "row-can-1", property_id: PROP_ID, channex_booking_id: "chx-can-1",
+      platform: "airbnb", check_in: "2026-08-01", check_out: "2026-08-05",
+      status: "confirmed", guest_name: "Cancel Guest",
+    });
+    seed.cleaning_tasks.push({
+      id: "task-can-1", property_id: PROP_ID, booking_id: "row-can-1",
+      next_booking_id: null, scheduled_date: "2026-08-05", scheduled_time: "11:30:00",
+      status: "assigned", cleaner_id: null, cleaner_token: "tok-can-1", checklist: [],
+    });
+    const { client, tables } = makeStatefulSupabase(seed);
+    (createServiceClient as jest.Mock).mockReturnValue(client);
+
+    const res = await (await POST(bookingEnvelope("booking_cancellation", "chx-can-1", "rev-can-1"))).json();
+    expect(res.action).toBe("cancelled");
+    expect(tables.cleaning_tasks.find((t) => t.id === "task-can-1")).toBeUndefined(); // torn down
+  });
+
+  test("booking_cancellation leaves an in-progress task intact", async () => {
+    const seed = seedTables();
+    seed.bookings.push({
+      id: "row-can-2", property_id: PROP_ID, channex_booking_id: "chx-can-2",
+      platform: "airbnb", check_in: "2026-08-10", check_out: "2026-08-14",
+      status: "confirmed", guest_name: "InProgress Guest",
+    });
+    seed.cleaning_tasks.push({
+      id: "task-can-2", property_id: PROP_ID, booking_id: "row-can-2",
+      next_booking_id: null, scheduled_date: "2026-08-14", scheduled_time: "11:30:00",
+      status: "in_progress", cleaner_id: null, cleaner_token: "tok-can-2", checklist: [],
+    });
+    const { client, tables } = makeStatefulSupabase(seed);
+    (createServiceClient as jest.Mock).mockReturnValue(client);
+
+    const res = await (await POST(bookingEnvelope("booking_cancellation", "chx-can-2", "rev-can-2"))).json();
+    expect(res.action).toBe("cancelled");
+    expect(tables.cleaning_tasks.find((t) => t.id === "task-can-2")).toBeDefined(); // preserved — real work
   });
 });
