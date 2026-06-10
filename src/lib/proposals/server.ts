@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/action-substrate/audit-writer";
 import type { StakesClass } from "@/lib/action-substrate/stakes-registry";
 import { assignCleaner } from "@/lib/turnover/assign";
+import { emitHostNotification } from "@/lib/notifications/host-feed";
 import type { BlockData } from "@/lib/agent/render/blocks";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
@@ -287,6 +288,16 @@ export async function createProposal(
     const finalized = await finalizeProposalAfterExecute(svc, proposal.id, exec);
     if (finalized) proposal = finalized;
     return { proposal, autoExecuted: true };
+  }
+
+  // P2.4: a proposal the AGENT (or a worker/system) suggested for the host
+  // lands in the bell as "review me". Host-created proposals don't self-notify.
+  if (args.createdBy !== "host") {
+    await emitHostNotification(svc, args.hostId, "proposal_created", {
+      proposalId: proposal.id,
+      actionType: args.actionType,
+      rationale: args.rationale ?? null,
+    });
   }
 
   return { proposal, autoExecuted: false };

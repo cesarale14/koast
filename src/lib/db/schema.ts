@@ -1137,6 +1137,40 @@ export type ProposalStatus =
 /** `proposals.created_by` — same vocabulary as agent_audit_log.actor_kind. */
 export type ProposalCreatedBy = AgentAuditLogActorKind;
 
+// ==================== Host Notifications (Koast v1 P2.4) ====================
+//
+// The curated host-facing in-app feed behind the bell (per-item read_at +
+// deep-link payload). DISTINCT from `notifications` (outbound SMS/email audit
+// log) and unified_audit_feed (the deep operational ledger). Host-scoped: RLS
+// host_id=auth.uid() (SELECT-only; writes via service_role).
+//
+// Migration 20260610030000_host_notifications.sql. (The partial unread index
+// idx_host_notifications_unread is DB-only — Drizzle's index() can't express
+// the WHERE read_at IS NULL clause; this Drizzle def maps the table + the
+// recent index only.)
+
+export const hostNotifications = pgTable(
+  "host_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hostId: uuid("host_id").notNull(),
+    // type CHECK ('cleaning_completed'|'booking_new'|'booking_cancelled'|'proposal_created'|'push_delivery_failure'). Mirrored by HostNotificationType.
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull().default({}),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_host_notifications_recent").on(t.hostId, t.createdAt)],
+);
+
+/** Controlled vocabulary for `host_notifications.type` (mirrors the CHECK). */
+export type HostNotificationType =
+  | "cleaning_completed"
+  | "booking_new"
+  | "booking_cancelled"
+  | "proposal_created"
+  | "push_delivery_failure";
+
 // ==================== Host Action Patterns (M11 Phase B item 1 — F8) ====================
 //
 // Per agent-loop-v1-design.md §7.3 + M11 Phase B STEP 2 reconciliation.

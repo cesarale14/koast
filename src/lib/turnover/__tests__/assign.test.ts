@@ -3,9 +3,11 @@ jest.mock("@/lib/push/send", () => ({
     .fn()
     .mockResolvedValue({ configured: false, total: 0, sent: 0, pruned: 0, failed: 0 }),
 }));
+jest.mock("@/lib/notifications/host-feed", () => ({ emitHostNotification: jest.fn() }));
 
 import { assignCleaner } from "../assign";
 import { sendAssignmentPush } from "@/lib/push/send";
+import { emitHostNotification } from "@/lib/notifications/host-feed";
 
 type Seed = {
   cleaners?: Record<string, unknown>[];
@@ -70,6 +72,66 @@ describe("assignCleaner", () => {
       expect(r.propertyName).toBe("Villa Jamaica");
     }
     expect(sendAssignmentPush).toHaveBeenCalledTimes(1);
+  });
+
+  test("emits push_delivery_failure when the cleaner has devices but none received it", async () => {
+    (sendAssignmentPush as jest.Mock).mockResolvedValueOnce({
+      configured: true,
+      total: 2,
+      sent: 0,
+      pruned: 0,
+      failed: 2,
+    });
+    const svc = makeSvc({
+      cleaners: [CLEANER],
+      cleaning_tasks: [TASK("pending")],
+      properties: [PROP],
+      updateResult: [{ id: "t1" }],
+    });
+    const r = await assignCleaner(svc, ARGS);
+    expect(r.ok).toBe(true);
+    expect(emitHostNotification).toHaveBeenCalledWith(
+      svc,
+      ARGS.hostId,
+      "push_delivery_failure",
+      expect.objectContaining({ cleanerName: "Karem Gutierrez", propertyName: "Villa Jamaica" }),
+    );
+  });
+
+  test("does NOT emit push_delivery_failure when the push is delivered", async () => {
+    (sendAssignmentPush as jest.Mock).mockResolvedValueOnce({
+      configured: true,
+      total: 2,
+      sent: 2,
+      pruned: 0,
+      failed: 0,
+    });
+    const svc = makeSvc({
+      cleaners: [CLEANER],
+      cleaning_tasks: [TASK("pending")],
+      properties: [PROP],
+      updateResult: [{ id: "t1" }],
+    });
+    await assignCleaner(svc, ARGS);
+    expect(emitHostNotification).not.toHaveBeenCalled();
+  });
+
+  test("does NOT emit when there are no subscribed devices (total 0)", async () => {
+    (sendAssignmentPush as jest.Mock).mockResolvedValueOnce({
+      configured: true,
+      total: 0,
+      sent: 0,
+      pruned: 0,
+      failed: 0,
+    });
+    const svc = makeSvc({
+      cleaners: [CLEANER],
+      cleaning_tasks: [TASK("pending")],
+      properties: [PROP],
+      updateResult: [{ id: "t1" }],
+    });
+    await assignCleaner(svc, ARGS);
+    expect(emitHostNotification).not.toHaveBeenCalled();
   });
 
   test("rejects an unowned/missing cleaner", async () => {
