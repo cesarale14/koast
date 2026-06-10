@@ -21,6 +21,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendAssignmentPush } from "@/lib/push/send";
+import { emitHostNotification } from "@/lib/notifications/host-feed";
 
 export type AssignCleanerFailCode =
   | "cleaner_not_found"
@@ -111,6 +112,16 @@ export async function assignCleaner(
       title: "New cleaning job",
       body: `${prop.name} · ${dateLabel}`,
     });
+    // P2.4: the cleaner has device(s) but NONE received the push → surface it on
+    // the host's bell so a dispatch silently failing is visible. (total===0 is
+    // "no devices subscribed yet", not a failure.)
+    if (push && push.configured && push.total > 0 && push.sent === 0) {
+      await emitHostNotification(svc, hostId, "push_delivery_failure", {
+        cleanerName: cleaner.name,
+        propertyName: prop.name,
+        total: push.total,
+      });
+    }
   } catch (err) {
     console.warn("[assignCleaner] push notify failed:", err);
   }

@@ -20,10 +20,11 @@ import {
   LayoutDashboard, CalendarDays, MessageCircle,
   Home, DollarSign, Star, Sparkles,
   TrendingUp, GitCompare,
-  Bell, Settings, Menu, ChevronLeft, X,
+  Settings, Menu, ChevronLeft, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { KoastMark } from "@/components/chat/KoastMark";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; badge?: number | null; }
 interface NavGroup { label?: string; items: NavItem[]; }
@@ -480,9 +481,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <TopBarSearch />
               <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-                <button className="relative transition-colors p-1.5 rounded-lg" style={{ color: "var(--tideline)" }}>
-                  <Bell size={20} strokeWidth={1.5} />
-                </button>
+                <NotificationBell />
               </div>
             </header>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyHostComplete, notifyHostIssue } from "@/lib/notifications";
+import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { blockCompletionForMissingPhotos } from "@/lib/turnover/completion-gate";
 
 export async function POST(
@@ -76,6 +77,18 @@ export async function POST(
     // Send notifications
     if (body.status === "completed") {
       await notifyHostComplete(supabase, hostId, task, propName);
+      // P2.4: fold the cleaning-completed event into the host bell properly
+      // (the interim S5 wiring was a 45s poll + a "the bell is P2" TODO). The
+      // poll stays for live card-status reflection; this lands the durable feed
+      // row with a deep-link to the photos.
+      if (hostId) {
+        const photoCount = Array.isArray(task.photos) ? task.photos.length : 0;
+        await emitHostNotification(supabase, hostId, "cleaning_completed", {
+          taskId: task.id,
+          propertyName: propName,
+          photoCount,
+        });
+      }
     } else if (body.status === "issue") {
       await notifyHostIssue(supabase, hostId, task, propName, body.issueDescription ?? "Issue reported");
     }

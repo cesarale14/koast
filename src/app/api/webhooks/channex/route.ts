@@ -16,6 +16,7 @@ import {
   reconcileTaskOnModify,
   teardownTaskOnCancel,
 } from "@/lib/turnover/auto-create";
+import { emitHostNotification } from "@/lib/notifications/host-feed";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
@@ -205,7 +206,7 @@ export async function POST(request: NextRequest) {
     // Verify property exists in our DB
     const { data: propData } = await supabase
       .from("properties")
-      .select("id, channex_property_id")
+      .select("id, channex_property_id, user_id")
       .eq("channex_property_id", channexPropertyId)
       .limit(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -223,6 +224,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "ok", message: "Property not found" });
     }
     const propertyId: string = prop.id;
+    const hostId: string | null = prop.user_id ?? null;
 
     // Fetch full booking details from Channex
     const channex = createChannexClient();
@@ -276,6 +278,25 @@ export async function POST(request: NextRequest) {
     const oldCheckIn = upsert.oldCheckIn;
     const oldCheckOut = upsert.oldCheckOut;
     console.log(`[webhook] Detected platform=${platform}, action=${upsert.action}, status=${bookingStatus}`);
+
+    // P2.4 — host bell: new + cancelled bookings. Fires once per processed
+    // webhook (duplicates are deduped above; self-originated bookings returned
+    // earlier). Best-effort — emitHostNotification never throws.
+    if (hostId) {
+      const bookingPayload = {
+        bookingId,
+        propertyId,
+        guestName,
+        checkIn: ba.arrival_date,
+        checkOut: ba.departure_date,
+        platform,
+      };
+      if (action === "cancelled") {
+        await emitHostNotification(supabase, hostId, "booking_cancelled", bookingPayload);
+      } else if (action === "created") {
+        await emitHostNotification(supabase, hostId, "booking_new", bookingPayload);
+      }
+    }
 
     // PR C — Outcome capture for pricing_performance. On booking_new only,
     // walk every date in the booking's stay and backfill any matching
