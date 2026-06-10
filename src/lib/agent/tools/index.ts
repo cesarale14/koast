@@ -17,6 +17,7 @@ import { proposeGuestMessageTool } from "./propose-guest-message";
 import { renderAgendaTool } from "./render-agenda";
 import { readTurnoversTool } from "./read-turnovers";
 import { readPricingTool } from "./read-pricing";
+import { proposeAssignCleanerTool } from "./propose-assign-cleaner";
 import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
@@ -40,6 +41,9 @@ registerTool(renderAgendaTool);
 // live on the SAME render flag (the whole generative-UI line is one switch).
 registerTool(readTurnoversTool);
 registerTool(readPricingTool);
+// P3.2 — the agent's first WRITE-as-proposal. Always exposed (not flag-gated):
+// it creates a PENDING proposal and executes nothing; host approval is the gate.
+registerTool(proposeAssignCleanerTool);
 
 // The generative-UI tools — exposed only when the render flag is on, in
 // lockstep with the prompt's applyRenderToggle.
