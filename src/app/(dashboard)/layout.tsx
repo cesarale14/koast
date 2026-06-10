@@ -10,6 +10,7 @@ import { ChatStoreProvider } from "@/components/chat/ChatStore";
 import { ChatPrimarySurface } from "@/components/chat/ChatPrimarySurface";
 import { ChatURLSync } from "@/components/chat/ChatURLSync";
 import { InspectSurface } from "@/components/chat/InspectSurface";
+import { CommandStrip } from "@/components/chat/command-strip/CommandStrip";
 import { isChatPrimary } from "@/lib/chat/isChatPrimary";
 import { useAuditPoll } from "@/components/chat/useAuditPoll";
 import { useSurfaceTelemetry } from "@/hooks/useSurfaceTelemetry";
@@ -485,19 +486,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </header>
 
-            <main className="flex-1 overflow-auto">
+            {/* P2.1: inspect content is a flex column — the page scrolls in the
+                flex-1 area and the docked CommandStrip is a flow child below it,
+                so it never overlaps the Messages composer or the Calendar's
+                bottom rows. ToastProvider wraps both so the strip + sheet can
+                toast. */}
+            <main className="flex-1 flex flex-col overflow-hidden">
               <ToastProvider>
-                <InspectSurface>
-                  {pathname === "/calendar" || pathname === "/messages" ? (
-                    <div className="h-full page-enter">{children}</div>
-                  ) : /^\/properties\/[^/]+$/.test(pathname) ? (
-                    // Property detail page handles its own layout (full-bleed
-                    // hero + max-w content). Skip the wrapper padding.
-                    <div className="page-enter">{children}</div>
-                  ) : (
-                    <div className="p-4 md:p-8 page-enter">{children}</div>
-                  )}
-                </InspectSurface>
+                <div className="flex-1 overflow-auto">
+                  <InspectSurface>
+                    {pathname === "/calendar" || pathname === "/messages" ? (
+                      <div className="h-full page-enter">{children}</div>
+                    ) : /^\/properties\/[^/]+$/.test(pathname) ? (
+                      // Property detail page handles its own layout (full-bleed
+                      // hero + max-w content). Skip the wrapper padding.
+                      <div className="page-enter">{children}</div>
+                    ) : (
+                      <div className="p-4 md:p-8 page-enter">{children}</div>
+                    )}
+                  </InspectSurface>
+                </div>
+                <CommandStrip />
               </ToastProvider>
             </main>
           </div>

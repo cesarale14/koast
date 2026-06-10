@@ -311,6 +311,16 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* P2.1 — command-strip companion sheet entrance */
+@keyframes koast-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes koast-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
