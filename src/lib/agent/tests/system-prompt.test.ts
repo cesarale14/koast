@@ -227,19 +227,22 @@ describe("system prompt", () => {
       else process.env[KEY] = prev;
     });
 
-    test("flag OFF: four-tool catalog, NO render_agenda entry, NO when-to-card rule", () => {
+    test("flag OFF: five-tool base catalog (incl propose_assign_cleaner), NO render_agenda entry", () => {
       delete process.env[KEY];
       const p = buildSystemPrompt();
       expect(p).toBe(SYSTEM_PROMPT_TEXT); // unchanged base prompt
-      expect(p).toMatch(/You have four tools across two capabilities/);
+      expect(p).toMatch(/You have five tools across three capabilities/);
+      // P3.2 — the write-as-proposal tool is ALWAYS in the catalog (not flag-gated).
+      expect(p).toMatch(/ {2}- propose_assign_cleaner —/);
+      expect(p).toMatch(/# Proposing operational actions/);
       expect(p).not.toMatch(/render_agenda/);
     });
 
     test("flag ON: seven-tool catalog + render_agenda + block-read entries + rules", () => {
       process.env[KEY] = "1";
       const p = buildSystemPrompt();
-      expect(p).toMatch(/You have seven tools across three capabilities/);
-      expect(p).not.toMatch(/You have four tools/);
+      expect(p).toMatch(/You have eight tools across three capabilities/);
+      expect(p).not.toMatch(/You have five tools/);
       expect(p).toMatch(/ {2}- render_agenda —/); // catalog entry
       expect(p).toMatch(/MUST call render_agenda/); // when-to-card rule (overview)
       expect(p).toMatch(/Do NOT call render_agenda for anything narrower/); // narrow exclusion
