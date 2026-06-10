@@ -30,6 +30,10 @@ export type TodayHomeProps = {
    * a consistent decent-asset set exists. */
   places: Places;
   greeting: GreetingFacts;
+  /** S4: optional interactive assign+dispatch strip (TodayNeedsCleaner). When
+   * present, the no_cleaner gaps it owns are dropped from the read-only "Needs
+   * you" list so they aren't shown twice. */
+  actionSlot?: React.ReactNode;
 };
 
 // ── greeting prose (from the structured facts; presentation only) ───────────
@@ -144,8 +148,11 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TodayHome({ payload, greeting }: TodayHomeProps) {
+export function TodayHome({ payload, greeting, actionSlot }: TodayHomeProps) {
   const c = curateToday(payload);
+  // S4: when the interactive assign strip is present, no_cleaner gaps are
+  // handled there — keep only the non-actionable gaps in the read-only list.
+  const gaps = actionSlot ? c.gaps.filter((g) => g.kind !== "no_cleaner") : c.gaps;
 
   return (
     // Transparent (fix 1): the chat shell paints --shore; this surface inherits it.
@@ -159,17 +166,19 @@ export function TodayHome({ payload, greeting }: TodayHomeProps) {
           {greetingLine(greeting)}
         </h1>
 
+        {actionSlot}
+
         {c.empty ? (
           <p style={{ marginTop: 20, fontSize: 17, color: "var(--tideline)", lineHeight: 1.6 }}>
             Nothing on the calendar for the next couple of days — you&apos;re all set. I&apos;ll surface anything that needs you the moment it lands.
           </p>
         ) : (
           <>
-            {c.gaps.length > 0 && (
+            {gaps.length > 0 && (
               <section style={{ marginTop: 44 }}>
                 <Eyebrow>Needs you</Eyebrow>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {c.gaps.map((gap, i) => (
+                  {gaps.map((gap, i) => (
                     <li
                       key={i}
                       data-testid="today-gap"

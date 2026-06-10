@@ -12,7 +12,9 @@
  */
 import { createClient } from "@/lib/supabase/server";
 import { readTodayHome } from "@/lib/today/readTodayHome";
+import { readUncoveredTurnovers } from "@/lib/today/readUncoveredTurnovers";
 import { TodayHome } from "@/components/today/TodayHome";
+import { TodayNeedsCleaner } from "@/components/today/TodayNeedsCleaner";
 
 function firstName(meta: Record<string, unknown> | undefined): string | null {
   const full = (meta?.full_name ?? meta?.name) as string | undefined;
@@ -31,6 +33,20 @@ function hourInTz(tz: string): number {
     return Number.isFinite(n) ? n % 24 : 9;
   } catch {
     return 9; // unknown tz → a neutral morning hour; greeting still renders
+  }
+}
+
+function dateInTz(tz: string): string {
+  try {
+    // en-CA renders YYYY-MM-DD, the shape cleaning_tasks.scheduled_date uses.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
   }
 }
 
@@ -55,11 +71,26 @@ export async function TodayHomeServer() {
 
   const name = firstName(user.user_metadata as Record<string, unknown> | undefined);
   const hourLocal = hourInTz(tz);
+  const todayLocal = dateInTz(tz);
 
-  const { payload, places, greeting } = await readTodayHome(supabase, user.id, {
-    name,
-    hourLocal,
-  });
+  const [data, uncovered] = await Promise.all([
+    readTodayHome(supabase, user.id, { name, hourLocal }),
+    readUncoveredTurnovers(supabase, user.id, todayLocal),
+  ]);
 
-  return <TodayHome payload={payload} places={places} greeting={greeting} />;
+  // S4: the inline assign+dispatch strip, only when there's an uncovered
+  // turnover to act on (otherwise the home stays calm/read-only).
+  const actionSlot =
+    uncovered.tasks.length > 0 ? (
+      <TodayNeedsCleaner tasks={uncovered.tasks} cleaners={uncovered.cleaners} />
+    ) : undefined;
+
+  return (
+    <TodayHome
+      payload={data.payload}
+      places={data.places}
+      greeting={data.greeting}
+      actionSlot={actionSlot}
+    />
+  );
 }
