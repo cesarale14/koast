@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyHostComplete, notifyHostIssue } from "@/lib/notifications";
+import { blockCompletionForMissingPhotos } from "@/lib/turnover/completion-gate";
 
 export async function POST(
   request: NextRequest,
@@ -13,7 +14,7 @@ export async function POST(
     // Validate token
     const { data: tasks } = await supabase
       .from("cleaning_tasks")
-      .select("id, property_id, scheduled_date, cleaner_token")
+      .select("id, property_id, scheduled_date, cleaner_token, photos")
       .eq("id", params.taskId)
       .eq("cleaner_token", params.token)
       .limit(1);
@@ -21,6 +22,25 @@ export async function POST(
     const task = ((tasks ?? []) as any[])[0];
     if (!task) {
       return NextResponse.json({ error: "Invalid task or token" }, { status: 403 });
+    }
+
+    // S3b — required-photo gate: can't mark complete without a confirmation
+    // photo when the property requires it (require_completion_photos, default on).
+    if (body.status === "completed") {
+      const { data: pdRows } = await supabase
+        .from("property_details")
+        .select("require_completion_photos")
+        .eq("property_id", task.property_id)
+        .limit(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const requirePhotos = ((pdRows ?? []) as any[])[0]?.require_completion_photos !== false;
+      const photoCount = Array.isArray(task.photos) ? task.photos.length : 0;
+      if (blockCompletionForMissingPhotos(body.status, requirePhotos, photoCount)) {
+        return NextResponse.json(
+          { error: "Add at least one photo before marking this clean complete." },
+          { status: 400 },
+        );
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +54,9 @@ export async function POST(
     }
     if (body.checklist) updateData.checklist = body.checklist;
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.photos) updateData.photos = body.photos;
+    // photos are written server-side by the token-verified upload route
+    // (/api/clean/[taskId]/[token]/photo) — the client no longer passes a
+    // photos array here, so it can't inject arbitrary JSON.
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from("cleaning_tasks") as any)

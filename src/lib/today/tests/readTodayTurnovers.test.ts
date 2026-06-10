@@ -41,16 +41,16 @@ describe("readTodayTurnovers", () => {
         { id: "t1", property_id: "p1", scheduled_date: "2026-06-12", status: "pending", cleaner_id: null },
         { id: "t2", property_id: "p1", scheduled_date: "2026-06-13", status: "assigned", cleaner_id: "c1" },
         { id: "t3", property_id: "p2", scheduled_date: "2026-06-13", status: "in_progress", cleaner_id: "c2" },
-        { id: "t4", property_id: "p2", scheduled_date: "2026-06-12", status: "completed", cleaner_id: "c1" },
+        { id: "t4", property_id: "p2", scheduled_date: "2026-06-12", status: "completed", cleaner_id: "c1", photos: [{ path: "a" }, { path: "b" }] },
       ],
     });
 
     const out = await readTodayTurnovers(supabase, HOST, "2026-06-10");
     expect(out.turnovers).toEqual([
-      { taskId: "t1", property: "Villa Jamaica", date: "2026-06-12", status: "pending", cleanerName: null },
-      { taskId: "t2", property: "Villa Jamaica", date: "2026-06-13", status: "assigned", cleanerName: "Karem Gutierrez" },
-      { taskId: "t3", property: "Cozy Loft - Tampa", date: "2026-06-13", status: "in_progress", cleanerName: "Cesar Santana" },
-      { taskId: "t4", property: "Cozy Loft - Tampa", date: "2026-06-12", status: "completed", cleanerName: "Karem Gutierrez" },
+      { taskId: "t1", property: "Villa Jamaica", date: "2026-06-12", status: "pending", cleanerName: null, photoCount: 0 },
+      { taskId: "t2", property: "Villa Jamaica", date: "2026-06-13", status: "assigned", cleanerName: "Karem Gutierrez", photoCount: 0 },
+      { taskId: "t3", property: "Cozy Loft - Tampa", date: "2026-06-13", status: "in_progress", cleanerName: "Cesar Santana", photoCount: 0 },
+      { taskId: "t4", property: "Cozy Loft - Tampa", date: "2026-06-12", status: "completed", cleanerName: "Karem Gutierrez", photoCount: 2 },
     ]);
     expect(out.cleaners).toEqual([
       { id: "c1", name: "Karem Gutierrez" },
