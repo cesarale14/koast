@@ -1082,6 +1082,61 @@ export type AgentArtifactState =
   | "edited"
   | "dismissed";
 
+// ==================== Proposals (Koast v1 P2.3) ====================
+//
+// The agent's host-surface suggestions (built now, emitted by the agent's
+// hands in P3). A proposal targets a property and is host-readable; the host
+// approves/dismisses. Approval executes through the SAME named internal action
+// the manual UI uses (no agent side-doors) + writes an agent_audit_log row.
+// Distinct from agent_artifacts (conversation-turn-scoped in-chat gated-tool
+// artifacts) — proposals are surfaced on Today / the bell / inline in chat.
+// Host-scoped: RLS host_id=auth.uid() (SELECT-only; writes via service_role).
+//
+// Migration 20260610020000_proposals.sql.
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hostId: uuid("host_id").notNull(),
+    propertyId: uuid("property_id").notNull(),
+    actionType: text("action_type").notNull(),
+    payload: jsonb("payload").notNull().default({}),
+    rationale: text("rationale"),
+    // status CHECK ('pending'|'approved'|'dismissed'|'executed'|'failed'). Mirrored by ProposalStatus.
+    status: text("status").notNull().default("pending"),
+    // created_by CHECK ('agent'|'host'|'worker'|'system'). Mirrors AgentAuditLogActorKind.
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    result: jsonb("result"),
+  },
+  (t) => [
+    index("idx_proposals_host_status").on(t.hostId, t.status),
+    index("idx_proposals_property").on(t.propertyId),
+    index("idx_proposals_host_created").on(t.hostId, t.createdAt),
+  ],
+);
+
+/**
+ * Controlled vocabulary for `proposals.status` (mirrors the CHECK).
+ *   - 'pending'   — awaiting the host
+ *   - 'approved'  — host approved; execution in flight (async/auto-approve path)
+ *   - 'executed'  — the action ran
+ *   - 'failed'    — execution errored (stays actionable; re-approvable)
+ *   - 'dismissed' — host rejected (zero side effects)
+ */
+export type ProposalStatus =
+  | "pending"
+  | "approved"
+  | "dismissed"
+  | "executed"
+  | "failed";
+
+/** `proposals.created_by` — same vocabulary as agent_audit_log.actor_kind. */
+export type ProposalCreatedBy = AgentAuditLogActorKind;
+
 // ==================== Host Action Patterns (M11 Phase B item 1 — F8) ====================
 //
 // Per agent-loop-v1-design.md §7.3 + M11 Phase B STEP 2 reconciliation.

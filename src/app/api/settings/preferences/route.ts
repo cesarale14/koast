@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const DEFAULT_PREFS = {
+export const DEFAULT_PREFS = {
   email_new_booking: true,
   email_messages: true,
   email_cleaning: true,

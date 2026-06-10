@@ -35,6 +35,9 @@ export type TodayHomeProps = {
    * gaps it owns are dropped from the read-only "Needs you" list so they aren't
    * shown twice. */
   actionSlot?: React.ReactNode;
+  /** P2.3: optional "Koast suggests" proposal surface (TodaySuggests). Self-
+   * fetching; renders nothing when there are no pending proposals. */
+  suggestsSlot?: React.ReactNode;
 };
 
 // ── greeting prose (from the structured facts; presentation only) ───────────
@@ -149,7 +152,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TodayHome({ payload, greeting, actionSlot }: TodayHomeProps) {
+export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: TodayHomeProps) {
   const c = curateToday(payload);
   // S4: when the interactive assign strip is present, no_cleaner gaps are
   // handled there — keep only the non-actionable gaps in the read-only list.
@@ -166,6 +169,8 @@ export function TodayHome({ payload, greeting, actionSlot }: TodayHomeProps) {
         >
           {greetingLine(greeting)}
         </h1>
+
+        {suggestsSlot}
 
         {actionSlot}
 
