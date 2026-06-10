@@ -30,9 +30,10 @@ export type TodayHomeProps = {
    * a consistent decent-asset set exists. */
   places: Places;
   greeting: GreetingFacts;
-  /** S4: optional interactive assign+dispatch strip (TodayNeedsCleaner). When
-   * present, the no_cleaner gaps it owns are dropped from the read-only "Needs
-   * you" list so they aren't shown twice. */
+  /** S4/S5: optional interactive turnover strip (TodayTurnovers — assign+dispatch
+   * for uncovered, status reflection for the rest). When present, the no_cleaner
+   * gaps it owns are dropped from the read-only "Needs you" list so they aren't
+   * shown twice. */
   actionSlot?: React.ReactNode;
 };
 
