@@ -12,9 +12,9 @@
  */
 import { createClient } from "@/lib/supabase/server";
 import { readTodayHome } from "@/lib/today/readTodayHome";
-import { readUncoveredTurnovers } from "@/lib/today/readUncoveredTurnovers";
+import { readTodayTurnovers } from "@/lib/today/readTodayTurnovers";
 import { TodayHome } from "@/components/today/TodayHome";
-import { TodayNeedsCleaner } from "@/components/today/TodayNeedsCleaner";
+import { TodayTurnovers } from "@/components/today/TodayTurnovers";
 
 function firstName(meta: Record<string, unknown> | undefined): string | null {
   const full = (meta?.full_name ?? meta?.name) as string | undefined;
@@ -73,16 +73,17 @@ export async function TodayHomeServer() {
   const hourLocal = hourInTz(tz);
   const todayLocal = dateInTz(tz);
 
-  const [data, uncovered] = await Promise.all([
+  const [data, todayTurnovers] = await Promise.all([
     readTodayHome(supabase, user.id, { name, hourLocal }),
-    readUncoveredTurnovers(supabase, user.id, todayLocal),
+    readTodayTurnovers(supabase, user.id, todayLocal),
   ]);
 
-  // S4: the inline assign+dispatch strip, only when there's an uncovered
-  // turnover to act on (otherwise the home stays calm/read-only).
+  // S4 + S5: the turnover strip — assign+dispatch for an uncovered turnover,
+  // status reflection (dispatched → in-progress → done) for the rest. Only
+  // rendered when there's a turnover in the window (otherwise the home stays calm).
   const actionSlot =
-    uncovered.tasks.length > 0 ? (
-      <TodayNeedsCleaner tasks={uncovered.tasks} cleaners={uncovered.cleaners} />
+    todayTurnovers.turnovers.length > 0 ? (
+      <TodayTurnovers turnovers={todayTurnovers.turnovers} cleaners={todayTurnovers.cleaners} />
     ) : undefined;
 
   return (
