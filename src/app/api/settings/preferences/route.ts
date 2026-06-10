@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-export const DEFAULT_PREFS = {
-  email_new_booking: true,
-  email_messages: true,
-  email_cleaning: true,
-  email_price_alerts: false,
-  sms_enabled: false,
-  push_enabled: false,
-};
+// DEFAULT_PREFS lives in a lib module, NOT exported from this route — route.ts
+// files may only export route handlers + Next config (a non-handler export
+// fails `next build`).
+import { DEFAULT_PREFS } from "@/lib/settings/default-prefs";
 
 export async function GET() {
   const supabase = createClient();

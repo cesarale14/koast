@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_PREFS } from "@/app/api/settings/preferences/route";
+import { DEFAULT_PREFS } from "@/lib/settings/default-prefs";
 import {
   getProposalActionDef,
   getProposalActionMeta,

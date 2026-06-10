@@ -859,6 +859,7 @@ What Koast has that competitors don't.
 13. Calendar layout: GAP constant in `MonthlyView.tsx` must match the `--col` formula `calc((100% + GAP) / 7)`; bar width is `calc(var(--col) * span - GAP)` to prevent overflow.
 14. `brand-*` Tailwind classes are RETIRED (merge `8529684`, 2026-04-30). Use `coastal` (was 500), `deep-sea` (was 600/700/800/900/950), `success-light` (was 50), `mangrove`, or `lagoon` per the migration map in "Token system (consolidated…)" above. New `brand-N` references will fail Tailwind compilation.
 15. ChannelPopover positioning uses `@floating-ui/react` — don't re-implement with raw `position: absolute`.
+16. **App Router `route.ts` files may export ONLY route handlers** (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`/`HEAD`/`OPTIONS`) plus the Next config exports (`dynamic`, `revalidate`, `runtime`, etc.). Any OTHER named export (a shared const, a helper) fails `next build` with "X is not a valid Route export field" — but `npx tsc --noEmit` AND `next lint` (the two VPS-runnable gates) both PASS it, so it slips through to Vercel. Put shared values/helpers in a `src/lib/**` module and import them. (Bit production in v1 P2.3: `export const DEFAULT_PREFS` in `settings/preferences/route.ts` errored every deploy until moved to `src/lib/settings/default-prefs.ts`.) This is the canonical "tsc-passes-but-next-build-fails" gap — when a route file needs to share something, it's a lib module, not a route export.
 
 ---
 
