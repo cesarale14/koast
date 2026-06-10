@@ -11,7 +11,11 @@ import {
   handleMessagingEvent,
   type MessageWebhookEnvelope,
 } from "@/lib/webhooks/messaging";
-import { createCleaningTask } from "@/lib/turnover/auto-create";
+import {
+  createCleaningTask,
+  reconcileTaskOnModify,
+  teardownTaskOnCancel,
+} from "@/lib/turnover/auto-create";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
@@ -333,33 +337,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // TURN-S1 (D1) — Turnover task creation hook. The Channex booking
+    // TURN-S1 (D1) + P1.1 — Turnover task lifecycle hook. The Channex booking
     // webhook is the app-code creation path: the pg_net trigger
-    // `bookings_fire_turnover_task` stays INERT, and this hook replaces it
-    // for Channex-sourced bookings (the iCal sweep keeps its own
-    // end-of-sweep backfillCleaningTasks). Same createCleaningTask helper
-    // the iCal path uses — it sets next_booking_id (the cleaning window)
-    // and is idempotent on booking_id (SELECT guard + UNIQUE-constraint
-    // 23505 catch), so webhook + iCal both calling it is safe.
+    // `bookings_fire_turnover_task` stays INERT, and this hook owns the loop
+    // for Channex-sourced bookings (the iCal sweep keeps its own end-of-sweep
+    // backfillCleaningTasks). Same createCleaningTask helper the iCal path uses
+    // — idempotent on booking_id (SELECT guard + UNIQUE-constraint 23505 catch).
     //
-    // Fire on any non-cancelled action with a resolved booking row:
-    //   - "created"  → new Channex booking (or promoted iCal placeholder)
-    //   - "modified" → ensure a task exists even when the original ingest
-    //                  predated this hook (self-heals; no-op if present)
-    // Cancellation teardown is a later slice — skip here. Non-critical:
-    // wrapped so a creation failure never 500s the webhook or blocks the
-    // Channex revision ack.
-    if (action !== "cancelled" && upsert.bookingRowId && ba.departure_date) {
-      try {
+    //   - "created"   → ensure a task exists (new booking / promoted placeholder)
+    //   - "modified"  → ensure exists, then reconcile date-drift: if the checkout
+    //                   moved, re-point scheduled_date + next_booking_id and
+    //                   re-push an already-assigned cleaner (was holding the old date)
+    //   - "cancelled" → tear down an UNSTARTED task (notify the cleaner, then
+    //                   hard-delete); an in-progress/completed task is left intact
+    //
+    // Best-effort: wrapped so a turnover failure never 500s the webhook or
+    // blocks the Channex revision ack.
+    try {
+      if (action === "cancelled") {
+        if (upsert.bookingRowId) {
+          const r = await teardownTaskOnCancel(supabase, { bookingRowId: upsert.bookingRowId });
+          console.log(`[webhook] turnover teardown for cancelled booking ${upsert.bookingRowId}: deleted=${r.deleted}`);
+        }
+      } else if (upsert.bookingRowId && ba.departure_date) {
         const taskId = await createCleaningTask(supabase, {
           id: upsert.bookingRowId,
           property_id: propertyId,
           check_out: ba.departure_date,
         });
+        if (action === "modified") {
+          const r = await reconcileTaskOnModify(supabase, {
+            bookingRowId: upsert.bookingRowId,
+            propertyId,
+            newCheckOut: ba.departure_date,
+          });
+          console.log(`[webhook] turnover reconcile for modified booking ${upsert.bookingRowId}: updated=${r.updated}`);
+        }
         console.log(`[webhook] turnover task ensured for booking ${upsert.bookingRowId} (channex ${bookingId}): task=${taskId ?? "none"}`);
-      } catch (err) {
-        console.warn(`[webhook] turnover task creation failed for booking ${upsert.bookingRowId}:`, err instanceof Error ? err.message : err);
       }
+    } catch (err) {
+      console.warn(`[webhook] turnover lifecycle hook failed for booking ${upsert.bookingRowId}:`, err instanceof Error ? err.message : err);
     }
 
     // Update Channex availability based on action — push for ALL room types
