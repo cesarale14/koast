@@ -28,6 +28,7 @@ type Turnover = {
   date: string;
   status: CleaningTaskStatus;
   cleanerName: string | null;
+  photoCount: number;
 };
 type Cleaner = { id: string; name: string };
 
@@ -84,6 +85,10 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
   // Optimistic assign overlay: taskId → cleaner name (renders as "dispatched"
   // immediately; the next refresh reconciles from the server).
   const [assignedNow, setAssignedNow] = useState<Record<string, string>>({});
+  // S3b host photo viewing: taskId → { loading, signed urls } (undefined = hidden).
+  const [photoState, setPhotoState] = useState<
+    Record<string, { loading: boolean; urls: string[] } | undefined>
+  >({});
 
   // S5 reflection poll — only while something is actually in flight.
   useEffect(() => {
@@ -131,6 +136,25 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
     }
   }
 
+  async function togglePhotos(taskId: string) {
+    const cur = photoState[taskId];
+    if (cur && !cur.loading) {
+      setPhotoState((s) => ({ ...s, [taskId]: undefined }));
+      return;
+    }
+    setPhotoState((s) => ({ ...s, [taskId]: { loading: true, urls: [] } }));
+    try {
+      const res = await fetch(`/api/turnover/photos/${taskId}`);
+      const d = await res.json().catch(() => ({}));
+      const urls = Array.isArray(d?.photos)
+        ? (d.photos as { url: string }[]).map((p) => p.url).filter(Boolean)
+        : [];
+      setPhotoState((s) => ({ ...s, [taskId]: { loading: false, urls } }));
+    } catch {
+      setPhotoState((s) => ({ ...s, [taskId]: { loading: false, urls: [] } }));
+    }
+  }
+
   return (
     <section style={{ marginTop: 40 }} data-testid="today-turnovers">
       <div
@@ -159,9 +183,6 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
             <li
               key={task.taskId}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
                 padding: "14px 16px",
                 borderRadius: 12,
                 background: "var(--shore-soft)",
@@ -169,6 +190,7 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
                 opacity: effectiveStatus === "completed" ? 0.7 : 1,
               }}
             >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span
                 aria-hidden
                 style={{ width: 9, height: 9, borderRadius: 99, background: dot, flexShrink: 0 }}
@@ -230,6 +252,47 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
                         : "Assign"}
                 </button>
               )}
+
+                {!isPending && task.photoCount > 0 && (
+                  <button
+                    onClick={() => togglePhotos(task.taskId)}
+                    disabled={photoState[task.taskId]?.loading}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid var(--hairline)",
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                      background: "white",
+                      color: "var(--coastal)",
+                    }}
+                  >
+                    {photoState[task.taskId]?.loading
+                      ? "Loading..."
+                      : photoState[task.taskId]
+                        ? "Hide"
+                        : `Photos (${task.photoCount})`}
+                  </button>
+                )}
+              </div>
+
+              {photoState[task.taskId] &&
+                !photoState[task.taskId]?.loading &&
+                (photoState[task.taskId]?.urls.length ?? 0) > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 10 }}>
+                    {photoState[task.taskId]!.urls.map((u, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={u}
+                        alt={`Cleaning photo ${i + 1}`}
+                        style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8 }}
+                      />
+                    ))}
+                  </div>
+                )}
             </li>
           );
         })}

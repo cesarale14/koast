@@ -12,7 +12,7 @@ export async function GET(
     // Validate token
     const { data: tasks } = await supabase
       .from("cleaning_tasks")
-      .select("id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, checklist, notes, cleaner_token, cleaner_id")
+      .select("id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, checklist, notes, cleaner_token, cleaner_id, photos")
       .eq("id", params.taskId)
       .eq("cleaner_token", params.token)
       .limit(1);
@@ -37,7 +37,7 @@ export async function GET(
     const { data: pdRows } = await supabase
       .from("property_details")
       .select(
-        "door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions, checkin_time, checkout_time",
+        "door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions, checkin_time, checkout_time, require_completion_photos",
       )
       .eq("property_id", task.property_id)
       .limit(1);
@@ -75,6 +75,18 @@ export async function GET(
       checkout_time: pd.checkout_time ? String(pd.checkout_time).slice(0, 5) : null,
     };
 
+    // S3b — confirmation photos (signed URLs from the private bucket) + the
+    // per-property required-photo gate (default on when unset).
+    const requirePhotos = pd.require_completion_photos !== false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawPhotos = (Array.isArray(task.photos) ? task.photos : []) as any[];
+    const photos: { path: string; url: string | null; uploaded_at: string | null }[] = [];
+    for (const p of rawPhotos) {
+      if (!p?.path) continue;
+      const { data: signed } = await supabase.storage.from("cleaning-photos").createSignedUrl(p.path, 3600);
+      photos.push({ path: p.path, url: signed?.signedUrl ?? null, uploaded_at: p.uploaded_at ?? null });
+    }
+
     // Fetch booking info (checkout guest)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let checkoutGuest: any = null;
@@ -106,6 +118,8 @@ export async function GET(
       },
       property,
       access,
+      photos,
+      requirePhotos,
       checkoutGuest,
       nextGuest,
       // TURN-S2-send: cleaner_id gates the enable-alerts UI (only an assigned

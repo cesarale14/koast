@@ -17,6 +17,7 @@ export type TodayTurnover = {
   date: string;
   status: CleaningTaskStatus;
   cleanerName: string | null;
+  photoCount: number;
 };
 export type CleanerOption = { id: string; name: string };
 export type TodayTurnovers = { turnovers: TodayTurnover[]; cleaners: CleanerOption[] };
@@ -52,7 +53,7 @@ export async function readTodayTurnovers(
 
   const { data: taskRows } = await supabase
     .from("cleaning_tasks")
-    .select("id, property_id, scheduled_date, status, cleaner_id")
+    .select("id, property_id, scheduled_date, status, cleaner_id, photos")
     .in("property_id", propIds)
     .gte("scheduled_date", today)
     .order("scheduled_date")
@@ -64,6 +65,7 @@ export async function readTodayTurnovers(
       scheduled_date: string;
       status: string | null;
       cleaner_id: string | null;
+      photos: unknown;
     }[]
   ).map((t) => ({
     taskId: t.id,
@@ -71,6 +73,7 @@ export async function readTodayTurnovers(
     date: t.scheduled_date,
     status: (t.status ?? "pending") as CleaningTaskStatus,
     cleanerName: t.cleaner_id ? cleanerName.get(t.cleaner_id) ?? null : null,
+    photoCount: Array.isArray(t.photos) ? t.photos.length : 0,
   }));
 
   return { turnovers, cleaners };

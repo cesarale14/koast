@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import EnableAlerts from "@/components/clean/EnableAlerts";
 
 interface ChecklistItem {
@@ -37,6 +37,8 @@ interface TaskData {
     checkin_time: string | null;
     checkout_time: string | null;
   };
+  photos: { path: string; url: string | null; uploaded_at: string | null }[];
+  requirePhotos: boolean;
   checkoutGuest: { guest_name: string; check_out: string } | null;
   nextGuest: { guest_name: string; check_in: string } | null;
   cleanerId: string | null;
@@ -55,6 +57,8 @@ export default function CleanerMobilePage({
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [issueText, setIssueText] = useState("");
   const [showIssue, setShowIssue] = useState(false);
+  const [photos, setPhotos] = useState<{ url: string | null; uploaded_at: string | null }[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clean/${params.taskId}/${params.token}`)
@@ -63,6 +67,7 @@ export default function CleanerMobilePage({
         if (d.error) { setError(d.error); } else {
           setData(d);
           setChecklist(d.task.checklist ?? []);
+          setPhotos(d.photos ?? []);
         }
         setLoading(false);
       })
@@ -111,6 +116,29 @@ export default function CleanerMobilePage({
 
   const doneCount = checklist.filter((i) => i.done).length;
 
+  const onPickPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setSaveError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/clean/${params.taskId}/${params.token}/photo`, {
+        method: "POST",
+        body: fd,
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.error ?? `HTTP ${res.status}`);
+      if (d.photo) setPhotos((p) => [...p, { url: d.photo.url, uploaded_at: d.photo.uploaded_at }]);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Photo upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // allow re-picking the same file
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
@@ -140,6 +168,7 @@ export default function CleanerMobilePage({
   );
   const checkoutLabel = fmtTime(access.checkout_time, "11:00 AM");
   const checkinLabel = fmtTime(access.checkin_time, "3:00 PM");
+  const completeBlocked = data.requirePhotos && photos.length === 0;
   const address = [property.address, property.city, property.state, property.zip].filter(Boolean).join(", ");
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
@@ -285,6 +314,54 @@ export default function CleanerMobilePage({
           </div>
         </div>
 
+        {/* Photos — confirm the clean (S3b). Uploaded via the token-verified
+            route; required before completion when the host enables it. */}
+        {task.status !== "issue" && (
+          <div className="bg-neutral-0 rounded-lg p-4 shadow-sm border border-[var(--border)]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-neutral-900">Photos</h2>
+              <span className="text-xs text-neutral-400">{photos.length}</span>
+            </div>
+            {photos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {photos.map((p, i) =>
+                  p.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={p.url}
+                      alt={`Cleaning photo ${i + 1}`}
+                      className="w-full h-24 object-cover rounded-md border border-neutral-100"
+                    />
+                  ) : null,
+                )}
+              </div>
+            )}
+            {task.status !== "completed" && (
+              <label
+                className={`block w-full text-center py-3 text-sm font-medium text-coastal rounded-lg border border-dashed border-neutral-300 cursor-pointer ${
+                  uploading ? "opacity-60" : ""
+                }`}
+              >
+                {uploading ? "Uploading…" : photos.length > 0 ? "Add another photo" : "Add a photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={onPickPhoto}
+                />
+              </label>
+            )}
+            {completeBlocked && task.status !== "completed" && (
+              <p className="text-xs text-neutral-500 mt-2 text-center">
+                Your host asks for a photo before completing.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* TURN-S1a — server error banner. Surfaces failed updateTask
             calls (previously fire-and-forget; cleaner saw fake success). */}
         {saveError && (
@@ -317,13 +394,18 @@ export default function CleanerMobilePage({
           )}
 
           {task.status === "in_progress" && (
-            <button
-              onClick={() => updateTask({ status: "completed", checklist })}
-              disabled={saving}
-              className="w-full py-4 bg-coastal text-white text-base font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50"
-            >
-              {saving ? "Completing..." : `Mark Complete (${doneCount}/${checklist.length})`}
-            </button>
+            <>
+              <button
+                onClick={() => updateTask({ status: "completed", checklist })}
+                disabled={saving || completeBlocked}
+                className="w-full py-4 bg-coastal text-white text-base font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50"
+              >
+                {saving ? "Completing..." : `Mark Complete (${doneCount}/${checklist.length})`}
+              </button>
+              {completeBlocked && (
+                <p className="text-xs text-neutral-500 text-center mt-1">Add at least one photo to complete.</p>
+              )}
+            </>
           )}
 
           {task.status === "completed" && (
