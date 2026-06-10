@@ -15,6 +15,7 @@ import { readTodayHome } from "@/lib/today/readTodayHome";
 import { readTodayTurnovers } from "@/lib/today/readTodayTurnovers";
 import { TodayHome } from "@/components/today/TodayHome";
 import { TodayTurnovers } from "@/components/today/TodayTurnovers";
+import { TodaySuggests } from "@/components/today/TodaySuggests";
 
 function firstName(meta: Record<string, unknown> | undefined): string | null {
   const full = (meta?.full_name ?? meta?.name) as string | undefined;
@@ -92,6 +93,7 @@ export async function TodayHomeServer() {
       places={data.places}
       greeting={data.greeting}
       actionSlot={actionSlot}
+      suggestsSlot={<TodaySuggests />}
     />
   );
 }

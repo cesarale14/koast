@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
+import { AutoApproveSettings } from "@/components/settings/AutoApproveSettings";
 import {
   User,
   Shield,
@@ -569,6 +570,9 @@ export default function SettingsPage() {
           </div>
         </div>
       </SectionCard>
+
+      {/* AUTOMATION (auto-approve toggles, all default off) */}
+      <AutoApproveSettings />
 
       {/* CONNECTED ACCOUNTS */}
       <SectionCard icon={Link2} title="Connected Accounts" description="Your linked OTA channels and calendar feeds.">
