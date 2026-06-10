@@ -41,6 +41,11 @@ const RequestSchema = z.object({
     .object({
       active_route: z.string().optional(),
       active_property_id: z.string().uuid().optional(),
+      // P2.1 — calendar visible window (YYYY-MM-DD) so the agent can resolve
+      // "this weekend" / "these dates" against what the host is looking at.
+      active_date_range: z
+        .object({ start: z.string(), end: z.string() })
+        .optional(),
     })
     .optional(),
 });

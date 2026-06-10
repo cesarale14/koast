@@ -88,12 +88,20 @@ export interface RunAgentTurnInput {
   conversation_id: string | null;
   user_message_text: string;
   /**
-   * D19 — ui_context hints from the chat shell. Only `active_property_id`
-   * is consumed in M5; future hints (active_route, etc.) extend this shape.
+   * D19 — ui_context hints from the chat shell. `active_property_id` (M5) is
+   * resolved + ownership-checked via resolveActiveProperty. P2.1 adds
+   * `active_route` + `active_date_range` from the docked command strip so the
+   * agent knows what surface the host is looking at — these are advisory text
+   * hints only (NO data read off them; property scope still flows through the
+   * ownership-checked active_property_id).
    * Server-side ownership is verified before any context is injected; an
    * unauthorized id is logged at warn and silently dropped from the turn.
    */
-  ui_context?: { active_property_id?: string };
+  ui_context?: {
+    active_property_id?: string;
+    active_route?: string;
+    active_date_range?: { start: string; end: string };
+  };
 }
 
 function getAnthropicClient(): Anthropic {
@@ -124,6 +132,48 @@ active_property = "${args.name}"
 active_property_id = ${args.id}
 use this id for read_memory tool calls.
 if the host's message references a different property by name, ask them to select that property in the UI rather than guessing its id.
+
+`;
+}
+
+/**
+ * P2.1 — map a host route to a human surface label for the page-context
+ * preamble. Unknown routes fall back to the raw path so the model still gets
+ * a hint. Kept deliberately small; extend as new surfaces matter to the agent.
+ */
+function pageLabelForRoute(route: string): string {
+  if (route === "/" || route === "/chat" || route.startsWith("/chat/")) return "the Today home";
+  if (route === "/calendar") return "the Calendar";
+  if (route === "/pricing") return "the Pricing page";
+  if (route === "/messages") return "the Messages inbox";
+  if (route === "/reviews") return "the Reviews page";
+  if (route === "/turnovers") return "the Turnovers page";
+  if (route === "/market-intel") return "the Market Intel page";
+  if (route === "/comp-sets") return "the Comp Sets page";
+  if (/^\/properties\/[^/]+$/.test(route)) return "a property's detail page";
+  if (route === "/properties") return "the Properties list";
+  return `the ${route} page`;
+}
+
+/**
+ * P2.1 — build the page-context preamble from the docked command strip's
+ * route + visible date range. This is advisory framing only: it tells the
+ * model what surface the host is looking at so "block this weekend" / "these
+ * dates" resolve against the visible window. NO data is read off these hints;
+ * property scope still flows through the ownership-checked active-property
+ * preamble. Empty string when there's no route hint (e.g. the full chat
+ * surface, which already owns context). Never persisted, never cached.
+ */
+export function buildPageContextPreamble(ui_context?: RunAgentTurnInput["ui_context"]): string {
+  const route = ui_context?.active_route;
+  if (!route) return "";
+  const range = ui_context?.active_date_range;
+  const rangeLine =
+    range && range.start && range.end
+      ? `\nvisible_dates = ${range.start} to ${range.end} (resolve "this weekend"/"these dates" against this window)`
+      : "";
+  return `[active context — provided by the host's UI]
+the host is currently looking at ${pageLabelForRoute(route)} in Koast.${rangeLine}
 
 `;
 }
@@ -710,7 +760,10 @@ export async function* runAgentTurn(
   const d19Pre = activeProperty
     ? buildActivePropertyPreamble({ name: activeProperty.name, id: activeProperty.id })
     : "";
-  const combinedPreamble = agendaPre + d19Pre;
+  // P2.1 — page-context preamble (what surface the host is looking at). Sits
+  // between the operational agenda and the active-property id block.
+  const pagePre = buildPageContextPreamble(input.ui_context);
+  const combinedPreamble = agendaPre + pagePre + d19Pre;
   const seedMessages: Anthropic.MessageParam[] =
     combinedPreamble.length > 0
       ? prependActiveContextToLastUserMessage(history, combinedPreamble)

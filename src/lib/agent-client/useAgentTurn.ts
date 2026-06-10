@@ -29,6 +29,9 @@ import { initialTurnState, type TurnState } from "./types";
 export type UiContext = {
   active_route?: string;
   active_property_id?: string;
+  /** P2.1 — the calendar's visible window (YYYY-MM-DD), when the host is on a
+   *  date surface, so "block this weekend" resolves against what they see. */
+  active_date_range?: { start: string; end: string };
 };
 
 export type SubmitOptions = {

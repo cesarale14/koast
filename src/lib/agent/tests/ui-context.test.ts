@@ -18,6 +18,7 @@ jest.mock("@/lib/supabase/service");
 
 import {
   buildActivePropertyPreamble,
+  buildPageContextPreamble,
   prependActiveContextToLastUserMessage,
   resolveActiveProperty,
 } from "../loop";
@@ -49,6 +50,45 @@ describe("buildActivePropertyPreamble", () => {
     );
     // Trailing blank line so the host's actual message starts on a fresh line.
     expect(out.endsWith("\n\n")).toBe(true);
+  });
+});
+
+describe("buildPageContextPreamble", () => {
+  test("returns empty string when no active_route (full chat surface owns context)", () => {
+    expect(buildPageContextPreamble(undefined)).toBe("");
+    expect(buildPageContextPreamble({})).toBe("");
+    expect(buildPageContextPreamble({ active_property_id: PROPERTY_ID })).toBe("");
+  });
+
+  test("names the surface for a known route and ends with a blank line", () => {
+    const out = buildPageContextPreamble({ active_route: "/calendar" });
+    expect(out).toContain("[active context — provided by the host's UI]");
+    expect(out).toContain("the host is currently looking at the Calendar in Koast.");
+    expect(out.endsWith("\n\n")).toBe(true);
+  });
+
+  test("maps a property-detail route to a friendly label", () => {
+    const out = buildPageContextPreamble({ active_route: `/properties/${PROPERTY_ID}` });
+    expect(out).toContain("a property's detail page");
+  });
+
+  test("falls back to the raw path for an unknown route", () => {
+    const out = buildPageContextPreamble({ active_route: "/something-new" });
+    expect(out).toContain("the /something-new page");
+  });
+
+  test("includes the visible date window when active_date_range is present", () => {
+    const out = buildPageContextPreamble({
+      active_route: "/calendar",
+      active_date_range: { start: "2026-06-12", end: "2026-06-14" },
+    });
+    expect(out).toContain("visible_dates = 2026-06-12 to 2026-06-14");
+    expect(out).toContain('resolve "this weekend"');
+  });
+
+  test("omits the date line when no range is present", () => {
+    const out = buildPageContextPreamble({ active_route: "/pricing" });
+    expect(out).not.toContain("visible_dates");
   });
 });
 
