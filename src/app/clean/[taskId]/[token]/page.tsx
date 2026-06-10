@@ -9,6 +9,15 @@ interface ChecklistItem {
   done: boolean;
 }
 
+function fmtTime(hhmm: string | null, fallback: string): string {
+  if (!hhmm) return fallback;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h)) return fallback;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(Number.isNaN(m) ? 0 : m).padStart(2, "0")} ${period}`;
+}
+
 interface TaskData {
   task: {
     id: string;
@@ -19,6 +28,15 @@ interface TaskData {
     notes: string | null;
   };
   property: { name: string; address: string; city: string; state: string; zip: string };
+  access: {
+    door_code: string | null;
+    smart_lock_instructions: string | null;
+    wifi_network: string | null;
+    wifi_password: string | null;
+    parking_instructions: string | null;
+    checkin_time: string | null;
+    checkout_time: string | null;
+  };
   checkoutGuest: { guest_name: string; check_out: string } | null;
   nextGuest: { guest_name: string; check_in: string } | null;
   cleanerId: string | null;
@@ -112,7 +130,16 @@ export default function CleanerMobilePage({
     );
   }
 
-  const { task, property, checkoutGuest, nextGuest } = data;
+  const { task, property, access, checkoutGuest, nextGuest } = data;
+  const hasAccess = Boolean(
+    access.door_code ||
+      access.smart_lock_instructions ||
+      access.wifi_network ||
+      access.wifi_password ||
+      access.parking_instructions,
+  );
+  const checkoutLabel = fmtTime(access.checkout_time, "11:00 AM");
+  const checkinLabel = fmtTime(access.checkin_time, "3:00 PM");
   const address = [property.address, property.city, property.state, property.zip].filter(Boolean).join(", ");
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
@@ -153,25 +180,65 @@ export default function CleanerMobilePage({
             <div>
               <p className="text-xs text-neutral-400">Checkout Guest</p>
               <p className="text-sm font-medium text-neutral-900">{checkoutGuest?.guest_name ?? "---"}</p>
-              <p className="text-xs text-neutral-400">out by 11:00 AM</p>
+              <p className="text-xs text-neutral-400">out by {checkoutLabel}</p>
             </div>
             <div>
               <p className="text-xs text-neutral-400">Next Guest</p>
               <p className="text-sm font-medium text-neutral-900">{nextGuest?.guest_name ?? "None"}</p>
-              {nextGuest && <p className="text-xs text-neutral-400">in at 3:00 PM</p>}
+              {nextGuest && <p className="text-xs text-neutral-400">in at {checkinLabel}</p>}
             </div>
           </div>
           {nextGuest && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-neutral-400 mb-1">
-                <span>11:00 AM</span>
-                <span>3:00 PM</span>
+                <span>{checkoutLabel}</span>
+                <span>{checkinLabel}</span>
               </div>
               <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
                 <div className="h-full bg-lagoon rounded-full" style={{ width: "100%" }} />
               </div>
               <p className="text-xs text-neutral-500 mt-1 text-center">4-hour cleaning window</p>
             </div>
+          )}
+        </div>
+
+        {/* Access — how to get in (S3). property_details (host-editable) with a
+            memory_facts fallback; degrades gracefully when nothing is set. */}
+        <div className="bg-neutral-0 rounded-lg p-4 shadow-sm border border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-neutral-900 mb-3">Getting in</h2>
+          {hasAccess ? (
+            <div className="space-y-3">
+              {access.door_code && (
+                <div>
+                  <p className="text-xs text-neutral-400">Door code</p>
+                  <p className="text-lg font-bold tracking-wider text-neutral-900">{access.door_code}</p>
+                </div>
+              )}
+              {access.smart_lock_instructions && (
+                <div>
+                  <p className="text-xs text-neutral-400">Lock / lockbox</p>
+                  <p className="text-sm text-neutral-900 whitespace-pre-line">{access.smart_lock_instructions}</p>
+                </div>
+              )}
+              {access.parking_instructions && (
+                <div>
+                  <p className="text-xs text-neutral-400">Parking</p>
+                  <p className="text-sm text-neutral-900 whitespace-pre-line">{access.parking_instructions}</p>
+                </div>
+              )}
+              {(access.wifi_network || access.wifi_password) && (
+                <div>
+                  <p className="text-xs text-neutral-400">Wifi</p>
+                  <p className="text-sm text-neutral-900">
+                    {access.wifi_network && <span className="font-medium">{access.wifi_network}</span>}
+                    {access.wifi_network && access.wifi_password ? "  ·  " : ""}
+                    {access.wifi_password && <span className="font-mono">{access.wifi_password}</span>}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-400">Your host hasn&apos;t added access details yet.</p>
           )}
         </div>
 

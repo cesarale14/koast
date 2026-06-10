@@ -31,6 +31,50 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const property = ((props ?? []) as any[])[0] ?? {};
 
+    // S3 — access content for the cleaner ("how to get in"). property_details
+    // is canonical (host-editable); memory_facts (the agent's host-taught facts)
+    // backfills door code + wifi password until the host fills the editor.
+    const { data: pdRows } = await supabase
+      .from("property_details")
+      .select(
+        "door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions, checkin_time, checkout_time",
+      )
+      .eq("property_id", task.property_id)
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pd = ((pdRows ?? []) as any[])[0] ?? {};
+
+    let factDoor: string | null = null;
+    let factWifi: string | null = null;
+    try {
+      const { data: facts } = await supabase
+        .from("memory_facts")
+        .select("sub_entity_type, attribute, value")
+        .eq("entity_type", "property")
+        .eq("entity_id", task.property_id)
+        .eq("status", "active")
+        .in("sub_entity_type", ["front_door", "wifi"]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const f of (facts ?? []) as any[]) {
+        const v = typeof f.value === "string" || typeof f.value === "number" ? String(f.value) : null;
+        if (!v) continue;
+        if (f.sub_entity_type === "front_door" && (f.attribute === "code" || !factDoor)) factDoor = v;
+        if (f.sub_entity_type === "wifi" && (f.attribute === "password" || !factWifi)) factWifi = v;
+      }
+    } catch {
+      /* memory_facts fallback is best-effort */
+    }
+
+    const access = {
+      door_code: pd.door_code ?? factDoor ?? null,
+      smart_lock_instructions: pd.smart_lock_instructions ?? null,
+      wifi_network: pd.wifi_network ?? null,
+      wifi_password: pd.wifi_password ?? factWifi ?? null,
+      parking_instructions: pd.parking_instructions ?? null,
+      checkin_time: pd.checkin_time ? String(pd.checkin_time).slice(0, 5) : null,
+      checkout_time: pd.checkout_time ? String(pd.checkout_time).slice(0, 5) : null,
+    };
+
     // Fetch booking info (checkout guest)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let checkoutGuest: any = null;
@@ -61,6 +105,7 @@ export async function GET(
         notes: task.notes,
       },
       property,
+      access,
       checkoutGuest,
       nextGuest,
       // TURN-S2-send: cleaner_id gates the enable-alerts UI (only an assigned
