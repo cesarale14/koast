@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -901,6 +901,30 @@ function PropertySettingsModal({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // S3 — access content for cleaners (property_details). Loaded lazily on open;
+  // property_details ships 0-row, so this editor is the only thing that fills it.
+  const [access, setAccess] = useState({
+    door_code: "",
+    smart_lock_instructions: "",
+    wifi_network: "",
+    wifi_password: "",
+    parking_instructions: "",
+    checkin_time: "",
+    checkout_time: "",
+  });
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/properties/${property.id}/access`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d?.access) setAccess((a) => ({ ...a, ...d.access }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [property.id]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     setFieldErrors({});
@@ -941,15 +965,31 @@ function PropertySettingsModal({
         return;
       }
 
+      // S3 — persist access content (property_details) alongside the property.
+      let accessOk = true;
+      try {
+        const accRes = await fetch(`/api/properties/${property.id}/access`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(access),
+        });
+        accessOk = accRes.ok;
+      } catch {
+        accessOk = false;
+      }
+
       setSaving(false);
-      toast("Property updated");
+      toast(
+        accessOk ? "Property updated" : "Property saved, but access info didn't save",
+        accessOk ? "success" : "error",
+      );
       onSaved();
       onClose();
     } catch (err) {
       setSaving(false);
       toast(err instanceof Error ? err.message : "Failed to update property", "error");
     }
-  }, [form, property.id, toast, onClose, onSaved]);
+  }, [form, access, property.id, toast, onClose, onSaved]);
 
   const handleDelete = useCallback(async () => {
     if (deleteConfirmName !== property.name) {
@@ -1086,6 +1126,43 @@ function PropertySettingsModal({
                 onChange={(v) => setForm({ ...form, max_guests: v })}
               />
             </Field>
+          </div>
+
+          {/* Access info for cleaners (S3) — populates property_details, which the
+              cleaner job card surfaces under "Getting in". */}
+          <div className="pt-5 mt-4" style={{ borderTop: "1px solid var(--dry-sand)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-3" style={{ color: "var(--tideline)" }}>
+              Access info for cleaners
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Door code">
+                  <TextInput value={access.door_code} onChange={(v) => setAccess({ ...access, door_code: v })} placeholder="e.g. 4828" />
+                </Field>
+                <Field label="Parking">
+                  <TextInput value={access.parking_instructions} onChange={(v) => setAccess({ ...access, parking_instructions: v })} placeholder="e.g. Driveway, spot 2" />
+                </Field>
+              </div>
+              <Field label="Lock / lockbox">
+                <TextInput value={access.smart_lock_instructions} onChange={(v) => setAccess({ ...access, smart_lock_instructions: v })} placeholder="e.g. Lockbox on the gas meter, code 1234" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Wifi network">
+                  <TextInput value={access.wifi_network} onChange={(v) => setAccess({ ...access, wifi_network: v })} />
+                </Field>
+                <Field label="Wifi password">
+                  <TextInput value={access.wifi_password} onChange={(v) => setAccess({ ...access, wifi_password: v })} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Checkout time">
+                  <TextInput value={access.checkout_time} onChange={(v) => setAccess({ ...access, checkout_time: v })} placeholder="11:00" />
+                </Field>
+                <Field label="Check-in time">
+                  <TextInput value={access.checkin_time} onChange={(v) => setAccess({ ...access, checkin_time: v })} placeholder="15:00" />
+                </Field>
+              </div>
+            </div>
           </div>
 
           {/* Danger zone */}
