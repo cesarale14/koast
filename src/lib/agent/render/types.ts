@@ -18,6 +18,7 @@
  * (prose stands), per the graceful-degradation principle.
  */
 import { z } from "zod";
+import { blocksRenderPayloadSchema } from "./blocks";
 
 export const RENDER_HORIZONS = ["today_48h"] as const; // v1; union extends later
 export const renderHorizonSchema = z.enum(RENDER_HORIZONS);
@@ -71,11 +72,17 @@ export const agendaRenderPayloadSchema = z.object({
 });
 
 /**
- * The render payload union — v1 has one member. New render kinds are added
- * here (and as a `RenderCard` branch + a tool). `discriminatedUnion` keeps a
- * single member future-proof: it becomes `z.discriminatedUnion("kind", [...])`.
+ * The render payload union (P2.2: now a real `z.discriminatedUnion("kind",…)`).
+ * Members: `agenda` (the operational rollup) and `blocks` (P2.2 — a list of
+ * id-lean PMS-component blocks; dormant until a render tool emits it). New
+ * render kinds add a member here + a `RenderCard` branch + (where the agent
+ * should emit it) a tool. Validate-on-read drops truly-unknown kinds → prose
+ * stands.
  */
-export const renderPayloadSchema = agendaRenderPayloadSchema;
+export const renderPayloadSchema = z.discriminatedUnion("kind", [
+  agendaRenderPayloadSchema,
+  blocksRenderPayloadSchema,
+]);
 
 export type AgendaRenderPayload = z.infer<typeof agendaRenderPayloadSchema>;
 export type AgendaPropertyGroup = z.infer<typeof agendaPropertyGroupSchema>;
