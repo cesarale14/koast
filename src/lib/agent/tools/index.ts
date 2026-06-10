@@ -15,6 +15,8 @@ import { writeMemoryFactTool } from "./write-memory-fact";
 import { readGuestThreadTool } from "./read-guest-thread";
 import { proposeGuestMessageTool } from "./propose-guest-message";
 import { renderAgendaTool } from "./render-agenda";
+import { readTurnoversTool } from "./read-turnovers";
+import { readPricingTool } from "./read-pricing";
 import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
@@ -34,14 +36,22 @@ registerTool(proposeGuestMessageTool);
 // never added). Gating EXPOSURE live, the same way the prompt gates the catalog
 // + rule, keeps the two in lockstep.
 registerTool(renderAgendaTool);
+// P3.1 — block-emitting read tools. Registered unconditionally; EXPOSURE gated
+// live on the SAME render flag (the whole generative-UI line is one switch).
+registerTool(readTurnoversTool);
+registerTool(readPricingTool);
+
+// The generative-UI tools — exposed only when the render flag is on, in
+// lockstep with the prompt's applyRenderToggle.
+const GENERATIVE_UI_TOOLS = new Set(["render_agenda", "read_turnovers", "read_pricing"]);
 
 /**
  * The per-request tool array handed to the model. Reads the render flag LIVE
- * (via isRenderAgendaEnabled) so render_agenda is exposed only when enabled —
- * in lockstep with the prompt's applyRenderToggle. Filtering EXPOSURE (not
- * registration) means the gate can't freeze at module-load.
+ * (via isRenderAgendaEnabled) so the generative-UI tools are exposed only when
+ * enabled — in lockstep with the prompt's applyRenderToggle. Filtering EXPOSURE
+ * (not registration) means the gate can't freeze at module-load.
  */
 export function activeAnthropicTools(): ReturnType<typeof getToolsForAnthropicSDK> {
   const all = getToolsForAnthropicSDK();
-  return isRenderAgendaEnabled() ? all : all.filter((t) => t.name !== "render_agenda");
+  return isRenderAgendaEnabled() ? all : all.filter((t) => !GENERATIVE_UI_TOOLS.has(t.name));
 }

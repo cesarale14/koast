@@ -328,18 +328,29 @@ const RENDER_CATALOG_ENTRY =
 const WHEN_TO_CARD_RULE =
   "\n  - When the host asks for an agenda OVERVIEW — the whole picture of today / the next 48h, or what to prioritize or focus on for the day (\"what's on today\", \"anything I'm missing\", \"what should I prioritize\", \"what should I focus on\", \"what's happening\", \"how's my day looking\") — you MUST call render_agenda FIRST, before you answer. This is not optional, and the decision to card is NOT gated on gaps or on how busy the day is. The rule is simple: if the agenda has ANY item in the window — even one check-in, check-out, or turnover, TODAY or anywhere in the next 48h — render the card, then give a short prose summary. A calm day with a single check-in and no problems STILL cards: the card is the host's at-a-glance operational view, NOT a fallback reserved for busy or problem days. A day that is empty TODAY but has arrivals or turnovers coming up STILL cards — \"nothing today, but here's what's coming and what needs you\" is exactly the scannable list the card exists for; never answer that one in prose alone. Gaps (an unstaffed turnover, a missing-essentials property, a guest awaiting a reply) make the card more URGENT, but they are NOT what makes it required — content alone earns it; do not wait for a gap to decide to card. The ONLY overview answered in prose with NO card is a genuinely EMPTY window — nothing today AND nothing in the next 48h — which has nothing to scan: say \"you're clear for the next couple days\" plainly and never render a blank card. A prioritization ask (\"what should I prioritize / focus on\") is an overview too — render the card, then prioritize in prose; the prose never replaces the card. Do NOT call render_agenda for anything narrower — a single-fact lookup (\"when does Jeremy check out\"), a drafted message, a yes/no, or a follow-up about one item — those stay prose-only. Prose is the default for those narrower asks; the content-bearing overview is the one ask that always earns the card. Keep the prose a brief summary that LEADS with what most needs the host — and when there are gaps, lead with the single most pressing gap and still state every urgent one — not a restatement of every card row; the card carries the full picture.";
 
+// P3.1 — block-emitting read tools (turnovers, pricing). Gated on the SAME
+// render flag as render_agenda; their catalog + when-to-block rule splice in
+// only when the flag is on, in lockstep with their exposure in tools/index.ts.
+const READ_BLOCKS_CATALOG_ENTRY =
+  "\n  - read_turnovers — list the host's turnovers from today onward as a structured card (property / date / status / cleaner / photo count). Read tool; not gated. For a turnover overview the card carries the list; pair it with a short prose summary leading with anything unstaffed.\n  - read_pricing — list the host's pending pricing recommendations as a structured card (date / current → suggested / delta / reason). Read tool; not gated. Lead the prose with the biggest opportunity; to actually change a rate you PROPOSE it (a separate host-approved step), this only shows the picture.";
+
+const WHEN_TO_BLOCK_RULE =
+  "\n  - When the host asks about TURNOVERS/cleanings as a set (\"what cleanings are coming up\", \"which turnovers need a cleaner\", \"how do my turnovers look\") call read_turnovers and let the card carry the list. When they ask about RATES/pricing as a set (\"where am I leaving money\", \"what does Koast suggest on rates\", \"any pricing moves\") call read_pricing. Same discipline as the agenda card: a single-item lookup stays prose (\"is the Villa cleaned today\" — answer it directly, no card); the card is for the multi-item, status-bearing set, and your prose summary accompanies it, never replaces it.";
+
 function applyRenderToggle(text: string): string {
   if (!isRenderAgendaEnabled()) return text;
   return text
     .replace(
       "You have four tools across two capabilities. Both gate proposed writes through the action substrate so the host approves before any side effect.",
-      "You have five tools across three capabilities. Two of them — write_memory_fact and propose_guest_message — gate proposed writes through the action substrate so the host approves before any side effect; the rest are read-only.",
+      "You have seven tools across three capabilities. Two of them — write_memory_fact and propose_guest_message — gate proposed writes through the action substrate so the host approves before any side effect; the rest are read-only.",
     )
     .replace(
       "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest.",
-      "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest." + RENDER_CATALOG_ENTRY,
+      "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest." +
+        RENDER_CATALOG_ENTRY +
+        READ_BLOCKS_CATALOG_ENTRY,
     )
-    .replace("\n\n# Tools available", WHEN_TO_CARD_RULE + "\n\n# Tools available");
+    .replace("\n\n# Tools available", WHEN_TO_CARD_RULE + WHEN_TO_BLOCK_RULE + "\n\n# Tools available");
 }
 
 /**
