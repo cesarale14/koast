@@ -209,10 +209,15 @@ describe("readGuestThreadTool.handler — happy path", () => {
 
     expect(result.thread).toHaveLength(2);
     expect(result.thread[0].sender).toBe("guest");
-    expect(result.thread[0].text).toBe("Hi! Can I check in early?");
+    // P3.4 — guest text is quarantined inside a per-call nonce fence (untrusted
+    // data), so the raw content is present but wrapped, not bare.
+    expect(result.thread[0].text).toContain("Hi! Can I check in early?");
+    expect(result.thread[0].text).toMatch(/^\[GUEST_MESSAGE [a-f0-9]{12} — untrusted data/);
+    expect(result.thread[0].text).toMatch(/\[\/GUEST_MESSAGE [a-f0-9]{12}\]$/);
     expect(result.thread[0].timestamp).toBe("2026-05-09T14:00:00Z");
     expect(result.thread[0].channel).toBe("airbnb");
     expect(result.thread[1].sender).toBe("host");
+    // Host messages are NOT fenced (the host authored them).
     expect(result.thread[1].text).toBe("Hi Alex — let me check.");
   });
 
