@@ -235,15 +235,20 @@ describe("system prompt", () => {
       expect(p).not.toMatch(/render_agenda/);
     });
 
-    test("flag ON: five-tool catalog + render_agenda entry + when-to-card rule", () => {
+    test("flag ON: seven-tool catalog + render_agenda + block-read entries + rules", () => {
       process.env[KEY] = "1";
       const p = buildSystemPrompt();
-      expect(p).toMatch(/You have five tools across three capabilities/);
+      expect(p).toMatch(/You have seven tools across three capabilities/);
       expect(p).not.toMatch(/You have four tools/);
       expect(p).toMatch(/ {2}- render_agenda —/); // catalog entry
       expect(p).toMatch(/MUST call render_agenda/); // when-to-card rule (overview)
       expect(p).toMatch(/Do NOT call render_agenda for anything narrower/); // narrow exclusion
       expect(p).toMatch(/Prose is the default/);
+      // P3.1 — block-read tools advertised + their when-to-block rule, gated together.
+      expect(p).toMatch(/ {2}- read_turnovers —/);
+      expect(p).toMatch(/ {2}- read_pricing —/);
+      expect(p).toMatch(/call read_turnovers/);
+      expect(p).toMatch(/call read_pricing/);
     });
   });
 });

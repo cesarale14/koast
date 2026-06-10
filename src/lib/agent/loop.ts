@@ -47,7 +47,7 @@ import { buildSystemPrompt } from "./system-prompt";
 import { buildAgendaRollup, agendaPreamble } from "./agenda";
 import { createMarkdownStripStream } from "@/lib/text/strip-markdown";
 import { isRenderAgendaEnabled } from "@/lib/agent/render/flag";
-import type { RenderPayload } from "./render/types";
+import { renderPayloadSchema, type RenderPayload } from "./render/types";
 import { dispatchToolCall } from "./dispatcher";
 // activeAnthropicTools() reads the render flag LIVE (per request) to gate
 // render_agenda's EXPOSURE — in lockstep with the prompt's applyRenderToggle.
@@ -516,14 +516,19 @@ async function* runOneRound(
           result_summary: summary,
         };
 
-        // Generative-UI (Phase B): render_agenda is non-gated and its result
-        // IS the typed render payload (dispatcher already Zod-validated it
-        // against renderPayloadSchema). Emit the `render` event live and stash
-        // it for finalize. NOT an action_proposed — no host approval.
-        if (block.name === "render_agenda") {
-          const payload = result.value as RenderPayload;
-          roundRenderPayload = payload;
-          yield { type: "render", payload };
+        // Generative-UI: a render/read tool whose result IS a typed
+        // RenderPayload (agenda OR P3.1 blocks) emits a `render` event. P3
+        // generalizes the old render_agenda name-equality to "any result that
+        // parses as renderPayloadSchema" so every block-emitting read tool
+        // lights up. The flag-check is a defensive belt — the generative-UI
+        // tools are exposure-gated on the same flag (tools/index.ts), so when
+        // off they aren't callable; this guarantees no stray card regardless.
+        if (isRenderAgendaEnabled()) {
+          const renderParsed = renderPayloadSchema.safeParse(result.value);
+          if (renderParsed.success) {
+            roundRenderPayload = renderParsed.data;
+            yield { type: "render", payload: renderParsed.data };
+          }
         }
 
         // D35 fork side-channel (M6 + M7 D39): when a gated tool's
