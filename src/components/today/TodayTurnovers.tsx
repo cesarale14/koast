@@ -12,15 +12,20 @@
  * - in_progress → lume dot, "{cleaner} is cleaning".
  * - completed → lagoon dot, "Done · {cleaner}".
  *
+ * P2.2: each row renders through the shared <TurnoverBlock> — the SAME
+ * component the agent's chat answers + P2.3 ProposalCards render. The strip
+ * owns the interaction state (busy/optimistic/poll/toast + the /api/turnover/*
+ * calls) and passes per-row data + actions to the block.
+ *
  * S5 reflection: while any turnover is active (assigned/in_progress) the strip
  * polls (router.refresh, 45s) so a cleaner marking in-progress/complete from
- * their phone surfaces on the host's home without a manual reload. The persistent
- * host notification center (the bell) is P2.
+ * their phone surfaces on the host's home without a manual reload.
  */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import type { CleaningTaskStatus } from "@/lib/db/schema";
+import { TurnoverBlock } from "@/components/chat/blocks/TurnoverBlock";
 
 type Turnover = {
   taskId: string;
@@ -39,42 +44,11 @@ interface PushSummary {
 
 const POLL_MS = 45_000;
 
-function fmtDate(iso: string): string {
-  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function reachLabel(push: PushSummary | null | undefined): string {
   if (!push || !push.configured) return "";
   const sent = push.sent ?? 0;
   if (sent > 0) return ` · pushed to ${sent} device${sent > 1 ? "s" : ""}`;
   return " · no devices subscribed yet";
-}
-
-const STATUS_DOT: Partial<Record<CleaningTaskStatus, string>> = {
-  assigned: "var(--amber-tide)",
-  in_progress: "var(--lume)",
-  completed: "var(--lagoon)",
-  issue: "var(--coral-reef)",
-};
-
-function statusLabel(status: CleaningTaskStatus, cleaner: string | null): string {
-  const who = cleaner ?? "Cleaner";
-  switch (status) {
-    case "assigned":
-      return cleaner ? `Dispatched to ${who}` : "Dispatched";
-    case "in_progress":
-      return `${who} is cleaning`;
-    case "completed":
-      return cleaner ? `Done · ${who}` : "Done";
-    case "issue":
-      return "Issue reported";
-    default:
-      return "";
-  }
 }
 
 export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[]; cleaners: Cleaner[] }) {
@@ -99,8 +73,6 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
   }, [turnovers, router]);
 
   if (turnovers.length === 0) return null;
-
-  const noCleaners = cleaners.length === 0;
 
   async function assign(task: Turnover) {
     const cleanerId = picked[task.taskId] ?? cleaners[0]?.id;
@@ -174,125 +146,34 @@ export function TodayTurnovers({ turnovers, cleaners }: { turnovers: Turnover[];
           const optimisticCleaner = assignedNow[task.taskId];
           const effectiveStatus: CleaningTaskStatus = optimisticCleaner ? "assigned" : task.status;
           const cleaner = optimisticCleaner ?? task.cleanerName;
-          const isPending = effectiveStatus === "pending";
           const isBusy = busy[task.taskId];
           const selected = picked[task.taskId] ?? cleaners[0]?.id ?? "";
-          const dot = isPending ? "var(--coral-reef)" : STATUS_DOT[effectiveStatus] ?? "var(--tideline)";
+          const ps = photoState[task.taskId];
 
           return (
-            <li
-              key={task.taskId}
-              style={{
-                padding: "14px 16px",
-                borderRadius: 12,
-                background: "var(--shore-soft)",
-                border: "1px solid var(--hairline)",
-                opacity: effectiveStatus === "completed" ? 0.7 : 1,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span
-                aria-hidden
-                style={{ width: 9, height: 9, borderRadius: 99, background: dot, flexShrink: 0 }}
+            <li key={task.taskId}>
+              <TurnoverBlock
+                data={{
+                  property: task.property,
+                  date: task.date,
+                  status: effectiveStatus,
+                  cleanerName: cleaner,
+                  photoCount: task.photoCount,
+                }}
+                actions={{
+                  cleaners,
+                  selectedCleanerId: selected,
+                  onSelectCleaner: (id) => setPicked((p) => ({ ...p, [task.taskId]: id })),
+                  onAssign: () => assign(task),
+                  assigning: isBusy,
+                  photos: {
+                    open: ps !== undefined,
+                    loading: ps?.loading ?? false,
+                    urls: ps?.urls ?? [],
+                    onToggle: () => togglePhotos(task.taskId),
+                  },
+                }}
               />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: "var(--deep-sea)", fontSize: 15 }}>{task.property}</div>
-                <div style={{ color: "var(--tideline)", fontSize: 13 }}>
-                  {fmtDate(task.date)}
-                  {!isPending ? ` · ${statusLabel(effectiveStatus, cleaner)}` : ""}
-                </div>
-              </div>
-
-              {isPending && cleaners.length > 1 && (
-                <select
-                  aria-label="Choose cleaner"
-                  value={selected}
-                  onChange={(e) => setPicked((p) => ({ ...p, [task.taskId]: e.target.value }))}
-                  disabled={isBusy}
-                  style={{
-                    fontSize: 13,
-                    padding: "6px 8px",
-                    borderRadius: 8,
-                    border: "1px solid var(--hairline)",
-                    background: "white",
-                    color: "var(--deep-sea)",
-                  }}
-                >
-                  {cleaners.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {isPending && (
-                <button
-                  onClick={() => assign(task)}
-                  disabled={isBusy || noCleaners}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    whiteSpace: "nowrap",
-                    cursor: isBusy || noCleaners ? "default" : "pointer",
-                    background: noCleaners ? "var(--shell)" : "var(--coastal)",
-                    color: noCleaners ? "var(--tideline)" : "white",
-                    opacity: isBusy ? 0.7 : 1,
-                  }}
-                >
-                  {isBusy
-                    ? "Assigning..."
-                    : noCleaners
-                      ? "No cleaners"
-                      : cleaners.length === 1
-                        ? `Assign ${cleaners[0].name.split(/\s+/)[0]}`
-                        : "Assign"}
-                </button>
-              )}
-
-                {!isPending && task.photoCount > 0 && (
-                  <button
-                    onClick={() => togglePhotos(task.taskId)}
-                    disabled={photoState[task.taskId]?.loading}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "1px solid var(--hairline)",
-                      whiteSpace: "nowrap",
-                      cursor: "pointer",
-                      background: "white",
-                      color: "var(--coastal)",
-                    }}
-                  >
-                    {photoState[task.taskId]?.loading
-                      ? "Loading..."
-                      : photoState[task.taskId]
-                        ? "Hide"
-                        : `Photos (${task.photoCount})`}
-                  </button>
-                )}
-              </div>
-
-              {photoState[task.taskId] &&
-                !photoState[task.taskId]?.loading &&
-                (photoState[task.taskId]?.urls.length ?? 0) > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 10 }}>
-                    {photoState[task.taskId]!.urls.map((u, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={i}
-                        src={u}
-                        alt={`Cleaning photo ${i + 1}`}
-                        style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8 }}
-                      />
-                    ))}
-                  </div>
-                )}
             </li>
           );
         })}

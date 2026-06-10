@@ -12,11 +12,15 @@
  */
 import type { RenderPayload } from "@/lib/agent/render/types";
 import { AgendaCard } from "./AgendaCard";
+import { BlockList } from "./blocks/registry";
 
 export function RenderCard({ payload }: { payload: RenderPayload }) {
   switch (payload.kind) {
     case "agenda":
       return <AgendaCard payload={payload} />;
+    case "blocks":
+      // P2.2: answers composed of the app's own components via the registry.
+      return <BlockList blocks={payload.blocks} />;
     default:
       // Unknown kind → render nothing; the prose carries the turn.
       return null;
