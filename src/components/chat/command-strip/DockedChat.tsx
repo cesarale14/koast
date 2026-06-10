@@ -30,6 +30,7 @@ import { useChatStore } from "@/components/chat/ChatStore";
 import { RenderCard } from "@/components/chat/RenderCard";
 import type { ContentBlock } from "@/lib/agent-client/types";
 import type { RenderPayload } from "@/lib/agent/render/types";
+import type { RefusalEnvelope } from "@/lib/agent/refusal-envelope";
 import { usePageContext } from "./usePageContext";
 
 type HarvestedTurn = {
@@ -38,6 +39,7 @@ type HarvestedTurn = {
   koastText: string;
   renderPayload?: RenderPayload;
   refusalText: string | null;
+  refusalEnvelope?: RefusalEnvelope;
   errored: boolean;
   hasArtifacts: boolean;
 };
@@ -95,6 +97,7 @@ function KoastBlock({
   text,
   renderPayload,
   refusalText,
+  refusalEnvelope,
   errored,
   showArtifactNudge,
   onOpenFull,
@@ -102,6 +105,7 @@ function KoastBlock({
   text: string;
   renderPayload?: RenderPayload;
   refusalText?: string | null;
+  refusalEnvelope?: RefusalEnvelope;
   errored?: boolean;
   showArtifactNudge?: boolean;
   onOpenFull: () => void;
@@ -117,6 +121,16 @@ function KoastBlock({
       {refusalText && (
         <div style={{ color: "var(--tideline)", fontSize: 13, fontStyle: "italic" }}>
           {refusalText}
+        </div>
+      )}
+      {refusalEnvelope && (
+        // The agent declined via a structured envelope (out-of-scope,
+        // host_input_needed, a publisher-category/guest-message block). Show the
+        // reason so the companion isn't a blank reply; the full surface has the
+        // richer renderer.
+        <div style={{ color: "var(--tideline)", fontSize: 13 }}>
+          {refusalEnvelope.reason}
+          {refusalEnvelope.alternative_path ? ` ${refusalEnvelope.alternative_path}` : ""}
         </div>
       )}
       {errored && (
@@ -183,7 +197,6 @@ export function DockedChat({ onRequestClose }: { onRequestClose?: () => void }) 
       state.status === "done" || state.status === "error" || state.status === "refusal";
     if (!terminal || !pendingHarvestRef.current) return;
     pendingHarvestRef.current = false;
-    const refusalText = state.refusal?.reason ?? state.refusalEnvelope?.reason ?? null;
     setHarvest((prev) => [
       ...prev,
       {
@@ -191,7 +204,11 @@ export function DockedChat({ onRequestClose }: { onRequestClose?: () => void }) 
         userText: pendingUserText ?? "",
         koastText: paragraphsOf(state.content),
         renderPayload: state.renderPayload,
-        refusalText: state.status === "refusal" ? refusalText : null,
+        // M5 stop-reason refusal (status==='refusal').
+        refusalText: state.refusal?.reason ?? null,
+        // Structured refusal envelope finalizes as 'done' (turnReducer does NOT
+        // set status='refusal'), so carry it independently of the status check.
+        refusalEnvelope: state.refusalEnvelope,
         errored: state.status === "error",
         hasArtifacts: hasArtifacts(state.content),
       },
@@ -221,7 +238,10 @@ export function DockedChat({ onRequestClose }: { onRequestClose?: () => void }) 
 
   const onSend = useCallback(() => {
     const text = draft.trim();
-    if (!text || busy) return;
+    // Also block while a finished-but-unharvested turn is pending: between the
+    // `done` event (busy clears) and the harvest effect running, a send would
+    // RESET the live turn before harvest and lose the just-finished answer.
+    if (!text || busy || pendingHarvestRef.current) return;
     setDraft("");
     setPendingUserText(text);
     pendingHarvestRef.current = true;
@@ -306,6 +326,7 @@ export function DockedChat({ onRequestClose }: { onRequestClose?: () => void }) 
               text={h.koastText}
               renderPayload={h.renderPayload}
               refusalText={h.refusalText}
+              refusalEnvelope={h.refusalEnvelope}
               errored={h.errored}
               showArtifactNudge={h.hasArtifacts}
               onOpenFull={onOpenFull}
@@ -316,10 +337,11 @@ export function DockedChat({ onRequestClose }: { onRequestClose?: () => void }) 
         {pendingUserText !== null && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <UserBubble text={pendingUserText} />
-            {liveText || state.renderPayload ? (
+            {liveText || state.renderPayload || state.refusalEnvelope ? (
               <KoastBlock
                 text={liveText}
                 renderPayload={state.renderPayload}
+                refusalEnvelope={state.refusalEnvelope}
                 onOpenFull={onOpenFull}
               />
             ) : liveStreaming ? (

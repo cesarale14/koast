@@ -31,7 +31,8 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (svc.from("proposals") as any)
       .update({ status: "dismissed", decided_at: new Date().toISOString() })
-      .eq("id", params.id);
+      .eq("id", params.id)
+      .eq("host_id", user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ dismissed: true });
