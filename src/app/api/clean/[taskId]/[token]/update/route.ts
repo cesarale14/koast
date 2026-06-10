@@ -15,7 +15,7 @@ export async function POST(
     // Validate token
     const { data: tasks } = await supabase
       .from("cleaning_tasks")
-      .select("id, property_id, scheduled_date, cleaner_token, photos")
+      .select("id, property_id, scheduled_date, cleaner_token, photos, status")
       .eq("id", params.taskId)
       .eq("cleaner_token", params.token)
       .limit(1);
@@ -74,9 +74,18 @@ export async function POST(
     const propName: string = prop?.name ?? "Property";
     const hostId: string | null = prop?.user_id ?? null;
 
-    // Send notifications
-    if (body.status === "completed") {
-      await notifyHostComplete(supabase, hostId, task, propName);
+    // Send notifications — only on a REAL transition into completed (the token
+    // is in the URL and the route is public, so a refresh/retry can re-POST
+    // 'completed'; gating on the prior status keeps notifications idempotent).
+    if (body.status === "completed" && task.status !== "completed") {
+      // notifyHostComplete is a side effect (host SMS / notifications audit
+      // row) — best-effort, so a transient failure there can't 500 the request
+      // or suppress the durable bell row for a completion that already persisted.
+      try {
+        await notifyHostComplete(supabase, hostId, task, propName);
+      } catch (err) {
+        console.warn("[clean/update] notifyHostComplete failed:", err);
+      }
       // P2.4: fold the cleaning-completed event into the host bell properly
       // (the interim S5 wiring was a 45s poll + a "the bell is P2" TODO). The
       // poll stays for live card-status reflection; this lands the durable feed

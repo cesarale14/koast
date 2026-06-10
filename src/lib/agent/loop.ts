@@ -152,7 +152,10 @@ function pageLabelForRoute(route: string): string {
   if (route === "/comp-sets") return "the Comp Sets page";
   if (/^\/properties\/[^/]+$/.test(route)) return "a property's detail page";
   if (route === "/properties") return "the Properties list";
-  return `the ${route} page`;
+  // Never echo an unrecognized route verbatim into the prompt — active_route is
+  // client-supplied (the host's own session) and a crafted value could try to
+  // inject prompt text. A generic label closes that vector.
+  return "the page they're on";
 }
 
 /**
@@ -168,8 +171,12 @@ export function buildPageContextPreamble(ui_context?: RunAgentTurnInput["ui_cont
   const route = ui_context?.active_route;
   if (!route) return "";
   const range = ui_context?.active_date_range;
+  // Only emit the date window when both ends are well-formed ISO dates — the
+  // values are client-supplied and interpolated into the prompt, so a strict
+  // shape check keeps untrusted text out of the model's context.
+  const ISO = /^\d{4}-\d{2}-\d{2}$/;
   const rangeLine =
-    range && range.start && range.end
+    range && ISO.test(range.start ?? "") && ISO.test(range.end ?? "")
       ? `\nvisible_dates = ${range.start} to ${range.end} (resolve "this weekend"/"these dates" against this window)`
       : "";
   return `[active context — provided by the host's UI]

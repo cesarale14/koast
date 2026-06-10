@@ -19,7 +19,7 @@ import { writeAuditLog } from "@/lib/action-substrate/audit-writer";
 import type { StakesClass } from "@/lib/action-substrate/stakes-registry";
 import { assignCleaner } from "@/lib/turnover/assign";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
-import type { BlockData } from "@/lib/agent/render/blocks";
+import { blockDataSchema, type BlockData } from "@/lib/agent/render/blocks";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,7 +146,13 @@ export interface NormalizedProposal {
 }
 
 export function normalizeProposal(row: ProposalRow): NormalizedProposal {
-  const block = (row.payload as { block?: BlockData } | null)?.block ?? null;
+  // Validate-on-read (mirrors the agenda render lane): a malformed block — even
+  // of a KNOWN kind — is dropped so the rationale prose stands, never rendered
+  // as garbage ("Invalid Date"). The Zod parse also strips undeclared keys
+  // (e.g. a leaked entity id), enforcing the render-lane no-ids invariant here.
+  const rawBlock = (row.payload as { block?: unknown } | null)?.block;
+  const parsed = rawBlock != null ? blockDataSchema.safeParse(rawBlock) : null;
+  const block: BlockData | null = parsed?.success ? parsed.data : null;
   return {
     id: row.id,
     propertyId: row.property_id,
@@ -237,13 +243,21 @@ export async function finalizeProposalAfterExecute(
   svc: Svc,
   proposalId: string,
   exec: ExecuteResult,
+  hostId: string,
 ): Promise<ProposalRow | null> {
   const now = new Date().toISOString();
   const update = exec.ok
     ? { status: "executed", decided_at: now, executed_at: now, result: exec.summary }
     : { status: "failed", decided_at: now, result: { error: exec.error } };
+  // Scope the write to the host (defense-in-depth: every service-client write
+  // carries its own ownership filter, not just an upstream SELECT).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (svc.from("proposals") as any).update(update).eq("id", proposalId).select().single();
+  const { data } = await (svc.from("proposals") as any)
+    .update(update)
+    .eq("id", proposalId)
+    .eq("host_id", hostId)
+    .select()
+    .single();
   return (data as ProposalRow) ?? null;
 }
 
@@ -285,7 +299,7 @@ export async function createProposal(
 
   if (await isAutoApproveEnabled(svc, args.hostId, args.actionType)) {
     const exec = await executeProposal(svc, { proposal, hostId: args.hostId });
-    const finalized = await finalizeProposalAfterExecute(svc, proposal.id, exec);
+    const finalized = await finalizeProposalAfterExecute(svc, proposal.id, exec, args.hostId);
     if (finalized) proposal = finalized;
     return { proposal, autoExecuted: true };
   }

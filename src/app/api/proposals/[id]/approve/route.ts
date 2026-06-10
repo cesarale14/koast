@@ -5,7 +5,11 @@
  * failed. A failed execution stays actionable (re-approvable) — it returns 200
  * with ok:false so the card can render the error without losing the action.
  *
- * "This call IS the gate": host auth + ownership (host_id) are re-checked here.
+ * At-most-once execution: the proposal is ATOMICALLY CLAIMED (pending|failed →
+ * approved) via a conditional UPDATE before executing, so a double-click /
+ * client retry / racing approve fails the claim (→ 409) and execution runs
+ * exactly once. "This call IS the gate": host auth + ownership (host_id) are
+ * enforced in the claim itself.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -24,31 +28,40 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const svc = createServiceClient();
-    const { data: rows } = await svc
-      .from("proposals")
-      .select("*")
+
+    // Atomic claim — only a pending/failed proposal owned by this host can be
+    // claimed (status → approved). Two concurrent approves: only one claims a
+    // row; the loser sees no row and 409s. 'failed' is claimable so it stays
+    // actionable (re-approve retries).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: claimedRows } = await (svc.from("proposals") as any)
+      .update({ status: "approved", decided_at: new Date().toISOString() })
       .eq("id", params.id)
       .eq("host_id", user.id)
-      .limit(1);
-    const proposal = ((rows ?? []) as ProposalRow[])[0];
-    if (!proposal) return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+      .in("status", ["pending", "failed"])
+      .select();
+    const proposal = ((claimedRows ?? []) as ProposalRow[])[0];
 
-    // Terminal states can't be re-approved. 'failed' is NOT terminal — it stays
-    // actionable, so a re-approve retries.
-    if (proposal.status === "executed" || proposal.status === "dismissed") {
-      return NextResponse.json(
-        { error: `Proposal already ${proposal.status}` },
-        { status: 409 },
-      );
+    if (!proposal) {
+      // Claim failed — disambiguate not-found/not-owned vs already resolved/in-flight.
+      const { data: existing } = await svc
+        .from("proposals")
+        .select("id, status")
+        .eq("id", params.id)
+        .eq("host_id", user.id)
+        .limit(1);
+      const row = ((existing ?? []) as { id: string; status: string }[])[0];
+      if (!row) return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+      return NextResponse.json({ error: `Proposal already ${row.status}` }, { status: 409 });
     }
 
     const exec = await executeProposal(svc, { proposal, hostId: user.id });
-    const finalized = await finalizeProposalAfterExecute(svc, proposal.id, exec);
+    const finalized = await finalizeProposalAfterExecute(svc, proposal.id, exec, user.id);
     const normalized = finalized ? normalizeProposal(finalized) : null;
 
     if (!exec.ok) {
       // Execution failed-but-recorded — request succeeded, action didn't. The
-      // card shows the error and stays actionable.
+      // card shows the error and stays actionable (status is now 'failed').
       return NextResponse.json({ ok: false, error: exec.error, proposal: normalized });
     }
     return NextResponse.json({ ok: true, proposal: normalized });

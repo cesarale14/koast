@@ -72,9 +72,10 @@ describe("buildPageContextPreamble", () => {
     expect(out).toContain("a property's detail page");
   });
 
-  test("falls back to the raw path for an unknown route", () => {
+  test("uses a generic label for an unknown route (never echoes the raw path)", () => {
     const out = buildPageContextPreamble({ active_route: "/something-new" });
-    expect(out).toContain("the /something-new page");
+    expect(out).toContain("the page they're on");
+    expect(out).not.toContain("/something-new");
   });
 
   test("includes the visible date window when active_date_range is present", () => {

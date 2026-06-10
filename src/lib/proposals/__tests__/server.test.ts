@@ -77,6 +77,27 @@ describe("normalizeProposal", () => {
   test("null block when payload has none", () => {
     expect(normalizeProposal(row({ payload: {} })).block).toBeNull();
   });
+
+  test("drops a malformed block (validate-on-read → prose stands, no 'Invalid Date')", () => {
+    // A KNOWN kind with bad data must be dropped, not rendered as garbage.
+    const n = normalizeProposal(row({ payload: { block: { kind: "turnover", data: {} } } }));
+    expect(n.block).toBeNull();
+  });
+
+  test("strips an injected entity id from a valid block (no-ids invariant)", () => {
+    const n = normalizeProposal(
+      row({
+        payload: {
+          block: {
+            kind: "turnover",
+            data: { property: "Villa", date: "2026-06-12", status: "pending", cleanerName: null, taskId: "leak" },
+          },
+        },
+      }),
+    );
+    expect(n.block).not.toBeNull();
+    expect(JSON.stringify(n.block)).not.toContain("leak");
+  });
 });
 
 describe("getProposalActionMeta", () => {
@@ -161,6 +182,7 @@ describe("finalizeProposalAfterExecute", () => {
       svcReturning(row({ status: "executed" })),
       "prop-1",
       { ok: true, summary: { cleaner_name: "Karem" } },
+      HOST,
     );
     expect(out?.status).toBe("executed");
   });
@@ -170,6 +192,7 @@ describe("finalizeProposalAfterExecute", () => {
       svcReturning(row({ status: "failed" })),
       "prop-1",
       { ok: false, error: "boom" },
+      HOST,
     );
     expect(out?.status).toBe("failed");
   });
