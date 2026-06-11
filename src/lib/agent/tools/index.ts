@@ -18,6 +18,7 @@ import { renderAgendaTool } from "./render-agenda";
 import { readTurnoversTool } from "./read-turnovers";
 import { readPricingTool } from "./read-pricing";
 import { proposeAssignCleanerTool } from "./propose-assign-cleaner";
+import { proposeNotifyCleanerTool } from "./propose-notify-cleaner";
 import {
   proposeBlockDatesTool,
   proposeAdjustPriceTool,
@@ -49,6 +50,8 @@ registerTool(readPricingTool);
 // P3.2 — the agent's first WRITE-as-proposal. Always exposed (not flag-gated):
 // it creates a PENDING proposal and executes nothing; host approval is the gate.
 registerTool(proposeAssignCleanerTool);
+// P3.2 — re-notify the already-assigned cleaner. Same non-gated proposals lane.
+registerTool(proposeNotifyCleanerTool);
 // P3.2 — the OTA trio (HARD-FLOOR). Always exposed: proposals are CREATABLE
 // while the OTA write gate is off; EXECUTION is impossible until it's flipped
 // (ProposalCard hides Approve when !executable + executeProposal + the dispatch

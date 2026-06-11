@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/action-substrate/audit-writer";
 import type { StakesClass } from "@/lib/action-substrate/stakes-registry";
 import { assignCleaner } from "@/lib/turnover/assign";
+import { notifyCleaner } from "@/lib/turnover/notify";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { blockDataSchema, type BlockData } from "@/lib/agent/render/blocks";
 import { isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
@@ -117,6 +118,26 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
         cleanerId: action.cleanerId,
         hostId,
       });
+      if (!r.ok) return { ok: false, error: r.error };
+      return {
+        ok: true,
+        summary: { cleaner_name: r.cleanerName, property_name: r.propertyName, push: r.push ?? null },
+      };
+    },
+  },
+
+  notify_cleaner: {
+    label: "Cleaner reminders",
+    description:
+      "Re-send the job notification to the assigned cleaner for a turnover, without asking first.",
+    otaTouching: false,
+    stakesClass: "low",
+    execute: async (svc, { payload, hostId }) => {
+      const action = ((payload as { action?: unknown })?.action ?? {}) as { taskId?: string };
+      if (!action.taskId) {
+        return { ok: false, error: "Proposal payload missing action.taskId" };
+      }
+      const r = await notifyCleaner(svc, { taskId: action.taskId, hostId });
       if (!r.ok) return { ok: false, error: r.error };
       return {
         ok: true,
