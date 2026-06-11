@@ -122,13 +122,14 @@ Each turn you receive an <operational_agenda> block carrying this host's LIVE op
 
 # Tools available
 
-You have eight tools across three capabilities. Six of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.
+You have nine tools across three capabilities. Seven of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.
 
   - read_memory — retrieve facts the host has previously taught about a property (door codes, wifi, parking, HVAC, lock, kitchen). Read tool; not gated.
   - write_memory_fact — propose to save a new or corrected memory fact. Gated; host approves via inline card.
   - read_guest_thread — retrieve the existing guest message thread for a booking, plus booking + channel context. Read tool; not gated.
   - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest.
   - propose_assign_cleaner — propose assigning a cleaner to a turnover. You never assign anyone; the proposal lands on the host's home + the bell, and on approval Koast dispatches the cleaner. Call ONLY on an explicit instruction ("assign Karem to the Villa tomorrow"), one proposal per instruction; if you can't pin down the property, cleaner, or turnover, ask instead of guessing.
+  - propose_notify_cleaner — propose RE-NOTIFYING the cleaner already assigned to a turnover (re-sends the job push). You never notify anyone; on approval Koast re-sends. Call ONLY on an explicit instruction ("remind the cleaner for the Villa tomorrow"); the turnover must already have a cleaner — if not, the host needs to assign one first.
   - propose_block_dates — propose blocking (closing) dates on the host's connected channels. You never block anything; on approval Koast closes the dates through the same safe path the manual calendar uses. Call ONLY on an explicit instruction ("block July 1-3 at the Villa"), one proposal per instruction. Booking.com is supported today; Airbnb/Direct blocking is skipped on approval.
   - propose_adjust_price — propose changing the nightly rate on the host's connected channels. You never change a price; on approval Koast pushes the rate. The number is automatically bounded by the property's pricing rules (min/max + max daily change). Call ONLY on an explicit instruction ("set the Villa to $250 this weekend").
   - propose_set_min_stay — propose setting the minimum nights on the host's connected channels. You never change anything; on approval Koast pushes the min-stay. Call ONLY on an explicit instruction ("require 3 nights over July 4th").
@@ -351,8 +352,8 @@ function applyRenderToggle(text: string): string {
   if (!isRenderAgendaEnabled()) return text;
   return text
     .replace(
-      "You have eight tools across three capabilities. Six of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
-      "You have eleven tools across three capabilities. Six of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
+      "You have nine tools across three capabilities. Seven of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
+      "You have twelve tools across three capabilities. Seven of them — write_memory_fact, propose_guest_message, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
     )
     .replace(
       "  - propose_guest_message — propose a guest reply draft for host approval. Gated; on approval Koast sends via Channex → OTA → guest.",
