@@ -127,6 +127,23 @@ export async function POST(
       console.warn("[pricing/calculate] pricing_recommendations insert failed:", insErr.message);
     }
 
+    // FRESHNESS sweep (P4.2): the DELETE above only clears pending rows for the
+    // re-computed window (today..+days), so rows whose date has gone PAST never
+    // get superseded and accumulate forever (they were the stale Apr–Jun set
+    // surfacing as "act now" in June). Expire every past-date pending row for
+    // this property here — read surfaces also filter (date >= today + isRecFresh),
+    // but expiring at the source keeps the table honest and the indexes lean.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: sweepErr } = await (supabase.from("pricing_recommendations") as any)
+      .delete()
+      .eq("property_id", propertyId)
+      .eq("status", "pending")
+      .lt("date", todayStr);
+    if (sweepErr) {
+      console.warn("[pricing/calculate] past-date pending sweep failed:", sweepErr.message);
+    }
+
     return NextResponse.json({
       property: propData[0].name,
       dates_calculated: rates.length,

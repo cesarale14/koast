@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isRecFresh, todayStrUTC } from "@/lib/pricing/freshness";
 
 const URGENCY_ORDER: Record<string, number> = {
   act_now: 0,
@@ -55,6 +56,15 @@ export async function GET(
       return NextResponse.json({ error: "status must be one of pending|applied|dismissed" }, { status: 400 });
     }
 
+    // FRESHNESS (P4.2): pending recs are only actionable while their night
+    // hasn't passed AND the producing run is recent — a rec about a past date,
+    // or one from a run that's gone stale, must never surface as "act now". We
+    // filter pending at both the DB (date >= today) and app (isRecFresh) layers.
+    // History views (applied / dismissed) are NOT date-filtered — they're the
+    // record of what happened, including past dates.
+    const nowISO = new Date().toISOString();
+    const applyFreshness = status === "pending";
+
     const supabase = createServiceClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase.from("pricing_recommendations") as any)
@@ -64,12 +74,19 @@ export async function GET(
       .order("date", { ascending: true })
       .order("created_at", { ascending: false })
       .limit(limit);
+    if (applyFreshness) query = query.gte("date", todayStrUTC(nowISO));
     if (since) query = query.gte("created_at", since);
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = ((data ?? []) as any[]).sort((a, b) => {
+    const filtered = applyFreshness
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? ((data ?? []) as any[]).filter((r) => isRecFresh({ date: r.date, createdAt: r.created_at }, nowISO))
+      : ((data ?? []) as unknown[]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (filtered as any[]).sort((a, b) => {
       const ua = URGENCY_ORDER[a.urgency ?? "review"] ?? 3;
       const ub = URGENCY_ORDER[b.urgency ?? "review"] ?? 3;
       if (ua !== ub) return ua - ub;

@@ -17,6 +17,7 @@ import type { Tool } from "../types";
 import { createServiceClient } from "@/lib/supabase/service";
 import { renderPayloadSchema, type RenderPayload } from "@/lib/agent/render/types";
 import type { BlockData } from "@/lib/agent/render/blocks";
+import { isRecFresh, todayStrUTC } from "@/lib/pricing/freshness";
 
 const ReadPricingInputSchema = z.object({});
 type ReadPricingInput = z.infer<typeof ReadPricingInputSchema>;
@@ -32,7 +33,10 @@ type RecRow = {
   delta_abs: number | string | null;
   reason_text: string | null;
   urgency: "act_now" | "coming_up" | "review" | null;
+  created_at: string | null;
 };
+
+const URGENCY_ORDER: Record<string, number> = { act_now: 0, coming_up: 1, review: 2 };
 
 function num(v: number | string | null): number | null {
   if (v == null) return null;
@@ -63,16 +67,34 @@ export const readPricingTool: Tool<ReadPricingInput, RenderPayload> = {
     // it for those errors; the dedup unique index guarantees one pending row per
     // (property, date), so the base table + status='pending' is correct. Surface
     // the error rather than swallowing it into a falsely-empty card.
+    //
+    // FRESHNESS (P4.2): only recs whose night hasn't passed (date >= today) AND
+    // whose producing run is recent (isRecFresh). Without this the date-asc order
+    // surfaced the stale PAST-date rows (Apr–Jun) FIRST and never reached today's
+    // fresh set. Order by urgency→date so the biggest LIVE opportunity leads.
+    const nowISO = new Date().toISOString();
+    const todayStr = todayStrUTC(nowISO);
     const { data: recRows, error: recError } = await supabase
       .from("pricing_recommendations")
-      .select("date, current_rate, suggested_rate, delta_abs, reason_text, urgency")
+      .select("date, current_rate, suggested_rate, delta_abs, reason_text, urgency, created_at")
       .in("property_id", propIds)
       .eq("status", "pending")
+      .gte("date", todayStr)
       .order("date", { ascending: true })
-      .limit(20);
+      .limit(200);
     if (recError) throw new Error(`[read_pricing] ${recError.message}`);
 
-    const blocks: BlockData[] = ((recRows ?? []) as RecRow[]).map((r) => ({
+    const fresh = ((recRows ?? []) as RecRow[])
+      .filter((r) => isRecFresh({ date: r.date, createdAt: r.created_at }, nowISO))
+      .sort((a, b) => {
+        const ua = URGENCY_ORDER[a.urgency ?? "review"] ?? 3;
+        const ub = URGENCY_ORDER[b.urgency ?? "review"] ?? 3;
+        if (ua !== ub) return ua - ub;
+        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      })
+      .slice(0, 20);
+
+    const blocks: BlockData[] = fresh.map((r) => ({
       kind: "price_diff",
       data: {
         date: r.date,
