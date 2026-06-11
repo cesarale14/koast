@@ -116,10 +116,15 @@ describe("isOtaWriteEnabled", () => {
     if (prev === undefined) delete process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH;
     else process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH = prev;
   });
-  test("off by default, on when the flag is '1'", () => {
+  test("off by default + fail-closed on '1'; on ONLY for the documented 'true' (R-5)", () => {
     delete process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH;
     expect(isOtaWriteEnabled()).toBe(false);
+    // R-5: unified with the route guard (isCalendarPushEnabled, "true"-only).
+    // "1" used to enable the proposal side while every route 503'd — now both
+    // fail closed on it. See gate-divergence.test.ts for the full matrix.
     process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH = "1";
+    expect(isOtaWriteEnabled()).toBe(false);
+    process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH = "true";
     expect(isOtaWriteEnabled()).toBe(true);
   });
 });
