@@ -24,6 +24,9 @@ import { blockDataSchema, type BlockData } from "@/lib/agent/render/blocks";
 import { isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
 import { applyOtaRestrictions } from "@/lib/channex/ota-apply";
 import type { KoastRestrictionProposal } from "@/lib/channex/safe-restrictions";
+import { proposeGuestMessageHandler } from "@/lib/action-substrate/handlers/propose-guest-message";
+import { ChannexSendError } from "@/lib/channex/messages";
+import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,7 +43,30 @@ type ProposalActionDef = {
   description: string;
   otaTouching: boolean;
   stakesClass: StakesClass;
-  execute: (svc: Svc, args: { payload: unknown; hostId: string }) => Promise<ExecuteResult>;
+  /**
+   * When true this action can NEVER be auto-approved — host approval is the
+   * ONLY execution path, structurally. The auto-approve settings toggle is
+   * NOT rendered for it (getProposalActionMeta omits it) AND isAutoApproveEnabled
+   * returns false for it unconditionally. send_guest_reply uses this: a
+   * guest-FACING send must never fire without explicit host approval. This is
+   * also what keeps the CLAUDE.md J3 fail-open contract valid for this action —
+   * because no auto-send call-site can exist, host approval remains the gate and
+   * the propose-time voice judges stay advisory (fail-open-with-flag). If this
+   * ever flips to allow auto-approve, the J3 contract REQUIRES the judges flip
+   * to fail-closed via applyOutputJudges' policyOverride hook FIRST.
+   */
+  neverAutoApprove?: boolean;
+  /**
+   * Execute the action through the SAME shared lib fn the manual UI uses.
+   * `result` carries the proposal's prior result row (proposals.result) so an
+   * action whose underlying writer is idempotency-keyed (send_guest_reply →
+   * proposeGuestMessageHandler's commit_metadata guard) can short-circuit a
+   * re-send. Absent/ignored by actions that don't need it.
+   */
+  execute: (
+    svc: Svc,
+    args: { payload: unknown; hostId: string; result?: Record<string, unknown> | null },
+  ) => Promise<ExecuteResult>;
 };
 
 /**
@@ -146,6 +172,108 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
     },
   },
 
+  // ── send_guest_reply (P3.2) — the agent's host-gated guest send on the
+  //    proposals lane. otaTouching:false (it's a Channex MESSAGE, not a calendar
+  //    write), stakes 'medium', neverAutoApprove (a guest-facing send NEVER fires
+  //    without explicit host approval — see the field doc). The voice judges
+  //    (J1-J6) + publisher hard-refusal run at PROPOSE time (in the tool + the
+  //    loop intercept); by execute time the text is already filtered + the
+  //    publisher categories already refused. Execution REUSES the M7 Channex send
+  //    single-writer (proposeGuestMessageHandler) — no agent side-door.
+  //
+  //    NO DOUBLE-SEND (the load-bearing guarantee): /api/proposals/[id]/approve
+  //    atomically claims pending|failed → approved before executing, so execution
+  //    runs at-most-once. This adapter preserves the invariant
+  //    **status='failed' ⟺ Channex did NOT send** by error class:
+  //      - ChannexSendError / ColdSendUnsupportedError → {ok:false} (Channex
+  //        rejected or the send is structurally unsupported; the proposal goes
+  //        'failed' = re-approvable, and a retry re-sends — correct, nothing went
+  //        out).
+  //      - ANY OTHER throw (a post-Channex-200 local-DB hiccup) → RE-THROW. The
+  //        message MAY already be on the OTA, so the proposal must NOT become
+  //        re-approvable: re-throwing leaves it 'approved' (un-reclaimable by the
+  //        atomic claim) and the webhook reconciles the local messages row. This
+  //        mirrors the artifact lane's outer-catch (terminal, no auto re-send).
+  //    At-most-once rests SOLELY on (a) the atomic claim and (b) the
+  //    failed⟺not-sent invariant. The `result` (proposals.result) threading into
+  //    the handler's commit_metadata is belt-and-suspenders that is INERT on this
+  //    lane by construction: the only re-approvable state is 'failed', and
+  //    finalizeProposalAfterExecute overwrites result with {error} on failure, so
+  //    a re-approve never carries a channex id and the handler's step-1 guard
+  //    never fires here. It is wired anyway so the handler's guard is honoured if
+  //    a future finalize preserves prior ids. Do NOT rely on it as the primary
+  //    guarantee.
+  send_guest_reply: {
+    label: "Guest replies",
+    description:
+      "Send the guest reply Koast drafts, without asking first. (Not available — guest sends always require your approval.)",
+    otaTouching: false,
+    stakesClass: "medium",
+    neverAutoApprove: true,
+    execute: async (svc, { payload, hostId, result }) => {
+      const action = ((payload as { action?: unknown })?.action ?? {}) as {
+        bookingId?: string;
+        messageText?: string;
+      };
+      if (!action.bookingId || !action.messageText) {
+        return { ok: false, error: "Proposal payload missing action.bookingId/action.messageText" };
+      }
+      // Prior-attempt result → commit_metadata (handler idempotency guard). Only
+      // a prior SUCCESS stored channex ids here; a 'failed' retry's result has
+      // none, so the handler re-sends (correct: failed ⟺ not sent).
+      const commit = (result ?? undefined) as
+        | { channex_message_id?: string; message_id?: string; channel?: string }
+        | undefined;
+      try {
+        const r = await proposeGuestMessageHandler({
+          host_id: hostId,
+          // The proposals lane carries no conversation/turn/artifact context; the
+          // handler body does not read these fields (they are vestigial inputs
+          // from the M7 artifact lane). proposeGuestMessageHandler writes only to
+          // bookings(read), message_threads, messages, property_channels(read) —
+          // none turn-keyed — so empty strings are safe here.
+          conversation_id: "",
+          turn_id: "",
+          artifact_id: "",
+          payload: { booking_id: action.bookingId, message_text: action.messageText },
+          commit_metadata: commit,
+        });
+        return {
+          ok: true,
+          summary: {
+            channex_message_id: r.channex_message_id,
+            message_id: r.message_id,
+            channel: r.channel,
+          },
+        };
+      } catch (err) {
+        // ColdSendUnsupportedError fires strictly PRE-Channex (the cold-send
+        // gates, before any POST) → nothing was sent → safe to mark 'failed'
+        // (re-approvable); a retry re-sends, which is correct.
+        if (err instanceof ColdSendUnsupportedError) {
+          return { ok: false, error: err.message };
+        }
+        // A ChannexSendError from a NON-2xx response is a TRUE OTA rejection
+        // (channexPost's !res.ok branch) → nothing was sent → re-approvable.
+        // But a 2xx ChannexSendError is the "200 with no data" AMBIGUOUS case
+        // (Channex accepted the request; the message MAY have been created but
+        // the body was empty/unparseable). Treat that like a post-send failure:
+        // fall through to RE-THROW so the proposal stays 'approved' and never
+        // re-sends. (Closes the named weakest link in the at-most-once model —
+        // see the H-item in koast-v1-hardening-backlog.md for the system-wide
+        // AmbiguousSendError follow-up across the manual + M7 send routes.)
+        if (err instanceof ChannexSendError && !(err.status >= 200 && err.status < 300)) {
+          return { ok: false, error: err.message };
+        }
+        // Ambiguous 2xx ChannexSendError, a post-Channex-200 local-DB hiccup, or
+        // any unknown error: the message may be on the OTA. Re-throw to keep the
+        // proposal 'approved' (un-reclaimable by the atomic claim) so it can
+        // never re-send. The webhook reconciles the local messages row.
+        throw err;
+      }
+    },
+  },
+
   // ── OTA trio (HARD-FLOOR, BDC clobber class) — otaTouching, stakes 'high'.
   //    Execution is IMPOSSIBLE while the OTA gate is off: belt 1 (ProposalCard
   //    hides Approve when !executable), belt 2 (executeProposal otaTouching
@@ -212,19 +340,23 @@ export function getProposalActionDef(actionType: string): ProposalActionDef | un
   return PROPOSAL_ACTIONS[actionType];
 }
 
-/** Client-safe metadata for the auto-approve settings (no execute fn). */
+/** Client-safe metadata for the auto-approve settings (no execute fn). Actions
+ *  flagged neverAutoApprove are OMITTED — the auto-approve toggle must not exist
+ *  for them (send_guest_reply: a guest-facing send is never auto-approvable). */
 export function getProposalActionMeta(): {
   actionType: string;
   label: string;
   description: string;
   otaTouching: boolean;
 }[] {
-  return Object.entries(PROPOSAL_ACTIONS).map(([actionType, def]) => ({
-    actionType,
-    label: def.label,
-    description: def.description,
-    otaTouching: def.otaTouching,
-  }));
+  return Object.entries(PROPOSAL_ACTIONS)
+    .filter(([, def]) => !def.neverAutoApprove)
+    .map(([actionType, def]) => ({
+      actionType,
+      label: def.label,
+      description: def.description,
+      otaTouching: def.otaTouching,
+    }));
 }
 
 /** Build the payload for an assign_cleaner proposal (block for display, action for execution). */
@@ -329,6 +461,10 @@ export async function isAutoApproveEnabled(
   actionType: string,
 ): Promise<boolean> {
   const def = getProposalActionDef(actionType);
+  // Structural never-auto-approve: independent of (and stricter than) the
+  // settings toggle, which getProposalActionMeta already hides. A guest-facing
+  // send can never auto-execute regardless of any persisted preference.
+  if (def?.neverAutoApprove) return false;
   if (def?.otaTouching && !isOtaWriteEnabled()) return false;
   const { data } = await svc
     .from("user_preferences")
@@ -360,7 +496,13 @@ export async function executeProposal(
   }
 
   const started = Date.now();
-  const result = await def.execute(svc, { payload: proposal.payload, hostId });
+  const result = await def.execute(svc, {
+    payload: proposal.payload,
+    hostId,
+    // Prior result (idempotency input for re-approvable actions, e.g.
+    // send_guest_reply's commit_metadata short-circuit).
+    result: proposal.result,
+  });
   const latency = Date.now() - started;
 
   try {

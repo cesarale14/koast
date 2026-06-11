@@ -8,7 +8,7 @@
  * handler time.
  *
  * Channel-aware drafting (M7 D41 + D48): the booking's channel surfaces
- * here so the agent can calibrate `propose_guest_message` tone per OTA
+ * here so the agent can calibrate `propose_guest_reply` tone per OTA
  * convention. The system prompt teaches the per-channel rules; this
  * tool's output is the input to that reasoning.
  *
@@ -130,7 +130,7 @@ type ReadGuestThreadOutput = z.infer<typeof ReadGuestThreadOutputSchema>;
 
 const DESCRIPTION = `Retrieve the message thread for a guest booking, plus booking + channel context (check-in/out dates, guest name, OTA).
 
-Call this BEFORE proposing any guest message via propose_guest_message — drafting without thread context risks repeating questions, missing prior commitments the host already made, or misjudging tone. Always read first; even when the thread looks short, the channel + booking dates inform the reply.
+Call this BEFORE proposing any guest message via propose_guest_reply — drafting without thread context risks repeating questions, missing prior commitments the host already made, or misjudging tone. Always read first; even when the thread looks short, the channel + booking dates inform the reply.
 
 Inputs:
   - booking_id (required, UUID): the booking whose thread to fetch.

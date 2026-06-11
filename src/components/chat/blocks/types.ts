@@ -19,4 +19,5 @@ export type {
   ThreadBlockData,
   PriceDiffBlockData,
   CalendarChangeBlockData,
+  GuestReplyBlockData,
 } from "@/lib/agent/render/blocks";

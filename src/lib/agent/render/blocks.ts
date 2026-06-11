@@ -72,12 +72,30 @@ export const calendarChangeBlockDataSchema = z.object({
   dateCount: z.number().int().positive().nullable().optional(),
 });
 
+/**
+ * guest_reply (P3.2 send_guest_reply) — the display block for a proposed guest
+ * message send: the channel, who it's to, and the DRAFTED reply text the host
+ * reads before approving. Id-lean like every block — the proposal's `action`
+ * payload (booking id) is what EXECUTES; this is only what the host SEES on the
+ * ProposalCard. `messageText` is the post-J1-filter (emoji-clean) draft that
+ * will actually be sent on approval.
+ */
+export const guestReplyBlockDataSchema = z.object({
+  /** Canonical channel label: 'airbnb' | 'booking_com' | 'vrbo' | 'direct'. */
+  channel: z.string(),
+  guestName: z.string().nullable(),
+  propertyName: z.string().nullable(),
+  /** The drafted reply (post voice-judge filter) the host approves to send. */
+  messageText: z.string(),
+});
+
 export const blockDataSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("turnover"), data: turnoverBlockDataSchema }),
   z.object({ kind: z.literal("booking"), data: bookingBlockDataSchema }),
   z.object({ kind: z.literal("thread"), data: threadBlockDataSchema }),
   z.object({ kind: z.literal("price_diff"), data: priceDiffBlockDataSchema }),
   z.object({ kind: z.literal("calendar_change"), data: calendarChangeBlockDataSchema }),
+  z.object({ kind: z.literal("guest_reply"), data: guestReplyBlockDataSchema }),
 ]);
 
 /** A render-payload kind carrying a list of blocks (dormant until a render tool emits it). */
@@ -92,6 +110,7 @@ export type BookingBlockData = z.infer<typeof bookingBlockDataSchema>;
 export type ThreadBlockData = z.infer<typeof threadBlockDataSchema>;
 export type PriceDiffBlockData = z.infer<typeof priceDiffBlockDataSchema>;
 export type CalendarChangeBlockData = z.infer<typeof calendarChangeBlockDataSchema>;
+export type GuestReplyBlockData = z.infer<typeof guestReplyBlockDataSchema>;
 export type BlockData = z.infer<typeof blockDataSchema>;
 export type BlockKind = BlockData["kind"];
 export type BlocksRenderPayload = z.infer<typeof blocksRenderPayloadSchema>;

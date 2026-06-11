@@ -396,16 +396,21 @@ async function* runOneRound(
 
       const inputObj = (block.input ?? {}) as Record<string, unknown>;
 
-      // M8 Phase D P4: pre-dispatch publisher-category classifier at
-      // propose_guest_message. If the model's drafted message_text
-      // matches one of the three §2.3.4 categories (legal correspondence,
-      // regulatory submission, substantive licensed-professional comm),
-      // emit a refusal_envelope event in lieu of dispatching the tool.
-      // The classifier is the substrate failsafe; the system prompt +
-      // tool description steer the model to redirect via chat instead
-      // of calling the tool in the first place (defense-in-depth per
-      // P4 sign-off Decision 1).
-      if (block.name === "propose_guest_message") {
+      // M8 Phase D P4: pre-dispatch publisher-category classifier at the guest-
+      // reply tools. If the model's drafted message_text matches one of the
+      // three §2.3.4 categories (legal correspondence, regulatory submission,
+      // substantive licensed-professional comm), emit a refusal_envelope event
+      // in lieu of dispatching the tool. The classifier is the substrate
+      // failsafe; the system prompt + tool description steer the model to
+      // redirect via chat instead of calling the tool (defense-in-depth per P4
+      // sign-off Decision 1).
+      //
+      // P3.2: the guard covers BOTH the retired M7 propose_guest_message (kept
+      // for any in-flight tool_use) AND the proposals-lane propose_guest_reply
+      // — they share the message_text/booking_id input shape, so the publisher
+      // refusal + the C3 required-capability check below apply to both with this
+      // one guard.
+      if (block.name === "propose_guest_message" || block.name === "propose_guest_reply") {
         const messageText =
           typeof (inputObj as { message_text?: unknown }).message_text === "string"
             ? ((inputObj as { message_text: string }).message_text)

@@ -116,14 +116,37 @@ describe("system prompt", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(/read_memory/);
     expect(SYSTEM_PROMPT_TEXT).toMatch(/write_memory_fact/);
     expect(SYSTEM_PROMPT_TEXT).toMatch(/read_guest_thread/);
-    expect(SYSTEM_PROMPT_TEXT).toMatch(/propose_guest_message/);
+    // P3.2: propose_guest_message retired from exposure; propose_guest_reply is
+    // the live guest-send tool (proposals lane).
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/propose_guest_reply/);
+  });
+
+  test("P3.2: propose_guest_message is RETIRED from the prompt in BOTH toggle states", () => {
+    // The old M7 gated tool is no longer exposed — the model must never see the
+    // retired name (it would emit an unregistered tool). The new proposals-lane
+    // tool must appear in both render-flag states (it is not flag-gated).
+    const KEY = "KOAST_ENABLE_RENDER_AGENDA";
+    const prev = process.env[KEY];
+    try {
+      delete process.env[KEY];
+      const off = buildSystemPrompt();
+      expect(off).not.toMatch(/propose_guest_message/);
+      expect(off).toMatch(/propose_guest_reply/);
+      process.env[KEY] = "1";
+      const on = buildSystemPrompt();
+      expect(on).not.toMatch(/propose_guest_message/);
+      expect(on).toMatch(/propose_guest_reply/);
+    } finally {
+      if (prev === undefined) delete process.env[KEY];
+      else process.env[KEY] = prev;
+    }
   });
 
   test("M7 D27 cross-capability pre-write reads stated once, applied to both capabilities", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(/## Pre-write reads/);
     // Memory: ALWAYS read_memory before write_memory_fact
     expect(SYSTEM_PROMPT_TEXT).toMatch(/ALWAYS call read_memory FIRST/);
-    // Guest messaging: ALWAYS read_guest_thread before propose_guest_message
+    // Guest messaging: ALWAYS read_guest_thread before propose_guest_reply
     expect(SYSTEM_PROMPT_TEXT).toMatch(
       /ALWAYS call read_guest_thread FIRST/,
     );
@@ -141,12 +164,12 @@ describe("system prompt", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(/direct:.*friendly[- ]professional/i);
   });
 
-  test("M7 D47: propose_guest_message has no supersession (guest messages don't supersede each other)", () => {
+  test("M7 D47: propose_guest_reply has no supersession (guest messages don't supersede each other)", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(
       /Guest messages do NOT supersede each other/,
     );
     expect(SYSTEM_PROMPT_TEXT).toMatch(
-      /no supersedes field on propose_guest_message/,
+      /no supersedes field on propose_guest_reply/,
     );
   });
 

@@ -48,22 +48,25 @@ EXTRACTED shared lib fn (the assignCleaner pattern; no side-doors).**
   blocks, gated dark.
 - ✅ Registry-driven lane-level visibility guard + Today route query-contract test
   (the agent→host seam, pinned in CI).
+- ✅ **send_guest_reply (focused TIER-1 pass)** — the proposals-lane guest send;
+  `propose_guest_reply` tool → `send_guest_reply` action (adapter reusing the M7
+  `proposeGuestMessageHandler` single-writer). propose_guest_message RETIRED from
+  exposure (registry + prompt); the tool def + post-approval handler + artifact
+  route stay intact for in-flight artifacts (R-3). J1–J6 voice judges +
+  publisher-category hard-refusal moved to PROPOSE time (judges in the tool via
+  `applyOutputJudges('host-to-guest')`; publisher refusal at the loop pre-dispatch
+  intercept, extended to the new tool name). `neverAutoApprove` (structural — no
+  settings toggle, isAutoApproveEnabled false) so a guest send is NEVER
+  auto-approvable; the J3 fail-open contract stays valid by construction. NO
+  double-send: atomic claim + the `status='failed' ⟺ not-sent` error-classification
+  invariant + result→commit_metadata idempotency. New `guest_reply` block kind for
+  the Today/bell card. Deterministic tests only (no live sends; live proof → A3).
 
 ### STILL REMAINING (deferred, by the same locked architecture)
-- **P3.2 send_guest_reply — DEFERRED to a focused TIER-1 pass (consult-flagged
-  2026-06-11).** The send mechanics are a clean reuse of `proposeGuestMessageHandler`,
-  but "retire propose_guest_message exposure" is high-blast-radius: 18 prod sites +
-  6 test files (the D35 dispatcher fork, /api/agent/artifact approve route,
-  conversation-pending-artifacts, host-action-patterns, the loop action_proposed
-  emission, a heavily voice-tuned prompt section) on the prod-validated, brand-
-  critical guest-messaging surface (intersects the CLAUDE.md J3 fail-open contract).
-  Plan: send_guest_reply action (adapter → proposeGuestMessageHandler, idempotency
-  from proposals.result via an extended execute arg carrying proposal.result) +
-  `propose_guest_reply` tool running `applyOutputJudges('host-to-guest')` (J1-J6) at
-  propose-time + the publisher-category hard-refusal (`classifyPublisherCategory` →
-  refusal_envelope) at loop pre-dispatch (extend the intercept to the new tool
-  name) + retire propose_guest_message + prompt rewire + the 6 test updates.
-  Strictly host-gated; NO auto-approve.
+- ~~**P3.2 send_guest_reply**~~ — SHIPPED 2026-06-11 (see the ✅ entry above +
+  docs/koast-v1-p3-phase-report.md §0a). The remaining guest-reply-specific
+  deferrals are the two below (inline ProposalCard + the edit affordance + the
+  post-200 limbo follow-up).
 - **P3.1 remaining reads** — threads-list (thread block exists; reuse the inbox
   query), calendar-rates (two-tier; price_diff/calendar_change blocks),
   property-access + channel-sync health (need new block kinds; channel-health is a
@@ -75,12 +78,25 @@ EXTRACTED shared lib fn (the assignCleaner pattern; no side-doors).**
   NormalizedProposal) emitted by the loop when a proposals-lane propose tool
   returns {created, proposal_id}, + ChatClient rendering a ProposalCard for it.
   Touches the SSE discriminated-union schema + the core loop + the chat shell —
-  a contained but contract-bearing change; do it carefully in its own pass.
+  a contained but contract-bearing change; do it carefully in its own pass. **For
+  send_guest_reply specifically**, this is also where (a) the host EDIT-before-approve
+  affordance returns (the retired artifact lane had it; the proposals lane is
+  Approve/Dismiss for v1), and (b) the persisted `payload.judge_results` render as
+  the confidence badge + judge StatusDot (PendingDraftBubble-style envelope).
+- **send_guest_reply post-Channex-200 'approved' limbo** — when the M7 writer's
+  Channex call succeeds (200) but a subsequent local-DB step throws, the adapter
+  RE-THROWS (fail-safe: the message is on the OTA, so it must NOT become
+  re-approvable → no re-send), leaving the proposal in 'approved' with a 500 to the
+  host; the webhook reconciles the messages row. Follow-up: a typed
+  `PostSendPersistError` thrown at the handler's post-200 DB-failure point carrying
+  the channex_message_id, so the adapter can mark the proposal 'executed' (the guest
+  DID get the message) instead of re-throwing — cleaner than the limbo, still no
+  re-send. Low priority (rare window; safe today).
 - **P3.3 discipline fixture tests** — deterministic tests of the emission
   discipline (questions → blocks/prose; one imperative → exactly one proposal;
   refusal over guessing on unresolved referents) via fixture LLM responses through
-  the loop. The prompt discipline itself shipped (extended for the OTA + notify
-  proposes); the fixture-harness tests are the remaining piece.
+  the loop. The prompt discipline itself shipped (extended for the OTA + notify +
+  guest-reply proposes); the fixture-harness tests are the remaining piece.
 
 **NEEDS-CESAR:** flip `KOAST_ENABLE_RENDER_AGENDA` in Vercel to light up the
 generative-UI line (agenda + block-reads incl. read_bookings) in prod (existing
@@ -107,6 +123,18 @@ flag, ships dark).
 - **Source:** P3.2 OTA trio (2026-06-11). `applyOtaRestrictions` is the extracted shared writer the agent's OTA actions use (no side-door). `/api/pricing/apply`, `/api/calendar/rates/apply`, and `/api/channels/rates` still have their OWN inline BDC→safe-restrictions / non-BDC→direct loop (they predate the extraction and have no test net). They already route BDC through `buildSafeBdcRestrictions`, so this is a DRY/maintainability cleanup, not a safety gap.
 - **Fix:** migrate the three routes' push loops to `applyOtaRestrictions` (keeping their route-specific DB writes: calendar_rates upsert, pricing_performance, audit). Add route tests first (none exist today) so the refactor has a safety net.
 - **Files:** the three routes above; `src/lib/channex/ota-apply.ts`.
+
+---
+
+## P3 — surfaced during the send_guest_reply adversarial review (2026-06-11)
+
+### H7.1 — `200-with-no-data` Channex response is system-wide classified as "not sent" (retryable) — double-send hazard
+- **Source:** the send_guest_reply 4-lens adversarial review (the named "weakest link" in the at-most-once model), 2026-06-11.
+- **Severity:** low (low probability — Channex returns the created entity under `data` on success), latent MEDIUM (a malformed/empty 200 that actually created the message → re-send to a real guest).
+- **Issue:** `sendMessage` / `sendMessageOnBooking` (`src/lib/channex/messages.ts:395-398, 433-439`) throw `ChannexSendError("...returned no data", 200, res)` when `res.ok` is TRUE but `res.data` is absent. All three send call sites — the manual send route (`/api/messages/threads/[id]/send`), the M7 artifact approve route (`/api/agent/artifact`), and now the P3.2 `send_guest_reply` adapter — historically treat EVERY `ChannexSendError` as retryable (not-sent). For a genuinely created-but-empty-body 200 that is a potential double-send on retry.
+- **Mitigated for the guest-reply lane already:** `send_guest_reply.execute` (`src/lib/proposals/server.ts`) now RE-THROWS a 2xx-status `ChannexSendError` (treats it as ambiguous/maybe-sent → proposal stays 'approved', no re-send) rather than marking it 'failed'/re-approvable. The manual send route + M7 artifact route are NOT yet hardened.
+- **Fix (system-wide):** introduce a distinct `AmbiguousSendError` for the `res.ok && !res.data` case in `messages.ts`, and have all three call sites treat it as terminal-no-retry (webhook reconciles) rather than retryable. Supersede with a true Channex idempotency key if/when that endpoint exposes one.
+- **Files:** `src/lib/channex/messages.ts`, `/api/messages/threads/[id]/send/route.ts`, `/api/agent/artifact/route.ts`, `src/lib/proposals/server.ts` (already partially mitigated).
 
 ---
 

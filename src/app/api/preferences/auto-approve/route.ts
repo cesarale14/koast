@@ -68,6 +68,16 @@ export async function PUT(req: NextRequest) {
   if (!def) {
     return NextResponse.json({ error: `Unknown action_type '${actionType}'` }, { status: 400 });
   }
+  // Never-auto-approvable actions (e.g. send_guest_reply — a guest-facing send)
+  // refuse the toggle at the write boundary too, symmetric with getProposalActionMeta
+  // omitting them from the GET. isAutoApproveEnabled already ignores any persisted
+  // value for these, so this just prevents a confusing persisted-but-inert pref.
+  if (enabled && def.neverAutoApprove) {
+    return NextResponse.json(
+      { error: `'${actionType}' can never be auto-approved.` },
+      { status: 400 },
+    );
+  }
   if (enabled && def.otaTouching && !isOtaWriteEnabled()) {
     return NextResponse.json(
       { error: "Can't auto-approve an OTA action while OTA writes are disabled." },

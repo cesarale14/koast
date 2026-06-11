@@ -13,7 +13,7 @@ import { registerTool, getToolsForAnthropicSDK } from "../dispatcher";
 import { readMemoryTool } from "./read-memory";
 import { writeMemoryFactTool } from "./write-memory-fact";
 import { readGuestThreadTool } from "./read-guest-thread";
-import { proposeGuestMessageTool } from "./propose-guest-message";
+import { proposeGuestReplyTool } from "./propose-guest-reply";
 import { renderAgendaTool } from "./render-agenda";
 import { readTurnoversTool } from "./read-turnovers";
 import { readPricingTool } from "./read-pricing";
@@ -29,11 +29,15 @@ import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
 registerTool(writeMemoryFactTool);
-// M7: guest messaging — read_guest_thread returns thread + booking
-// context, propose_guest_message gates a draft for host approval and
-// (post-approval) Channex send.
+// M7 → P3.2: guest messaging — read_guest_thread returns thread + booking
+// context; propose_guest_reply (PROPOSALS lane) proposes a draft for host
+// approval, and on approval the send_guest_reply action runs the SAME M7
+// Channex send single-writer. The old M7 propose_guest_message (gated
+// agent_artifacts lane) is RETIRED from exposure — its tool def + post-approval
+// handler + artifact route stay intact so already-emitted in-flight artifacts
+// still resolve, but the agent can no longer CREATE new ones (R-3).
 registerTool(readGuestThreadTool);
-registerTool(proposeGuestMessageTool);
+registerTool(proposeGuestReplyTool);
 // Generative-UI: render_agenda — non-gated render of the operational agenda as
 // a typed card payload (drives the `render` SSE event + agent_turns.render).
 //
