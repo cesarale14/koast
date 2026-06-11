@@ -70,6 +70,17 @@ generative-UI line (agenda + block-reads) in prod (existing flag, ships dark).
 
 ---
 
+## P3 — surfaced during the visibility diagnostic (2026-06-11)
+
+### H3.1 — `user_preferences` table does not exist in prod → auto-approve reads a phantom table
+- **Source:** the propose_assign_cleaner visibility diagnostic (2026-06-11). While confirming the agent→host proposal seam, a direct prod query found NO preferences table at all (`information_schema` has zero `%pref%` tables in `public`), yet `isAutoApproveEnabled` in `src/lib/proposals/server.ts` reads `from("user_preferences").select("preferences")`. CLAUDE.md's 30-table list (verified 2026-04-17) names `user_preferences`, so it was either dropped since or never created in this project.
+- **Severity:** low TODAY (safe by construction), latent MEDIUM. The read destructures only `data` and ignores `error`; a PostgREST 404 returns `{data:null}` (does not throw), so `isAutoApproveEnabled` returns `false` — the safe default (all auto-approve OFF). createProposal is unaffected. BUT: (a) every agent/worker/system proposal create logs a silent PostgREST error; (b) the auto-approve feature is dead — when it ships (the Settings toggle `getProposalActionMeta` already feeds), it will read/write a phantom table and silently never enable. OTA auto-approve is doubly safe regardless via the `def.otaTouching && !isOtaWriteEnabled()` short-circuit BEFORE the read.
+- **Fix:** decide the home for per-host auto-approve prefs — either (a) a migration creating `user_preferences(user_id uuid pk, preferences jsonb)` (RLS host-scoped), or (b) repoint `isAutoApproveEnabled` + the Settings writer at `host_state` (the `20260511010000_add_host_state_table.sql` table) if that's the canonical per-host KV. Until then, the safe-default behavior holds; do NOT enable any auto-approve UI claiming to persist.
+- **Test:** an `isAutoApproveEnabled` unit asserting a missing-table/`error` read yields `false` (pin the safe default), plus a migration smoke once the table lands.
+- **Files:** `src/lib/proposals/server.ts` (`isAutoApproveEnabled`), wherever the auto-approve Settings writer lands.
+
+---
+
 ## Notes
 - This list is the durable home for cross-phase deferrals. Inline-fixable items
   are fixed in their slice; only items that genuinely belong to a later phase

@@ -29,6 +29,7 @@ import {
   createProposal,
   normalizeProposal,
   buildAssignCleanerProposalPayload,
+  PROPOSAL_ACTIONS,
   type ProposalRow,
 } from "../server";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
@@ -175,4 +176,62 @@ describe("step 4 — the boundary: a HOST-created proposal does NOT self-notify"
     expect(autoExecuted).toBe(false);
     expect(mockEmit).not.toHaveBeenCalled();
   });
+});
+
+// ── LANE-LEVEL GUARD: the whole write set, not just assign_cleaner ───────────
+// The prod incident was diagnosed as a SURFACE-freshness bug, not a lane bug —
+// the lane (createProposal) stamped host_id + fired the bell correctly. But the
+// brief asks us to prove the staged write set (notify_cleaner, send_guest_reply,
+// the OTA trio) can't SILENTLY inherit a visibility defect as each lands. So we
+// pin the invariant REGISTRY-DRIVEN: for EVERY action registered in
+// PROPOSAL_ACTIONS, an agent-created proposal must stamp host_id, land pending,
+// and fire the proposal_created bell carrying that action_type. A new action
+// added to the registry is automatically held to the same contract here — if it
+// were ever wired through a side-door that skipped host_id or the bell, this
+// fails in CI, for that action, by name.
+describe("lane-level: every registered proposal action surfaces (host_id + bell) when the agent creates it", () => {
+  const actionTypes = Object.keys(PROPOSAL_ACTIONS);
+
+  test("the registry is non-empty (guards against a vacuous pass)", () => {
+    expect(actionTypes.length).toBeGreaterThan(0);
+  });
+
+  test.each(actionTypes)(
+    "%s: agent create → host-scoped pending row + proposal_created bell",
+    async (actionType) => {
+      // The inserted row echoes the action_type under test (DB default status
+      // 'pending'); auto-approve pref is OFF (fakeSvc default) so the pending +
+      // bell path is exercised. OTA-touching actions are doubly gated off (flag
+      // off) so they too land pending — never auto-executed — here.
+      const { svc, captured } = fakeSvc({
+        inserted: insertedRow({ action_type: actionType }),
+      });
+
+      const { proposal, autoExecuted } = await createProposal(svc, {
+        hostId: HOST,
+        propertyId: PROPERTY,
+        actionType,
+        payload: PAYLOAD,
+        rationale: "lane guard",
+        createdBy: "agent",
+      });
+
+      expect(captured.proposalInsert).toMatchObject({
+        host_id: HOST,
+        property_id: PROPERTY,
+        action_type: actionType,
+        created_by: "agent",
+      });
+      expect(proposal.host_id).toBe(HOST);
+      expect(proposal.status).toBe("pending");
+      expect(autoExecuted).toBe(false);
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      expect(mockEmit).toHaveBeenCalledWith(
+        svc,
+        HOST,
+        "proposal_created",
+        expect.objectContaining({ proposalId: proposal.id, actionType }),
+      );
+    },
+  );
 });
