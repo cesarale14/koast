@@ -4,8 +4,9 @@
  * suggested, with the never-red delta + reason), so "where am I leaving money
  * on the table" answers as the app's own price-diff cards.
  *
- * Non-gated (read-only). Reads pricing_recommendations_latest (the same view the
- * Pricing surface reads) scoped to the host's properties. Blocks are id-LEAN
+ * Non-gated (read-only). Reads the pricing_recommendations base table (the same
+ * source the canonical /api/pricing/recommendations reader uses), pending rows,
+ * scoped to the host's properties. Blocks are id-LEAN
  * (display only); the actionable apply path is a separate OTA proposal (P3.2),
  * never wired here. When the render flag is off the model still gets this data
  * as the tool_result JSON and answers in prose.
@@ -56,13 +57,20 @@ export const readPricingTool: Tool<ReadPricingInput, RenderPayload> = {
     const propIds = ((propRows ?? []) as { id: string }[]).map((p) => p.id);
     if (propIds.length === 0) return { v: 1, kind: "blocks", blocks: [] };
 
-    const { data: recRows } = await supabase
-      .from("pricing_recommendations_latest")
+    // Read the BASE table (the same source the canonical /api/pricing/
+    // recommendations reader uses). The pricing_recommendations_latest VIEW
+    // predates the status/urgency/reason_text columns and lacks them — querying
+    // it for those errors; the dedup unique index guarantees one pending row per
+    // (property, date), so the base table + status='pending' is correct. Surface
+    // the error rather than swallowing it into a falsely-empty card.
+    const { data: recRows, error: recError } = await supabase
+      .from("pricing_recommendations")
       .select("date, current_rate, suggested_rate, delta_abs, reason_text, urgency")
       .in("property_id", propIds)
       .eq("status", "pending")
       .order("date", { ascending: true })
       .limit(20);
+    if (recError) throw new Error(`[read_pricing] ${recError.message}`);
 
     const blocks: BlockData[] = ((recRows ?? []) as RecRow[]).map((r) => ({
       kind: "price_diff",

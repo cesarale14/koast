@@ -20,6 +20,7 @@ function fakeSvc(seed: Seed) {
       select: () => b,
       eq: () => b,
       in: () => b,
+      gte: () => b,
       order: () => b,
       limit: () => Promise.resolve(result),
       then: (res: (v: unknown) => unknown) => Promise.resolve(result).then(res),
@@ -68,6 +69,26 @@ describe("propose_assign_cleaner", () => {
     expect(payload.action).toEqual({ taskId: "t1", cleanerId: "c1" });
     expect(JSON.stringify(payload.block)).not.toContain("t1");
     expect(JSON.stringify(payload.block)).not.toContain("c1");
+  });
+
+  test("prefers an exact cleaner-name match over a substring (Karem, not Karembu)", async () => {
+    (createServiceClient as jest.Mock).mockReturnValue(
+      fakeSvc({
+        properties: [{ id: "p1", name: "Villa Jamaica" }],
+        cleaners: [
+          { id: "c1", name: "Karem" },
+          { id: "c2", name: "Karembu" },
+        ],
+        cleaning_tasks: [{ id: "t1", scheduled_date: "2026-06-12", status: "pending" }],
+      }),
+    );
+    const out = await proposeAssignCleanerTool.handler(
+      { property: "Villa", cleaner: "Karem", rationale: "x" },
+      CTX,
+    );
+    expect(out.created).toBe(true);
+    const payload = mockCreate.mock.calls[0][1].payload as { action: { cleanerId: string } };
+    expect(payload.action.cleanerId).toBe("c1"); // exact "Karem", not substring "Karembu"
   });
 
   test("created:false (no execute) when the property can't be found", async () => {

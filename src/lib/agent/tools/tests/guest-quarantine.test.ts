@@ -30,6 +30,31 @@ describe("sanitizeGuestText (P3.4 quarantine)", () => {
     // @ts-expect-error — defensive: must not throw on null
     expect(sanitizeGuestText(null)).toBe("");
   });
+
+  test("strips invisible-injection vectors (tag chars, zero-width, bidi, BOM)", () => {
+    const TAG = String.fromCodePoint(0xe0041); // Unicode Tag 'A' (invisible)
+    const ZWSP = String.fromCharCode(0x200b);
+    const RLO = String.fromCharCode(0x202e); // bidi override
+    const BOM = String.fromCharCode(0xfeff);
+    const clean = sanitizeGuestText(`hi${ZWSP}${RLO}${BOM}${TAG} there`);
+    expect(clean.includes(ZWSP)).toBe(false);
+    expect(clean.includes(RLO)).toBe(false);
+    expect(clean.includes(BOM)).toBe(false);
+    expect(clean.includes(TAG)).toBe(false);
+    expect(clean).toContain("hi");
+    expect(clean).toContain("there");
+  });
+
+  test("never leaves a lone surrogate at the length cap", () => {
+    const out = sanitizeGuestText("a".repeat(1999) + "😀" + "b".repeat(10));
+    for (let i = 0; i < out.length; i++) {
+      const c = out.charCodeAt(i);
+      if (c >= 0xd800 && c <= 0xdbff) {
+        const next = out.charCodeAt(i + 1);
+        expect(next >= 0xdc00 && next <= 0xdfff).toBe(true); // paired, never lone
+      }
+    }
+  });
 });
 
 describe("fenceGuestText (P3.4 quarantine)", () => {
