@@ -17,6 +17,7 @@ import { proposeGuestMessageTool } from "./propose-guest-message";
 import { renderAgendaTool } from "./render-agenda";
 import { readTurnoversTool } from "./read-turnovers";
 import { readPricingTool } from "./read-pricing";
+import { readBookingsTool } from "./read-bookings";
 import { proposeAssignCleanerTool } from "./propose-assign-cleaner";
 import { proposeNotifyCleanerTool } from "./propose-notify-cleaner";
 import {
@@ -47,6 +48,7 @@ registerTool(renderAgendaTool);
 // live on the SAME render flag (the whole generative-UI line is one switch).
 registerTool(readTurnoversTool);
 registerTool(readPricingTool);
+registerTool(readBookingsTool);
 // P3.2 — the agent's first WRITE-as-proposal. Always exposed (not flag-gated):
 // it creates a PENDING proposal and executes nothing; host approval is the gate.
 registerTool(proposeAssignCleanerTool);
@@ -62,7 +64,7 @@ registerTool(proposeSetMinStayTool);
 
 // The generative-UI tools — exposed only when the render flag is on, in
 // lockstep with the prompt's applyRenderToggle.
-const GENERATIVE_UI_TOOLS = new Set(["render_agenda", "read_turnovers", "read_pricing"]);
+const GENERATIVE_UI_TOOLS = new Set(["render_agenda", "read_turnovers", "read_pricing", "read_bookings"]);
 
 /**
  * The per-request tool array handed to the model. Reads the render flag LIVE

@@ -246,12 +246,13 @@ describe("system prompt", () => {
       expect(p).not.toMatch(/render_agenda/);
     });
 
-    test("flag ON: twelve-tool catalog + render_agenda + block-read entries + rules", () => {
+    test("flag ON: thirteen-tool catalog + render_agenda + block-read entries + rules", () => {
       process.env[KEY] = "1";
       const p = buildSystemPrompt();
-      expect(p).toMatch(/You have twelve tools across three capabilities/);
+      expect(p).toMatch(/You have thirteen tools across three capabilities/);
       expect(p).not.toMatch(/You have nine tools/);
       expect(p).toMatch(/ {2}- render_agenda —/); // catalog entry
+      expect(p).toMatch(/ {2}- read_bookings —/); // P3.1 read-blocks entry
       expect(p).toMatch(/MUST call render_agenda/); // when-to-card rule (overview)
       expect(p).toMatch(/Do NOT call render_agenda for anything narrower/); // narrow exclusion
       expect(p).toMatch(/Prose is the default/);
