@@ -79,6 +79,17 @@ generative-UI line (agenda + block-reads) in prod (existing flag, ships dark).
 - **Test:** an `isAutoApproveEnabled` unit asserting a missing-table/`error` read yields `false` (pin the safe default), plus a migration smoke once the table lands.
 - **Files:** `src/lib/proposals/server.ts` (`isAutoApproveEnabled`), wherever the auto-approve Settings writer lands.
 
+### H3.2 — non-BDC (Airbnb/Direct) date BLOCK is the un-wrapped room-type gap — REFUSED today
+- **Source:** P3.2 OTA trio (2026-06-11). `applyOtaRestrictions` routes BDC blocks through `buildSafeBdcRestrictions` (availability=0 on the rate-plan restriction). A non-BDC block needs the room-type `/availability` endpoint (`channex.updateAvailability`), which is NOT yet wrapped in a read-first safe pattern (it's the `/activate` 365-day-reopen clobber path). The dispatch currently REFUSES non-BDC availability changes with skip reason `non_bdc_availability_unwrapped` rather than emit an un-wrapped room-type write — fail-closed.
+- **Severity:** low (feature gap, not a risk). BDC blocks work; Airbnb/Direct blocks are deferred. Execution is gated off entirely regardless.
+- **Fix (before the flag flips, if non-BDC block is wanted):** add a read-first room-type availability wrapper that resolves `room_type_id` (from `channex_room_types`) and ONLY ever writes availability=0 (a monotonic CLOSE structurally cannot re-open a host-closed date — the clobber vector was re-opening). Then route non-BDC blocks through it instead of refusing.
+- **Files:** `src/lib/channex/ota-apply.ts` (the `non_bdc_availability_unwrapped` branch), `src/lib/channex/client.ts` (`updateAvailability`).
+
+### H3.3 — three apply routes still carry an inline per-channel dispatch loop
+- **Source:** P3.2 OTA trio (2026-06-11). `applyOtaRestrictions` is the extracted shared writer the agent's OTA actions use (no side-door). `/api/pricing/apply`, `/api/calendar/rates/apply`, and `/api/channels/rates` still have their OWN inline BDC→safe-restrictions / non-BDC→direct loop (they predate the extraction and have no test net). They already route BDC through `buildSafeBdcRestrictions`, so this is a DRY/maintainability cleanup, not a safety gap.
+- **Fix:** migrate the three routes' push loops to `applyOtaRestrictions` (keeping their route-specific DB writes: calendar_rates upsert, pricing_performance, audit). Add route tests first (none exist today) so the refactor has a safety net.
+- **Files:** the three routes above; `src/lib/channex/ota-apply.ts`.
+
 ---
 
 ## Notes
