@@ -80,6 +80,10 @@ export function ProposalCard({
   }
 
   const done = status === "executed";
+  // Belt 1 of the OTA execution-impossibility: when the action isn't executable
+  // (an OTA write while the gate is off), Approve is hidden — Dismiss stays live.
+  // executable is computed server-side (getProposalActionDef + the unified gate).
+  const canApprove = proposal.executable !== false;
 
   return (
     <div
@@ -124,48 +128,57 @@ export function ProposalCard({
           Done
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={approve}
-            disabled={busy !== null}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "8px 16px",
-              borderRadius: 8,
-              border: "none",
-              cursor: busy ? "default" : "pointer",
-              background: "var(--lume)",
-              color: "var(--deep-sea)",
-              opacity: busy === "approve" ? 0.7 : 1,
-            }}
-          >
-            <Check size={15} strokeWidth={2.2} />
-            {busy === "approve" ? "Approving…" : error ? "Try again" : "Approve"}
-          </button>
-          <button
-            onClick={dismiss}
-            disabled={busy !== null}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid var(--hairline)",
-              cursor: busy ? "default" : "pointer",
-              background: "white",
-              color: "var(--tideline)",
-            }}
-          >
-            <X size={15} strokeWidth={2} />
-            Dismiss
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {!canApprove && (
+            <div style={{ color: "var(--tideline)", fontSize: 12.5 }}>
+              Channel changes are turned off — turn them on in Settings to approve this.
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {canApprove && (
+              <button
+                onClick={approve}
+                disabled={busy !== null}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: busy ? "default" : "pointer",
+                  background: "var(--lume)",
+                  color: "var(--deep-sea)",
+                  opacity: busy === "approve" ? 0.7 : 1,
+                }}
+              >
+                <Check size={15} strokeWidth={2.2} />
+                {busy === "approve" ? "Approving…" : error ? "Try again" : "Approve"}
+              </button>
+            )}
+            <button
+              onClick={dismiss}
+              disabled={busy !== null}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                fontWeight: 600,
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: "1px solid var(--hairline)",
+                cursor: busy ? "default" : "pointer",
+                background: "white",
+                color: "var(--tideline)",
+              }}
+            >
+              <X size={15} strokeWidth={2} />
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
     </div>

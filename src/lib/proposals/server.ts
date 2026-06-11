@@ -21,6 +21,8 @@ import { assignCleaner } from "@/lib/turnover/assign";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { blockDataSchema, type BlockData } from "@/lib/agent/render/blocks";
 import { isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
+import { applyOtaRestrictions } from "@/lib/channex/ota-apply";
+import type { KoastRestrictionProposal } from "@/lib/channex/safe-restrictions";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,6 +60,42 @@ export function isOtaWriteEnabled(): boolean {
   return isCalendarPushEnabled();
 }
 
+/** OTA op action payload shape — entity ids + execution fields (the host-facing
+ *  display lives in payload.block). All three OTA ops share this. */
+type OtaActionFields = { propertyId?: string; dates?: string[]; channel?: string | null };
+
+/**
+ * Shared OTA execute — builds the per-date restriction set and dispatches it
+ * through applyOtaRestrictions (the SINGLE shared writer: BDC→safe-restrictions,
+ * non-BDC→direct). The flag refusal lives in applyOtaRestrictions (belt 3); this
+ * is reached only when executeProposal's otaTouching guard (belt 2) already
+ * passed. No OTA action gets a parallel push path.
+ */
+async function executeOtaOp(
+  svc: Svc,
+  payload: unknown,
+  build: (date: string) => KoastRestrictionProposal,
+  summaryExtra: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const action = ((payload as { action?: unknown })?.action ?? {}) as OtaActionFields;
+  if (!action.propertyId || !Array.isArray(action.dates) || action.dates.length === 0) {
+    return { ok: false, error: "Proposal payload missing action.propertyId/action.dates" };
+  }
+  const perDate = new Map<string, KoastRestrictionProposal>();
+  for (const d of action.dates) perDate.set(d, build(d));
+  const r = await applyOtaRestrictions(svc, {
+    propertyId: action.propertyId,
+    perDate,
+    targetChannel: action.channel ?? null,
+  });
+  if (!r.ok) {
+    const reason =
+      r.refusedReason ?? r.failedChannels[0]?.error ?? r.skipped[0]?.reason ?? "No channel accepted the change";
+    return { ok: false, error: reason };
+  }
+  return { ok: true, summary: { pushed_channels: r.pushedChannels, dates: action.dates, ...summaryExtra } };
+}
+
 /** The action registry — action_type → how it executes + its risk shape. */
 export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
   assign_cleaner: {
@@ -84,6 +122,67 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
         ok: true,
         summary: { cleaner_name: r.cleanerName, property_name: r.propertyName, push: r.push ?? null },
       };
+    },
+  },
+
+  // ── OTA trio (HARD-FLOOR, BDC clobber class) — otaTouching, stakes 'high'.
+  //    Execution is IMPOSSIBLE while the OTA gate is off: belt 1 (ProposalCard
+  //    hides Approve when !executable), belt 2 (executeProposal otaTouching
+  //    refusal), belt 3 (applyOtaRestrictions self-refusal). BDC routes through
+  //    buildSafeBdcRestrictions; block uses availability=0, never stop_sell.
+  block_dates: {
+    label: "Date blocks",
+    description:
+      "Block dates on your connected channels when Koast recommends it, without asking first.",
+    otaTouching: true,
+    stakesClass: "high",
+    execute: (svc, { payload }) =>
+      executeOtaOp(svc, payload, () => ({ availability: 0 }), { op: "block" }),
+  },
+  adjust_price: {
+    label: "Price adjustments",
+    description:
+      "Push the nightly rate Koast recommends to your connected channels, without asking first.",
+    otaTouching: true,
+    stakesClass: "high",
+    execute: (svc, { payload }) => {
+      // The rate is whiplash-bounded at PROPOSE time (against pricing_rules), so
+      // the value carried here is already clamped — the model's raw number never
+      // reaches Channex unbounded. availability=1/stop_sell=false are no-ops
+      // (rate pushes don't change bookability) mirroring /api/pricing/apply.
+      const rate = Number(
+        ((payload as { action?: { rate?: unknown } })?.action?.rate),
+      );
+      if (!Number.isFinite(rate) || rate <= 0) {
+        return Promise.resolve({ ok: false, error: "Proposal payload missing a positive action.rate" });
+      }
+      return executeOtaOp(
+        svc,
+        payload,
+        () => ({ rate, availability: 1, stop_sell: false }),
+        { op: "price", rate },
+      );
+    },
+  },
+  set_min_stay: {
+    label: "Minimum-stay changes",
+    description:
+      "Set the minimum nights Koast recommends on your connected channels, without asking first.",
+    otaTouching: true,
+    stakesClass: "high",
+    execute: (svc, { payload }) => {
+      const minStay = Number(
+        ((payload as { action?: { minStay?: unknown } })?.action?.minStay),
+      );
+      if (!Number.isInteger(minStay) || minStay < 1) {
+        return Promise.resolve({ ok: false, error: "Proposal payload missing a valid action.minStay (>=1)" });
+      }
+      return executeOtaOp(
+        svc,
+        payload,
+        () => ({ min_stay_arrival: minStay }),
+        { op: "min_stay", min_stay: minStay },
+      );
     },
   },
 };
@@ -156,6 +255,16 @@ export interface NormalizedProposal {
   status: ProposalStatus;
   result: Record<string, unknown> | null;
   createdAt: string;
+  /** True when this action writes to an OTA (block/price/min-stay). */
+  otaTouching: boolean;
+  /**
+   * Whether the host can APPROVE+execute this now (belt 1 of the OTA execution-
+   * impossibility). Computed SERVER-SIDE: non-OTA actions are always executable;
+   * OTA actions are executable only while the unified write gate is on. An
+   * unknown action_type is never executable. ProposalCard hides/disables Approve
+   * when false (Dismiss stays live).
+   */
+  executable: boolean;
 }
 
 export function normalizeProposal(row: ProposalRow): NormalizedProposal {
@@ -166,6 +275,11 @@ export function normalizeProposal(row: ProposalRow): NormalizedProposal {
   const rawBlock = (row.payload as { block?: unknown } | null)?.block;
   const parsed = rawBlock != null ? blockDataSchema.safeParse(rawBlock) : null;
   const block: BlockData | null = parsed?.success ? parsed.data : null;
+  const def = getProposalActionDef(row.action_type);
+  const otaTouching = def?.otaTouching ?? false;
+  // Unknown action → not executable (can't run what isn't registered). OTA →
+  // gated; non-OTA → always executable.
+  const executable = def ? (!def.otaTouching || isOtaWriteEnabled()) : false;
   return {
     id: row.id,
     propertyId: row.property_id,
@@ -175,6 +289,8 @@ export function normalizeProposal(row: ProposalRow): NormalizedProposal {
     status: row.status,
     result: row.result,
     createdAt: row.created_at,
+    otaTouching,
+    executable,
   };
 }
 

@@ -18,6 +18,11 @@ import { renderAgendaTool } from "./render-agenda";
 import { readTurnoversTool } from "./read-turnovers";
 import { readPricingTool } from "./read-pricing";
 import { proposeAssignCleanerTool } from "./propose-assign-cleaner";
+import {
+  proposeBlockDatesTool,
+  proposeAdjustPriceTool,
+  proposeSetMinStayTool,
+} from "./propose-ota";
 import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
@@ -44,6 +49,13 @@ registerTool(readPricingTool);
 // P3.2 — the agent's first WRITE-as-proposal. Always exposed (not flag-gated):
 // it creates a PENDING proposal and executes nothing; host approval is the gate.
 registerTool(proposeAssignCleanerTool);
+// P3.2 — the OTA trio (HARD-FLOOR). Always exposed: proposals are CREATABLE
+// while the OTA write gate is off; EXECUTION is impossible until it's flipped
+// (ProposalCard hides Approve when !executable + executeProposal + the dispatch
+// all refuse). The host sees the suggestion + a "turn on channel changes" path.
+registerTool(proposeBlockDatesTool);
+registerTool(proposeAdjustPriceTool);
+registerTool(proposeSetMinStayTool);
 
 // The generative-UI tools — exposed only when the render flag is on, in
 // lockstep with the prompt's applyRenderToggle.
