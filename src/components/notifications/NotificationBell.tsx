@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { firstNameOf } from "@/components/chat/blocks/format";
+import { describeHostNotification, PROPOSALS_CHANGED_EVENT } from "@/lib/notifications/describe";
 import type { NormalizedHostNotification } from "@/lib/notifications/host-feed";
 
 const POLL_MS = 60_000;
@@ -26,47 +26,6 @@ function timeAgo(iso: string): string {
   const hr = Math.round(min / 60);
   if (hr < 24) return `${hr}h`;
   return `${Math.round(hr / 24)}d`;
-}
-
-function describe(n: NormalizedHostNotification): { title: string; sub?: string; href: string } {
-  const p = n.payload ?? {};
-  const prop = (p.propertyName as string) ?? "a property";
-  switch (n.type) {
-    case "cleaning_completed": {
-      const c = Number(p.photoCount ?? 0);
-      return {
-        title: `Cleaning done at ${prop}`,
-        sub: c > 0 ? `${c} photo${c > 1 ? "s" : ""} to review` : undefined,
-        href: "/",
-      };
-    }
-    case "booking_new":
-      return {
-        title: `New booking${p.guestName ? ` — ${firstNameOf(p.guestName as string)}` : ""}`,
-        sub: p.checkIn ? `${p.checkIn} → ${p.checkOut}` : undefined,
-        href: "/calendar",
-      };
-    case "booking_cancelled":
-      return {
-        title: `Booking cancelled${p.guestName ? ` — ${firstNameOf(p.guestName as string)}` : ""}`,
-        sub: p.checkIn ? `${p.checkIn} → ${p.checkOut}` : undefined,
-        href: "/calendar",
-      };
-    case "proposal_created":
-      return {
-        title: "Koast has a suggestion",
-        sub: (p.rationale as string) ?? undefined,
-        href: "/",
-      };
-    case "push_delivery_failure":
-      return {
-        title: `Couldn't reach ${(p.cleanerName as string) ?? "the cleaner"}`,
-        sub: `The dispatch for ${prop} didn't go through`,
-        href: "/turnovers",
-      };
-    default:
-      return { title: "Update", href: "/" };
-  }
 }
 
 export function NotificationBell() {
@@ -123,7 +82,7 @@ export function NotificationBell() {
   }, [open]);
 
   async function openItem(n: NormalizedHostNotification) {
-    const { href } = describe(n);
+    const { href } = describeHostNotification(n);
     if (!n.readAt) {
       setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, readAt: new Date().toISOString() } : it)));
       setCount((c) => Math.max(0, c - 1));
@@ -131,6 +90,13 @@ export function NotificationBell() {
     }
     setOpen(false);
     router.push(href);
+    // Deep-linking a proposal lands on "/", but router.push("/") is a no-op when
+    // the host is ALREADY there — so nudge TodaySuggests to refetch its pending
+    // list directly. Without this, tapping "Koast has a suggestion" from the
+    // Today home wouldn't surface the new card.
+    if (n.type === "proposal_created" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(PROPOSALS_CHANGED_EVENT));
+    }
   }
 
   async function markAll() {
@@ -205,7 +171,7 @@ export function NotificationBell() {
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {items.map((n) => {
-                const d = describe(n);
+                const d = describeHostNotification(n);
                 const unread = !n.readAt;
                 return (
                   <li key={n.id}>
