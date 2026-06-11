@@ -55,11 +55,29 @@ export const priceDiffBlockDataSchema = z.object({
   urgency: z.enum(["act_now", "coming_up", "review"]).nullable().optional(),
 });
 
+/**
+ * calendar_change (P3.2 OTA trio) — the display block for a proposed OTA write:
+ * block a date (availability=0), adjust a price, or set a min-stay. Id-lean like
+ * every block: the proposal's `action` payload (entity ids, channel) is what
+ * EXECUTES; this is only what the host SEES on the ProposalCard.
+ */
+export const calendarChangeBlockDataSchema = z.object({
+  property: z.string(),
+  /** First/only date, YYYY-MM-DD. */
+  date: z.string(),
+  change: z.enum(["block", "price", "min_stay"]),
+  /** price → dollar rate; min_stay → nights; block → null. */
+  value: z.number().nullable().optional(),
+  /** Dates spanned when >1 (renders "3 nights"); omit/1 for a single date. */
+  dateCount: z.number().int().positive().nullable().optional(),
+});
+
 export const blockDataSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("turnover"), data: turnoverBlockDataSchema }),
   z.object({ kind: z.literal("booking"), data: bookingBlockDataSchema }),
   z.object({ kind: z.literal("thread"), data: threadBlockDataSchema }),
   z.object({ kind: z.literal("price_diff"), data: priceDiffBlockDataSchema }),
+  z.object({ kind: z.literal("calendar_change"), data: calendarChangeBlockDataSchema }),
 ]);
 
 /** A render-payload kind carrying a list of blocks (dormant until a render tool emits it). */
@@ -73,6 +91,7 @@ export type TurnoverBlockData = z.infer<typeof turnoverBlockDataSchema>;
 export type BookingBlockData = z.infer<typeof bookingBlockDataSchema>;
 export type ThreadBlockData = z.infer<typeof threadBlockDataSchema>;
 export type PriceDiffBlockData = z.infer<typeof priceDiffBlockDataSchema>;
+export type CalendarChangeBlockData = z.infer<typeof calendarChangeBlockDataSchema>;
 export type BlockData = z.infer<typeof blockDataSchema>;
 export type BlockKind = BlockData["kind"];
 export type BlocksRenderPayload = z.infer<typeof blocksRenderPayloadSchema>;
