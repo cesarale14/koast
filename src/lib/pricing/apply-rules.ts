@@ -86,12 +86,23 @@ export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
 
   // 3) Comp-floor guardrail. Skip entirely when comp set is insufficient —
   //    there's no meaningful floor to enforce. When the computed floor
-  //    EXCEEDS the host's max_rate, we also don't apply it (max_rate is
-  //    an absolute ceiling, not a soft preference); instead we surface
-  //    the conflict as an insight so the host can raise their max if they
-  //    trust the market signal. This is the fix for the Villa Jamaica case
-  //    where inferred max=$230 sat below compSetP25×0.85=$237.58 and
-  //    previously produced $240 outputs that walked up the host's intent.
+  //    EXCEEDS the host's max_rate, we don't apply it (max_rate is an
+  //    absolute ceiling, not a soft preference); instead we surface the
+  //    conflict as an insight so the host can raise their max if they trust
+  //    the market signal. This is the Villa Jamaica case where inferred
+  //    max=$230 sat below compSetP25×0.85=$237.58.
+  //
+  //    P4.1 fix: the conflict trip is emitted ONLY on dates where the ceiling
+  //    ACTUALLY BINDS — i.e. the engine's raw desire reached/exceeded max_rate
+  //    (`suggestedRate >= max_rate`). compSetP25 is a property-global number, so
+  //    the old unconditional `floor > max_rate` test tripped on EVERY date,
+  //    stamping low-demand dates ($210, well under the ceiling) with a false
+  //    "comps floor $238 above your max, holding at $210 — act now". On a
+  //    sub-ceiling date the ceiling isn't the binding constraint; the conflict
+  //    is silent there and the date reports its true reason (or none). Using the
+  //    RAW suggestedRate (not clamped_by) catches the raw==max boundary too —
+  //    the engine wanting exactly the ceiling is still the ceiling binding.
+  const ceilingBinds = suggestedRate >= rules.max_rate;
   if (compSetQuality === "insufficient" || compSetQuality === "unknown") {
     guardrail_trips.push({
       guardrail: "comp_floor",
@@ -101,7 +112,7 @@ export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
     });
   } else if (compSetP25 != null) {
     const floor = compSetP25 * rules.comp_floor_pct;
-    if (floor > rules.max_rate) {
+    if (floor > rules.max_rate && ceilingBinds) {
       guardrail_trips.push({
         guardrail: "comp_floor_exceeds_max_rate",
         value: null,
@@ -110,7 +121,7 @@ export function applyPricingRules(input: ApplyRulesInput): ApplyRulesResult {
         comp_floor_value: floor,
         max_rate: rules.max_rate,
       });
-    } else if (adjusted < floor) {
+    } else if (floor <= rules.max_rate && adjusted < floor) {
       adjusted = floor;
       clamped_by.push("comp_floor");
       guardrail_trips.push({
