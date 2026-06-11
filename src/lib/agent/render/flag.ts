@@ -14,5 +14,11 @@
  * live, exactly like the prompt.
  */
 export function isRenderAgendaEnabled(): boolean {
-  return process.env.KOAST_ENABLE_RENDER_AGENDA === "1";
+  // Accept BOTH "1" and "true" — a Vercel env set to "true" (the natural value)
+  // must enable the line. Previously this accepted "1" ONLY, so setting the env
+  // to "true" silently read as OFF: the generative-UI tools were never exposed
+  // and the agent declined ("pricing is coming in a subsequent phase"). Matches
+  // isOtaWriteEnabled's parsing; the '1'-only mismatch is the bug.
+  const v = process.env.KOAST_ENABLE_RENDER_AGENDA;
+  return v === "1" || v === "true";
 }

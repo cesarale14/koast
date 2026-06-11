@@ -177,9 +177,13 @@ describe("system prompt", () => {
 
   test("M13 Phase 1.B: doctrine closing line anchors point 3 forward to tool design (1.D)", () => {
     expect(SYSTEM_PROMPT_TEXT).toMatch(
-      /doctrine is a system-wide standard.*extends to tool design/i,
+      /doctrine is a system-wide standard.*on every operational tool as it lands/i,
     );
-    expect(SYSTEM_PROMPT_TEXT).toMatch(/point 3 binds the natural-reference contract/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/point 3 binds the natural-reference contract/i);
+    // P3-finish: the doctrine no longer narrates pricing/calendar as "subsequent
+    // phases" — it directs the model to use the tools it actually has.
+    expect(SYSTEM_PROMPT_TEXT).not.toMatch(/shipping in subsequent phases/);
+    expect(SYSTEM_PROMPT_TEXT).toMatch(/never tell the host a capability is "coming in a later phase"/);
   });
 
   test("M13 Phase 1.B: prompt anti-patterns only appear inside the doctrine (negated context)", () => {
