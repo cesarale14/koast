@@ -34,39 +34,57 @@ loop), + a review-fix pass. Remaining, by the same locked architecture:
 agent_artifacts D35 fork. Each new `PROPOSAL_ACTIONS` entry's `execute` calls an
 EXTRACTED shared lib fn (the assignCleaner pattern; no side-doors).**
 
-- P3.2 notify_cleaner — extract `notifyCleaner(svc,{taskId,hostId})` from
-  /api/turnover/notify; register (otaTouching:false); + `propose_notify_cleaner`.
-- P3.2 send_guest_reply — proposals-lane action reusing `proposeGuestMessageHandler`
-  (the M7 Channex send single-writer) via an adapter (idempotency from
-  proposals.result, not artifact.commit_metadata). Run `applyOutputJudges(
-  'host-to-guest')` (J1-J6) at propose-time + the publisher-category hard-refusal
-  (`classifyPublisherCategory` → refusal_envelope) at loop pre-dispatch (extend
-  the propose_guest_message intercept). Retire propose_guest_message exposure.
-  Strictly host-gated; NO auto-approve (J3 fail-open valid only while host
-  approval gates the send).
-- P3.2 OTA trio (block_dates / adjust_price / set_min_stay) — **HARD-FLOOR TIER 1
-  (BDC clobber class); full Phase-1-STOP rigor.** otaTouching:true, stakesClass
-  'high'. Extract shared apply lib fns from /api/pricing/apply +
-  /api/calendar/rates/apply + /api/channels/rates (route-inline today); ALL route
-  through `buildSafeBdcRestrictions` (block uses availability=0, NEVER stop_sell;
-  the non-BDC room-type `updateAvailability` path is the documented un-wrapped
-  KNOWN GAP — wrap before any flag-flip). Built fully + mock-tested + EXECUTION-
-  IMPOSSIBLE while OTA off. Add a `calendar_change` block kind for block/min_stay
-  display. **ProposalCard executable gate:** add `otaTouching`+`executable` to
-  NormalizedProposal (server-side, via getProposalActionDef + isOtaWriteEnabled);
-  ProposalCard hides/disables Approve when !executable (Dismiss stays live).
-  **R-5:** unify `isOtaWriteEnabled` ('1'||'true') with `isCalendarPushEnabled`
-  ('true' only) so the proposal-side gate and the route agree.
-- P3.1 remaining reads — bookings-list (greenfield query), threads-list,
-  calendar-rates (two-tier), property-access, channel-sync health (pure
-  property_channels read, NOT GET /api/channels which writes on stale-read),
-  proposals — each reuse/extract the surface query (no parallel logic).
-- P3.3 emission discipline — the seed shipped (the "# Proposing operational
-  actions" prompt section + propose_assign_cleaner's description). Extend the
-  prompt + add discipline tests as the write set grows.
+### SHIPPED this P3-finish pass (2026-06-11) — see docs/koast-v1-p3-phase-report.md
+- ✅ **OTA trio** (block_dates / adjust_price / set_min_stay) — HARD-FLOOR TIER 1.
+  Shared writer `src/lib/channex/ota-apply.ts` (BDC→safe-restrictions, block=
+  availability=0/never stop_sell); 3-belt execution-impossibility; whiplash-bounded
+  adjust_price; `calendar_change` block; `otaTouching`+`executable` on
+  NormalizedProposal + ProposalCard gate; **R-5 unified** (isOtaWriteEnabled now
+  delegates to isCalendarPushEnabled, "true"-only). Deferrals: H3.2 (non-BDC block
+  room-type gap), H3.3 (migrate the 3 legacy apply routes to the shared dispatch).
+- ✅ **notify_cleaner** — `notifyCleaner` extracted from /api/turnover/notify;
+  action (otaTouching:false, stakes 'low') + `propose_notify_cleaner`.
+- ✅ **read_bookings** (first of the P3.1 reads) — upcoming bookings as booking
+  blocks, gated dark.
+- ✅ Registry-driven lane-level visibility guard + Today route query-contract test
+  (the agent→host seam, pinned in CI).
+
+### STILL REMAINING (deferred, by the same locked architecture)
+- **P3.2 send_guest_reply — DEFERRED to a focused TIER-1 pass (consult-flagged
+  2026-06-11).** The send mechanics are a clean reuse of `proposeGuestMessageHandler`,
+  but "retire propose_guest_message exposure" is high-blast-radius: 18 prod sites +
+  6 test files (the D35 dispatcher fork, /api/agent/artifact approve route,
+  conversation-pending-artifacts, host-action-patterns, the loop action_proposed
+  emission, a heavily voice-tuned prompt section) on the prod-validated, brand-
+  critical guest-messaging surface (intersects the CLAUDE.md J3 fail-open contract).
+  Plan: send_guest_reply action (adapter → proposeGuestMessageHandler, idempotency
+  from proposals.result via an extended execute arg carrying proposal.result) +
+  `propose_guest_reply` tool running `applyOutputJudges('host-to-guest')` (J1-J6) at
+  propose-time + the publisher-category hard-refusal (`classifyPublisherCategory` →
+  refusal_envelope) at loop pre-dispatch (extend the intercept to the new tool
+  name) + retire propose_guest_message + prompt rewire + the 6 test updates.
+  Strictly host-gated; NO auto-approve.
+- **P3.1 remaining reads** — threads-list (thread block exists; reuse the inbox
+  query), calendar-rates (two-tier; price_diff/calendar_change blocks),
+  property-access + channel-sync health (need new block kinds; channel-health is a
+  pure property_channels read, NOT GET /api/channels which writes on stale-read),
+  proposals. Each reuse/extract the surface query (no parallel logic); gated dark.
+- **P3.3 inline ProposalCard in the thread** — a proposals-lane proposal still
+  renders as a raw tool-call line in chat (it DOES surface on Today + the bell).
+  To render it inline: a new SSE event (e.g. `proposal_created` carrying the
+  NormalizedProposal) emitted by the loop when a proposals-lane propose tool
+  returns {created, proposal_id}, + ChatClient rendering a ProposalCard for it.
+  Touches the SSE discriminated-union schema + the core loop + the chat shell —
+  a contained but contract-bearing change; do it carefully in its own pass.
+- **P3.3 discipline fixture tests** — deterministic tests of the emission
+  discipline (questions → blocks/prose; one imperative → exactly one proposal;
+  refusal over guessing on unresolved referents) via fixture LLM responses through
+  the loop. The prompt discipline itself shipped (extended for the OTA + notify
+  proposes); the fixture-harness tests are the remaining piece.
 
 **NEEDS-CESAR:** flip `KOAST_ENABLE_RENDER_AGENDA` in Vercel to light up the
-generative-UI line (agenda + block-reads) in prod (existing flag, ships dark).
+generative-UI line (agenda + block-reads incl. read_bookings) in prod (existing
+flag, ships dark).
 
 ---
 
