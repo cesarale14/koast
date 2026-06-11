@@ -20,6 +20,7 @@ import type { StakesClass } from "@/lib/action-substrate/stakes-registry";
 import { assignCleaner } from "@/lib/turnover/assign";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { blockDataSchema, type BlockData } from "@/lib/agent/render/blocks";
+import { isCalendarPushEnabled } from "@/lib/channex/calendar-push-gate";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,10 +40,22 @@ type ProposalActionDef = {
   execute: (svc: Svc, args: { payload: unknown; hostId: string }) => Promise<ExecuteResult>;
 };
 
-/** OTA write enablement — the same env gate as the BDC calendar push (default off). */
+/**
+ * OTA write enablement — the proposal-side gate for OTA-touching actions
+ * (executable computation, executeProposal hard-refusal, auto-approve refusal).
+ *
+ * R-5 (HARD-FLOOR): this is the SAME predicate as the route-level write guard.
+ * It MUST NOT diverge from `isCalendarPushEnabled` — a divergence is the
+ * dangerous state where a proposal renders executable (Approve shown) but the
+ * underlying Channex write refuses, or vice versa. So this delegates to the one
+ * canonical gate rather than re-parsing the env. Previously this accepted "1"
+ * OR "true" while the 8 route guards accept "true" only; they now agree by
+ * construction (aligned DOWN to the stricter established route semantics — a
+ * hard-floor gate fails closed on any non-"true" value; the documented flip is
+ * `KOAST_ALLOW_BDC_CALENDAR_PUSH=true`). gate-divergence.test.ts pins this.
+ */
 export function isOtaWriteEnabled(): boolean {
-  const v = process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH;
-  return v === "1" || v === "true";
+  return isCalendarPushEnabled();
 }
 
 /** The action registry — action_type → how it executes + its risk shape. */
