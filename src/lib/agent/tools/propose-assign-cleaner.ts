@@ -48,6 +48,40 @@ function ci(s: string): string {
   return s.trim().toLowerCase();
 }
 
+/**
+ * Resolve a host reference to exactly one row, preferring an exact (case-
+ * insensitive) name match before a substring match — so "Karem" picks "Karem"
+ * over "Karembu" when both exist. ambiguous=true when >1 match at the chosen
+ * tier; no match → undefined.
+ */
+function pickOne<T extends { name: string | null }>(
+  rows: T[],
+  query: string,
+): { match?: T; ambiguous?: boolean } {
+  const q = ci(query);
+  const exact = rows.filter((r) => (r.name ?? "").trim().toLowerCase() === q);
+  if (exact.length === 1) return { match: exact[0] };
+  if (exact.length > 1) return { ambiguous: true };
+  const sub = rows.filter((r) => (r.name ?? "").toLowerCase().includes(q));
+  if (sub.length === 1) return { match: sub[0] };
+  if (sub.length > 1) return { ambiguous: true };
+  return {};
+}
+
+/** Local calendar date (YYYY-MM-DD) in the given timezone (ET default). */
+function localDate(tz: string | null | undefined): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz || "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
 export const proposeAssignCleanerTool: Tool<Input, Output> = {
   name: "propose_assign_cleaner",
   description: DESCRIPTION,
@@ -61,40 +95,44 @@ export const proposeAssignCleanerTool: Tool<Input, Output> = {
     // Resolve property (host-owned; case-insensitive substring; exactly one).
     const { data: propRows } = await supabase
       .from("properties")
-      .select("id, name")
+      .select("id, name, timezone")
       .eq("user_id", hostId);
-    const props = ((propRows ?? []) as { id: string; name: string | null }[]).filter((p) =>
-      (p.name ?? "").toLowerCase().includes(ci(input.property)),
+    const propPick = pickOne(
+      (propRows ?? []) as { id: string; name: string | null; timezone: string | null }[],
+      input.property,
     );
-    if (props.length === 0) return { created: false, reason: `No property matches "${input.property}".` };
-    if (props.length > 1)
+    if (propPick.ambiguous)
       return { created: false, reason: `"${input.property}" matches more than one property — which one?` };
-    const property = props[0];
+    if (!propPick.match) return { created: false, reason: `No property matches "${input.property}".` };
+    const property = propPick.match;
 
-    // Resolve cleaner (host-owned, active; exactly one).
+    // Resolve cleaner (host-owned, active; exact-name preferred).
     const { data: cleanerRows } = await supabase
       .from("cleaners")
       .select("id, name")
       .eq("user_id", hostId)
       .eq("is_active", true);
-    const cleaners = ((cleanerRows ?? []) as { id: string; name: string | null }[]).filter((c) =>
-      (c.name ?? "").toLowerCase().includes(ci(input.cleaner)),
+    const cleanerPick = pickOne(
+      (cleanerRows ?? []) as { id: string; name: string | null }[],
+      input.cleaner,
     );
-    if (cleaners.length === 0) return { created: false, reason: `No active cleaner matches "${input.cleaner}".` };
-    if (cleaners.length > 1)
+    if (cleanerPick.ambiguous)
       return { created: false, reason: `"${input.cleaner}" matches more than one cleaner — which one?` };
-    const cleaner = cleaners[0];
+    if (!cleanerPick.match) return { created: false, reason: `No active cleaner matches "${input.cleaner}".` };
+    const cleaner = cleanerPick.match;
 
     // Resolve the turnover task: assignable (pending|assigned) for this property,
-    // the given date or the soonest upcoming.
+    // the given date or the SOONEST UPCOMING (>= today; never a past turnover).
     let taskQuery = supabase
       .from("cleaning_tasks")
       .select("id, scheduled_date, status")
       .eq("property_id", property.id)
       .in("status", ["pending", "assigned"])
       .order("scheduled_date", { ascending: true });
-    if (input.date) taskQuery = taskQuery.eq("scheduled_date", input.date);
-    const { data: taskRows } = await taskQuery.limit(5);
+    taskQuery = input.date
+      ? taskQuery.eq("scheduled_date", input.date)
+      : taskQuery.gte("scheduled_date", localDate(property.timezone));
+    const { data: taskRows } = await taskQuery.limit(1);
     const tasks = (taskRows ?? []) as { id: string; scheduled_date: string; status: string }[];
     if (tasks.length === 0) {
       return {

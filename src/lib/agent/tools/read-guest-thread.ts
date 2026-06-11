@@ -38,22 +38,34 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 const MAX_GUEST_MESSAGE_CHARS = 2000;
 
-/** Strip C0/C1 control chars (keep \n and \t) + cap length. Pure. */
+/**
+ * Strip control + invisible-injection chars + cap length. Pure. Drops C0/C1
+ * control (keeping \n, \t), DEL, and the steganographic vectors used to smuggle
+ * invisible instructions: zero-width + bidi marks/overrides/isolates, BOM, and
+ * the Unicode Tag block (which can encode a whole hidden ASCII instruction).
+ * Iterates by code point + caps by code-point count, so it never splits a
+ * surrogate pair.
+ */
 export function sanitizeGuestText(raw: string): string {
-  let out = "";
+  const kept: string[] = [];
   for (const ch of raw ?? "") {
     const code = ch.codePointAt(0) ?? 0;
-    const isControl =
+    const drop =
       code <= 0x08 ||
       code === 0x0b ||
       code === 0x0c ||
       (code >= 0x0e && code <= 0x1f) ||
-      (code >= 0x7f && code <= 0x9f);
-    if (!isControl) out += ch;
+      (code >= 0x7f && code <= 0x9f) ||
+      (code >= 0x200b && code <= 0x200f) || // zero-width + LTR/RTL marks
+      (code >= 0x202a && code <= 0x202e) || // bidi embedding/override
+      (code >= 0x2066 && code <= 0x2069) || // bidi isolates
+      code === 0xfeff || // BOM / ZWNBSP
+      (code >= 0xe0000 && code <= 0xe007f); // Unicode Tag block
+    if (!drop) kept.push(ch);
   }
-  return out.length > MAX_GUEST_MESSAGE_CHARS
-    ? out.slice(0, MAX_GUEST_MESSAGE_CHARS) + "..."
-    : out;
+  return kept.length > MAX_GUEST_MESSAGE_CHARS
+    ? kept.slice(0, MAX_GUEST_MESSAGE_CHARS).join("") + "..."
+    : kept.join("");
 }
 
 /** Wrap untrusted guest text in a per-call nonce fence. Pure (nonce injected). */

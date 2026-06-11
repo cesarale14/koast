@@ -66,7 +66,7 @@ describe("read_pricing", () => {
     (createServiceClient as jest.Mock).mockReturnValue(
       fakeSvc({
         properties: [{ id: "p1" }],
-        pricing_recommendations_latest: [
+        pricing_recommendations: [
           // Postgres numerics may arrive as strings — assert coercion.
           { date: "2026-06-12", current_rate: "180", suggested_rate: "205", delta_abs: "25", reason_text: "Event nearby", urgency: "act_now" },
         ],

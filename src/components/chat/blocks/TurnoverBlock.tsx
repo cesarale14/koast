@@ -88,7 +88,14 @@ export function TurnoverBlock({
           <div style={{ fontWeight: 600, color: "var(--deep-sea)", fontSize: 15 }}>{data.property}</div>
           <div style={{ color: "var(--tideline)", fontSize: 13 }}>
             {fmtWeekdayMonthDay(data.date)}
-            {!isPending ? ` · ${turnoverStatusLabel(data.status, data.cleanerName)}` : ""}
+            {!isPending
+              ? ` · ${turnoverStatusLabel(data.status, data.cleanerName)}`
+              : // A pending block with a cleaner name is an assign PROPOSAL —
+                // surface who's being assigned so the host approves with the
+                // primary fact visible. (Today's pending strip has no cleaner.)
+                data.cleanerName
+                ? ` · To ${data.cleanerName}`
+                : ""}
           </div>
         </div>
 
