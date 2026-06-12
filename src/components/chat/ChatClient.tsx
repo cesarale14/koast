@@ -47,6 +47,8 @@ import { AuditDrawer } from "@/components/inspect/AuditDrawer";
 import { ErrorBlock } from "./ErrorBlock";
 import { RefusalTag } from "./RefusalTag";
 import { MemoryArtifact, type FactSpan } from "./MemoryArtifact";
+import { ProposalCard } from "@/components/proposals/ProposalCard";
+import type { NormalizedProposal } from "@/lib/proposals/schema";
 import { RefusalEnvelopeRenderer } from "./RefusalEnvelopeRenderer";
 import { RenderCard } from "./RenderCard";
 import {
@@ -104,6 +106,14 @@ type UITurnLite = {
     /** M7 — derived canonical channel for guest_message_proposal. */
     derived_channel?: string;
   }>;
+  /**
+   * P6.5 — proposals-lane proposals created during this turn (send_guest_reply,
+   * adjust_price, …), harvested from the live stream's proposal_card blocks so
+   * the inline ProposalCard survives turn-completion within the session. NOT
+   * server-hydrated on reload (proposals have no turn FK) — on a hard reload the
+   * propose_* tool line stands; the proposal is still reachable from Today/bell.
+   */
+  pendingProposals?: NormalizedProposal[];
 };
 
 type ConvListItem = {
@@ -691,6 +701,8 @@ export function ChatClient({
       commit_metadata: Record<string, unknown> | null;
     };
     const liveArtifacts: LiveArtifact[] = [];
+    // P6.5 — proposals-lane proposals harvested from proposal_card blocks.
+    const harvestedProposals: NormalizedProposal[] = [];
     for (const b of state.content) {
       if (b.kind === "memory_artifact") {
         const dbState =
@@ -740,6 +752,8 @@ export function ChatClient({
           commit_metadata:
             Object.keys(commitMetadata).length > 0 ? commitMetadata : null,
         });
+      } else if (b.kind === "proposal_card") {
+        harvestedProposals.push(b.proposal);
       }
     }
 
@@ -768,6 +782,7 @@ export function ChatClient({
       refusalEnvelope: state.refusalEnvelope,
       renderPayload: state.renderPayload,
       pendingArtifacts: liveArtifacts.length > 0 ? liveArtifacts : undefined,
+      pendingProposals: harvestedProposals.length > 0 ? harvestedProposals : undefined,
     };
     harvested.push(koastTurn);
     setSessionHarvest((prev) => [...prev, ...harvested]);
@@ -1230,6 +1245,16 @@ export function ChatClient({
                       );
                     }
                     if (block.kind === "tool") {
+                      // P6.5: a successful propose_* tool renders its inline
+                      // ProposalCard (proposal_card block) in place of the raw
+                      // line. A FAILED propose_* still shows (no card).
+                      if (
+                        block.tool_name.startsWith("propose_") &&
+                        block.status === "completed" &&
+                        block.success !== false
+                      ) {
+                        return null;
+                      }
                       const failed =
                         block.status === "failed" ||
                         (block.status === "completed" && block.success === false);
@@ -1256,11 +1281,16 @@ export function ChatClient({
                         />
                       );
                     }
-                    // P6.5: proposal_card render (the inline ProposalCard) is
-                    // wired in Phase 2; until then any non-memory_artifact block
-                    // (i.e. proposal_card) renders nothing here and the propose_*
-                    // tool line stands. This guard also makes the union
-                    // exhaustive-safe now that proposal_card exists.
+                    // P6.5: render the real inline ProposalCard for a
+                    // proposal_card block (live Approve / Dismiss / Edit). Any
+                    // other non-memory_artifact block renders nothing here.
+                    if (block.kind === "proposal_card") {
+                      return (
+                        <div key={`live-proposal-${block.proposal.id}`} style={{ margin: "8px 0" }}>
+                          <ProposalCard proposal={block.proposal} refetchOnFocus />
+                        </div>
+                      );
+                    }
                     if (block.kind !== "memory_artifact") return null;
                     // M6 D35: live memory_artifact block from the
                     // turnReducer. Save/Discard fire POST /api/agent/artifact;
@@ -1360,7 +1390,11 @@ function HistoryTurnView({
       }
     >
       <KoastMessage>
-        {turn.tool_calls.map((tc) => (
+        {turn.tool_calls
+          // P6.5: a successful propose_* tool's inline ProposalCard renders in
+          // its place (see turn.pendingProposals below) — hide the raw line.
+          .filter((tc) => !(tc.tool_name.startsWith("propose_") && tc.success))
+          .map((tc) => (
           <ToolCall
             key={tc.tool_use_id}
             name={tc.tool_name}
@@ -1482,6 +1516,13 @@ function HistoryTurnView({
             />
           );
         })}
+        {/* P6.5: inline ProposalCards harvested from this turn — survive
+            turn-completion within the session (reload falls back to the line). */}
+        {(turn.pendingProposals ?? []).map((p) => (
+          <div key={`history-proposal-${p.id}`} style={{ margin: "8px 0" }}>
+            <ProposalCard proposal={p} refetchOnFocus />
+          </div>
+        ))}
         {turn.refusal && <RefusalTag scope={[]} />}
       </KoastMessage>
     </Turn>

@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
     const propertyId = url.searchParams.get("property_id");
+    const id = url.searchParams.get("id"); // P6.5: single-proposal refetch (inline card)
 
     const svc = createServiceClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
       .limit(50);
     if (status) q = q.eq("status", status);
     if (propertyId) q = q.eq("property_id", propertyId);
+    if (id) q = q.eq("id", id);
 
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
