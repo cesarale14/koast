@@ -494,14 +494,17 @@ export async function isAutoApproveEnabled(
   // send can never auto-execute regardless of any persisted preference.
   if (def?.neverAutoApprove) return false;
   if (def?.otaTouching && !isOtaWriteEnabled()) return false;
-  const { data } = await svc
-    .from("user_preferences")
-    .select("preferences")
-    .eq("user_id", hostId)
-    .limit(1);
-  const prefs = ((data ?? []) as { preferences?: Record<string, unknown> }[])[0]?.preferences ?? {};
-  const map = (prefs as { auto_approve?: Record<string, unknown> }).auto_approve ?? {};
-  return map[actionType] === true;
+  // H3.1 (P6.2) — the `user_preferences` table was deliberately dropped
+  // (migration 20260507020000_drop_deprecated_config_tables). Reading it was a
+  // phantom read (PostgREST 404 → {data:null} → false), so the effective behavior
+  // was already "no auto-approve". We now return that explicitly — no phantom
+  // query, no silent PostgREST error on every proposal create. When a real
+  // per-host auto-approve preference home ships (host_state or a recreated prefs
+  // table + the Settings writer), wire it HERE. The structural guards above
+  // (neverAutoApprove, OTA-off) remain the load-bearing safety.
+  void svc;
+  void hostId;
+  return false;
 }
 
 // ---- Execute + finalize --------------------------------------------------

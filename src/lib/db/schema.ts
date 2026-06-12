@@ -693,13 +693,12 @@ export const messageTemplatesRelations = relations(messageTemplates, ({ one }) =
   property: one(properties, { fields: [messageTemplates.propertyId], references: [properties.id] }),
 }));
 
-// ==================== User Preferences ====================
-
-export const userPreferences = pgTable("user_preferences", {
-  userId: uuid("user_id").primaryKey(),
-  preferences: jsonb("preferences").notNull().default({}),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+// ==================== User Preferences (REMOVED) ====================
+// The `user_preferences` table was deliberately dropped (migration
+// 20260507020000_drop_deprecated_config_tables); its only reader was
+// isAutoApproveEnabled, fixed in P6.2 (H3.1) to not query the phantom table.
+// Declaration removed to keep the Drizzle ↔ DB diff clean. A future per-host
+// auto-approve preference home should use host_state or a fresh table.
 
 // ==================== Host State (M8 Phase G C4) ====================
 //

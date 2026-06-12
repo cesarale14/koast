@@ -37,6 +37,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, ignored: "billing_disabled" });
   }
 
+  // P6.3 — body-size guard. Stripe webhooks are <50 KB; cap before reading.
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > 1_000_000) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   const sig = request.headers.get("stripe-signature");
   const rawBody = await request.text();
   let event: Stripe.Event;

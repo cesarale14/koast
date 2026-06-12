@@ -19,8 +19,20 @@ import {
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { acquireLock } from "@/lib/concurrency/locks";
 
+// P6.3 — Channex webhooks are small (<50 KB typical). Cap the body so a spoofed
+// or malformed delivery can't force a large parse into memory (DoS).
+const MAX_WEBHOOK_BODY_BYTES = 1_000_000; // 1 MB
+
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
+
+  // P6.3 — body-size guard BEFORE any parse.
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_WEBHOOK_BODY_BYTES) {
+    console.warn(`[webhook] payload too large (${contentLength}B) from ${sourceIp} — rejected`);
+    return NextResponse.json({ status: "rejected", message: "Payload too large" }, { status: 413 });
+  }
+
   const supabase = createServiceClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -9,7 +9,11 @@ phases surface deferrals; cleared as the owning phase ships them.
 
 ## P6 — External-user de-risk
 
-### H6.1 — Channex webhook revision-claim (TOCTOU) — claim-first on `revision_id`
+### H6.1 — Channex webhook revision-claim (TOCTOU) — claim-first on `revision_id` — ✅ DONE (P6.1, 2026-06-12)
+**CLOSED.** `acquireLock("channex_revision:<id>", 120s)` claim-first at the top of the
+webhook handler; refusal → `skipped_in_flight` without acking (failed first delivery still
+retries post-TTL). claim-first.test.ts pins it. Original entry below.
+
 - **Source:** P2 adversarial review (surfaced via the P2.4 booking bell), 2026-06-10. Added to this list per the P3 brief.
 - **Severity:** medium. Pre-existing webhook concurrency; P2 only made the symptom host-visible (duplicate "New booking"/"Booking cancelled" bell rows).
 - **Issue:** `src/app/api/webhooks/channex/route.ts` dedups a Channex revision by READING `channex_webhook_log` for a prior terminal row (`action_taken IN created|modified|cancelled|skipped_self`) near the top, but the terminal log row is only INSERTed at the very END of the handler — after `channex.getBooking`, room-type fetch, `updateAvailability`, the `pricing_performance` backfill, and (P2.4) the `host_notifications` bell emit. If Channex re-delivers the same revision while the first request is still in-flight (plausible: the sequential Channex round-trips can exceed the webhook timeout), BOTH requests pass the dedup check and BOTH run the full body → duplicate booking bell, duplicate pricing backfill, duplicate availability push.
@@ -106,7 +110,11 @@ flag, ships dark).
 
 ## P3 — surfaced during the visibility diagnostic (2026-06-11)
 
-### H3.1 — `user_preferences` table does not exist in prod → auto-approve reads a phantom table
+### H3.1 — `user_preferences` table does not exist in prod → auto-approve reads a phantom table — ✅ DONE (P6.2, 2026-06-12)
+**CLOSED.** Verified the table was deliberately dropped (`20260507020000`). `isAutoApproveEnabled`
+no longer reads it (returns false explicitly); the stale `userPreferences` schema declaration
+removed. Future auto-approve prefs → host_state or a fresh table. Original entry below.
+
 - **Source:** the propose_assign_cleaner visibility diagnostic (2026-06-11). While confirming the agent→host proposal seam, a direct prod query found NO preferences table at all (`information_schema` has zero `%pref%` tables in `public`), yet `isAutoApproveEnabled` in `src/lib/proposals/server.ts` reads `from("user_preferences").select("preferences")`. CLAUDE.md's 30-table list (verified 2026-04-17) names `user_preferences`, so it was either dropped since or never created in this project.
 - **Severity:** low TODAY (safe by construction), latent MEDIUM. The read destructures only `data` and ignores `error`; a PostgREST 404 returns `{data:null}` (does not throw), so `isAutoApproveEnabled` returns `false` — the safe default (all auto-approve OFF). createProposal is unaffected. BUT: (a) every agent/worker/system proposal create logs a silent PostgREST error; (b) the auto-approve feature is dead — when it ships (the Settings toggle `getProposalActionMeta` already feeds), it will read/write a phantom table and silently never enable. OTA auto-approve is doubly safe regardless via the `def.otaTouching && !isOtaWriteEnabled()` short-circuit BEFORE the read.
 - **Fix:** decide the home for per-host auto-approve prefs — either (a) a migration creating `user_preferences(user_id uuid pk, preferences jsonb)` (RLS host-scoped), or (b) repoint `isAutoApproveEnabled` + the Settings writer at `host_state` (the `20260511010000_add_host_state_table.sql` table) if that's the canonical per-host KV. Until then, the safe-default behavior holds; do NOT enable any auto-approve UI claiming to persist.
@@ -145,7 +153,11 @@ writer `applyOtaRestrictions`; the inline BDC→safe / non-BDC→direct loops ar
 
 ## P3 — surfaced during the send_guest_reply adversarial review (2026-06-11)
 
-### H7.1 — `200-with-no-data` Channex response is system-wide classified as "not sent" (retryable) — double-send hazard
+### H7.1 — `200-with-no-data` Channex response is system-wide classified as "not sent" (retryable) — double-send hazard — ✅ DONE (P6.1, 2026-06-12)
+**CLOSED.** Distinct `AmbiguousSendError` for `res.ok && !res.data`; all 3 send call sites
+(proposals lane, manual send route, M7 artifact route) treat it as TERMINAL-no-retry (no
+re-send; webhook reconciles). ChannexSendError is now always a true non-2xx rejection. Original entry below.
+
 - **Source:** the send_guest_reply 4-lens adversarial review (the named "weakest link" in the at-most-once model), 2026-06-11.
 - **Severity:** low (low probability — Channex returns the created entity under `data` on success), latent MEDIUM (a malformed/empty 200 that actually created the message → re-send to a real guest).
 - **Issue:** `sendMessage` / `sendMessageOnBooking` (`src/lib/channex/messages.ts:395-398, 433-439`) throw `ChannexSendError("...returned no data", 200, res)` when `res.ok` is TRUE but `res.data` is absent. All three send call sites — the manual send route (`/api/messages/threads/[id]/send`), the M7 artifact approve route (`/api/agent/artifact`), and now the P3.2 `send_guest_reply` adapter — historically treat EVERY `ChannexSendError` as retryable (not-sent). For a genuinely created-but-empty-body 200 that is a potential double-send on retry.
