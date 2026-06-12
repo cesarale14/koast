@@ -22,6 +22,7 @@ function fakeSvc(seed: Seed) {
       in: () => b,
       is: () => b,
       not: () => b,
+      gte: () => b,
       order: () => b,
       limit: () => Promise.resolve(result),
       then: (res: (v: unknown) => unknown) => Promise.resolve(result).then(res),
@@ -63,12 +64,17 @@ describe("read_turnovers", () => {
 
 describe("read_pricing", () => {
   test("maps pending recommendations to price_diff blocks (numeric coercion)", async () => {
+    // P4.2: read_pricing now drops stale recs (isRecFresh). Use a future date +
+    // a recent created_at so the rec survives the freshness gate regardless of the
+    // run date — the assertion is on coercion, not on a fixed calendar date.
+    const future = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const nowISO = new Date().toISOString();
     (createServiceClient as jest.Mock).mockReturnValue(
       fakeSvc({
         properties: [{ id: "p1" }],
         pricing_recommendations: [
           // Postgres numerics may arrive as strings — assert coercion.
-          { date: "2026-06-12", current_rate: "180", suggested_rate: "205", delta_abs: "25", reason_text: "Event nearby", urgency: "act_now" },
+          { date: future, current_rate: "180", suggested_rate: "205", delta_abs: "25", reason_text: "Event nearby", urgency: "act_now", created_at: nowISO },
         ],
       }),
     );
@@ -77,7 +83,7 @@ describe("read_pricing", () => {
     if (out.kind === "blocks") {
       expect(out.blocks[0]).toEqual({
         kind: "price_diff",
-        data: { date: "2026-06-12", currentRate: 180, suggestedRate: 205, deltaAbs: 25, reason: "Event nearby", urgency: "act_now" },
+        data: { date: future, currentRate: 180, suggestedRate: 205, deltaAbs: 25, reason: "Event nearby", urgency: "act_now" },
       });
     }
   });
