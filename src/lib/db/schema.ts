@@ -1124,7 +1124,7 @@ export const hostNotifications = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     hostId: uuid("host_id").notNull(),
-    // type CHECK ('cleaning_completed'|'booking_new'|'booking_cancelled'|'proposal_created'|'push_delivery_failure'). Mirrored by HostNotificationType.
+    // type CHECK ('cleaning_completed'|'booking_new'|'booking_cancelled'|'proposal_created'|'push_delivery_failure'|'channel_disconnect'). Mirrored by HostNotificationType.
     type: text("type").notNull(),
     payload: jsonb("payload").notNull().default({}),
     readAt: timestamp("read_at", { withTimezone: true }),
@@ -1139,7 +1139,22 @@ export type HostNotificationType =
   | "booking_new"
   | "booking_cancelled"
   | "proposal_created"
-  | "push_delivery_failure";
+  | "push_delivery_failure"
+  | "channel_disconnect";
+
+// ==================== API Errors (P6.4 — internal capture) ====================
+// Operator-facing error capture (no Sentry dep). Written by captureApiError();
+// RLS-on/no-policies → service-role only. See migration 20260612040000.
+export const apiErrors = pgTable("api_errors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  route: text("route").notNull(),
+  method: text("method"),
+  status: integer("status"),
+  message: text("message").notNull(),
+  context: jsonb("context").default({}),
+  hostId: uuid("host_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ==================== Host Action Patterns (M11 Phase B item 1 — F8) ====================
 //
