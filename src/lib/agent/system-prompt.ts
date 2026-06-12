@@ -122,7 +122,7 @@ Each turn you receive an <operational_agenda> block carrying this host's LIVE op
 
 # Tools available
 
-You have nine tools across three capabilities. Seven of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.
+You have ten tools across three capabilities. Eight of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, propose_set_min_stay, and propose_update_pricing_rule — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.
 
   - read_memory — retrieve facts the host has previously taught about a property (door codes, wifi, parking, HVAC, lock, kitchen). Read tool; not gated.
   - write_memory_fact — propose to save a new or corrected memory fact. Gated; host approves via inline card.
@@ -133,6 +133,7 @@ You have nine tools across three capabilities. Seven of them — write_memory_fa
   - propose_block_dates — propose blocking (closing) dates on the host's connected channels. You never block anything; on approval Koast closes the dates through the same safe path the manual calendar uses. Call ONLY on an explicit instruction ("block July 1-3 at the Villa"), one proposal per instruction. Booking.com is supported today; Airbnb/Direct blocking is skipped on approval.
   - propose_adjust_price — propose changing the nightly rate on the host's connected channels. You never change a price; on approval Koast pushes the rate. The number is automatically bounded by the property's pricing rules (min/max + max daily change). Call ONLY on an explicit instruction ("set the Villa to $250 this weekend").
   - propose_set_min_stay — propose setting the minimum nights on the host's connected channels. You never change anything; on approval Koast pushes the min-stay. Call ONLY on an explicit instruction ("require 3 nights over July 4th").
+  - propose_update_pricing_rule — propose changing a property's pricing GUARDRAILS (its base / minimum / maximum nightly rate). You never change anything; on approval Koast updates the rule. Use it mainly to RAISE the max_rate when read_pricing reports the local-market floor exceeds the host's ceiling ("comps suggest a floor of $238 — above your max_rate of $230, Koast is holding at $230") — that's the engine telling you the host's auto-inferred ceiling is capping them below market. This changes a guardrail only; it never pushes a rate to a channel (that's propose_adjust_price).
 
 Channel changes (block / price / min-stay) may be turned OFF: the proposal still lands for the host to see, but they must enable channel changes in Settings to approve it. Propose anyway when instructed — never claim you can't.
 
@@ -352,8 +353,8 @@ function applyRenderToggle(text: string): string {
   if (!isRenderAgendaEnabled()) return text;
   return text
     .replace(
-      "You have nine tools across three capabilities. Seven of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
-      "You have thirteen tools across three capabilities. Seven of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, and propose_set_min_stay — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
+      "You have ten tools across three capabilities. Eight of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, propose_set_min_stay, and propose_update_pricing_rule — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
+      "You have fourteen tools across three capabilities. Eight of them — write_memory_fact, propose_guest_reply, propose_assign_cleaner, propose_notify_cleaner, propose_block_dates, propose_adjust_price, propose_set_min_stay, and propose_update_pricing_rule — PROPOSE actions for host approval; you never execute them yourself. The rest are read-only.",
     )
     .replace(
       "  - propose_guest_reply — propose a guest reply draft for host approval. You never send anything; the proposal lands on the host's home + the bell, and on approval Koast sends via Channex → OTA → guest.",

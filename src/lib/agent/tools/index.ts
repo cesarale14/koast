@@ -25,6 +25,7 @@ import {
   proposeAdjustPriceTool,
   proposeSetMinStayTool,
 } from "./propose-ota";
+import { proposeUpdatePricingRuleTool } from "./propose-pricing-rule";
 import { isRenderAgendaEnabled } from "../render/flag";
 
 registerTool(readMemoryTool);
@@ -65,6 +66,11 @@ registerTool(proposeNotifyCleanerTool);
 registerTool(proposeBlockDatesTool);
 registerTool(proposeAdjustPriceTool);
 registerTool(proposeSetMinStayTool);
+// P4.1 — host-gated change to a property's pricing GUARDRAILS (raise the
+// inferred max_rate ceiling that sits below market). otaTouching:false — it
+// writes pricing_rules, not Channex — so it's host-gated-executable like
+// assign_cleaner, NOT OTA-gated. Always exposed.
+registerTool(proposeUpdatePricingRuleTool);
 
 // The generative-UI tools — exposed only when the render flag is on, in
 // lockstep with the prompt's applyRenderToggle.

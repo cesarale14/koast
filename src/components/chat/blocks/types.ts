@@ -20,4 +20,5 @@ export type {
   PriceDiffBlockData,
   CalendarChangeBlockData,
   GuestReplyBlockData,
+  RuleChangeBlockData,
 } from "@/lib/agent/render/blocks";

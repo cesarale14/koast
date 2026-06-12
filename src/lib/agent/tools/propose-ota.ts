@@ -26,6 +26,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createProposal } from "@/lib/proposals/server";
 import { applyPricingRules, type PricingRulesRow } from "@/lib/pricing/apply-rules";
 import type { BlockData } from "@/lib/agent/render/blocks";
+import { resolveProperty } from "./resolve-property";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Svc = ReturnType<typeof createServiceClient>;
@@ -47,29 +48,6 @@ const ChannelSchema = z
   .describe("Optional channel to target (e.g. 'BDC' for Booking.com). Omit to target all connected channels.");
 
 const RationaleSchema = z.string().min(1).max(280).describe("One short line on why — shown on the proposal card.");
-
-function ci(s: string): string {
-  return s.trim().toLowerCase();
-}
-
-/** Resolve a host-owned property by name (exact CI match preferred over substring). */
-async function resolveProperty(
-  svc: Svc,
-  hostId: string,
-  query: string,
-): Promise<{ id: string; name: string } | { error: string }> {
-  const { data } = await svc.from("properties").select("id, name").eq("user_id", hostId);
-  const rows = (data ?? []) as { id: string; name: string | null }[];
-  const q = ci(query);
-  const exact = rows.filter((r) => (r.name ?? "").trim().toLowerCase() === q);
-  const sub = rows.filter((r) => (r.name ?? "").toLowerCase().includes(q));
-  const pick = exact.length === 1 ? exact[0] : exact.length === 0 && sub.length === 1 ? sub[0] : null;
-  if (exact.length > 1 || (exact.length === 0 && sub.length > 1)) {
-    return { error: `"${query}" matches more than one property — which one?` };
-  }
-  if (!pick) return { error: `No property matches "${query}".` };
-  return { id: pick.id, name: pick.name ?? "Property" };
-}
 
 const ProposeOutput = z.object({
   created: z.boolean(),

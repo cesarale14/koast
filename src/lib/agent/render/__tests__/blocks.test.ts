@@ -17,12 +17,21 @@ const PRICE = {
   kind: "price_diff" as const,
   data: { date: "2026-06-12", currentRate: 180, suggestedRate: 205, deltaAbs: 25, reason: "Event nearby", urgency: "act_now" as const },
 };
+const RULE_CHANGE = {
+  kind: "rule_change" as const,
+  data: { property: "Villa Jamaica", field: "max_rate" as const, label: "Maximum rate", oldValue: 230, newValue: 260 },
+};
 
 describe("blockDataSchema", () => {
   test("accepts each block kind", () => {
-    for (const b of [TURNOVER, BOOKING, THREAD, PRICE]) {
+    for (const b of [TURNOVER, BOOKING, THREAD, PRICE, RULE_CHANGE]) {
       expect(blockDataSchema.safeParse(b).success).toBe(true);
     }
+  });
+
+  test("rule_change rejects a non-enum field", () => {
+    const bad = { kind: "rule_change", data: { property: "X", field: "comp_floor_pct", label: "x", oldValue: 1, newValue: 2 } };
+    expect(blockDataSchema.safeParse(bad).success).toBe(false);
   });
 
   test("rejects an unknown kind", () => {

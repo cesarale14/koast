@@ -254,26 +254,29 @@ describe("system prompt", () => {
       else process.env[KEY] = prev;
     });
 
-    test("flag OFF: nine-tool base catalog (incl propose_assign_cleaner + notify + OTA trio), NO render_agenda entry", () => {
+    test("flag OFF: ten-tool base catalog (incl propose_assign_cleaner + notify + OTA trio + update_pricing_rule), NO render_agenda entry", () => {
       delete process.env[KEY];
       const p = buildSystemPrompt();
       expect(p).toBe(SYSTEM_PROMPT_TEXT); // unchanged base prompt
-      expect(p).toMatch(/You have nine tools across three capabilities/);
+      expect(p).toMatch(/You have ten tools across three capabilities/);
       // P3.2 — the write-as-proposal tools are ALWAYS in the catalog (not flag-gated).
       expect(p).toMatch(/ {2}- propose_assign_cleaner —/);
       expect(p).toMatch(/ {2}- propose_notify_cleaner —/);
       expect(p).toMatch(/ {2}- propose_block_dates —/);
       expect(p).toMatch(/ {2}- propose_adjust_price —/);
       expect(p).toMatch(/ {2}- propose_set_min_stay —/);
+      // P4.1 — the pricing-rule guardrail proposal (also always in the catalog).
+      expect(p).toMatch(/ {2}- propose_update_pricing_rule —/);
       expect(p).toMatch(/# Proposing operational actions/);
       expect(p).not.toMatch(/render_agenda/);
     });
 
-    test("flag ON: thirteen-tool catalog + render_agenda + block-read entries + rules", () => {
+    test("flag ON: fourteen-tool catalog + render_agenda + block-read entries + rules", () => {
       process.env[KEY] = "1";
       const p = buildSystemPrompt();
-      expect(p).toMatch(/You have thirteen tools across three capabilities/);
-      expect(p).not.toMatch(/You have nine tools/);
+      expect(p).toMatch(/You have fourteen tools across three capabilities/);
+      expect(p).not.toMatch(/You have ten tools/);
+      expect(p).toMatch(/ {2}- propose_update_pricing_rule —/); // P4.1 tool survives the toggle
       expect(p).toMatch(/ {2}- render_agenda —/); // catalog entry
       expect(p).toMatch(/ {2}- read_bookings —/); // P3.1 read-blocks entry
       expect(p).toMatch(/MUST call render_agenda/); // when-to-card rule (overview)

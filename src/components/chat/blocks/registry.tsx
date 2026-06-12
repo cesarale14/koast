@@ -20,6 +20,7 @@ import { ThreadBlock } from "./ThreadBlock";
 import { PriceDiffBlock } from "./PriceDiffBlock";
 import { CalendarChangeBlock } from "./CalendarChangeBlock";
 import { GuestReplyBlock } from "./GuestReplyBlock";
+import { RuleChangeBlock } from "./RuleChangeBlock";
 
 export function Block({ block }: { block: BlockData }) {
   switch (block.kind) {
@@ -35,6 +36,8 @@ export function Block({ block }: { block: BlockData }) {
       return <CalendarChangeBlock data={block.data} />;
     case "guest_reply":
       return <GuestReplyBlock data={block.data} />;
+    case "rule_change":
+      return <RuleChangeBlock data={block.data} />;
   }
   // Exhaustive today; a future kind (validated away upstream) renders nothing.
   return null;

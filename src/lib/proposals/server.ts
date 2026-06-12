@@ -27,6 +27,7 @@ import type { KoastRestrictionProposal } from "@/lib/channex/safe-restrictions";
 import { proposeGuestMessageHandler } from "@/lib/action-substrate/handlers/propose-guest-message";
 import { ChannexSendError } from "@/lib/channex/messages";
 import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
+import { updatePricingRule, type UpdatePricingRulePatch } from "@/lib/pricing/update-rule";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,6 +170,38 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
         ok: true,
         summary: { cleaner_name: r.cleanerName, property_name: r.propertyName, push: r.push ?? null },
       };
+    },
+  },
+
+  // ── update_pricing_rule (P4.1) — host-approved change to a property's pricing
+  //    guardrails (base/min/max). otaTouching:false — it writes the host's OWN
+  //    pricing_rules row, NOT Channex, so it's host-gated-executable like
+  //    assign_cleaner (not OTA-gated). The P4.1 surface fix detects the engine's
+  //    inferred ceiling sitting below market; this is how the host approves
+  //    raising it (propose → approve). Executes the EXTRACTED updatePricingRule
+  //    single-writer (no agent side-door); the partial patch is re-validated
+  //    against the merged row (min<=base<=max) inside the writer.
+  update_pricing_rule: {
+    label: "Pricing-rule changes",
+    description:
+      "Update your pricing guardrails (base / min / max rate) when Koast recommends it, without asking first.",
+    otaTouching: false,
+    stakesClass: "medium",
+    execute: async (svc, { payload, hostId }) => {
+      const action = ((payload as { action?: unknown })?.action ?? {}) as {
+        propertyId?: string;
+        patch?: UpdatePricingRulePatch;
+      };
+      if (!action.propertyId || !action.patch || typeof action.patch !== "object") {
+        return { ok: false, error: "Proposal payload missing action.propertyId/action.patch" };
+      }
+      const r = await updatePricingRule(svc, {
+        propertyId: action.propertyId,
+        hostId,
+        patch: action.patch,
+      });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, summary: r.summary };
     },
   },
 

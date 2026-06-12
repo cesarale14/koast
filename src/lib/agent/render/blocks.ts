@@ -89,6 +89,26 @@ export const guestReplyBlockDataSchema = z.object({
   messageText: z.string(),
 });
 
+/**
+ * rule_change (P4.1) — the display block for a proposed pricing-RULE change (e.g.
+ * raise the inferred max_rate ceiling the engine detected sits below market). The
+ * P4.1 fix surfaces the ceiling-binding conflict; this is how the host approves
+ * raising their OWN guardrail (propose→approve like every other write). Id-lean:
+ * the proposal's `action` payload (property id + patch) is what EXECUTES; this is
+ * only what the host SEES.
+ */
+export const ruleChangeBlockDataSchema = z.object({
+  property: z.string(),
+  /** Which rule bound is changing. */
+  field: z.enum(["max_rate", "min_rate", "base_rate"]),
+  /** Human label, e.g. "Maximum rate". */
+  label: z.string(),
+  /** Current value (null if the rule row had none). */
+  oldValue: z.number().nullable(),
+  /** Proposed new value. */
+  newValue: z.number(),
+});
+
 export const blockDataSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("turnover"), data: turnoverBlockDataSchema }),
   z.object({ kind: z.literal("booking"), data: bookingBlockDataSchema }),
@@ -96,6 +116,7 @@ export const blockDataSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("price_diff"), data: priceDiffBlockDataSchema }),
   z.object({ kind: z.literal("calendar_change"), data: calendarChangeBlockDataSchema }),
   z.object({ kind: z.literal("guest_reply"), data: guestReplyBlockDataSchema }),
+  z.object({ kind: z.literal("rule_change"), data: ruleChangeBlockDataSchema }),
 ]);
 
 /** A render-payload kind carrying a list of blocks (dormant until a render tool emits it). */
@@ -111,6 +132,7 @@ export type ThreadBlockData = z.infer<typeof threadBlockDataSchema>;
 export type PriceDiffBlockData = z.infer<typeof priceDiffBlockDataSchema>;
 export type CalendarChangeBlockData = z.infer<typeof calendarChangeBlockDataSchema>;
 export type GuestReplyBlockData = z.infer<typeof guestReplyBlockDataSchema>;
+export type RuleChangeBlockData = z.infer<typeof ruleChangeBlockDataSchema>;
 export type BlockData = z.infer<typeof blockDataSchema>;
 export type BlockKind = BlockData["kind"];
 export type BlocksRenderPayload = z.infer<typeof blocksRenderPayloadSchema>;
