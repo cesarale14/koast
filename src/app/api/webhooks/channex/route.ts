@@ -18,6 +18,7 @@ import {
 } from "@/lib/turnover/auto-create";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { acquireLock } from "@/lib/concurrency/locks";
+import { channexEnvelopeSchema } from "@/lib/webhooks/schemas";
 
 // P6.3 — Channex webhooks are small (<50 KB typical). Cap the body so a spoofed
 // or malformed delivery can't force a large parse into memory (DoS).
@@ -42,6 +43,13 @@ export async function POST(request: NextRequest) {
   } catch {
     console.warn(`[webhook] Failed to parse JSON from ${sourceIp}`);
     return NextResponse.json({ status: "ok", message: "Invalid JSON, ignored" });
+  }
+
+  // P6.3 — envelope shape guard. A non-object / mistyped body is junk we won't
+  // process; ack 200 (don't trigger Channex retries on garbage) but skip.
+  if (!channexEnvelopeSchema.safeParse(rawPayload).success) {
+    console.warn(`[webhook] malformed envelope from ${sourceIp} — ignored`);
+    return NextResponse.json({ status: "ok", message: "Malformed payload, ignored" });
   }
 
   const event = rawPayload?.event ?? rawPayload?.type ?? null;

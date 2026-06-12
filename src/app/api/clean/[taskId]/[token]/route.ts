@@ -1,26 +1,28 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getVapidPublicKey } from "@/lib/push/vapid";
+import { rateLimit, rateLimited, clientIp } from "@/lib/rate-limit";
+import { verifyCleanerToken } from "@/lib/cleaner-token/verify";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { taskId: string; token: string } }
 ) {
   try {
     const supabase = createServiceClient();
 
-    // Validate token
-    const { data: tasks } = await supabase
-      .from("cleaning_tasks")
-      .select("id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, checklist, notes, cleaner_token, cleaner_id, photos")
-      .eq("id", params.taskId)
-      .eq("cleaner_token", params.token)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const task = ((tasks ?? []) as any[])[0];
-    if (!task) {
-      return NextResponse.json({ error: "Invalid task or token" }, { status: 403 });
-    }
+    // P6.3 — throttle reads per IP (token brute-force guard).
+    const rl = await rateLimit(supabase, { key: `clean-read:${clientIp(request)}`, limit: 60, windowSec: 60 });
+    if (!rl.allowed) return rateLimited(rl);
+
+    const tokenAuth = await verifyCleanerToken(
+      supabase,
+      params.taskId,
+      params.token,
+      "id, property_id, booking_id, next_booking_id, status, scheduled_date, scheduled_time, cleaner_id, checklist, notes, photos",
+    );
+    if (!tokenAuth.ok) return NextResponse.json({ error: tokenAuth.error }, { status: tokenAuth.status });
+    const task = tokenAuth.task;
 
     // Fetch property info
     const { data: props } = await supabase

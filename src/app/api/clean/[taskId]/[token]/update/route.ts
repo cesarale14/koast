@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { notifyHostComplete, notifyHostIssue } from "@/lib/notifications";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
 import { blockCompletionForMissingPhotos } from "@/lib/turnover/completion-gate";
+import { rateLimit, rateLimited, clientIp } from "@/lib/rate-limit";
+import { verifyCleanerToken } from "@/lib/cleaner-token/verify";
 
 export async function POST(
   request: NextRequest,
@@ -12,18 +14,18 @@ export async function POST(
     const supabase = createServiceClient();
     const body = await request.json();
 
-    // Validate token
-    const { data: tasks } = await supabase
-      .from("cleaning_tasks")
-      .select("id, property_id, scheduled_date, cleaner_token, photos, status")
-      .eq("id", params.taskId)
-      .eq("cleaner_token", params.token)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const task = ((tasks ?? []) as any[])[0];
-    if (!task) {
-      return NextResponse.json({ error: "Invalid task or token" }, { status: 403 });
-    }
+    // P6.3 — throttle status updates per IP.
+    const rl = await rateLimit(supabase, { key: `clean-update:${clientIp(request)}`, limit: 30, windowSec: 60 });
+    if (!rl.allowed) return rateLimited(rl);
+
+    const tokenAuth = await verifyCleanerToken(
+      supabase,
+      params.taskId,
+      params.token,
+      "id, property_id, scheduled_date, photos, status",
+    );
+    if (!tokenAuth.ok) return NextResponse.json({ error: tokenAuth.error }, { status: tokenAuth.status });
+    const task = tokenAuth.task;
 
     // S3b — required-photo gate: can't mark complete without a confirmation
     // photo when the property requires it (require_completion_photos, default on).

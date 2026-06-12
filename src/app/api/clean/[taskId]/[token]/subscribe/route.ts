@@ -12,6 +12,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit, rateLimited, clientIp } from "@/lib/rate-limit";
+import { verifyCleanerToken } from "@/lib/cleaner-token/verify";
 
 export const runtime = "nodejs";
 
@@ -33,18 +35,14 @@ export async function POST(
 
     const supabase = createServiceClient();
 
+    // P6.3 — throttle subscribe attempts per IP.
+    const rl = await rateLimit(supabase, { key: `clean-subscribe:${clientIp(request)}`, limit: 20, windowSec: 60 });
+    if (!rl.allowed) return rateLimited(rl);
+
     // Token authenticates the device → resolve the owning cleaner.
-    const { data: tasks } = await supabase
-      .from("cleaning_tasks")
-      .select("id, cleaner_id")
-      .eq("id", params.taskId)
-      .eq("cleaner_token", params.token)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const task = ((tasks ?? []) as any[])[0];
-    if (!task) {
-      return NextResponse.json({ error: "Invalid task or token" }, { status: 403 });
-    }
+    const tokenAuth = await verifyCleanerToken(supabase, params.taskId, params.token, "id, cleaner_id");
+    if (!tokenAuth.ok) return NextResponse.json({ error: tokenAuth.error }, { status: tokenAuth.status });
+    const task = tokenAuth.task;
     if (!task.cleaner_id) {
       // No cleaner to bind to yet — the task must be assigned first.
       return NextResponse.json({ error: "Task not assigned to a cleaner yet" }, { status: 409 });

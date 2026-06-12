@@ -18,6 +18,7 @@ import type Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStripe, isBillingEnabled } from "@/lib/billing/stripe";
 import { syncSubscriptionToDb } from "@/lib/billing/sync";
+import { stripeEnvelopeSchema } from "@/lib/webhooks/schemas";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,12 @@ export async function POST(request: NextRequest) {
     const msg = err instanceof Error ? err.message : "bad signature";
     console.warn("[webhooks/stripe] signature verification failed:", msg);
     return NextResponse.json({ error: `Webhook signature verification failed: ${msg}` }, { status: 400 });
+  }
+
+  // P6.3 — envelope shape guard (belt-and-suspenders over the signature-verified event).
+  if (!stripeEnvelopeSchema.safeParse(event).success) {
+    console.warn("[webhooks/stripe] event missing id/type — ignored");
+    return NextResponse.json({ received: true, ignored: "malformed_event" });
   }
 
   const supabase = createServiceClient();

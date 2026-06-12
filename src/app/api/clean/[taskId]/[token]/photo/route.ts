@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit, rateLimited, clientIp } from "@/lib/rate-limit";
+import { verifyCleanerToken } from "@/lib/cleaner-token/verify";
 
 /**
  * POST /api/clean/[taskId]/[token]/photo  (S3b — v1 program)
@@ -17,6 +19,7 @@ export const runtime = "nodejs";
 
 const BUCKET = "cleaning-photos";
 const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTOS = 30; // P6.3 — per-task upload count cap (the photos array is unbounded otherwise).
 const MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -32,15 +35,20 @@ export async function POST(
   try {
     const supabase = createServiceClient();
 
-    const { data: tasks } = await supabase
-      .from("cleaning_tasks")
-      .select("id, photos")
-      .eq("id", params.taskId)
-      .eq("cleaner_token", params.token)
-      .limit(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const task = ((tasks ?? []) as any[])[0];
-    if (!task) return NextResponse.json({ error: "Invalid task or token" }, { status: 403 });
+    // P6.3 — throttle uploads per IP (spam + brute-force guard).
+    const rl = await rateLimit(supabase, { key: `clean-photo:${clientIp(request)}`, limit: 20, windowSec: 60 });
+    if (!rl.allowed) return rateLimited(rl);
+
+    const auth = await verifyCleanerToken(supabase, params.taskId, params.token, "id, photos");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const task = auth.task;
+
+    // P6.3 — count cap BEFORE the upload, so a rejected over-limit upload never
+    // orphans an object in the bucket.
+    const existing = Array.isArray(task.photos) ? task.photos : [];
+    if (existing.length >= MAX_PHOTOS) {
+      return NextResponse.json({ error: `Photo limit reached (max ${MAX_PHOTOS} per clean).` }, { status: 400 });
+    }
 
     const form = await request.formData();
     const file = form.get("file");
@@ -63,8 +71,7 @@ export async function POST(
     }
 
     const uploaded_at = new Date().toISOString();
-    const prev = Array.isArray(task.photos) ? task.photos : [];
-    const next = [...prev, { path, uploaded_at }];
+    const next = [...existing, { path, uploaded_at }];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updErr } = await (supabase.from("cleaning_tasks") as any)
       .update({ photos: next })
