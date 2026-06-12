@@ -18,8 +18,28 @@ export default async function TurnoverPage() {
     .eq("user_id", user.id)
     .order("name");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties = (props ?? []) as any[];
-  const propertyIds = properties.map((p: { id: string }) => p.id);
+  const rawProperties = (props ?? []) as any[];
+  const propertyIds = rawProperties.map((p: { id: string }) => p.id);
+
+  // P-2: per-property "has any access info?" flag (door / smart-lock / wifi / parking
+  // in property_details). The turnover card surfaces "Add access info" when false —
+  // the moment a host discovers it's missing.
+  const { data: accessRows } = propertyIds.length > 0
+    ? await svc
+        .from("property_details")
+        .select("property_id, door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions")
+        .in("property_id", propertyIds)
+    : { data: [] };
+  const accessByProperty = new Set(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((accessRows ?? []) as any[])
+      .filter((r) =>
+        [r.door_code, r.smart_lock_instructions, r.wifi_network, r.wifi_password, r.parking_instructions]
+          .some((v) => typeof v === "string" && v.trim().length > 0),
+      )
+      .map((r) => r.property_id),
+  );
+  const properties = rawProperties.map((p) => ({ ...p, hasAccessInfo: accessByProperty.has(p.id) }));
 
   // Fetch cleaning tasks and bookings scoped to user's properties
   const { data: tasks } = propertyIds.length > 0

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
-import { Home, Plus, X, Loader2, ChevronRight, Check, ChevronDown } from "lucide-react";
+import { Home, Plus, X, Loader2, ChevronRight, Check, ChevronDown, Settings } from "lucide-react";
 import { PLATFORMS, platformKeyFrom, type PlatformKey } from "@/lib/platforms";
 import ChannelPopover from "@/components/channels/ChannelPopover";
 
@@ -142,6 +142,7 @@ function PropertyCard({
   cleaningToday,
   index,
 }: PropertyCardData) {
+  const router = useRouter();
   // Derive status from the live data we have. Turnover = cleaning task
   // scheduled for today. Occupied = current active booking. Vacant =
   // neither.
@@ -226,6 +227,22 @@ function PropertyCard({
           className="absolute inset-x-0 bottom-0 pointer-events-none"
           style={{ height: 80, background: "linear-gradient(transparent, rgba(0,0,0,0.5))" }}
         />
+        {/* P-2: discoverable Settings shortcut (incl. Access info) — top-left, so a
+            host reaches property settings from the LIST, not just a buried hero gear. */}
+        <button
+          type="button"
+          aria-label="Property settings"
+          title="Settings & access info"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            router.push(`/properties/${p.id}?settings=access`);
+          }}
+          className="absolute top-3 left-3 z-[2] flex items-center justify-center transition-transform hover:scale-105"
+          style={{ width: 30, height: 30, borderRadius: 9, background: "rgba(255,255,255,0.82)", backdropFilter: "blur(8px)", boxShadow: "var(--shadow-card)" }}
+        >
+          <Settings size={15} strokeWidth={1.8} style={{ color: "var(--coastal)" }} />
+        </button>
         {/* Channel badges — top right (wrapped in ChannelPopover) */}
         <div className="absolute top-3 right-3 flex gap-1 z-[2]" onClick={(e) => e.preventDefault()}>
           {connectedChannels.map((ch) => {

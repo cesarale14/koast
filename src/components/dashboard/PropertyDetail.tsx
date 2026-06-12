@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -147,8 +147,23 @@ export default function PropertyDetail({
     if (fromUrl === "calendar") return "Calendar";
     return "Overview";
   });
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // P-2: deep-link — ?settings (any value) opens the Settings modal; ?settings=access
+  // also scrolls it to the Access-info section, so a card / turnover CTA can land a host
+  // straight on the form.
+  const [settingsOpen, setSettingsOpen] = useState(() => !!searchParams?.get("settings"));
+  const settingsDeepLink = searchParams?.get("settings");
   const [showBdcConnect, setShowBdcConnect] = useState(false);
+
+  // Strip the ?settings param when the modal closes so a refresh doesn't reopen it.
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    if (searchParams?.get("settings")) {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.delete("settings");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
 
   const onTabChange = useCallback(
     (next: "Overview" | "Calendar" | "Pricing") => {
@@ -246,8 +261,9 @@ export default function PropertyDetail({
       {settingsOpen && (
         <PropertySettingsModal
           property={property}
-          onClose={() => setSettingsOpen(false)}
+          onClose={closeSettings}
           onSaved={() => router.refresh()}
+          scrollToAccess={settingsDeepLink === "access"}
         />
       )}
 
@@ -873,13 +889,25 @@ function PropertySettingsModal({
   property,
   onClose,
   onSaved,
+  scrollToAccess = false,
 }: {
   property: PropertyDetailProps["property"];
   onClose: () => void;
   onSaved: () => void;
+  /** P-2: when opened via ?settings=access, scroll the modal to the Access-info section. */
+  scrollToAccess?: boolean;
 }) {
   const { toast } = useToast();
   const router = useRouter();
+  const accessRef = useRef<HTMLDivElement>(null);
+  // Scroll the Access-info section into view + flash it when arriving via deep-link.
+  useEffect(() => {
+    if (!scrollToAccess) return;
+    const t = setTimeout(() => {
+      accessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [scrollToAccess]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -1130,7 +1158,7 @@ function PropertySettingsModal({
 
           {/* Access info for cleaners (S3) — populates property_details, which the
               cleaner job card surfaces under "Getting in". */}
-          <div className="pt-5 mt-4" style={{ borderTop: "1px solid var(--dry-sand)" }}>
+          <div ref={accessRef} id="access-info" className="pt-5 mt-4" style={{ borderTop: "1px solid var(--dry-sand)" }}>
             <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-3" style={{ color: "var(--tideline)" }}>
               Access info for cleaners
             </div>

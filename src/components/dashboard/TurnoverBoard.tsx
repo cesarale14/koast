@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import PropertyAvatar from "@/components/ui/PropertyAvatar";
 import { RefreshCw, ChevronDown, ChevronRight, Sparkles, CheckCircle2, Clock, AlertTriangle, MessageSquare } from "lucide-react";
@@ -31,7 +32,7 @@ interface Cleaner {
 
 interface TurnoverBoardProps {
   tasks: Task[];
-  properties: { id: string; name: string; cover_photo_url?: string | null }[];
+  properties: { id: string; name: string; cover_photo_url?: string | null; hasAccessInfo?: boolean }[];
   bookings: { id: string; guest_name: string | null; check_in: string; check_out: string }[];
   cleaners?: Cleaner[];
 }
@@ -584,7 +585,7 @@ function Header({ stats, cleanerCount, onShowCleaners, onBackfill, backfilling }
 // ====== Task Card ======
 function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, onToggle, onUpdateStatus, onAssign, onNotify, updating, notifying, compact }: {
   task: Task;
-  propMap: Map<string, { id: string; name: string; cover_photo_url?: string | null }>;
+  propMap: Map<string, { id: string; name: string; cover_photo_url?: string | null; hasAccessInfo?: boolean }>;
   bookingMap: Map<string, { id: string; guest_name: string | null; check_in: string; check_out: string }>;
   cleanerMap: Map<string, Cleaner>;
   cleaners: Cleaner[];
@@ -729,6 +730,21 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
             )}
           </div>
         </div>
+
+        {/* P-2: access-info discovery — when the property has none, the cleaner can't
+            see how to get in. Surface it HERE (the host's turnover moment) with a
+            deep-link straight to the Access-info form. */}
+        {!prop?.hasAccessInfo && (
+          <Link
+            href={`/properties/${task.property_id}?settings=access`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ color: "var(--amber-tide)" }}
+          >
+            <AlertTriangle size={13} strokeWidth={2} />
+            Add access info — the cleaner can&apos;t see how to get in
+          </Link>
+        )}
 
         {/* Mobile bottom row: status + cleaner + actions (NOT inside the expand button) */}
         <div className="flex items-center gap-2 flex-wrap mt-3 sm:hidden">
