@@ -20,9 +20,17 @@ import type { BlockData } from "@/lib/agent/render/blocks";
 const ReadBookingsInputSchema = z.object({});
 type ReadBookingsInput = z.infer<typeof ReadBookingsInputSchema>;
 
-const DESCRIPTION = `List the host's upcoming bookings (checkout from today onward) — guest, check-in → check-out, platform (airbnb / booking_com / vrbo / direct), guest count, and payout — as booking cards. Use this for "who's checking in", "what's on the calendar this week", "any arrivals today".
+const DESCRIPTION = `List the host's bookings — upcoming (checkout today onward) PLUS recently-departed (checked out within the last 30 days, the post-stay messaging / review-request window) — with guest, check-in → check-out, platform (airbnb / booking_com / vrbo / direct), guest count, and payout, as booking cards. Use this for "who's checking in", "what's on the calendar this week", "any arrivals today", and for finding a guest who just checked out.
 
 Read-only; the data is built server-side from live Koast bookings (you do not pass it in). Pair the cards with a short prose summary leading with the nearest arrival/checkout.`;
+
+/** A3 — recently-departed bookings are in scope for post-stay messaging (last N days). */
+const RECENT_CHECKOUT_WINDOW_DAYS = 30;
+function daysAgoStr(today: string, n: number): string {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 /** Host-local today (YYYY-MM-DD) from the primary property timezone (ET default). */
 async function hostLocalToday(
@@ -69,15 +77,16 @@ export const readBookingsTool: Tool<ReadBookingsInput, RenderPayload> = {
     if (props.length === 0) return { v: 1, kind: "blocks", blocks: [] };
     const nameById = new Map(props.map((p) => [p.id, p.name ?? "Property"]));
 
-    // Upcoming, non-cancelled bookings on those properties, nearest first.
+    // Upcoming PLUS recently-departed (A3 — last 30 days, the post-stay messaging
+    // window) non-cancelled bookings, chronological by check-in.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bookingRows } = await (supabase.from("bookings") as any)
       .select("property_id, platform, guest_name, check_in, check_out, num_guests, total_price, status")
       .in("property_id", Array.from(nameById.keys()))
       .neq("status", "cancelled")
-      .gte("check_out", today)
+      .gte("check_out", daysAgoStr(today, RECENT_CHECKOUT_WINDOW_DAYS))
       .order("check_in", { ascending: true })
-      .limit(25);
+      .limit(40);
 
     const blocks: BlockData[] = ((bookingRows ?? []) as Array<{
       property_id: string;

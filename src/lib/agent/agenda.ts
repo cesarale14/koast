@@ -47,6 +47,13 @@ export interface AgendaPendingMessage {
   preview: string;
   bookingId: string;
 }
+/** A3 — a guest who checked out recently (within RECENT_CHECKOUT_WINDOW_DAYS). */
+export interface AgendaRecentCheckout {
+  property: string;
+  guest: string | null;
+  date: string; // check_out
+  bookingId: string;
+}
 
 export interface AgendaRollup {
   today: string;
@@ -55,6 +62,10 @@ export interface AgendaRollup {
   checkOuts: AgendaCheckOut[];
   turnovers: AgendaTurnover[];
   pendingMessages: AgendaPendingMessage[];
+  /** A3 — recently-departed guests (post-stay messaging window). Carried for
+   * tool-chaining (booking id → read_guest_thread → propose_guest_reply); kept
+   * OUT of the render groups so TodayHome stays today+48h. */
+  recentCheckouts: AgendaRecentCheckout[];
   empty: boolean;
   /** Properties with no timezone set — their date-windowed events are SKIPPED
    * (a missing item beats a wrong-day one) and the count is surfaced so the
@@ -79,6 +90,31 @@ function addDaysStr(dateStr: string, n: number): string {
   const d = new Date(dateStr + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Post-stay messaging READ window (A3). A guest who checked out within this many
+ * days is surfaced to the agent WITH the booking id, so it can draft a reply /
+ * review request — the canonical post-checkout moment. Grounded in OTA reality:
+ * Airbnb keeps the thread messageable after checkout (its review window is 14
+ * days) and Booking.com supports post-stay follow-ups, so 30 days is a safe READ
+ * superset that comfortably covers the review-request window. This only affects
+ * what the agent can SEE — the SEND still obeys the platform's window via Channex,
+ * and a no-thread cold-send fails closed (you can't cold-open a thread post-stay).
+ */
+export const RECENT_CHECKOUT_WINDOW_DAYS = 30;
+
+/**
+ * Pure: is `checkOut` a recent departure relative to `today` — strictly BEFORE
+ * today (today's checkouts live in the agenda proper) and within the window. The
+ * lower bound is inclusive (checkout exactly windowDays ago still counts).
+ */
+export function isRecentCheckout(
+  checkOut: string,
+  today: string,
+  windowDays: number = RECENT_CHECKOUT_WINDOW_DAYS,
+): boolean {
+  return checkOut < today && checkOut >= addDaysStr(today, -windowDays);
 }
 /** OTA / feed placeholder names that are NOT real guest names: "Airbnb Guest",
  * "Booking.com Guest", bare "Guest", etc. iCal-sourced bookings carry these
@@ -130,6 +166,7 @@ export async function buildAgendaRollup(
     checkOuts: [],
     turnovers: [],
     pendingMessages: [],
+    recentCheckouts: [],
     empty: true,
     nullTzPropertyCount,
   });
@@ -190,7 +227,7 @@ export async function buildAgendaRollup(
   const globalMin = sortedTodays[0];
   const globalMax = sortedEnds[sortedEnds.length - 1];
 
-  const [ciRes, coRes, toRes, msgRes] = await Promise.all([
+  const [ciRes, coRes, toRes, msgRes, recentRes] = await Promise.all([
     supabase
       .from("bookings")
       .select("id, property_id, guest_first_name, guest_name, check_in, num_guests")
@@ -221,6 +258,15 @@ export async function buildAgendaRollup(
       .in("property_id", windowedIds)
       .order("created_at", { ascending: false })
       .limit(200),
+    // A3 — recently departed (post-stay messaging window). Wide lower bound here;
+    // filtered to each property's own [today-window, today) below.
+    supabase
+      .from("bookings")
+      .select("id, property_id, guest_first_name, guest_name, check_out")
+      .in("property_id", windowedIds)
+      .neq("status", "cancelled")
+      .gte("check_out", addDaysStr(globalMin, -RECENT_CHECKOUT_WINDOW_DAYS))
+      .lt("check_out", globalMax),
   ]);
 
   const inWindow = (propId: string, date: string): boolean => {
@@ -261,6 +307,21 @@ export async function buildAgendaRollup(
       bookingId: b.id,
     }));
 
+  // A3 — recently departed: per-property window (strictly before that property's
+  // today, within the post-stay window). Today's checkouts stay in checkOuts above.
+  const recentCheckouts: AgendaRecentCheckout[] = ((recentRes.data ?? []) as Array<{ id: string; property_id: string; guest_first_name: string | null; guest_name: string | null; check_out: string }>)
+    .filter((b) => {
+      const w = propWindow.get(b.property_id);
+      return !!w && isRecentCheckout(b.check_out, w.today);
+    })
+    .map((b) => ({
+      property: propName.get(b.property_id) ?? "a property",
+      guest: realFirstName(b.guest_first_name, b.guest_name),
+      date: b.check_out,
+      bookingId: b.id,
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1)); // most-recent first
+
   // Latest message per thread; flag threads whose latest is from the guest.
   const seenThread = new Set<string>();
   const pendingMessages: AgendaPendingMessage[] = [];
@@ -291,6 +352,7 @@ export async function buildAgendaRollup(
     checkOuts,
     turnovers,
     pendingMessages,
+    recentCheckouts,
     empty: isEmpty,
     nullTzPropertyCount,
   };
@@ -500,6 +562,18 @@ export function agendaPreamble(
             .join("; "),
       );
     }
+  }
+
+  // A3 — recently departed (post-stay messaging window). Shown regardless of
+  // whether the operational window is empty: a host with nothing upcoming may
+  // still want to message a guest who just left.
+  if (rollup.recentCheckouts.length > 0) {
+    lines.push(
+      `RECENTLY DEPARTED (${rollup.recentCheckouts.length}; checked out within the last ${RECENT_CHECKOUT_WINDOW_DAYS} days — the post-stay / review-request window). You CAN draft a reply or review request to these guests: call read_guest_thread, then propose_guest_reply with the booking id. The send obeys the platform's post-stay window via Channex; a guest with no existing thread fails closed (you can't cold-open a thread after checkout). ` +
+        rollup.recentCheckouts
+          .map((c) => `${c.guest ? `${c.guest} at ${c.property}` : `a departed guest at ${c.property}`}, checked out ${c.date} (internal booking id for tools: ${c.bookingId})`)
+          .join("; "),
+    );
   }
 
   if (rollup.nullTzPropertyCount > 0) {

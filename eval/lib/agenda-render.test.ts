@@ -26,6 +26,7 @@ const SPLIT: AgendaRollup = {
     { property: "Villa Jamaica", date: "2026-06-02", time: "11:30:00", cleanerAssigned: false },
   ],
   pendingMessages: [{ property: "Villa Jamaica", guest: "Jeremy", preview: "Can I check in early?", bookingId: "B3" }],
+  recentCheckouts: [],
   empty: false,
   nullTzPropertyCount: 1,
 };
@@ -37,6 +38,7 @@ const EMPTY: AgendaRollup = {
   checkOuts: [],
   turnovers: [],
   pendingMessages: [],
+  recentCheckouts: [],
   empty: true,
   nullTzPropertyCount: 0,
 };
