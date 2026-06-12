@@ -1256,6 +1256,12 @@ export function ChatClient({
                         />
                       );
                     }
+                    // P6.5: proposal_card render (the inline ProposalCard) is
+                    // wired in Phase 2; until then any non-memory_artifact block
+                    // (i.e. proposal_card) renders nothing here and the propose_*
+                    // tool line stands. This guard also makes the union
+                    // exhaustive-safe now that proposal_card exists.
+                    if (block.kind !== "memory_artifact") return null;
                     // M6 D35: live memory_artifact block from the
                     // turnReducer. Save/Discard fire POST /api/agent/artifact;
                     // the response stream's action_completed event is

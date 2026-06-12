@@ -50,6 +50,7 @@
 
 import { z } from "zod";
 import { renderPayloadSchema } from "./render/types";
+import { normalizedProposalSchema } from "@/lib/proposals/schema";
 
 // Action-kind-specific payload schemas. Reused by the AgentStreamEventSchema
 // nested discriminated union below. Memory-write payload preserves the 8
@@ -196,6 +197,15 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("render"),
     payload: renderPayloadSchema,
+  }),
+  // P6.5 — a PROPOSALS-LANE proposal (send_guest_reply, adjust_price,
+  // assign_cleaner, …) was created mid-turn. Carries the normalized proposal so
+  // the thread renders the REAL ProposalCard inline (Approve/Dismiss live, same
+  // atomic-claim path as Today). Distinct from action_proposed, which is the
+  // M6/M7 gated-ARTIFACT path; this is the P2.3 proposals lane.
+  z.object({
+    type: z.literal("proposal_created"),
+    proposal: normalizedProposalSchema,
   }),
 ]);
 

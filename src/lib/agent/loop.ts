@@ -57,6 +57,7 @@ import type { AgentStreamEvent } from "./sse";
 import type { ToolHandlerContext } from "./types";
 import { classifyError } from "./error-classifier";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAndNormalizeProposal } from "@/lib/proposals/server";
 import { isCannedAgentMode, CANNED_AGENT_TEXT } from "./e2e-canned";
 
 const MODEL_ID = "claude-sonnet-4-5-20250929";
@@ -79,6 +80,23 @@ function isProposalOutput(
     typeof (value as { artifact_id?: unknown }).artifact_id === "string" &&
     typeof (value as { audit_log_id?: unknown }).audit_log_id === "string" &&
     (value as { outcome?: unknown }).outcome === "pending"
+  );
+}
+
+/**
+ * P6.5 — type guard for a PROPOSALS-LANE tool output ({created, proposal_id}):
+ * propose_guest_reply / propose_assign_cleaner / propose_notify_cleaner /
+ * propose_pricing_rule / propose_ota. Distinct from isProposalOutput (the M6/M7
+ * gated-artifact shape). A created proposal emits `proposal_created`.
+ */
+function isProposalsLaneOutput(
+  value: unknown,
+): value is { created: true; proposal_id: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { created?: unknown }).created === true &&
+    typeof (value as { proposal_id?: unknown }).proposal_id === "string"
   );
 }
 
@@ -580,6 +598,27 @@ async function* runOneRound(
                 message_text: guestInput.message_text,
               },
             };
+          }
+        }
+
+        // P6.5 — a PROPOSALS-LANE tool created a proposals row. Fetch + normalize
+        // it and emit `proposal_created` so the thread renders the real inline
+        // ProposalCard. Best-effort: a fetch miss just omits the card (the
+        // tool-call line stands); it must never break the turn.
+        if (isProposalsLaneOutput(result.value)) {
+          try {
+            const proposal = await fetchAndNormalizeProposal(
+              createServiceClient(),
+              result.value.proposal_id,
+            );
+            if (proposal) {
+              yield { type: "proposal_created", proposal };
+            }
+          } catch (err) {
+            console.warn(
+              "[loop] proposal_created emit failed:",
+              err instanceof Error ? err.message : err,
+            );
           }
         }
       } else {

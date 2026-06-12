@@ -541,3 +541,41 @@ describe("turnReducer — action_completed (memory_write)", () => {
     expect(block.memory_fact_id).toBe("fact-x");
   });
 });
+
+describe("turnReducer — proposal_created (P6.5 inline ProposalCard)", () => {
+  const sampleProposal = {
+    id: "prop-1",
+    propertyId: "prop-uuid",
+    actionType: "send_guest_reply",
+    block: { kind: "guest_reply" as const, data: { channel: "airbnb", guestName: "Sam", propertyName: "Villa", messageText: "Hi Sam!" } },
+    rationale: "Guest asked about check-in time",
+    status: "pending" as const,
+    result: null,
+    createdAt: "2026-06-12T12:00:00Z",
+    otaTouching: false,
+    executable: true,
+  };
+
+  test("appends a proposal_card block carrying the normalized proposal", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, { type: "proposal_created", proposal: sampleProposal });
+    expect(s.content).toHaveLength(1);
+    const block = s.content[0];
+    if (block.kind !== "proposal_card") throw new Error("expected proposal_card");
+    expect(block.proposal.id).toBe("prop-1");
+    expect(block.proposal.actionType).toBe("send_guest_reply");
+  });
+
+  test("a proposal_card after prose is appended in order (card follows the text)", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, { type: "token", delta: "Here's a draft reply:" });
+    s = turnReducer(s, { type: "proposal_created", proposal: sampleProposal });
+    expect(s.content.map((b) => b.kind)).toEqual(["paragraph", "proposal_card"]);
+  });
+
+  test("status stays streaming until done (the card sits inline mid-turn)", () => {
+    let s = turnReducer(initialTurnState, { type: "turn_started", conversation_id: "c" });
+    s = turnReducer(s, { type: "proposal_created", proposal: sampleProposal });
+    expect(s.status).toBe("streaming");
+  });
+});

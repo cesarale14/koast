@@ -84,6 +84,45 @@ describe("AgentStreamEventSchema", () => {
       AgentStreamEventSchema.safeParse({ type: "token" }).success,
     ).toBe(false);
   });
+
+  // P6.5 — proposal_created (inline ProposalCard). The proposal payload is the
+  // normalized shape the card consumes; round-trips through serialize.
+  const validProposalCreated = {
+    type: "proposal_created" as const,
+    proposal: {
+      id: "prop-1",
+      propertyId: "p-uuid",
+      actionType: "send_guest_reply",
+      block: { kind: "guest_reply" as const, data: { channel: "airbnb", guestName: "Sam", propertyName: "Villa", messageText: "Hi!" } },
+      rationale: "Guest asked a question",
+      status: "pending" as const,
+      result: null,
+      createdAt: "2026-06-12T12:00:00Z",
+      otaTouching: false,
+      executable: true,
+    },
+  };
+
+  test("accepts a well-formed proposal_created event", () => {
+    expect(AgentStreamEventSchema.safeParse(validProposalCreated).success).toBe(true);
+  });
+
+  test("rejects a proposal_created missing the proposal", () => {
+    expect(AgentStreamEventSchema.safeParse({ type: "proposal_created" }).success).toBe(false);
+  });
+
+  test("rejects a proposal_created with a bad status enum", () => {
+    const bad = { ...validProposalCreated, proposal: { ...validProposalCreated.proposal, status: "bogus" } };
+    expect(AgentStreamEventSchema.safeParse(bad).success).toBe(false);
+  });
+
+  test("serializeSseEvent round-trips a proposal_created event", () => {
+    const wire = serializeSseEvent(validProposalCreated);
+    expect(wire.startsWith("data: ")).toBe(true);
+    const parsed = JSON.parse(wire.slice(6));
+    expect(parsed.type).toBe("proposal_created");
+    expect(parsed.proposal.id).toBe("prop-1");
+  });
 });
 
 describe("serializeSseEvent", () => {

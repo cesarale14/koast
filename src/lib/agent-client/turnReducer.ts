@@ -137,6 +137,12 @@ export function turnReducer(
         renderPayload: event.payload,
       };
 
+    case "proposal_created":
+      // P6.5: a proposals-lane proposal landed — append a proposal_card block so
+      // the thread renders the real ProposalCard inline. Mirrors the
+      // guest_message artifact append; the card self-manages approve/dismiss.
+      return appendProposalCard(state, event);
+
     default: {
       // TS exhaustiveness — adding any forward-looking event to
       // AgentStreamEventSchema without a matching `case` will fail compile.
@@ -384,6 +390,18 @@ function appendGuestMessageArtifactPending(
     started_at: now,
   };
   return { ...state, content: [...state.content, newBlock] };
+}
+
+function appendProposalCard(
+  state: TurnState,
+  event: Extract<AgentStreamEvent, { type: "proposal_created" }>,
+): TurnState {
+  const block: ContentBlock = {
+    kind: "proposal_card",
+    proposal: event.proposal,
+    started_at: nowFn(),
+  };
+  return { ...state, content: [...state.content, block] };
 }
 
 function mutateGuestMessageArtifactSent(

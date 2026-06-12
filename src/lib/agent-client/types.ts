@@ -22,6 +22,7 @@ import { z } from "zod";
 // Pure contract module (Zod + types only, no server deps) — safe to import
 // client-side, and the single source of truth for the render payload shape.
 import { renderPayloadSchema, type RenderPayload } from "@/lib/agent/render/types";
+import { normalizedProposalSchema, type NormalizedProposal } from "@/lib/proposals/schema";
 
 /* ============================================================
    Active SSE events (M4 + M6 + M7)
@@ -166,6 +167,13 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     type: z.literal("render"),
     payload: renderPayloadSchema,
   }),
+  // P6.5 — a proposals-lane proposal was created mid-turn (mirrors the server
+  // SSE schema). turnReducer appends a `proposal_card` block; ChatClient renders
+  // the real ProposalCard inline in place of the propose_* tool line.
+  z.object({
+    type: z.literal("proposal_created"),
+    proposal: normalizedProposalSchema,
+  }),
 ]);
 
 export type AgentStreamEvent = z.infer<typeof AgentStreamEventSchema>;
@@ -284,6 +292,20 @@ export type ContentBlock =
       /** Filled when state='failed' (commit_metadata.last_error). Try-again clears. */
       error?: { message: string };
       /** Client-side timestamp at action_proposed; for ordering. */
+      started_at: number;
+    }
+  | {
+      // P6.5: a PROPOSALS-LANE proposal (send_guest_reply, adjust_price,
+      // assign_cleaner, …) rendered inline as the real ProposalCard — in place
+      // of the raw propose_* tool line. Unlike memory/guest artifacts (whose
+      // lifecycle the reducer tracks), the card owns its own approve/dismiss +
+      // refetch-on-focus consistency (TodaySuggests pattern); the reducer just
+      // carries the proposal so the card can mount. `tool_use_id`, when known,
+      // lets ChatClient suppress the paired propose_* tool block.
+      kind: "proposal_card";
+      proposal: NormalizedProposal;
+      tool_use_id?: string;
+      /** Client-side timestamp at proposal_created; for ordering. */
       started_at: number;
     };
 

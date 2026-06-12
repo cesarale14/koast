@@ -29,6 +29,7 @@ import { ChannexSendError } from "@/lib/channex/messages";
 import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
 import { updatePricingRule, type UpdatePricingRulePatch } from "@/lib/pricing/update-rule";
 import type { ProposalCreatedBy, ProposalStatus } from "@/lib/db/schema";
+import { normalizedProposalSchema, type NormalizedProposal } from "./schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Svc = SupabaseClient<any, any, any>;
@@ -426,27 +427,10 @@ export interface ProposalRow {
   result: Record<string, unknown> | null;
 }
 
-/** Client-facing normalized proposal (camelCase; carries the display block). */
-export interface NormalizedProposal {
-  id: string;
-  propertyId: string;
-  actionType: string;
-  block: BlockData | null;
-  rationale: string | null;
-  status: ProposalStatus;
-  result: Record<string, unknown> | null;
-  createdAt: string;
-  /** True when this action writes to an OTA (block/price/min-stay). */
-  otaTouching: boolean;
-  /**
-   * Whether the host can APPROVE+execute this now (belt 1 of the OTA execution-
-   * impossibility). Computed SERVER-SIDE: non-OTA actions are always executable;
-   * OTA actions are executable only while the unified write gate is on. An
-   * unknown action_type is never executable. ProposalCard hides/disables Approve
-   * when false (Dismiss stays live).
-   */
-  executable: boolean;
-}
+// NormalizedProposal + its Zod schema live in the client-safe ./schema module
+// (imported at the top of this file) — re-exported here for the many existing
+// importers (ProposalCard, the proposals routes, TodaySuggests).
+export { normalizedProposalSchema, type NormalizedProposal };
 
 export function normalizeProposal(row: ProposalRow): NormalizedProposal {
   // Validate-on-read (mirrors the agenda render lane): a malformed block — even
@@ -473,6 +457,30 @@ export function normalizeProposal(row: ProposalRow): NormalizedProposal {
     otaTouching,
     executable,
   };
+}
+
+/** Fetch a proposal row by id (no ownership filter — callers scope as needed). */
+export async function getProposalById(svc: Svc, proposalId: string): Promise<ProposalRow | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (svc.from("proposals") as any)
+    .select("*")
+    .eq("id", proposalId)
+    .limit(1)
+    .maybeSingle();
+  return (data as ProposalRow) ?? null;
+}
+
+/**
+ * Fetch + normalize a proposal by id — the loop uses this to put a card-ready
+ * NormalizedProposal on the `proposal_created` SSE event. Returns null if the row
+ * is gone (the card simply isn't emitted; the tool-call line stands).
+ */
+export async function fetchAndNormalizeProposal(
+  svc: Svc,
+  proposalId: string,
+): Promise<NormalizedProposal | null> {
+  const row = await getProposalById(svc, proposalId);
+  return row ? normalizeProposal(row) : null;
 }
 
 // ---- Auto-approve preference --------------------------------------------
