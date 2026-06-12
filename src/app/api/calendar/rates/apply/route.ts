@@ -22,9 +22,9 @@
  *   mode=master, wipe=true  : upsert base row, DELETE overrides, push to all active channels
  *   mode=platform           : upsert override row, push to that channel only
  *
- * Push dispatch reuses the pattern from /api/pricing/apply's multi-
- * channel loop: BDC goes through buildSafeBdcRestrictions; non-BDC
- * channels push directly.
+ * Push dispatch goes through the ONE canonical writer applyOtaRestrictions
+ * (H3.3): BDC → buildSafeBdcRestrictions, non-BDC → direct. The route keeps its
+ * own calendar_rates writes + the master/platform/wipe target selection.
  */
 
 import { NextRequest, NextResponse } from "next/server";

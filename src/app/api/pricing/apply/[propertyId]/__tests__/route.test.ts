@@ -54,6 +54,11 @@ import {
   isBdcChannelCode,
   CALENDAR_PUSH_DISABLED_MESSAGE,
 } from "@/lib/channex/calendar-push-gate";
+import {
+  buildSafeBdcRestrictions,
+  priorStateFromBdcPlan,
+  toChannexRestrictionValues,
+} from "@/lib/channex/safe-restrictions";
 
 const HOST_ID = "00000000-0000-0000-0000-0000000aa001";
 const PROPERTY_ID = "11111111-1111-1111-1111-1111111aa001";
@@ -171,6 +176,17 @@ describe("POST /api/pricing/apply — M9 Phase G E2 agent_audit_log INSERT", () 
     });
     const res = await POST(req, { params: { propertyId: PROPERTY_ID } });
     expect(res.status).toBe(200);
+
+    // Characterization (locked pre-migration): the response body shape the UI +
+    // callers depend on. applied_count drives PricingTab's success copy;
+    // performance_rows_created + calendar_rates_upserted + targets are read by
+    // the apply flow. ABB pushed 1 rec on 1 date.
+    const body = await res.clone().json();
+    expect(body.applied_count).toBe(1);
+    expect(body.performance_rows_created).toBe(1);
+    expect(body.calendar_rates_upserted).toBe(1);
+    expect(body.targets).toEqual(["ABB"]);
+    expect(body.partial_failure).toBeUndefined();
 
     const auditChain = supabase.__fromMocks.get("agent_audit_log")!;
     // The insert method isn't on the default chain (it's writes-shape);
@@ -305,6 +321,52 @@ describe("POST /api/pricing/apply — M9 Phase G E2 agent_audit_log INSERT", () 
     expect(insertCall.payload.applied_count).toBe(1);
     // Successful channel only (ABB); VRBO failed.
     expect(insertCall.payload.channels_pushed).toEqual(["airbnb"]);
+  });
+
+  test("BDC path: pushes via safe-restrictions + assembles prior_state for revert (M2)", async () => {
+    // Characterization of the BDC branch + the M2-revert prior_state assembly —
+    // the part the migration to applyOtaRestrictions must preserve. The
+    // safe-restrictions module is mocked; we drive a non-empty plan + a prior
+    // state and assert the route surfaces it on the audit payload.
+    const PLAN = { entries_to_push: [{ date: "2026-06-01" }], rate_changes: [{ date: "2026-06-01", from: 180 }], min_stay_changes: [] };
+    (buildSafeBdcRestrictions as jest.Mock).mockResolvedValue(PLAN);
+    (toChannexRestrictionValues as jest.Mock).mockReturnValue([
+      { property_id: CHANNEX_PROPERTY_ID, rate_plan_id: "rate-plan-bdc-1", date_from: "2026-06-01", date_to: "2026-06-01", rate: 20000 },
+    ]);
+    (priorStateFromBdcPlan as jest.Mock).mockReturnValue([
+      { date: "2026-06-01", channel: "BDC", rate: 180, min_stay_arrival: null },
+    ]);
+
+    const channex: ChannexMock = { updateRestrictions: jest.fn().mockResolvedValue(undefined) };
+    const supabase = setupCommonMocks({
+      recs: [{ id: REC_ID_1, date: "2026-06-01", suggested_rate: 200 }],
+      channexImpl: channex,
+    });
+    // Override channels to BDC for this test.
+    mockSupabaseQuery(supabase, "property_channels", {
+      data: [{ channel_code: "BDC", channel_name: "Booking.com", settings: { rate_plan_id: "rate-plan-bdc-1" }, status: "active" }],
+      error: null,
+    });
+    augmentWritesOnChain(supabase.__fromMocks.get("calendar_rates")!);
+    augmentWritesOnChain(supabase.__fromMocks.get("pricing_performance")!);
+    augmentWritesOnChain(supabase.__fromMocks.get("pricing_recommendations")!);
+    augmentWritesOnChain(supabase.__fromMocks.get("agent_audit_log")!);
+    (createServiceClient as jest.Mock).mockReturnValue(supabase);
+
+    const req = buildRequest({ recommendation_ids: [REC_ID_1], idempotency_key: IDEMPOTENCY_KEY });
+    const res = await POST(req, { params: { propertyId: PROPERTY_ID } });
+    expect(res.status).toBe(200);
+    const body = await res.clone().json();
+    expect(body.applied_count).toBe(1);
+    expect(body.targets).toEqual(["BDC"]);
+
+    const auditChain = supabase.__fromMocks.get("agent_audit_log")!;
+    const insertCall = (auditChain as unknown as { insert: jest.Mock }).insert.mock.calls[0]?.[0];
+    expect(insertCall.payload.channels_pushed).toEqual(["booking_com"]);
+    // prior_state assembled from priorStateFromBdcPlan for the pushed date.
+    expect(insertCall.payload.prior_state).toEqual([
+      { date: "2026-06-01", channel: "BDC", rate: 180, min_stay_arrival: null },
+    ]);
   });
 });
 

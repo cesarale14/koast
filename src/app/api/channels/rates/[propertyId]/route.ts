@@ -3,12 +3,8 @@ import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-au
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
 import { CALENDAR_PUSH_DISABLED_MESSAGE, isCalendarPushEnabled, isBdcChannelCode } from "@/lib/channex/calendar-push-gate";
-import {
-  buildSafeBdcRestrictions,
-  toChannexRestrictionValues,
-  type KoastRestrictionProposal,
-  type SafeRestrictionPlan,
-} from "@/lib/channex/safe-restrictions";
+import { type KoastRestrictionProposal } from "@/lib/channex/safe-restrictions";
+import { applyOtaRestrictions } from "@/lib/channex/ota-apply";
 
 /**
  * Per-channel rate editing API for the calendar right-side panel.
@@ -80,33 +76,6 @@ const CHANNEL_NAME: Record<string, string> = {
 // Every connected channel is editable — Moora pushes rates to all of
 // them via their dedicated Channex rate plans.
 const READ_ONLY_CHANNELS = new Set<string>();
-
-// Group a sorted array of ISO dates into contiguous sub-ranges. Used
-// by the BDC bulk path so each safe-restrictions call covers one
-// continuous {date_from, date_to} span.
-function groupContiguousDates(sorted: string[]): Array<{ from: string; to: string; dates: string[] }> {
-  const groups: Array<{ from: string; to: string; dates: string[] }> = [];
-  if (sorted.length === 0) return groups;
-  let groupStart = sorted[0];
-  let groupEnd = sorted[0];
-  let acc: string[] = [sorted[0]];
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(groupEnd + "T00:00:00Z");
-    const next = new Date(sorted[i] + "T00:00:00Z");
-    const delta = (next.getTime() - prev.getTime()) / 86_400_000;
-    if (delta === 1) {
-      groupEnd = sorted[i];
-      acc.push(sorted[i]);
-    } else {
-      groups.push({ from: groupStart, to: groupEnd, dates: acc });
-      groupStart = sorted[i];
-      groupEnd = sorted[i];
-      acc = [sorted[i]];
-    }
-  }
-  groups.push({ from: groupStart, to: groupEnd, dates: acc });
-  return groups;
-}
 
 // ==========================================================================
 // GET
@@ -602,10 +571,6 @@ export async function POST(
     const effectiveDateFrom = dates[0];
     const effectiveDateTo = dates[dates.length - 1];
 
-    // Group dates into contiguous sub-ranges — defined at module scope
-    // below (groupContiguousDates) to satisfy strict-mode "no function
-    // decls in blocks."
-
     // Persist per-channel override rows in calendar_rates. Strict separation:
     // the base row (channel_code = NULL) is NOT touched — the pricing engine
     // still owns that number.
@@ -635,84 +600,37 @@ export async function POST(
       return NextResponse.json({ error: `DB save failed: ${upsertErr.message}` }, { status: 500 });
     }
 
-    // Push rate + (optional) min_stay to Channex. BDC targets route
-    // through the safe-restrictions helper (pre-flight read + host-state
-    // preservation — see docs/postmortems/INCIDENT_POSTMORTEM_BDC_CLOBBER.md).
-    // Non-BDC targets use the existing direct push. For non-contiguous
-    // multi-date bulk pushes (5b.3), BDC loops over contiguous sub-ranges.
-    const channex = createChannexClient();
-    let pushed = false;
-    let pushError: string | null = null;
-    let bdcPlan: SafeRestrictionPlan | null = null;
-    // Per-date outcome map, populated as each batch/range resolves.
+    // Push through the ONE canonical writer (H3.3). targetChannel restricts to
+    // this single channel; BDC → safe-restrictions, non-BDC → direct, all owned
+    // by applyOtaRestrictions (which resolves the channex property id + the
+    // channel's rate plan from property_channels — persisted above via discovery).
+    // NOTE: the writer targets active channels only; a pending_authorization
+    // channel's rate is still saved locally (the upsert above) but not pushed
+    // (it can't accept a push until authorized) — pushed:false, per_date failed.
+    const koastPerDate = new Map<string, KoastRestrictionProposal>();
+    for (const d of dates) {
+      const proposal: KoastRestrictionProposal = { rate };
+      if (min_stay_arrival != null) proposal.min_stay_arrival = min_stay_arrival;
+      koastPerDate.set(d, proposal);
+    }
+    const apply = await applyOtaRestrictions(supabase, {
+      propertyId,
+      perDate: koastPerDate,
+      targetChannel: channel_code,
+    });
+    const code = (channel_code ?? "").toUpperCase();
+    const pushed = apply.pushedChannels.length > 0;
+    const pushError = apply.failedChannels[0]?.error ?? apply.skipped[0]?.reason ?? apply.refusedReason ?? null;
+    const bdcPlan = apply.bdcPlans[0]?.plan ?? null;
+    // Per-date outcome from the writer's success map (granular for the bulk modal).
     const dateStatus: Record<string, "ok" | "failed"> = {};
     const dateErrors: Record<string, string> = {};
-
-    if (isBdcChannelCode(channel_code)) {
-      const groups = groupContiguousDates(dates);
-      for (const g of groups) {
-        const koastProposed = new Map<string, KoastRestrictionProposal>();
-        for (const d of g.dates) {
-          const proposal: KoastRestrictionProposal = { rate };
-          if (min_stay_arrival != null) proposal.min_stay_arrival = min_stay_arrival;
-          koastProposed.set(d, proposal);
-        }
-        try {
-          const plan = await buildSafeBdcRestrictions({
-            channex,
-            channexPropertyId,
-            bdcRatePlanId: ratePlanId,
-            dateFrom: g.from,
-            dateTo: g.to,
-            koastProposed,
-          });
-          if (!bdcPlan) bdcPlan = plan; // retain first plan for backwards-compat in response
-          const payload = toChannexRestrictionValues(plan, channexPropertyId, ratePlanId);
-          for (let i = 0; i < payload.length; i += 200) {
-            await channex.updateRestrictions(payload.slice(i, i + 200));
-          }
-          for (const d of g.dates) dateStatus[d] = "ok";
-          pushed = true;
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[channels/rates POST BDC-safe] push failed ${g.from}..${g.to}: ${msg}`);
-          pushError = pushError ?? msg;
-          for (const d of g.dates) {
-            dateStatus[d] = "failed";
-            dateErrors[d] = msg;
-          }
-        }
-      }
-    } else {
-      // Non-BDC: direct push, Channex expects cents. One Channex call per
-      // 200-date chunk (Channex's standard batch limit). Track per-date
-      // status per batch so the UI can render a granular success/failure
-      // breakdown in the bulk-edit modal.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const restrictionValues: any[] = dates.map((d) => ({
-        property_id: channexPropertyId,
-        rate_plan_id: ratePlanId,
-        date_from: d,
-        date_to: d,
-        rate: Math.round(rate * 100),
-        ...(min_stay_arrival != null ? { min_stay_arrival } : {}),
-      }));
-      for (let i = 0; i < restrictionValues.length; i += 200) {
-        const slice = restrictionValues.slice(i, i + 200);
-        const batchDates = dates.slice(i, i + 200);
-        try {
-          await channex.updateRestrictions(slice);
-          for (const d of batchDates) dateStatus[d] = "ok";
-          pushed = true;
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[channels/rates POST] Channex push failed batch ${i}: ${msg}`);
-          pushError = pushError ?? msg;
-          for (const d of batchDates) {
-            dateStatus[d] = "failed";
-            dateErrors[d] = msg;
-          }
-        }
+    for (const d of dates) {
+      if (apply.successByDate.get(d)?.has(code)) {
+        dateStatus[d] = "ok";
+      } else {
+        dateStatus[d] = "failed";
+        if (pushError) dateErrors[d] = pushError;
       }
     }
 
