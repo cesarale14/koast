@@ -1,7 +1,6 @@
 -- ╔══════════════════════════════════════════════════════════════════════════╗
--- ║  HELD — DESTRUCTIVE — DO NOT APPLY WITHOUT CESAR'S EXPLICIT CONFIRM        ║
--- ║  Filename is prefixed HELD_ and timestamped so it does NOT match the       ║
--- ║  migration runner glob until renamed (drop the HELD_ prefix on confirm).   ║
+-- ║  DESTRUCTIVE — CONFIRMED by Cesar 2026-06-12 (P6-continuation). Applied    ║
+-- ║  staging→verify→prod→verify→record per the migration discipline.          ║
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 --
 -- P6.2 — drop the vestigial pg_net turnover trigger. Verified against prod
@@ -26,10 +25,21 @@
 DROP TRIGGER IF EXISTS bookings_fire_turnover_task ON bookings;
 DROP FUNCTION IF EXISTS fire_turnover_task_create();
 
--- ── OPTIONAL (separate decision — Cesar opts in/out) ────────────────────────
--- Remove the pg_net extension entirely (supply-chain simplification). pg_net is
--- a Supabase baseline extension; nothing in Koast uses it (all HTTP is Node-side)
--- once the trigger above is gone. CASCADE drops its http_* helper functions.
--- Leave COMMENTED unless Cesar wants the extension removed too:
+-- ── pg_net EXTENSION: DELIBERATELY LEFT INSTALLED (consumer-check result) ────
+-- Cesar's confirm was conditional: drop the extension too ONLY IF a both-DB
+-- consumer scan finds zero other references to net.http_* besides the trigger
+-- above; otherwise leave it and document why. The scan (2026-06-12, staging +
+-- prod, identical results) found ONE other reference:
 --
--- DROP EXTENSION IF EXISTS pg_net CASCADE;
+--   extensions.grant_pg_net_access()  — a Supabase PLATFORM-managed event-trigger
+--   function (fires on CREATE EXTENSION pg_net to provision supabase_functions_admin
+--   and grant USAGE on the net schema). It is platform plumbing, not a Koast consumer.
+--
+-- Because pg_net is a Supabase baseline extension entangled with that managed
+-- event trigger, `DROP EXTENSION pg_net CASCADE` would drop/break Supabase's own
+-- plumbing — not safe on a managed project. The supply-chain concern was the
+-- TRIGGER invoking net.http_post (removed above); the unused extension sitting
+-- idle is harmless. Decision: KEEP pg_net. (pg_cron is not installed in either
+-- DB, so there are no scheduled net.http_* jobs either.)
+--
+-- DROP EXTENSION pg_net — intentionally NOT executed.
