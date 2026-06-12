@@ -30,18 +30,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createChannexClient } from "@/lib/channex/client";
 import { acquireLock, releaseLock } from "@/lib/concurrency/locks";
 import {
   CALENDAR_PUSH_DISABLED_MESSAGE,
-  isBdcChannelCode,
   isCalendarPushEnabled,
 } from "@/lib/channex/calendar-push-gate";
-import {
-  buildSafeBdcRestrictions,
-  toChannexRestrictionValues,
-  type KoastRestrictionProposal,
-} from "@/lib/channex/safe-restrictions";
+import { applyOtaRestrictions } from "@/lib/channex/ota-apply";
+import type { KoastRestrictionProposal } from "@/lib/channex/safe-restrictions";
 
 type Mode = "master" | "platform";
 
@@ -113,10 +108,11 @@ export async function POST(request: NextRequest) {
         .select("id, channex_property_id")
         .eq("id", property_id)
         .maybeSingle();
+      // Early "not connected" guard for a cleaner 400 than the writer's refusal;
+      // the writer (applyOtaRestrictions) re-resolves the channex property id itself.
       if (!prop?.channex_property_id) {
         return NextResponse.json({ error: "Property not connected to Channex" }, { status: 400 });
       }
-      const channexPropertyId: string = prop.channex_property_id;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: channelLinks } = await (supabase.from("property_channels") as any)
@@ -164,55 +160,17 @@ export async function POST(request: NextRequest) {
         targets = links.filter((l) => !overrideCodes.has(l.channel_code));
       }
 
-      // Push to Channex target-by-target, mirroring /api/pricing/apply.
-      const channex = createChannexClient();
-      const failedChannels: Array<{ channel_code: string; error: string }> = [];
-      const pushedChannels: string[] = [];
-
-      for (const t of targets) {
-        try {
-          if (isBdcChannelCode(t.channel_code)) {
-            const proposal: KoastRestrictionProposal = {
-              rate,
-              availability: 1,
-              stop_sell: false,
-            };
-            const koastProposed = new Map<string, KoastRestrictionProposal>([[date, proposal]]);
-            const plan = await buildSafeBdcRestrictions({
-              channex,
-              channexPropertyId,
-              bdcRatePlanId: t.rate_plan_id,
-              dateFrom: date,
-              dateTo: date,
-              koastProposed,
-            });
-            if (plan.entries_to_push.length === 0) {
-              failedChannels.push({ channel_code: t.channel_code, error: "safe_restrictions_skipped" });
-              continue;
-            }
-            const payload = toChannexRestrictionValues(plan, channexPropertyId, t.rate_plan_id);
-            await channex.updateRestrictions(payload);
-            pushedChannels.push(t.channel_code);
-          } else {
-            await channex.updateRestrictions([
-              {
-                property_id: channexPropertyId,
-                rate_plan_id: t.rate_plan_id,
-                date_from: date,
-                date_to: date,
-                rate: Math.round(rate * 100),
-                min_stay_arrival: 1,
-                stop_sell: false,
-              },
-            ]);
-            pushedChannels.push(t.channel_code);
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          failedChannels.push({ channel_code: t.channel_code, error: msg });
-          console.error(`[calendar/rates/apply ${t.channel_code}]`, msg);
-        }
-      }
+      // Push through the shared single writer (H3.3). One date, the computed
+      // target subset; BDC → safe-restrictions, non-BDC → direct, all owned by
+      // applyOtaRestrictions (which resolves the channex property id itself).
+      const proposal: KoastRestrictionProposal = { rate, availability: 1, stop_sell: false };
+      const apply = await applyOtaRestrictions(supabase, {
+        propertyId: property_id,
+        perDate: new Map([[date, proposal]]),
+        targetChannels: targets.map((t) => t.channel_code),
+      });
+      const pushedChannels = apply.pushedChannels;
+      const failedChannels = apply.failedChannels;
 
       // DB writes — only touch rows for channels that pushed successfully.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
