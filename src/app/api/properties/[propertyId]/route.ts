@@ -190,7 +190,6 @@ export async function DELETE(
       "ical_feeds",
       "guest_reviews",
       "messages",
-      "message_templates",
       "bookings",
       "listings",
       "property_details",

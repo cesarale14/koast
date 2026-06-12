@@ -6,19 +6,12 @@ import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 import {
-  DEFAULT_ONBOARDING_TEMPLATES,
-  type DefaultTemplate,
-} from "@/lib/onboarding/default-templates";
-import {
   Building2,
   Calendar,
   Wifi,
-  MessageSquare,
   Check,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
-  ChevronUp,
   Sparkles,
   Home,
   Link as LinkIcon,
@@ -48,27 +41,6 @@ const PLATFORM_COLORS: Record<string, string> = {
   airbnb: "border-airbnb bg-[#FF385C]/5 text-airbnb",
   vrbo: "border-[#3B5998] bg-[#3B5998]/5 text-[#3B5998]",
   booking_com: "border-[var(--booking-com)] bg-[#003580]/5 text-[var(--booking-com)]",
-};
-
-const TEMPLATE_LABELS: Record<string, string> = {
-  booking_confirmation: "Booking Confirmation",
-  pre_arrival: "Pre-Arrival",
-  checkin_instructions: "Check-in Instructions",
-  welcome: "Welcome Message",
-  midstay_checkin: "Mid-Stay Check-in",
-  checkout_reminder: "Checkout Reminder",
-  thank_you: "Thank You",
-  review_request: "Review Request",
-};
-
-const TRIGGER_LABELS: Record<string, string> = {
-  on_booking: "When booked",
-  before_checkin: "Before check-in",
-  on_checkin: "On check-in day",
-  after_checkin: "After check-in",
-  before_checkout: "Before checkout",
-  on_checkout: "On checkout day",
-  after_checkout: "After checkout",
 };
 
 /* ------------------------------------------------------------------ */
@@ -125,15 +97,6 @@ export default function OnboardingPage() {
   );
   const [emergencyContact, setEmergencyContact] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
-
-  // --- Templates ---
-  const [templateStates, setTemplateStates] = useState<Record<string, boolean>>(
-    () =>
-      Object.fromEntries(
-        DEFAULT_ONBOARDING_TEMPLATES.map((t) => [t.templateType, true])
-      )
-  );
-  const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
 
   /* ---------------------------------------------------------------- */
   /*  Step navigation helpers                                          */
@@ -277,45 +240,11 @@ export default function OnboardingPage() {
       );
       if (error) throw error;
       toast("Details saved!");
-      setStep(4);
-    } catch (err) {
-      console.error(err);
-      toast("Failed to save details.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveTemplates = async () => {
-    if (!propertyId) return;
-    setSaving(true);
-    try {
-      const active = DEFAULT_ONBOARDING_TEMPLATES.filter(
-        (t) => templateStates[t.templateType]
-      );
-      if (active.length > 0) {
-        const { error } = await supabase.from("message_templates").insert(
-          active.map((t) => ({
-            property_id: propertyId,
-            template_type: t.templateType,
-            subject: t.subject,
-            body: t.body,
-            is_active: true,
-            trigger_type: t.triggerType,
-            trigger_days_offset: t.triggerDaysOffset,
-            trigger_time: t.triggerTime,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          })) as any
-        );
-        if (error) throw error;
-        toast("Templates saved!");
-      } else {
-        toast("No templates activated — you can set these up later in Messages");
-      }
+      // Templates step retired (P6) — go straight to the finish step.
       setStep(5);
     } catch (err) {
       console.error(err);
-      toast("Failed to save templates.", "error");
+      toast("Failed to save details.", "error");
     } finally {
       setSaving(false);
     }
@@ -792,103 +721,6 @@ export default function OnboardingPage() {
   );
 
   /* ---------------------------------------------------------------- */
-  /*  Step 4 : Message Templates                                       */
-  /* ---------------------------------------------------------------- */
-
-  const toggleTemplate = (type: string) => {
-    setTemplateStates((prev) => ({ ...prev, [type]: !prev[type] }));
-  };
-
-  const renderTemplates = () => (
-    <div className="space-y-5">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <MessageSquare className="w-4 h-4 text-coastal" />
-          <h2 className="text-lg font-bold text-neutral-800">
-            Message Templates
-          </h2>
-        </div>
-        <p className="text-sm text-neutral-500">
-          We&apos;ve prepared 8 automated messages for the full guest journey.
-          Toggle any you don&apos;t need.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        {DEFAULT_ONBOARDING_TEMPLATES.map((t: DefaultTemplate) => {
-          const isActive = templateStates[t.templateType] ?? true;
-          const isExpanded = expandedTemplate === t.templateType;
-          const triggerLabel =
-            TRIGGER_LABELS[t.triggerType] ?? t.triggerType;
-          const offsetLabel =
-            t.triggerDaysOffset !== 0
-              ? ` (${Math.abs(t.triggerDaysOffset)}d ${
-                  t.triggerDaysOffset < 0 ? "before" : "after"
-                })`
-              : "";
-
-          return (
-            <div
-              key={t.templateType}
-              className={`border rounded-lg transition-colors ${
-                isActive
-                  ? "border-[var(--border)] bg-neutral-0"
-                  : "border-neutral-200 bg-neutral-50 opacity-60"
-              }`}
-            >
-              <div className="flex items-center justify-between px-4 py-3">
-                <button
-                  onClick={() =>
-                    setExpandedTemplate(isExpanded ? null : t.templateType)
-                  }
-                  className="flex items-center gap-2 flex-1 text-left"
-                >
-                  {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-neutral-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-neutral-400" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-neutral-800">
-                      {TEMPLATE_LABELS[t.templateType] ?? t.templateType}
-                    </p>
-                    <p className="text-xs text-neutral-400">
-                      {triggerLabel}
-                      {offsetLabel} at {t.triggerTime}
-                    </p>
-                  </div>
-                </button>
-
-                {/* Active toggle */}
-                <button
-                  onClick={() => toggleTemplate(t.templateType)}
-                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
-                    isActive ? "bg-coastal" : "bg-neutral-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
-                      isActive ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {isExpanded && (
-                <div className="px-4 pb-3 border-t border-neutral-100">
-                  <pre className="text-xs text-neutral-600 whitespace-pre-wrap mt-2 font-[var(--font-nunito),sans-serif] leading-relaxed">
-                    {t.body}
-                  </pre>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  /* ---------------------------------------------------------------- */
   /*  Step 5 : Done                                                    */
   /* ---------------------------------------------------------------- */
 
@@ -904,11 +736,6 @@ export default function OnboardingPage() {
         label: "Guest details saved",
         icon: Wifi,
         done: !!(wifiNetwork || doorCode),
-      },
-      {
-        label: "Message templates configured",
-        icon: MessageSquare,
-        done: Object.values(templateStates).some(Boolean),
       },
     ];
 
@@ -985,8 +812,6 @@ export default function OnboardingPage() {
         return renderCalendar();
       case 3:
         return renderDetails();
-      case 4:
-        return renderTemplates();
       case 5:
         return renderDone();
       default:
@@ -1027,7 +852,7 @@ export default function OnboardingPage() {
           </button>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setStep(4)}
+              onClick={() => setStep(5)}
               className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
             >
               Skip
@@ -1041,29 +866,6 @@ export default function OnboardingPage() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-        </div>
-      );
-    }
-
-    // Step 4 (templates) has custom save handler
-    if (step === 4) {
-      return (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-100">
-          <button
-            onClick={goBack}
-            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-800 transition-colors inline-flex items-center gap-1"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back
-          </button>
-          <button
-            onClick={handleSaveTemplates}
-            disabled={saving}
-            className="px-6 py-2.5 bg-coastal text-white text-sm font-semibold rounded-lg hover:bg-deep-sea disabled:opacity-50 transition-colors inline-flex items-center gap-2"
-          >
-            {saving ? "Saving..." : "Save Templates & Finish"}
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       );
     }

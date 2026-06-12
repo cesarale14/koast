@@ -6,14 +6,13 @@
 // the same /api/messages/threads payload, just without the HTTP round
 // trip.
 //
-// Slice 1: read-only. Composer disabled in UnifiedInbox; templates tab
-// preserved.
+// Slice 1: read-only. Composer disabled in UnifiedInbox. (The Templates
+// tab was retired with the message_templates feature in P6 — AI messaging
+// is the successor; this page is now the inbox only.)
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import UnifiedInbox, { type ThreadRow } from "@/components/dashboard/UnifiedInbox";
-import TemplateManager from "@/components/dashboard/TemplateManager";
-import MessagesPageTabs from "@/components/dashboard/MessagesPageTabs";
 import EmptyState from "@/components/ui/EmptyState";
 import { MessageCircle } from "lucide-react";
 
@@ -66,19 +65,6 @@ export default async function MessagesPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bookingsById = new Map(((bookingsRes.data ?? []) as any[]).map((b) => [b.id, b]));
   }
-
-  // Templates tab data (unchanged from prior shape)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const templatesRes: any = propertyIds.length > 0
-    ? await svc
-        .from("message_templates")
-        .select(
-          "id, property_id, template_type, subject, body, is_active, trigger_type, trigger_days_offset, trigger_time"
-        )
-        .in("property_id", propertyIds)
-    : { data: [] };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const templates = (templatesRes.data ?? []) as any[];
 
   if (properties.length === 0) {
     return (
@@ -133,10 +119,5 @@ export default async function MessagesPage() {
     };
   });
 
-  return (
-    <MessagesPageTabs
-      inboxContent={<UnifiedInbox threads={threads} properties={properties} />}
-      templatesContent={<TemplateManager templates={templates} properties={properties} />}
-    />
-  );
+  return <UnifiedInbox threads={threads} properties={properties} />;
 }

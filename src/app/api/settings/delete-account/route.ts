@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
         "ical_feeds",
         "guest_reviews",
         "messages",
-        "message_templates",
         "bookings",
         "listings",
         "property_details",

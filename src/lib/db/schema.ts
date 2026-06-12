@@ -328,23 +328,9 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   thread: one(messageThreads, { fields: [messages.threadId], references: [messageThreads.id] }),
 }));
 
-// ==================== Message Automation Firings (Session 8a) ====================
-
-// Idempotency table for the messaging template executor. Worker
-// INSERT ON CONFLICT DO NOTHING RETURNING id; draft message is
-// created only when the insert succeeded. Discarding a draft does
-// NOT remove the firings row — re-fire is gated here, not by the
-// draft's eventual status.
-export const messageAutomationFirings = pgTable("message_automation_firings", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  templateId: uuid("template_id").notNull().references(() => messageTemplates.id, { onDelete: "cascade" }),
-  bookingId: uuid("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
-  draftMessageId: uuid("draft_message_id").references(() => messages.id, { onDelete: "set null" }),
-  firedAt: timestamp("fired_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  uniqueIndex("idx_message_automation_firings_unique").on(t.templateId, t.bookingId),
-  index("idx_message_automation_firings_template").on(t.templateId),
-]);
+// ==================== Message Automation Firings — REMOVED (P6) ====================
+// Retired with the message_templates feature; table dropped (20260507020000).
+// AI messaging (the draft pipeline) is the successor — no template-automation layer.
 
 // ==================== Cleaning Tasks ====================
 
@@ -674,24 +660,9 @@ export const propertyDetailsRelations = relations(propertyDetails, ({ one }) => 
   property: one(properties, { fields: [propertyDetails.propertyId], references: [properties.id] }),
 }));
 
-// ==================== Message Templates ====================
-
-export const messageTemplates = pgTable("message_templates", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  propertyId: uuid("property_id").references(() => properties.id).notNull(),
-  templateType: text("template_type").notNull(),
-  subject: text("subject"),
-  body: text("body").notNull(),
-  isActive: boolean("is_active").default(true),
-  triggerType: text("trigger_type").notNull(),
-  triggerDaysOffset: integer("trigger_days_offset").default(0),
-  triggerTime: time("trigger_time"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
-
-export const messageTemplatesRelations = relations(messageTemplates, ({ one }) => ({
-  property: one(properties, { fields: [messageTemplates.propertyId], references: [properties.id] }),
-}));
+// ==================== Message Templates — REMOVED (P6) ====================
+// Feature retired; tables message_templates + message_automation_firings were
+// dropped (20260507020000). AI messaging (the draft pipeline) is the successor.
 
 // ==================== User Preferences (REMOVED) ====================
 // The `user_preferences` table was deliberately dropped (migration

@@ -1,9 +1,9 @@
 // Session 8a — POST /api/messages/threads/[id]/discard
 //
 // Discard a pending automation draft. Sets the message's
-// draft_status to 'discarded'. The firings row in
-// message_automation_firings remains intact — re-fire is gated
-// by firings, not by draft state, per D4.
+// draft_status to 'discarded'. (The legacy template-automation
+// firings table was retired with the message_templates feature in
+// P6; discard now only flips draft_status.)
 //
 // Body: { messageId: string }
 // Returns: { ok: true } on success.
