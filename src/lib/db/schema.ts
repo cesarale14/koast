@@ -1325,3 +1325,23 @@ export type HostSurfaceTelemetryTaskClass =
 export type HostSurfaceTelemetryEntryTrigger =
   | "agent_offered_navchip"
   | "self_navigated";
+
+/**
+ * Controlled vocabulary for `user_subscriptions.status` (P5 Stripe billing).
+ * Mirrors the DB CHECK constraint (migration 20260612010000_billing_stripe) +
+ * Stripe's subscription.status values; null when the host has never subscribed.
+ * The CHECK-constrained-column convention: this union is the application-layer
+ * mirror of the database-layer enforcement.
+ */
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+  | "unpaid"
+  | "paused";
+
+/** Resolved feature plan (not stored — derived from tier/comped/status). */
+export type BillingPlan = "free" | "pro";

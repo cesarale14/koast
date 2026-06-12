@@ -1,0 +1,75 @@
+/**
+ * POST /api/billing/checkout (P5) — create a Stripe Checkout Session for Koast Pro.
+ *
+ * Inert-safe: 503 when billing isn't configured (no Stripe env). A comped host
+ * (owner / dogfood) gets 409 — they already have Pro, no checkout. Resolves or
+ * creates the host's Stripe customer (persisting stripe_customer_id), then opens
+ * a subscription Checkout Session with a 14-day trial.
+ *
+ * TEST MODE ONLY — no real charge happens with sk_test_ keys; the real checkout
+ * round-trip is A5.
+ */
+
+import { NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/auth/api-auth";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getStripe, getProPriceId, isBillingEnabled, TRIAL_PERIOD_DAYS } from "@/lib/billing/stripe";
+import { resolveAccess } from "@/lib/billing/plan";
+
+export async function POST() {
+  try {
+    const stripe = getStripe();
+    const priceId = getProPriceId();
+    if (!isBillingEnabled() || !stripe || !priceId) {
+      return NextResponse.json({ error: "Billing is not configured." }, { status: 503 });
+    }
+
+    const { user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const supabase = createServiceClient();
+
+    // Comped hosts already have Pro — no checkout.
+    const access = await resolveAccess(supabase, user.id);
+    if (access.comped) {
+      return NextResponse.json({ error: "Your account already has Pro access." }, { status: 409 });
+    }
+
+    // Resolve or create the Stripe customer, persisting the id.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: subRow } = await (supabase.from("user_subscriptions") as any)
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    let customerId: string | null = subRow?.stripe_customer_id ?? null;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email ?? undefined,
+        metadata: { koast_user_id: user.id },
+      });
+      customerId = customer.id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from("user_subscriptions") as any).upsert(
+        { user_id: user.id, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" },
+      );
+    }
+
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.koasthq.com";
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: { trial_period_days: TRIAL_PERIOD_DAYS },
+      success_url: `${base}/settings?billing=success`,
+      cancel_url: `${base}/settings?billing=cancelled`,
+      allow_promotion_codes: true,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[billing/checkout]", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

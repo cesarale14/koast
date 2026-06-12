@@ -40,6 +40,7 @@ import {
   type SafeRestrictionPlan,
   type CapturedPriorState,
 } from "./safe-restrictions";
+import { hasProAccess } from "@/lib/billing/gate";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Svc = SupabaseClient<any, any, any>;
@@ -130,13 +131,20 @@ export async function applyOtaRestrictions(
 
   if (opts.perDate.size === 0) return emptyResult("no_dates");
 
-  // Resolve the Channex property id.
+  // Resolve the Channex property id + owner (for the plan gate).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: prop } = await (svc.from("properties") as any)
-    .select("id, channex_property_id")
+    .select("id, channex_property_id, user_id")
     .eq("id", opts.propertyId)
     .maybeSingle();
   if (!prop?.channex_property_id) return emptyResult("property_not_connected");
+
+  // P5 plan gate — an OTA (Channex) write requires Pro. This is the single seam
+  // covering the WHOLE unified write path (the 3 apply routes + the proposals
+  // lane). INERT when billing is off (hasProAccess → true); comped hosts pass.
+  if (prop.user_id && !(await hasProAccess(svc, prop.user_id))) {
+    return emptyResult("plan_gate_pro_required");
+  }
   const channexPropertyId: string = prop.channex_property_id;
 
   // Resolve active channels with a configured rate plan.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/api-auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { requireProAccess, PlanGateError } from "@/lib/billing/gate";
 import { createChannexClient } from "@/lib/channex/client";
 import { acquireLock, releaseLock as releaseLockHelper } from "@/lib/concurrency/locks";
 
@@ -41,6 +42,16 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient();
+
+    // P5 plan gate — connecting a channel calls Channex → Pro-only. INERT when
+    // billing is off; comped hosts pass. 402 when a free host tries while on.
+    try {
+      await requireProAccess(supabase, user.id);
+    } catch (e) {
+      if (e instanceof PlanGateError) return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+      throw e;
+    }
+
     const channex = createChannexClient();
 
     // 1. Verify property ownership

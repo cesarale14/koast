@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
+import { requireProAccess, PlanGateError } from "@/lib/billing/gate";
 import { sendMessage as channexSendMessage, ChannexSendError } from "@/lib/channex/messages";
 import { createHash } from "crypto";
 
@@ -70,6 +71,15 @@ export async function POST(
 
     const owned = await verifyPropertyOwnership(user.id, thread.property_id);
     if (!owned) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // P5 plan gate — sending a guest message goes through the Channex inbox → Pro-only.
+    // INERT when billing is off; comped hosts pass. 402 for a free host while on.
+    try {
+      await requireProAccess(supabase, user.id);
+    } catch (e) {
+      if (e instanceof PlanGateError) return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+      throw e;
+    }
 
     // In-flight dedup
     clearExpired();

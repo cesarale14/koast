@@ -261,6 +261,64 @@ describe("H3.3 — capturePriorState (non-BDC pre-flight)", () => {
   });
 });
 
+describe("P5 plan gate — Channex write requires Pro (the unified seam)", () => {
+  const STRIPE = "STRIPE_SECRET_KEY";
+  const prevStripe = process.env[STRIPE];
+  afterEach(() => {
+    if (prevStripe === undefined) delete process.env[STRIPE];
+    else process.env[STRIPE] = prevStripe;
+  });
+
+  // svc that resolves the property WITH an owner + a user_subscriptions row.
+  function gateSvc(sub: Record<string, unknown> | null) {
+    const propRow = { id: "p1", channex_property_id: CPX, user_id: "owner-1" };
+    const props = { select: () => props, eq: () => props, maybeSingle: async () => ({ data: propRow }) };
+    const subs = { select: () => subs, eq: () => subs, maybeSingle: async () => ({ data: sub }) };
+    const chans = {
+      select: () => chans, eq: () => chans,
+      then: (r: (v: { data: unknown }) => unknown) => r({ data: [{ channel_code: "BDC", settings: { rate_plan_id: RATE_PLAN_BDC }, status: "active" }] }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { from: (t: string) => (t === "properties" ? props : t === "user_subscriptions" ? subs : t === "property_channels" ? chans : {}) } as any;
+  }
+
+  test("billing ON + free host → refuses plan_gate_pro_required, no channex call", async () => {
+    process.env[STRIPE] = "sk_test_x";
+    const channex = mockChannex({ bdcState: { "2026-07-01": { availability: 1 } } });
+    const r = await applyOtaRestrictions(gateSvc(null), {
+      propertyId: "p1",
+      perDate: perDate({ "2026-07-01": { rate: 210, availability: 1, stop_sell: false } }),
+      channex,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.refusedReason).toBe("plan_gate_pro_required");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((channex as any).updateRestrictions).not.toHaveBeenCalled();
+  });
+
+  test("billing ON + comped host → passes the gate", async () => {
+    process.env[STRIPE] = "sk_test_x";
+    const channex = mockChannex({ bdcState: { "2026-07-01": { rate: "200.00", availability: 1, stop_sell: false } } });
+    const r = await applyOtaRestrictions(gateSvc({ comped: true, status: null }), {
+      propertyId: "p1",
+      perDate: perDate({ "2026-07-01": { rate: 210, availability: 1, stop_sell: false } }),
+      channex,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  test("billing OFF → gate inert (free host still pushes)", async () => {
+    delete process.env[STRIPE];
+    const channex = mockChannex({ bdcState: { "2026-07-01": { rate: "200.00", availability: 1, stop_sell: false } } });
+    const r = await applyOtaRestrictions(gateSvc(null), {
+      propertyId: "p1",
+      perDate: perDate({ "2026-07-01": { rate: 210, availability: 1, stop_sell: false } }),
+      channex,
+    });
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("resolution refusals", () => {
   test("property not connected → property_not_connected", async () => {
     const r = await applyOtaRestrictions(mockSvc({ channexPropertyId: null }), {
