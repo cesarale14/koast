@@ -106,3 +106,23 @@ export function curateToday(payload: AgendaRenderPayload): CuratedToday {
     empty: today.length === 0 && upcoming.length === 0 && payload.gaps.length === 0,
   };
 }
+
+/**
+ * A2 (5b) — partition the read-only "Needs you" gaps into what's IMMINENT (today
+ * through +windowDays) vs. what's further out. Cold-open focus stays on the next
+ * couple of days; dated gaps beyond the window fold into a "+N upcoming" link.
+ * Undated gaps (no date on the gap) are always imminent — they're not time-bound.
+ * Pure so it's unit-tested; the surface only renders the result.
+ */
+export function partitionImminentGaps(
+  gaps: AgendaGap[],
+  today: string,
+  windowDays = 2,
+): { imminent: AgendaGap[]; upcomingCount: number } {
+  const cutoff = new Date(`${today}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() + windowDays);
+  const imminent = gaps.filter(
+    (g) => !g.date || new Date(`${g.date}T00:00:00Z`).getTime() <= cutoff.getTime(),
+  );
+  return { imminent, upcomingCount: gaps.length - imminent.length };
+}

@@ -21,7 +21,7 @@
 import type { AgendaRenderPayload, AgendaGap } from "@/lib/agent/render/types";
 import type { GreetingFacts, GapCategory } from "@/lib/today/deriveGreeting";
 import type { Places } from "@/lib/today/places";
-import { curateToday, type CuratedProperty, type MovementLine } from "@/lib/today/curate";
+import { curateToday, partitionImminentGaps, type CuratedProperty, type MovementLine } from "@/lib/today/curate";
 
 export type TodayHomeProps = {
   payload: AgendaRenderPayload;
@@ -158,6 +158,15 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: Today
   // handled there — keep only the non-actionable gaps in the read-only list.
   const gaps = actionSlot ? c.gaps.filter((g) => g.kind !== "no_cleaner") : c.gaps;
 
+  // A2 (5b): keep "Needs you" to what's imminent — today through +48h. Dated gaps
+  // beyond that window fold into a "+N upcoming" link. Partition logic is a pure,
+  // unit-tested helper in the curate layer (presentation only lives here).
+  const { imminent: visibleGaps, upcomingCount: upcomingGapCount } = partitionImminentGaps(
+    gaps,
+    payload.today,
+    2,
+  );
+
   return (
     // Transparent (fix 1): the chat shell paints --shore; this surface inherits it.
     <div data-testid="today-home" style={{ height: "100%", overflowY: "auto", background: "transparent" }}>
@@ -180,11 +189,11 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: Today
           </p>
         ) : (
           <>
-            {gaps.length > 0 && (
+            {(visibleGaps.length > 0 || upcomingGapCount > 0) && (
               <section style={{ marginTop: 44 }}>
                 <Eyebrow>Needs you</Eyebrow>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {gaps.map((gap, i) => (
+                  {visibleGaps.map((gap, i) => (
                     <li
                       key={i}
                       data-testid="today-gap"
@@ -195,6 +204,15 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: Today
                     </li>
                   ))}
                 </ul>
+                {upcomingGapCount > 0 && (
+                  <a
+                    href="/turnovers"
+                    data-testid="today-gap-upcoming"
+                    style={{ display: "inline-block", marginTop: 12, fontSize: 14, fontWeight: 600, color: "var(--koast-trench)" }}
+                  >
+                    +{upcomingGapCount} upcoming →
+                  </a>
+                )}
               </section>
             )}
 

@@ -3,8 +3,9 @@
  * (same-type grouping; gap/movement separation), never a rendered string. The
  * component owns the prose; the curation is what has to be correct.
  */
-import { curateToday } from "@/lib/today/curate";
-import type { AgendaRenderPayload } from "@/lib/agent/render/types";
+import { curateToday, partitionImminentGaps } from "@/lib/today/curate";
+import { deriveGreeting } from "@/lib/today/deriveGreeting";
+import type { AgendaRenderPayload, AgendaGap } from "@/lib/agent/render/types";
 
 const payload = (over: Partial<AgendaRenderPayload>): AgendaRenderPayload => ({
   v: 1,
@@ -137,5 +138,59 @@ describe("curateToday — separate gaps from movements", () => {
 
   it("fully empty payload → empty:true with empty sections", () => {
     expect(curateToday(payload({}))).toMatchObject({ today: [], upcoming: [], gaps: [], empty: true });
+  });
+});
+
+// A2 (5b) — the "Needs you" imminence window (today + 48h).
+describe("partitionImminentGaps", () => {
+  const TODAY = "2026-06-03";
+  const gap = (over: Partial<AgendaGap>): AgendaGap => ({ kind: "no_cleaner", property: "Villa", ...over });
+
+  it("a dated gap inside the window is imminent", () => {
+    const r = partitionImminentGaps([gap({ date: "2026-06-04" })], TODAY, 2);
+    expect(r.imminent).toHaveLength(1);
+    expect(r.upcomingCount).toBe(0);
+  });
+
+  it("a dated gap beyond the window folds into upcomingCount", () => {
+    const r = partitionImminentGaps([gap({ date: "2026-06-10" })], TODAY, 2);
+    expect(r.imminent).toHaveLength(0);
+    expect(r.upcomingCount).toBe(1);
+  });
+
+  it("the window edge (today + windowDays) is inclusive", () => {
+    const r = partitionImminentGaps([gap({ date: "2026-06-05" })], TODAY, 2);
+    expect(r.imminent).toHaveLength(1);
+  });
+
+  it("undated gaps are always imminent (not time-bound)", () => {
+    const r = partitionImminentGaps([gap({}), gap({ kind: "awaiting_reply", guest: "Sam" })], TODAY, 2);
+    expect(r.imminent).toHaveLength(2);
+    expect(r.upcomingCount).toBe(0);
+  });
+
+  it("never loses or dupes a gap: imminent + upcomingCount === total", () => {
+    const gaps = [gap({ date: "2026-06-03" }), gap({ date: "2026-06-09" }), gap({}), gap({ date: "2026-06-20" })];
+    const r = partitionImminentGaps(gaps, TODAY, 2);
+    expect(r.imminent.length + r.upcomingCount).toBe(gaps.length);
+  });
+});
+
+// A2 (5a) — pin the headline-count ↔ rendered-gaps consistency: the greeting's
+// turnover count and the rendered no_cleaner rows BOTH derive from payload.gaps,
+// so they can never diverge. This locks that invariant.
+describe("greeting turnover count == rendered no_cleaner gaps (A2 5a)", () => {
+  it("the deriveGreeting turnovers count equals the no_cleaner gap rows", () => {
+    const gaps: AgendaGap[] = [
+      { kind: "no_cleaner", property: "Villa" },
+      { kind: "no_cleaner", property: "Loft" },
+      { kind: "awaiting_reply", property: "Villa", guest: "Sam" },
+    ];
+    const p = payload({ gaps });
+    const greeting = deriveGreeting(p, "Cesar", 9);
+    const turnovers = greeting.gaps.find((g) => g.category === "turnovers");
+    const rendered = curateToday(p).gaps.filter((g) => g.kind === "no_cleaner");
+    expect(turnovers?.count).toBe(rendered.length);
+    expect(turnovers?.count).toBe(2);
   });
 });
