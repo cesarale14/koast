@@ -184,6 +184,83 @@ describe("non-BDC", () => {
   });
 });
 
+describe("H3.3 — targetChannels subset", () => {
+  const multiChannels = [
+    { channel_code: "ABB", settings: { rate_plan_id: RATE_PLAN_ABB }, status: "active" },
+    { channel_code: "DIRECT", settings: { rate_plan_id: "rp-direct" }, status: "active" },
+  ];
+
+  test("targetChannels restricts the push to the named subset", async () => {
+    const channex = mockChannex({});
+    const r = await applyOtaRestrictions(mockSvc({ channels: multiChannels }), {
+      propertyId: "p1",
+      perDate: perDate({ "2026-07-01": { rate: 180 } }),
+      targetChannels: ["ABB"],
+      channex,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.pushedChannels).toEqual(["ABB"]);
+    expect(r.targets.map((t) => t.channel_code)).toEqual(["ABB"]);
+  });
+
+  test("no targetChannels = all active channels", async () => {
+    const channex = mockChannex({});
+    const r = await applyOtaRestrictions(mockSvc({ channels: multiChannels }), {
+      propertyId: "p1",
+      perDate: perDate({ "2026-07-01": { rate: 180 } }),
+      channex,
+    });
+    expect(new Set(r.pushedChannels)).toEqual(new Set(["ABB", "DIRECT"]));
+  });
+});
+
+describe("H3.3 — per-batch partial failure", () => {
+  test("a failing non-BDC push records failedChannels + failedByDate, ok=false", async () => {
+    const channex = mockChannex({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (channex as any).updateRestrictions = jest.fn(async () => {
+      throw new Error("channex 422");
+    });
+    const r = await applyOtaRestrictions(
+      mockSvc({ channels: [{ channel_code: "ABB", settings: { rate_plan_id: RATE_PLAN_ABB }, status: "active" }] }),
+      { propertyId: "p1", perDate: perDate({ "2026-07-01": { rate: 180 } }), channex },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.failedChannels).toEqual([{ channel_code: "ABB", error: "channex 422" }]);
+    expect(r.failedByDate.get("2026-07-01")?.has("ABB")).toBe(true);
+    expect(r.pushedChannels).toEqual([]);
+  });
+});
+
+describe("H3.3 — capturePriorState (non-BDC pre-flight)", () => {
+  test("captures pre-push rate/min-stay per date for revert", async () => {
+    const channex = mockChannex({});
+    // getRestrictionsBucketed returns the ABB plan's current state for the pre-flight.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (channex as any).getRestrictionsBucketed = jest.fn(async () => ({
+      [RATE_PLAN_ABB]: { "2026-07-01": { rate: "150.00", min_stay_arrival: 2 } },
+    }));
+    const r = await applyOtaRestrictions(
+      mockSvc({ channels: [{ channel_code: "ABB", settings: { rate_plan_id: RATE_PLAN_ABB }, status: "active" }] }),
+      { propertyId: "p1", perDate: perDate({ "2026-07-01": { rate: 180 } }), capturePriorState: true, channex },
+    );
+    expect(r.ok).toBe(true);
+    const prior = r.priorStateByChannel.get("ABB")?.get("2026-07-01");
+    expect(prior).toMatchObject({ channel: "ABB", rate: 150, min_stay_arrival: 2 });
+  });
+
+  test("capturePriorState defaults off — no extra read, empty map", async () => {
+    const channex = mockChannex({});
+    const r = await applyOtaRestrictions(
+      mockSvc({ channels: [{ channel_code: "ABB", settings: { rate_plan_id: RATE_PLAN_ABB }, status: "active" }] }),
+      { propertyId: "p1", perDate: perDate({ "2026-07-01": { rate: 180 } }), channex },
+    );
+    expect(r.priorStateByChannel.size).toBe(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((channex as any).getRestrictionsBucketed).not.toHaveBeenCalled();
+  });
+});
+
 describe("resolution refusals", () => {
   test("property not connected → property_not_connected", async () => {
     const r = await applyOtaRestrictions(mockSvc({ channexPropertyId: null }), {

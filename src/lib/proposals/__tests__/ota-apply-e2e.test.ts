@@ -36,7 +36,10 @@ const RATE_PLAN_BDC = "rp-bdc";
 type BdcDateState = { rate?: string; availability?: number; stop_sell?: boolean; min_stay_arrival?: number };
 
 function mockChannex(bdcState: Record<string, BdcDateState>) {
-  const updateRestrictions = jest.fn(async () => ({ data: {} }));
+  const updateRestrictions = jest.fn((batch: Array<Record<string, unknown>>) => {
+    void batch;
+    return Promise.resolve({ data: {} });
+  });
   const getRestrictionsBucketed = jest.fn(async () => ({ [RATE_PLAN_BDC]: bdcState }));
   return { updateRestrictions, getRestrictionsBucketed };
 }
@@ -91,6 +94,7 @@ describe("P4.3 — 3-belt impossibility intact WHILE OFF (end-to-end)", () => {
     const r = await executeProposal(mockSvc(), { proposal: adjustPriceProposal(210), hostId: HOST });
 
     expect(r.ok).toBe(false);
+    if (r.ok) throw new Error("expected refusal");
     expect(r.error).toMatch(/disabled/i);
     // belt 2 short-circuits BEFORE the writer — createChannexClient never even
     // runs, AND no execution is attempted so no audit row is written (a refused

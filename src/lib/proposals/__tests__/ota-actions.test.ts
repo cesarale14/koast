@@ -50,6 +50,10 @@ beforeEach(() => {
     failedChannels: [],
     skipped: [],
     successByDate: new Map(),
+    failedByDate: new Map(),
+    targets: [{ channel_code: "BDC", rate_plan_id: "rp" }],
+    bdcPlans: [],
+    priorStateByChannel: new Map(),
   });
   process.env.KOAST_ALLOW_BDC_CALENDAR_PUSH = "true";
 });
@@ -123,6 +127,10 @@ describe("OTA op → per-date restriction wiring (gate on)", () => {
       failedChannels: [],
       skipped: [{ channel_code: "ABB", reason: "non_bdc_availability_unwrapped" }],
       successByDate: new Map(),
+      failedByDate: new Map(),
+      targets: [{ channel_code: "ABB", rate_plan_id: "rp" }],
+      bdcPlans: [],
+      priorStateByChannel: new Map(),
       refusedReason: undefined,
     });
     const r = await executeProposal(svc, {
