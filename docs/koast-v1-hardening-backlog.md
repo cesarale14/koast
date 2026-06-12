@@ -119,10 +119,15 @@ flag, ships dark).
 - **Fix (before the flag flips, if non-BDC block is wanted):** add a read-first room-type availability wrapper that resolves `room_type_id` (from `channex_room_types`) and ONLY ever writes availability=0 (a monotonic CLOSE structurally cannot re-open a host-closed date — the clobber vector was re-opening). Then route non-BDC blocks through it instead of refusing.
 - **Files:** `src/lib/channex/ota-apply.ts` (the `non_bdc_availability_unwrapped` branch), `src/lib/channex/client.ts` (`updateAvailability`).
 
-### H3.3 — three apply routes still carry an inline per-channel dispatch loop
+### H3.3 — three apply routes still carry an inline per-channel dispatch loop — PARTIALLY DONE (P4.3)
 - **Source:** P3.2 OTA trio (2026-06-11). `applyOtaRestrictions` is the extracted shared writer the agent's OTA actions use (no side-door). `/api/pricing/apply`, `/api/calendar/rates/apply`, and `/api/channels/rates` still have their OWN inline BDC→safe-restrictions / non-BDC→direct loop (they predate the extraction and have no test net). They already route BDC through `buildSafeBdcRestrictions`, so this is a DRY/maintainability cleanup, not a safety gap.
-- **Fix:** migrate the three routes' push loops to `applyOtaRestrictions` (keeping their route-specific DB writes: calendar_rates upsert, pricing_performance, audit). Add route tests first (none exist today) so the refactor has a safety net.
-- **Files:** the three routes above; `src/lib/channex/ota-apply.ts`.
+- **P4.3 progress (2026-06-12):**
+  - ✅ `applyOtaRestrictions` extended into the CANONICAL push mechanic: `targetChannels` (channel subset), `capturePriorState` (non-BDC pre-flight for M2 revert), richer result (`targets`, `bdcPlans`, `priorStateByChannel`, `failedByDate`), and per-batch try/catch (partial-failure granularity). Additive — existing OTA-action callers unaffected. Writer tests cover all new features.
+  - ✅ `/api/calendar/rates/apply` MIGRATED to the shared writer (characterization test written first, behavior-preserving). Uses `targetChannels` for the master-no-wipe subset.
+- **REMAINING (turnkey — the writer already supports both):**
+  - `/api/pricing/apply` → call `applyOtaRestrictions({ capturePriorState: true })`; assemble `prior_state` from `result.bdcPlans` (via `priorStateFromBdcPlan`) + `result.priorStateByChannel`; build `pricing_performance` + `calendar_rates` from `result.successByDate` + `result.targets`; preserve the response (`failed_batches` is consumed by `PricingTab.tsx` for the partial-failure count — keep it a non-empty array on failure). Its existing 313-line route test mocks `buildSafeBdcRestrictions` (which the writer still calls) so it should stay green with minimal updates. **Watch:** non-BDC `failedByDate` granularity vs the old per-batch `failed_batches` shape.
+  - `/api/channels/rates` POST → single channel: pass `targetChannel: channel_code`; the route keeps its rate-plan auto-discovery + the `calendar_rates` override upsert; build `per_date` + `push_error` + `bdc_plan` from the writer result (`per_date` is consumed by `CalendarSidebar.tsx`, `push_error` by `PerChannelRateEditor.tsx`). **Watch:** the route currently pushes to `pending_authorization` channels too (the writer filters `status='active'`) and groups contiguous BDC date-ranges (the writer uses one min..max span — equivalent for correctness, reads a wider range). Write a characterization test first.
+- **Files:** the two remaining routes above; `src/lib/channex/ota-apply.ts` (done).
 
 ---
 
