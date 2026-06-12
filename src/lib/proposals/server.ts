@@ -286,19 +286,14 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
         if (err instanceof ColdSendUnsupportedError) {
           return { ok: false, error: err.message };
         }
-        // A ChannexSendError from a NON-2xx response is a TRUE OTA rejection
-        // (channexPost's !res.ok branch) → nothing was sent → re-approvable.
-        // But a 2xx ChannexSendError is the "200 with no data" AMBIGUOUS case
-        // (Channex accepted the request; the message MAY have been created but
-        // the body was empty/unparseable). Treat that like a post-send failure:
-        // fall through to RE-THROW so the proposal stays 'approved' and never
-        // re-sends. (Closes the named weakest link in the at-most-once model —
-        // see the H-item in koast-v1-hardening-backlog.md for the system-wide
-        // AmbiguousSendError follow-up across the manual + M7 send routes.)
-        if (err instanceof ChannexSendError && !(err.status >= 200 && err.status < 300)) {
+        // ChannexSendError is now (H7.1) ALWAYS a true non-2xx OTA rejection
+        // (channexPost's !res.ok branch) → nothing was sent → re-approvable. The
+        // former "2xx with no data" ambiguous case is its own AmbiguousSendError
+        // (not a ChannexSendError), so it falls through to the RE-THROW below.
+        if (err instanceof ChannexSendError) {
           return { ok: false, error: err.message };
         }
-        // Ambiguous 2xx ChannexSendError, a post-Channex-200 local-DB hiccup, or
+        // AmbiguousSendError (2xx-no-data), a post-Channex-200 local-DB hiccup, or
         // any unknown error: the message may be on the OTA. Re-throw to keep the
         // proposal 'approved' (un-reclaimable by the atomic claim) so it can
         // never re-send. The webhook reconciles the local messages row.

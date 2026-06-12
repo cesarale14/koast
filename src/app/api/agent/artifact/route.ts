@@ -50,7 +50,7 @@ import { updateAuditOutcome } from "@/lib/action-substrate/audit-writer";
 import { recordHostActionPattern } from "@/lib/action-substrate/host-action-patterns";
 import type { HostActionPatternOutcome } from "@/lib/db/schema";
 import { makeSseResponse, serializeSseEvent } from "@/lib/agent/sse";
-import { ChannexSendError } from "@/lib/channex/messages";
+import { ChannexSendError, AmbiguousSendError } from "@/lib/channex/messages";
 import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
 
 // Side-effect import: registers tools and stakes entries (M6 D24
@@ -462,6 +462,26 @@ export async function POST(request: NextRequest) {
             // Other errors (ownership, booking missing, db upsert hiccup
             // post-Channex-200) re-throw to the outer catch — M6
             // dismissed pattern.
+            // H7.1 — AmbiguousSendError (2xx-no-data): Channex accepted, the
+            // message MAY be on the OTA. §6-style encoding but recoverable:FALSE
+            // so the host can NEVER try-again (re-send); the webhook reconciles.
+            if (guestErr instanceof AmbiguousSendError) {
+              await updateAuditOutcome(audit_id, "failed", {
+                latency_ms: Date.now() - dispatchStart,
+                error_message: guestErr.message,
+              });
+              controller.enqueue(
+                encoder.encode(
+                  serializeSseEvent({
+                    type: "error",
+                    code: "channex_send_ambiguous",
+                    message: "Message accepted by Channex but not confirmed — do not resend; it will reconcile via the webhook.",
+                    recoverable: false,
+                  }),
+                ),
+              );
+              return;
+            }
             const isChannexFailure = guestErr instanceof ChannexSendError;
             const isColdSendUnsupported = guestErr instanceof ColdSendUnsupportedError;
             if (isChannexFailure || isColdSendUnsupported) {

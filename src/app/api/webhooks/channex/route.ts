@@ -17,6 +17,7 @@ import {
   teardownTaskOnCancel,
 } from "@/lib/turnover/auto-create";
 import { emitHostNotification } from "@/lib/notifications/host-feed";
+import { acquireLock } from "@/lib/concurrency/locks";
 
 export async function POST(request: NextRequest) {
   const sourceIp = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
@@ -168,6 +169,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // H6.1 — CLAIM-FIRST. Take an advisory lock on the revision BEFORE the
+    // read-then-process dedup below, so two concurrent deliveries of the SAME
+    // revision can't both pass the (terminal-row-not-yet-written) check and
+    // double-process — the TOCTOU that double-fired the booking bell + the
+    // availability push. The lock TTL (120s) covers the in-flight window; the
+    // terminal-row dedup below stays the durable guard for a re-delivery AFTER
+    // completion. We do NOT ack Channex on the in-flight skip (so a retry of a
+    // FAILED first delivery still processes once the lock TTL-expires).
+    if (revisionId) {
+      const claimed = await acquireLock(supabase, `channex_revision:${revisionId}`, 120);
+      if (!claimed) {
+        console.log(`[webhook] revision ${revisionId} already in-flight — claim refused, skipping`);
+        return NextResponse.json({ status: "ok", action: "skipped_in_flight", revision_id: revisionId });
+      }
+    }
+
     // Idempotency: Channex retries webhooks on network failures. If we've
     // already processed this revision (or booking+event combo when no
     // revision_id is sent), ack and return without re-processing. This

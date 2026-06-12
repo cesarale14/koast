@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUser, verifyPropertyOwnership } from "@/lib/auth/api-auth";
 import { requireProAccess, PlanGateError } from "@/lib/billing/gate";
-import { sendMessage as channexSendMessage, ChannexSendError } from "@/lib/channex/messages";
+import { sendMessage as channexSendMessage, ChannexSendError, AmbiguousSendError } from "@/lib/channex/messages";
 import { createHash } from "crypto";
 
 const MAX_BODY_LEN = 5000; // permissive cap; Airbnb ~1000 typical, BDC larger
@@ -145,6 +145,16 @@ export async function POST(
 
         return NextResponse.json({ ok: true, message: inserted });
       } catch (err) {
+        // H7.1 — an AMBIGUOUS 2xx-no-data send: Channex accepted, the message MAY
+        // be on the OTA. TERMINAL-no-retry: surface a warning (NOT a hard error the
+        // UI would naively re-submit → double-send) and let the webhook reconcile.
+        if (err instanceof AmbiguousSendError) {
+          console.warn(`[messages/send] ambiguous send (200, no data) thread=${thread.channex_thread_id.slice(0, 8)}:`, err.message);
+          return NextResponse.json(
+            { warning: "Message accepted by Channex but not yet confirmed — do not resend; it will appear once the webhook reconciles.", ambiguous: true },
+            { status: 202 },
+          );
+        }
         if (err instanceof ChannexSendError) {
           console.warn(`[messages/send] Channex error status=${err.status} thread=${thread.channex_thread_id.slice(0, 8)}:`, err.message);
           return NextResponse.json(

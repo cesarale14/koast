@@ -201,6 +201,26 @@ export class ChannexSendError extends Error {
   }
 }
 
+/**
+ * H7.1 — the "200 with no data" AMBIGUOUS case: Channex accepted the request
+ * (res.ok) but returned no parseable entity, so the message MAY have been created.
+ * DISTINCT from ChannexSendError (a true non-2xx OTA rejection = nothing sent =
+ * safe to retry). All send call sites treat AmbiguousSendError as TERMINAL-no-retry
+ * — never re-send (the webhook reconciles the local row). Same shape (status/body)
+ * so call sites can log it; a separate class so `instanceof ChannexSendError`
+ * retry paths never catch it.
+ */
+export class AmbiguousSendError extends Error {
+  status: number;
+  body: unknown;
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "AmbiguousSendError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function channexPost<T = unknown>(path: string, body: unknown, cfg?: MessagingClientConfig): Promise<T> {
   const { apiKey, baseUrl } = resolveConfig(cfg);
   const url = `${baseUrl}${path}`;
@@ -393,7 +413,7 @@ export async function sendMessage(
     cfg,
   );
   if (!res.data) {
-    throw new ChannexSendError("Channex POST /messages returned no data", 200, res);
+    throw new AmbiguousSendError("Channex POST /messages returned no data", 200, res);
   }
   return res.data;
 }
@@ -431,7 +451,7 @@ export async function sendMessageOnBooking(
     cfg,
   );
   if (!res.data) {
-    throw new ChannexSendError(
+    throw new AmbiguousSendError(
       "Channex POST /bookings/:id/messages returned no data",
       200,
       res,

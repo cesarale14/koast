@@ -20,7 +20,7 @@ import {
   isAutoApproveEnabled,
 } from "../server";
 import { proposeGuestMessageHandler } from "@/lib/action-substrate/handlers/propose-guest-message";
-import { ChannexSendError } from "@/lib/channex/messages";
+import { ChannexSendError, AmbiguousSendError } from "@/lib/channex/messages";
 import { ColdSendUnsupportedError } from "@/lib/action-substrate/handlers/errors";
 
 const mockHandler = proposeGuestMessageHandler as jest.MockedFunction<
@@ -112,13 +112,14 @@ describe("send_guest_reply.execute — adapter + no-double-send", () => {
     expect(r.ok).toBe(false);
   });
 
-  test("2xx ChannexSendError (200-no-data, AMBIGUOUS) → RE-THROWS (never re-sends)", async () => {
-    // The "200 with no data" case: Channex accepted the request and MAY have
-    // created the message. Classifying it as 'not sent' (re-approvable) would
-    // risk a double-send — so a 2xx ChannexSendError must re-throw, not {ok:false}.
-    mockHandler.mockRejectedValue(new ChannexSendError("returned no data", 200, {}));
+  test("AmbiguousSendError (200-no-data) → RE-THROWS (never re-sends) — H7.1", async () => {
+    // H7.1: the "200 with no data" case is now its own AmbiguousSendError (NOT a
+    // ChannexSendError). Channex accepted + MAY have created the message, so it must
+    // re-throw (proposal stays 'approved', no re-send), not {ok:false}. The webhook
+    // reconciles the local row.
+    mockHandler.mockRejectedValue(new AmbiguousSendError("returned no data", 200, {}));
     await expect(def.execute(svc, { payload, hostId: HOST })).rejects.toBeInstanceOf(
-      ChannexSendError,
+      AmbiguousSendError,
     );
   });
 

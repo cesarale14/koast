@@ -21,6 +21,14 @@ import { createCleaningTask } from "@/lib/turnover/auto-create";
 
 jest.mock("@/lib/supabase/service");
 jest.mock("@/lib/channex/client");
+// H6.1 — the webhook now claim-firsts via acquireLock; this suite isn't testing
+// the lock, so model it as "always acquired" (the lock behavior is covered in
+// claim-first.test.ts). Without this, the in-memory fake's concurrency_locks
+// insert returns no row → acquireLock false → every delivery skipped_in_flight.
+jest.mock("@/lib/concurrency/locks", () => ({
+  acquireLock: jest.fn().mockResolvedValue(true),
+  releaseLock: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { createChannexClient } from "@/lib/channex/client";
