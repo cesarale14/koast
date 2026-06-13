@@ -466,11 +466,19 @@ async function* runOneRound(
         // host_input_needed envelope and break dispatch. Booking →
         // property resolution lives behind this intercept; a M9 cache
         // is a forward-tracked perf candidate.
+        //
+        // ACCEPTANCE FIX: this is MESSAGE-CLASS-CONDITIONAL. The access-facts
+        // precondition applies ONLY to check-in / arrival-instruction drafts
+        // (where the message delivers door/wifi/parking to an arriving guest).
+        // A review request, post-checkout follow-up, thank-you, or general reply
+        // does NOT need access info — never gate it. Skip the whole check (and the
+        // DB fetch) for any non-check-in-class draft.
+        const { isCheckinInstructionDraft } = await import("./required-capabilities");
         const bookingId =
           typeof (inputObj as { booking_id?: unknown }).booking_id === "string"
             ? ((inputObj as { booking_id: string }).booking_id)
             : null;
-        if (bookingId) {
+        if (bookingId && isCheckinInstructionDraft(messageText)) {
           const supabaseRC = createServiceClient();
           const { data: bookingRow, error: bookingErr } = await supabaseRC
             .from("bookings")

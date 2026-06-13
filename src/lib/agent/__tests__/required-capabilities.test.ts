@@ -16,6 +16,8 @@ import {
   evaluateCapabilities,
   buildMultiMissingEnvelopeText,
   MISSING_CAPABILITY_COPY,
+  isCheckinInstructionDraft,
+  slotLabel,
   type RequiredCapabilityKey,
 } from "../required-capabilities";
 
@@ -138,7 +140,7 @@ describe("buildMultiMissingEnvelopeText", () => {
     const wifi = MISSING_CAPABILITY_COPY.wifi_network_name;
     const out = buildMultiMissingEnvelopeText([wifi]);
     expect(out.reason).toBe(wifi.reason);
-    expect(out.missing_inputs).toEqual(["wifi_network_name"]);
+    expect(out.missing_inputs).toEqual(["Wifi"]); // human label, not the slug
     expect(out.suggested_inputs).toEqual(wifi.suggested_inputs);
   });
 
@@ -150,7 +152,7 @@ describe("buildMultiMissingEnvelopeText", () => {
     expect(out.reason).toBe(
       "I need a couple of things before drafting — wifi credentials and the parking situation. They all come up in almost every check-in.",
     );
-    expect(out.missing_inputs).toEqual(["wifi_network_name", "parking_instructions"]);
+    expect(out.missing_inputs).toEqual(["Wifi", "Parking"]); // human labels, not slugs
   });
 
   test("3-missing concatenates with Oxford comma", () => {
@@ -169,7 +171,54 @@ describe("buildMultiMissingEnvelopeText", () => {
   test("missing_inputs preserves order; suggested_inputs flattens", () => {
     const keys: RequiredCapabilityKey[] = ["parking_instructions", "wifi_password"];
     const out = buildMultiMissingEnvelopeText(keys.map((k) => MISSING_CAPABILITY_COPY[k]));
-    expect(out.missing_inputs).toEqual(["parking_instructions", "wifi_password"]);
+    expect(out.missing_inputs).toEqual(["Parking", "Wifi password"]); // labels, ordered
     expect(out.suggested_inputs.length).toBeGreaterThan(0);
+  });
+});
+
+// Acceptance fix: the access-facts gate is message-class-conditional. The gate
+// runs ONLY when isCheckinInstructionDraft is true.
+describe("isCheckinInstructionDraft (message-class gate condition)", () => {
+  // Fixture: a follow-up / review / marketing draft → NOT check-in-class → NO gate.
+  test("post-checkout follow-up / return-visit marketing → false (no gate)", () => {
+    expect(
+      isCheckinInstructionDraft(
+        "Hi Jonathan! Hope you enjoyed your stay at Villa Jamaica — we'd love to host you again next time you're in Tampa. Take care!",
+      ),
+    ).toBe(false);
+  });
+  test("review request → false (no gate)", () => {
+    expect(
+      isCheckinInstructionDraft("Thanks so much for staying with us! If you have a minute, we'd really appreciate a review."),
+    ).toBe(false);
+  });
+  test("plain thank-you → false", () => {
+    expect(isCheckinInstructionDraft("Thank you — it was a pleasure having you!")).toBe(false);
+  });
+  test("a general schedule reply with no access intent → false", () => {
+    expect(isCheckinInstructionDraft("Yes, a noon checkout works fine. See you then!")).toBe(false);
+  });
+
+  // Check-in / arrival-instruction drafts → true (the gate MAY fire).
+  test("check-in instructions draft → true", () => {
+    expect(
+      isCheckinInstructionDraft("Welcome! For check-in, the door code is on the keypad and the wifi network is Villa-Guest."),
+    ).toBe(true);
+  });
+  test("arrival/parking draft → true", () => {
+    expect(isCheckinInstructionDraft("When you arrive, parking is in the driveway and the lockbox is by the door.")).toBe(true);
+  });
+  test("empty / whitespace → false", () => {
+    expect(isCheckinInstructionDraft("")).toBe(false);
+  });
+});
+
+describe("slotLabel — human labels, never raw slugs", () => {
+  test("maps each capability slot to a human label", () => {
+    expect(slotLabel("front_door_access_code")).toBe("Door code");
+    expect(slotLabel("wifi_network_name")).toBe("Wifi");
+    expect(slotLabel("parking_instructions")).toBe("Parking");
+    expect(slotLabel("property_structural")).toBe("Property type");
+    expect(slotLabel("wifi_password")).toBe("Wifi password");
   });
 });

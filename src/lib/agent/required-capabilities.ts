@@ -85,6 +85,70 @@ export const MISSING_CAPABILITY_COPY: Record<RequiredCapabilityKey, MissingCapab
   },
 };
 
+/**
+ * Message-class gate (acceptance fix): the required-capability check is a
+ * precondition for CHECK-IN / ARRIVAL-INSTRUCTION drafts ONLY — where the
+ * message's job is telling an arriving guest how to get in (door/wifi/parking).
+ * It must NEVER fire for a review request, post-checkout follow-up, thank-you,
+ * marketing, or general reply — those don't deliver access info. Returns true
+ * only when the draft carries check-in / arrival / access-delivery intent.
+ */
+const CHECKIN_DRAFT_SIGNALS = [
+  "check in",
+  "check-in",
+  "checkin",
+  "checking in",
+  "when you arrive",
+  "upon arrival",
+  "on arrival",
+  "when you get here",
+  "how to get in",
+  "getting in",
+  "to get in",
+  "how to access",
+  "to access the",
+  "door code",
+  "access code",
+  "entry code",
+  "lockbox",
+  "lock box",
+  "keypad",
+  "key code",
+  "the code is",
+  "gate code",
+  "wifi",
+  "wi-fi",
+  "where to park",
+  "parking is",
+  "parking situation",
+  "park your",
+  "where you can park",
+  "arrival instructions",
+];
+
+export function isCheckinInstructionDraft(messageText: string): boolean {
+  if (!messageText) return false;
+  const t = messageText.toLowerCase();
+  return CHECKIN_DRAFT_SIGNALS.some((s) => t.includes(s));
+}
+
+/** Human-readable label for a capability slot — shown to the host in the
+ *  host_input_needed card (never the raw slug). */
+export function slotLabel(key: RequiredCapabilityKey): string {
+  switch (key) {
+    case "property_structural":
+      return "Property type";
+    case "front_door_access_code":
+      return "Door code";
+    case "wifi_network_name":
+      return "Wifi";
+    case "wifi_password":
+      return "Wifi password";
+    case "parking_instructions":
+      return "Parking";
+  }
+}
+
 export interface CheckRequiredCapabilitiesResult {
   satisfied: boolean;
   missing: MissingCapability[];
@@ -238,7 +302,7 @@ export function buildMultiMissingEnvelopeText(missing: MissingCapability[]): {
   if (missing.length === 1) {
     return {
       reason: missing[0].reason,
-      missing_inputs: [missing[0].key],
+      missing_inputs: [slotLabel(missing[0].key)],
       suggested_inputs: missing[0].suggested_inputs,
     };
   }
@@ -252,7 +316,9 @@ export function buildMultiMissingEnvelopeText(missing: MissingCapability[]): {
     ". They all come up in almost every check-in.";
   return {
     reason,
-    missing_inputs: missing.map((m) => m.key),
+    // Human labels (e.g. "Door code", "Wifi", "Parking") — the host sees these
+    // in the card, never the raw slugs.
+    missing_inputs: missing.map((m) => slotLabel(m.key)),
     suggested_inputs: missing.flatMap((m) => m.suggested_inputs),
   };
 }
