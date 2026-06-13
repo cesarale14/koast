@@ -14,15 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
+import { urlBase64ToUint8Array, isValidVapidPublicKey } from "@/lib/push/vapid-key";
 
 interface Env {
   isIOS: boolean;
@@ -83,6 +75,14 @@ export default function EnableAlerts({
       }
       if (!e.pushSupported || !vapidPublicKey) {
         setGuide("unsupported");
+        return;
+      }
+      // A1-5: refuse a malformed application-server key BEFORE pushManager.subscribe,
+      // which would otherwise throw the cryptic "valid P-256 public key" error. A
+      // valid VAPID key decodes to 65 bytes (0x04…); a truncated paste is 64.
+      if (!isValidVapidPublicKey(vapidPublicKey)) {
+        setErrMsg("Push isn't set up correctly for this deployment (invalid notification key). The host needs to fix the VAPID key.");
+        setGuide("error");
         return;
       }
 
