@@ -25,6 +25,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { KoastMark } from "@/components/chat/KoastMark";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; badge?: number | null; }
 interface NavGroup { label?: string; items: NavItem[]; }
@@ -58,6 +59,60 @@ const navGroups: NavGroup[] = [
 const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, var(--abyss) 100%)";
 const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(76,196,204,0.15)";
 const INACTIVE_TEXT = "rgba(168,191,174,0.6)";
+
+/**
+ * Sidebar account badge — real name + real plan. Was a hardcoded "Cesar / Free
+ * plan" literal (acceptance failure: a comped account showed Free). Name comes
+ * from the auth user; plan from /api/billing/status (resolveAccess — comped /
+ * active / trialing → Pro; billing-off → Pro). Display-only; gating is elsewhere.
+ */
+function UserBadge({ onSettingsClick }: { onSettingsClick?: () => void }) {
+  const [name, setName] = useState("Account");
+  const [planLabel, setPlanLabel] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const u = data.user;
+        const n =
+          (u?.user_metadata?.full_name as string) ||
+          (u?.user_metadata?.name as string) ||
+          u?.email ||
+          "Account";
+        setName(n);
+      })
+      .catch(() => {});
+    fetch("/api/billing/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.plan) setPlanLabel(d.plan === "pro" ? "Pro plan" : "Free plan");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const initial = (name.trim().charAt(0) || "K").toUpperCase();
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+        style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
+      >
+        {initial}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{name}</p>
+        <p className="text-[11px] truncate" style={{ color: INACTIVE_TEXT }}>{planLabel || " "}</p>
+      </div>
+      <Link href="/settings" onClick={onSettingsClick} className="transition-colors" style={{ color: INACTIVE_TEXT }}>
+        <Settings size={16} strokeWidth={1.5} />
+      </Link>
+    </div>
+  );
+}
 
 /* ---- Collapsed nav link with tooltip ---- */
 function NavLinkCollapsed({ item, isActive }: { item: NavItem; isActive: boolean }) {
@@ -180,21 +235,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
               ))}
             </nav>
             <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(76,196,204,0.1)" }}>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-                  style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
-                >
-                  C
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">Cesar</p>
-                  <p className="text-[11px] truncate" style={{ color: INACTIVE_TEXT }}>Free plan</p>
-                </div>
-                <Link href="/settings" className="transition-colors" style={{ color: INACTIVE_TEXT }}>
-                  <Settings size={16} strokeWidth={1.5} />
-                </Link>
-              </div>
+              <UserBadge />
             </div>
           </>
         ) : (
@@ -283,21 +324,7 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
           ))}
         </nav>
         <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(76,196,204,0.1)" }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-              style={{ backgroundColor: "rgba(76,196,204,0.2)", color: "var(--koast-tide)" }}
-            >
-              C
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">Cesar</p>
-              <p className="text-[11px] truncate" style={{ color: INACTIVE_TEXT }}>Free plan</p>
-            </div>
-            <Link href="/settings" onClick={onClose} className="transition-colors" style={{ color: INACTIVE_TEXT }}>
-              <Settings size={16} strokeWidth={1.5} />
-            </Link>
-          </div>
+          <UserBadge onSettingsClick={onClose} />
         </div>
       </aside>
     </>

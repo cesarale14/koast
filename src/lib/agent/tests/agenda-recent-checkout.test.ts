@@ -78,3 +78,24 @@ describe("agendaPreamble — RECENTLY DEPARTED section (A3)", () => {
     expect(out).toContain("a departed guest at Cozy Loft");
   });
 });
+
+// Failure-1 regression: a missing-access-info property must NOT tell the agent that
+// drafting guest messages is "limited" — access info gates ONLY check-in-instruction
+// messages, never a post-checkout / review / thank-you / marketing draft.
+describe("agendaPreamble — Property gaps line is NON-gating (access-info bleed fix)", () => {
+  test("does not say drafting is limited/blocked; scopes access to check-in only", () => {
+    const out = agendaPreamble(rollup({ empty: false }), { missing: 1, total: 2 });
+    expect(out).toContain("Property gaps");
+    // The old gating language is gone.
+    expect(out).not.toMatch(/limited until filled/i);
+    expect(out).not.toMatch(/drafting guest messages for those is limited/i);
+    // The new doctrine: only check-in messages, never blocks other drafts.
+    expect(out).toMatch(/CHECK-IN-INSTRUCTION/i);
+    expect(out).toMatch(/never blocks|never make an unrelated draft wait/i);
+  });
+
+  test("omits the Property gaps line entirely when nothing is missing", () => {
+    const out = agendaPreamble(rollup({ empty: false }), { missing: 0, total: 2 });
+    expect(out).not.toContain("Property gaps");
+  });
+});

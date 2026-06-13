@@ -584,7 +584,7 @@ export function agendaPreamble(
 
   if (gaps && gaps.total > 0 && gaps.missing > 0) {
     lines.push(
-      `Property gaps: ${gaps.missing} of ${gaps.total} properties are missing check-in essentials (door/access, wifi, or parking) — drafting guest messages for those is limited until filled.`,
+      `Property gaps: ${gaps.missing} of ${gaps.total} properties haven't had check-in essentials saved yet (door/access, wifi, parking). This matters ONLY for CHECK-IN-INSTRUCTION messages to arriving guests — it NEVER blocks or gates drafting any other message (a post-checkout follow-up, review request, thank-you, or marketing note don't use access info). Offer to fill it in for arriving guests; never make an unrelated draft wait on it.`,
     );
   }
 
