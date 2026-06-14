@@ -11,6 +11,33 @@ The P1.5a Access-info form was only reachable via a subtle hero gear. Fixed: (1)
 (2) a Settings button on each Properties-list card; (3) a turnover-card "Add access info"
 CTA when a property has none (computes `hasAccessInfo` from `property_details`).
 
+## A1 — cleaner push notifications (web-push)
+
+### A1-5 — "Enable job alerts" rejected the VAPID key — FIXED (`17e2ec4` code + Vercel env)
+"Enable job alerts" threw "applicationServerKey must contain a valid P-256 public key". Root
+cause (diagnosed against prod, by curling the `/api/clean` endpoint + decoding the served
+key): the Vercel `VAPID_PUBLIC_KEY` decoded to 64 bytes / 86 base64url chars — truncated by
+one char; a valid key is 65 bytes / ~87 chars (0x04 uncompressed-P-256 prefix), so
+`pushManager.subscribe` rejected it. The client conversion was correct; the env value was
+malformed (a paste truncation). Fix:
+- (env) Cesar set a correct, MATCHING VAPID keypair in Vercel + redeployed.
+- (code, `17e2ec4`) pure `src/lib/push/vapid-key.ts` `isValidVapidPublicKey` (must decode to
+  65 bytes / 0x04); `getVapidPublicKey()` validates → returns null + warns on a bad key (page
+  degrades to "unavailable", misconfig visible in logs); `EnableAlerts` refuses an invalid key
+  before `subscribe()` with a plain message.
+- Deterministic test (the no-jsdom seam the suite was blind to): the EXACT truncated prod key
+  pinned as rejected, a valid 65-byte key accepted, + null/empty/std-base64/private-key-shape.
+
+### A1 — web-push end-to-end on a real iPhone (prod) — ✅ PASS
+Confirmed live by Cesar: notification delivered BOTH app-open AND app-closed on a real iPhone
+(installed PWA), prod. DB evidence:
+- `cleaner_push_subscriptions` row — cleaner **Karem Gutierrez**, Apple Web Push endpoint
+  (`web.push.apple.com/…`), p256dh + auth present, device iPhone iOS 18.7 Safari, bound via the
+  task token; `last_seen_at` fresh (2026-06-14 23:03 UTC).
+- **0** `push_delivery_failure` host-notification bells in the window (consistent with success).
+- (web-push → APNs isn't logged server-side beyond failures; the `notifications` table is the
+  SMS/email audit, so no row there is expected — the on-device delivery is authoritative.)
+
 ## A3 — post-checkout / post-stay guest messaging
 
 ### A3-1 — recently-departed guests visible to the agent — FIXED (`8c20637`)
@@ -60,4 +87,6 @@ refetch-on-focus consistency. Live-verification script:
 `docs/koast-v1-inline-proposalcard-live-verification.md`.
 
 ## Remaining NEEDS-CESAR
-PITR toggle · Stripe test-mode env · the A4 OTA-flag flip.
+PITR toggle · Stripe test-mode env · the A4 OTA-flag flip. (Optional: rotate the VAPID keypair
+before public launch — the working pair was generated in-channel during the A1-5 fix; it's a
+low-stakes, trivially-rotatable notification key.)
