@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { parseListingUrl } from "@/lib/listing-url-parser";
 import { fetchListingDetails } from "@/lib/listing-details";
 import { buildFilteredCompSet } from "@/lib/airroi/compsets";
+import { bootstrapNewProperty } from "@/lib/properties/bootstrap";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = ReturnType<typeof createServiceClient>;
@@ -131,6 +132,24 @@ export async function POST(request: NextRequest) {
     console.log(
       `[import-from-url] Created property ${propertyId} name="${propertyName}"`
     );
+
+    // Launch invariant (P7.2): tz never null → agenda-visible, + a
+    // property_details row. No base rate here, so no calendar_rates seed (the
+    // pricing engine / host fill rates in). Logged-not-fatal: a rare bootstrap
+    // hiccup must not lose the imported property.
+    try {
+      await bootstrapNewProperty(supabase, {
+        propertyId,
+        latitude: defaultLat,
+        longitude: defaultLng,
+        country: null,
+      });
+    } catch (err) {
+      console.warn(
+        "[import-from-url] bootstrap error (property kept, tz may need backfill):",
+        err instanceof Error ? err.message : err
+      );
+    }
 
     // 5b. Auto-bootstrap comp set from AirROI. Non-blocking — any error
     //     here logs a warning and continues so a flaky AirROI run doesn't

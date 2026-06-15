@@ -22,6 +22,10 @@ export type TodayHomeData = {
   payload: AgendaRenderPayload;
   places: Places;
   greeting: GreetingFacts;
+  /** P7.1: true when the host owns zero properties — drives the first-run
+   * "Add your first property" CTA (distinct from the "all caught up" empty
+   * state, which means ≥1 property with nothing scheduled). */
+  hasNoProperties: boolean;
 };
 
 export async function readTodayHome(
@@ -43,5 +47,6 @@ export async function readTodayHome(
     (propRes.data ?? []) as { name: string | null; cover_photo_url: string | null }[],
   );
   const greeting = deriveGreeting(payload, opts.name, opts.hourLocal);
-  return { payload, places, greeting };
+  const hasNoProperties = (propRes.data ?? []).length === 0;
+  return { payload, places, greeting, hasNoProperties };
 }

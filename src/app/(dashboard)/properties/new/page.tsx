@@ -135,39 +135,43 @@ export default function AddPropertyPage() {
         return;
       }
 
-      // Insert property
-      const { data: property, error: propError } = await supabase
-        .from("properties")
-        .insert({
+      // Route through the single creation chokepoint: it INSERTs the property
+      // and runs the launch invariant server-side (timezone never null → the
+      // property is agenda-visible, a property_details row, and — since we pass
+      // base_rate/min_stay — the seeded calendar_rates base layer that used to
+      // be built inline here).
+      const res = await fetch("/api/properties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: form.name,
           address: form.address || null,
           city: form.city || null,
           state: form.state || null,
           zip: form.zip || null,
-          latitude: form.latitude ? parseFloat(form.latitude) : null,
-          longitude: form.longitude ? parseFloat(form.longitude) : null,
-          bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
-          bathrooms: form.bathrooms ? parseFloat(form.bathrooms) : null,
-          max_guests: form.max_guests ? parseInt(form.max_guests) : null,
+          latitude: form.latitude || null,
+          longitude: form.longitude || null,
+          bedrooms: form.bedrooms || null,
+          bathrooms: form.bathrooms || null,
+          max_guests: form.max_guests || null,
           property_type: form.property_type,
-          user_id: (await supabase.auth.getUser()).data.user!.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .select("id")
-        .single();
-
-      if (propError) {
-        // Surface the DB-trigger quota error in friendly wording instead of
-        // leaking "property_quota_exceeded" to the toast.
-        const raw = propError.message ?? "";
-        if (raw.includes("property_quota_exceeded") || raw.includes("free_tier_limit_exceeded")) {
-          toast("Free plan limited to 1 property. Upgrade to Pro to add more.", "error");
-          setSaving(false);
-          return;
-        }
-        throw propError;
+          base_rate: form.base_rate || null,
+          min_stay: form.min_stay || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(
+          json.error ||
+            (res.status === 403
+              ? "Free plan limited to 1 property. Upgrade to Pro to add more."
+              : "Failed to create property. Please try again."),
+          "error",
+        );
+        setSaving(false);
+        return;
       }
-      const propertyId = (property as { id: string }).id;
+      const propertyId = json.id as string;
 
       // Insert listings for enabled platforms
       const enabledPlatforms = Object.entries(form.platforms).filter(([, v]) => v.enabled);
@@ -181,29 +185,6 @@ export default function AddPropertyPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           })) as any
         );
-      }
-
-      // Generate calendar_rates for next 90 days
-      const baseRate = parseFloat(form.base_rate);
-      const rateEntries = [];
-      for (let i = 0; i < 90; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() + i);
-        rateEntries.push({
-          property_id: propertyId,
-          date: d.toISOString().split("T")[0],
-          channel_code: null,
-          base_rate: baseRate,
-          applied_rate: baseRate,
-          min_stay: parseInt(form.min_stay) || 1,
-          is_available: true,
-          rate_source: "manual",
-        });
-      }
-      // Insert in batches of 30
-      for (let i = 0; i < rateEntries.length; i += 30) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await supabase.from("calendar_rates").insert(rateEntries.slice(i, i + 30) as any);
       }
 
       toast("Property created successfully!");

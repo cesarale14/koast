@@ -22,6 +22,7 @@ import type { AgendaRenderPayload, AgendaGap } from "@/lib/agent/render/types";
 import type { GreetingFacts, GapCategory } from "@/lib/today/deriveGreeting";
 import type { Places } from "@/lib/today/places";
 import { curateToday, partitionImminentGaps, type CuratedProperty, type MovementLine } from "@/lib/today/curate";
+import { todayView } from "@/lib/today/todayView";
 
 export type TodayHomeProps = {
   payload: AgendaRenderPayload;
@@ -38,6 +39,10 @@ export type TodayHomeProps = {
   /** P2.3: optional "Koast suggests" proposal surface (TodaySuggests). Self-
    * fetching; renders nothing when there are no pending proposals. */
   suggestsSlot?: React.ReactNode;
+  /** P7.1: the host owns zero properties. Replaces the "all caught up" empty
+   * state with the first-run "Add your first property" CTA — the fix for the
+   * onboarding dead-end (a brand-new account stranded on an empty Today). */
+  firstRun?: boolean;
 };
 
 // ── greeting prose (from the structured facts; presentation only) ───────────
@@ -152,8 +157,9 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: TodayHomeProps) {
+export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRun }: TodayHomeProps) {
   const c = curateToday(payload);
+  const view = todayView(firstRun, c.empty);
   // S4: when the interactive assign strip is present, no_cleaner gaps are
   // handled there — keep only the non-actionable gaps in the read-only list.
   const gaps = actionSlot ? c.gaps.filter((g) => g.kind !== "no_cleaner") : c.gaps;
@@ -183,7 +189,45 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot }: Today
 
         {actionSlot}
 
-        {c.empty ? (
+        {view === "first_run" ? (
+          <section
+            data-testid="today-first-run"
+            style={{
+              marginTop: 28,
+              padding: "28px 28px 30px",
+              borderRadius: 16,
+              background: "var(--white)",
+              border: "1px solid var(--hairline)",
+            }}
+          >
+            <p style={{ fontSize: 17, color: "var(--deep-sea)", lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
+              Let&apos;s get your first property set up.
+            </p>
+            <p style={{ marginTop: 8, fontSize: 15, color: "var(--tideline)", lineHeight: 1.6 }}>
+              Add a property and connect a calendar or a channel — your check-ins,
+              turnovers, and pricing start showing up right here.
+            </p>
+            <a
+              href="/onboarding"
+              data-testid="today-first-run-cta"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 20,
+                padding: "11px 18px",
+                borderRadius: 10,
+                background: "var(--coastal)",
+                color: "var(--shore)",
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Add your first property
+            </a>
+          </section>
+        ) : view === "all_set" ? (
           <p style={{ marginTop: 20, fontSize: 17, color: "var(--tideline)", lineHeight: 1.6 }}>
             Nothing on the calendar for the next couple of days — you&apos;re all set. I&apos;ll surface anything that needs you the moment it lands.
           </p>

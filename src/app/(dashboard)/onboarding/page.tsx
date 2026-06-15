@@ -21,7 +21,9 @@ import {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const STEPS = ["Welcome", "Property", "Calendar", "Details", "Messages", "Done"];
+// "Messages" step retired (P6); Done is index 4. Keep this in sync with the
+// step numbers used in goNext / renderStep / renderFooter below.
+const STEPS = ["Welcome", "Property", "Calendar", "Details", "Done"];
 
 const PLATFORM_HELP: Record<string, string> = {
   airbnb:
@@ -156,28 +158,32 @@ export default function OnboardingPage() {
         return false;
       }
 
-      const { data, error } = await supabase
-        .from("properties")
-        .insert({
+      // Route through the single creation chokepoint so the launch invariant
+      // runs server-side (timezone never null → agenda-visible, a
+      // property_details row, an optional rate seed).
+      const res = await fetch("/api/properties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: name.trim(),
           address: address || null,
           city: city || null,
           state: state || null,
           zip: zip || null,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          latitude: latitude || null,
+          longitude: longitude || null,
           bedrooms,
           bathrooms,
           max_guests: maxGuests,
           property_type: propertyType,
-          user_id: user.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      setPropertyId((data as { id: string }).id);
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(json.error || "Failed to create property. Please try again.", "error");
+        return false;
+      }
+      setPropertyId(json.id as string);
       toast("Property created!");
       return true;
     } catch (err) {
@@ -241,7 +247,7 @@ export default function OnboardingPage() {
       if (error) throw error;
       toast("Details saved!");
       // Templates step retired (P6) — go straight to the finish step.
-      setStep(5);
+      setStep(4);
     } catch (err) {
       console.error(err);
       toast("Failed to save details.", "error");
@@ -812,7 +818,7 @@ export default function OnboardingPage() {
         return renderCalendar();
       case 3:
         return renderDetails();
-      case 5:
+      case 4:
         return renderDone();
       default:
         return null;
@@ -837,7 +843,7 @@ export default function OnboardingPage() {
       );
     }
 
-    if (step === 5) return null;
+    if (step === 4) return null;
 
     // Step 3 (details) has custom save handler
     if (step === 3) {
@@ -852,7 +858,7 @@ export default function OnboardingPage() {
           </button>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setStep(5)}
+              onClick={() => setStep(4)}
               className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
             >
               Skip

@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createChannexClient } from "@/lib/channex/client";
 import { acquireLock, releaseLock } from "@/lib/concurrency/locks";
 import { syncReviewsForOneProperty } from "@/lib/reviews/sync";
+import { bootstrapNewProperty } from "@/lib/properties/bootstrap";
 
 /**
  * RDX-FINAL Phase E — strip the legacy " - StayCommand" / " - Koast"
@@ -231,6 +232,24 @@ export async function POST(request: NextRequest) {
             propertyId = newProp.id;
             console.log(`[channex/import] Inserted new property ${propertyId}`);
           }
+        }
+
+        // Launch invariant (P7.2): tz never null → agenda-visible, + a
+        // property_details row. Idempotent — never clobbers a host-set tz on
+        // re-import. Logged-not-fatal so a bootstrap hiccup doesn't abort the
+        // import of an otherwise-valid Channex property.
+        try {
+          await bootstrapNewProperty(supabase, {
+            propertyId,
+            latitude: propInsert.latitude,
+            longitude: propInsert.longitude,
+            country: attrs.country || null,
+          });
+        } catch (err) {
+          console.warn(
+            "[channex/import] bootstrap error (property kept, tz may need backfill):",
+            err instanceof Error ? err.message : err
+          );
         }
 
         // 3. Fetch room types → create listings
