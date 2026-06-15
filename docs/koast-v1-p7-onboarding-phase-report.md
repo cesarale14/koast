@@ -71,6 +71,64 @@ store than where the content lives.
 - Full memory_facts convergence (one store) is a later phase; the read-bridge is
   the launch-correct, low-risk fix. +10 tests.
 
+## The "original-2-only" pattern — named + swept (P7 readiness class)
+The three P7 dead-ends are one class: **works for the original two properties,
+silently no-ops for a new host.** Each is a path that assumed the seeded state
+of the founding fleet (Airbnb-Channex-connected, timezone set, capabilities in
+memory_facts) and quietly produced nothing for a property that lacks it — no
+error, just absence. This is *the* external-user-readiness risk.
+- **tz-skip** — agenda skipped null-tz properties (P7.2: tz never null).
+- **store-split** — capability gate read memory_facts; host form wrote
+  property_details (P7.5: read-bridge).
+- **validator-filter** — recs only for Airbnb-Channex properties (below).
+
+**Sweep of every place with this shape** (koast `src/` + `koast-workers/`):
+- **ACTIVE dead-ends found: only the validator** (now fixed). Its enumeration is
+  dynamic (no hardcoded ids) but filtered to `channex_property_id IS NOT NULL AND
+  channel_code='ABB' AND rate_plan_id` — evidence: the exact query run against
+  prod returns only the 2 founding properties; the new property is
+  `validator_covers=false`.
+- **Dead code (latent, no callers): `koast-workers/db.py` `get_active_properties()`**
+  filters `WHERE channex_property_id IS NOT NULL` — unused (no caller); left in
+  place but noted as a trap if ever wired up. `get_all_properties()` is the
+  unfiltered sibling.
+- **By-design (not dead-ends): `reviews/sync.ts` + `messages/sync.ts`** filter to
+  channex properties — correct, an iCal host carries no OTA messages/reviews
+  (that's the Free-tier reality, not an accident).
+- **Benign:** mock fixtures, comment-example ids, the channel-specific ops
+  (connect/sync/status/group-token/auto-scaffold) correctly scoped to channex,
+  and one internal cert-runner that hardcodes a property id (internal tool only).
+
+### Validator fix (`koast-workers bc5bc8b`)
+Recs now generate for **every onboarded property** (read-only insight; *apply*
+stays Channex/Pro-gated). `--all-properties` broadens the target set; the
+current-rate baseline is the live Airbnb rate when connected, else the
+`calendar_rates` base layer (seeded by `bootstrapNewProperty`). Gated/opt-in so
+the daily timer is unchanged until the ExecStart adds the flag; `--property` +
+`--skip-detector` + `--dry-run` make controlled runs safe.
+
+**Controlled run evidence** (`--all-properties --property <new> --skip-detector`):
+the new Free/iCal property produced **60 pricing_recommendations** (current-rate
+coverage 60 from the calendar_rates baseline, live=0), **no proposals/bells**.
+
+**Guardrails:**
+- *Apply surface NOT widened* — `applyOtaRestrictions` belt 3 refuses a
+  no-Channex property (`property_not_connected`) even with the OTA flag ON;
+  `isOtaWriteEnabled` delegates to the single gate. Generation ≠ apply.
+- *Coherent + low-confidence* — the new property's recs are coherent (140–150
+  around a 150 baseline; max 6.7% delta, no wild numbers). Low confidence is
+  captured in data (`competitor.confidence=0`, `comp_set_insufficient`, most
+  signals "no data"); `WhyThisRate` shows the per-signal reasons; NULL `urgency`
+  sorts them as `review` (lowest). **Open UX call:** no prominent
+  "early-estimate / limited-data" badge yet — recommend adding one driven by
+  `comp_set_quality='insufficient'` so a new host's first recs read as estimates,
+  not confident calls. Coherent + not confidently-wrong today; the badge is the
+  remaining polish.
+
+**Remaining to declare P7 done:** enable `--all-properties` on the daily timer's
+ExecStart (deliberate one-line change, post-review) so new hosts get recs on the
+6am ET tick; the controlled run already covered the acceptance property.
+
 ## Deferred (flagged, not silently dropped)
 - **Airbnb new-host connect** — behind the flag above; its own spike.
 - **Persistent sidebar "Add property" item** — deferred. It's awkward under the

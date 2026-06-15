@@ -444,7 +444,7 @@ export default function AddPropertyPage() {
               <input type="number" value={form.base_rate} onChange={(e) => updateField("base_rate", e.target.value)}
                 className="w-full h-10 px-3 text-sm border border-[var(--border)] rounded-lg bg-neutral-0 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-coastal/30 focus:border-coastal transition-colors"
                 placeholder="150" min="0" step="1" />
-              <p className="text-xs text-neutral-400 mt-1">This will be applied to all dates for the next 90 days.</p>
+              <p className="text-xs text-neutral-400 mt-1">Seeds your calendar&apos;s base rate for the coming year — adjust any date later.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
