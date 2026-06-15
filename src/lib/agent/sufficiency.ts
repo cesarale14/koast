@@ -25,7 +25,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { evaluateCapabilities } from "./required-capabilities";
+import { evaluateCapabilities, type PropertyDetailsCaps } from "./required-capabilities";
 
 export type SufficiencyLevel = "rich" | "lean" | "thin";
 
@@ -97,12 +97,26 @@ export async function classifySufficiency(
     factsByProperty.set(f.entity_id, list);
   }
 
+  // Read-bridge: the host access-info form writes property_details; a non-empty
+  // column satisfies the capability just as a memory_fact does. So filling that
+  // form clears the Today "missing check-in details" item.
+  const { data: detailRows, error: detailErr } = await supabase
+    .from("property_details")
+    .select("property_id, door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions")
+    .in("property_id", propIds)
+    .returns<Array<PropertyDetailsCaps & { property_id: string }>>();
+  if (detailErr) {
+    throw new Error(`property_details lookup failed: ${detailErr.message}`);
+  }
+  const detailsByProperty = new Map<string, PropertyDetailsCaps>();
+  for (const d of detailRows ?? []) detailsByProperty.set(d.property_id, d);
+
   const per_property: PerPropertySufficiency[] = [];
   let richProperties = 0;
   let anyPartial = false;
   for (const p of properties) {
     const facts = factsByProperty.get(p.id) ?? [];
-    const result = evaluateCapabilities(p, facts);
+    const result = evaluateCapabilities(p, facts, detailsByProperty.get(p.id) ?? null);
     per_property.push({
       property_id: p.id,
       property_name: p.name,

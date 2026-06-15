@@ -23,8 +23,16 @@ interface FactRow {
   attribute: string;
   value: unknown;
 }
+interface DetailRow {
+  property_id: string;
+  door_code?: string | null;
+  smart_lock_instructions?: string | null;
+  wifi_network?: string | null;
+  wifi_password?: string | null;
+  parking_instructions?: string | null;
+}
 
-function makeMock(properties: PropertyRow[], facts: FactRow[]) {
+function makeMock(properties: PropertyRow[], facts: FactRow[], details: DetailRow[] = []) {
   const propTable = {
     select: () => ({
       eq: () => ({
@@ -45,9 +53,19 @@ function makeMock(properties: PropertyRow[], facts: FactRow[]) {
       }),
     }),
   };
+  // P7.5 read-bridge: classifySufficiency also reads property_details
+  // (.select().in().returns()). Empty by default → the bridge is a no-op and
+  // the memory_facts-only expectations below are unchanged.
+  const detailsTable = {
+    select: () => ({
+      in: () => ({
+        returns: () => Promise.resolve({ data: details, error: null }),
+      }),
+    }),
+  };
   return {
     from: (table: string) =>
-      table === "properties" ? propTable : factTable,
+      table === "properties" ? propTable : table === "property_details" ? detailsTable : factTable,
   } as unknown as Parameters<typeof classifySufficiency>[0];
 }
 
@@ -132,6 +150,29 @@ describe("classifySufficiency — locked test list", () => {
     expect(result.level).toBe("rich");
     expect(result.rollup.properties).toBe(2);
     expect(result.rollup.rich_properties).toBe(1);
+  });
+
+  test("read-bridge: property_details ALONE (no memory facts) → level=rich", async () => {
+    // P7.5: filling the host access-info form clears the "missing check-in
+    // details" item even with zero memory_facts.
+    const result = await classifySufficiency(
+      makeMock(
+        [{ id: "p1", name: "Villa", city: "Tampa", property_type: "house" }],
+        [],
+        [
+          {
+            property_id: "p1",
+            door_code: "1234",
+            wifi_network: "X",
+            wifi_password: "Y",
+            parking_instructions: "driveway",
+          },
+        ],
+      ),
+      "host-1",
+    );
+    expect(result.level).toBe("rich");
+    expect(result.per_property[0].missing_count).toBe(0);
   });
 
   test("level transitions cleanly between thin → lean → rich on same property", async () => {

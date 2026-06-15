@@ -1,4 +1,5 @@
-import { todayView } from "../todayView";
+import { todayView, essentialsHref } from "../todayView";
+import type { AgendaGap } from "@/lib/agent/render/types";
 
 /**
  * P7.1: the first-run state (zero properties) and the all-set state (≥1
@@ -23,5 +24,26 @@ describe("todayView", () => {
   it("undefined firstRun behaves as ≥1 property", () => {
     expect(todayView(undefined, true)).toBe("all_set");
     expect(todayView(undefined, false)).toBe("agenda");
+  });
+});
+
+describe("essentialsHref (P7.5 — making the access item actionable)", () => {
+  const gap = (kind: AgendaGap["kind"], property: string): AgendaGap =>
+    ({ kind, property }) as AgendaGap;
+
+  it("deep-links a resolved property to its access form", () => {
+    expect(
+      essentialsHref(gap("missing_essentials", "Villa Jamaica"), { "Villa Jamaica": "p-123" }),
+    ).toBe("/properties/p-123?settings=access");
+  });
+
+  it("falls back to the property list when the nickname can't be resolved", () => {
+    expect(essentialsHref(gap("missing_essentials", "Unknown"), {})).toBe("/properties");
+    expect(essentialsHref(gap("missing_essentials", "Unknown"))).toBe("/properties");
+  });
+
+  it("returns null for non-essentials gaps (not access-actionable here)", () => {
+    expect(essentialsHref(gap("no_cleaner", "Villa Jamaica"), { "Villa Jamaica": "p-1" })).toBeNull();
+    expect(essentialsHref(gap("awaiting_reply", "Villa Jamaica"))).toBeNull();
   });
 });

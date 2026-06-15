@@ -195,22 +195,33 @@ export async function checkRequiredCapabilities(
   supabase: SupabaseClient,
   propertyId: string,
 ): Promise<CheckRequiredCapabilitiesResult> {
-  const [{ data: propRow, error: propErr }, { data: factRows, error: factErr }] =
-    await Promise.all([
-      supabase
-        .from("properties")
-        .select("id, name, city, property_type")
-        .eq("id", propertyId)
-        .maybeSingle<PropertyRow>(),
-      supabase
-        .from("memory_facts")
-        .select("sub_entity_type, attribute, value")
-        .eq("entity_type", "property")
-        .eq("entity_id", propertyId)
-        .eq("status", "active")
-        .in("sub_entity_type", ["front_door", "lock", "wifi", "parking"])
-        .returns<MemoryFactRow[]>(),
-    ]);
+  const [
+    { data: propRow, error: propErr },
+    { data: factRows, error: factErr },
+    { data: detailRow },
+  ] = await Promise.all([
+    supabase
+      .from("properties")
+      .select("id, name, city, property_type")
+      .eq("id", propertyId)
+      .maybeSingle<PropertyRow>(),
+    supabase
+      .from("memory_facts")
+      .select("sub_entity_type, attribute, value")
+      .eq("entity_type", "property")
+      .eq("entity_id", propertyId)
+      .eq("status", "active")
+      .in("sub_entity_type", ["front_door", "lock", "wifi", "parking"])
+      .returns<MemoryFactRow[]>(),
+    // The read-bridge: the host access-info form writes these; a non-empty
+    // column satisfies the capability just as a memory_fact does. Missing-row
+    // is normal (property_details ships 0-row) → details stays null.
+    supabase
+      .from("property_details")
+      .select("door_code, smart_lock_instructions, wifi_network, wifi_password, parking_instructions")
+      .eq("property_id", propertyId)
+      .maybeSingle<PropertyDetailsCaps>(),
+  ]);
 
   if (propErr) {
     throw new Error(`property lookup failed: ${propErr.message}`);
@@ -222,17 +233,37 @@ export async function checkRequiredCapabilities(
     throw new Error(`property not found: ${propertyId}`);
   }
 
-  return evaluateCapabilities(propRow, factRows ?? []);
+  return evaluateCapabilities(propRow, factRows ?? [], detailRow ?? null);
+}
+
+/**
+ * The capability-relevant columns of property_details. The host's access-info
+ * form (/api/properties/[id]/access) writes these, and the agent's draft route
+ * already reads them for the actual check-in content — so they ALSO satisfy the
+ * capability gate. Without this read-bridge the gate (memory_facts) and the
+ * content store (property_details) disagree: a host who filled the form is
+ * still nagged "missing check-in details" on Today and the check-in draft gate
+ * still fires for info the agent already has.
+ */
+export interface PropertyDetailsCaps {
+  door_code?: string | null;
+  smart_lock_instructions?: string | null;
+  wifi_network?: string | null;
+  wifi_password?: string | null;
+  parking_instructions?: string | null;
 }
 
 /**
  * Pure-helper version of the capability evaluator. Split out so unit
  * tests can exercise the rule set without a supabase mock — they pass
- * in PropertyRow + MemoryFactRow[] fixtures directly.
+ * in PropertyRow + MemoryFactRow[] (+ optional PropertyDetailsCaps) fixtures
+ * directly. A capability is present if EITHER a memory_fact OR the
+ * corresponding property_details column carries it.
  */
 export function evaluateCapabilities(
   property: PropertyRow,
   facts: MemoryFactRow[],
+  details?: PropertyDetailsCaps | null,
 ): CheckRequiredCapabilitiesResult {
   const missing: MissingCapability[] = [];
 
@@ -252,19 +283,26 @@ export function evaluateCapabilities(
   }
 
   // #2 access code — front_door::access_code OR lock::access_code OR
-  // front_door::lockbox_flag (the per-arrival lockbox carve-out).
+  // front_door::lockbox_flag (the per-arrival lockbox carve-out), OR the
+  // property_details door_code / smart_lock_instructions the host form writes.
   const hasFrontDoorCode =
     hasNonEmptyString(factMap.get("front_door::access_code")) ||
     hasNonEmptyString(factMap.get("lock::access_code")) ||
-    hasNonEmptyString(factMap.get("front_door::lockbox_flag"));
+    hasNonEmptyString(factMap.get("front_door::lockbox_flag")) ||
+    hasNonEmptyString(details?.door_code) ||
+    hasNonEmptyString(details?.smart_lock_instructions);
   if (!hasFrontDoorCode) {
     missing.push(MISSING_CAPABILITY_COPY.front_door_access_code);
   }
 
   // #3 wifi — both network_name AND password required; report
   // independently so the host knows exactly what's missing.
-  const hasWifiNetwork = hasNonEmptyString(factMap.get("wifi::network_name"));
-  const hasWifiPassword = hasNonEmptyString(factMap.get("wifi::password"));
+  const hasWifiNetwork =
+    hasNonEmptyString(factMap.get("wifi::network_name")) ||
+    hasNonEmptyString(details?.wifi_network);
+  const hasWifiPassword =
+    hasNonEmptyString(factMap.get("wifi::password")) ||
+    hasNonEmptyString(details?.wifi_password);
   if (!hasWifiNetwork) {
     missing.push(MISSING_CAPABILITY_COPY.wifi_network_name);
   } else if (!hasWifiPassword) {
@@ -272,7 +310,9 @@ export function evaluateCapabilities(
   }
 
   // #4 parking
-  const hasParking = hasNonEmptyString(factMap.get("parking::instructions"));
+  const hasParking =
+    hasNonEmptyString(factMap.get("parking::instructions")) ||
+    hasNonEmptyString(details?.parking_instructions);
   if (!hasParking) {
     missing.push(MISSING_CAPABILITY_COPY.parking_instructions);
   }

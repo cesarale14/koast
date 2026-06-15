@@ -93,6 +93,7 @@ export async function TodayHomeServer() {
       places={data.places}
       greeting={data.greeting}
       firstRun={data.hasNoProperties}
+      propertyIdByName={data.propertyIdByName}
       actionSlot={actionSlot}
       suggestsSlot={<TodaySuggests />}
     />

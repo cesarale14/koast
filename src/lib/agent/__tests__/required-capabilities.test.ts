@@ -222,3 +222,64 @@ describe("slotLabel — human labels, never raw slugs", () => {
     expect(slotLabel("wifi_password")).toBe("Wifi password");
   });
 });
+
+describe("evaluateCapabilities — property_details read-bridge (P7.5)", () => {
+  test("property_details ALONE (no memory_facts) satisfies the gate", () => {
+    const result = evaluateCapabilities(fullProperty, [], {
+      door_code: "1234",
+      wifi_network: "ZORRO",
+      wifi_password: "secret",
+      parking_instructions: "driveway",
+    });
+    expect(result.satisfied).toBe(true);
+    expect(result.missing).toEqual([]);
+  });
+
+  test("smart_lock_instructions satisfies the door/access capability", () => {
+    const result = evaluateCapabilities(fullProperty, [], {
+      smart_lock_instructions: "Code 9-9-9 then #",
+      wifi_network: "ZORRO",
+      wifi_password: "secret",
+      parking_instructions: "street",
+    });
+    expect(result.satisfied).toBe(true);
+  });
+
+  test("memory_facts and property_details combine — each fills a gap", () => {
+    // door from a memory_fact, wifi + parking from the form
+    const result = evaluateCapabilities(
+      fullProperty,
+      [fact("front_door", "access_code", "1234")],
+      { wifi_network: "ZORRO", wifi_password: "secret", parking_instructions: "lot B" },
+    );
+    expect(result.satisfied).toBe(true);
+  });
+
+  test("partial property_details still reports the genuinely-missing slots", () => {
+    // only wifi network in the form, nothing in memory_facts
+    const result = evaluateCapabilities(fullProperty, [], { wifi_network: "ZORRO" });
+    const keys = result.missing.map((m) => m.key);
+    expect(keys).toContain("front_door_access_code");
+    expect(keys).toContain("wifi_password"); // network present, password missing
+    expect(keys).toContain("parking_instructions");
+  });
+
+  test("blank/whitespace property_details columns do NOT satisfy", () => {
+    const result = evaluateCapabilities(fullProperty, [], {
+      door_code: "   ",
+      wifi_network: "",
+      wifi_password: null,
+      parking_instructions: undefined,
+    });
+    expect(result.missing.map((m) => m.key)).toEqual([
+      "front_door_access_code",
+      "wifi_network_name",
+      "parking_instructions",
+    ]);
+  });
+
+  test("omitting details (undefined) preserves memory_facts-only behavior", () => {
+    expect(evaluateCapabilities(fullProperty, fullFacts).satisfied).toBe(true);
+    expect(evaluateCapabilities(fullProperty, []).satisfied).toBe(false);
+  });
+});

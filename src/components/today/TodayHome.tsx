@@ -22,7 +22,7 @@ import type { AgendaRenderPayload, AgendaGap } from "@/lib/agent/render/types";
 import type { GreetingFacts, GapCategory } from "@/lib/today/deriveGreeting";
 import type { Places } from "@/lib/today/places";
 import { curateToday, partitionImminentGaps, type CuratedProperty, type MovementLine } from "@/lib/today/curate";
-import { todayView } from "@/lib/today/todayView";
+import { todayView, essentialsHref } from "@/lib/today/todayView";
 
 export type TodayHomeProps = {
   payload: AgendaRenderPayload;
@@ -43,6 +43,9 @@ export type TodayHomeProps = {
    * state with the first-run "Add your first property" CTA — the fix for the
    * onboarding dead-end (a brand-new account stranded on an empty Today). */
   firstRun?: boolean;
+  /** P7.5: property nickname → id, so the "missing check-in details" gap can
+   * deep-link to that property's access-info form. */
+  propertyIdByName?: Record<string, string>;
 };
 
 // ── greeting prose (from the structured facts; presentation only) ───────────
@@ -157,7 +160,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRun }: TodayHomeProps) {
+export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRun, propertyIdByName }: TodayHomeProps) {
   const c = curateToday(payload);
   const view = todayView(firstRun, c.empty);
   // S4: when the interactive assign strip is present, no_cleaner gaps are
@@ -237,16 +240,29 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRu
               <section style={{ marginTop: 44 }}>
                 <Eyebrow>Needs you</Eyebrow>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {visibleGaps.map((gap, i) => (
-                    <li
-                      key={i}
-                      data-testid="today-gap"
-                      style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 16, color: "var(--deep-sea)" }}
-                    >
-                      <span aria-hidden style={{ width: 9, height: 9, borderRadius: 99, background: GAP_DOT[gap.kind], flexShrink: 0 }} />
-                      <span>{gapLine(gap)}</span>
-                    </li>
-                  ))}
+                  {visibleGaps.map((gap, i) => {
+                    const href = essentialsHref(gap, propertyIdByName);
+                    return (
+                      <li
+                        key={i}
+                        data-testid="today-gap"
+                        style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 16, color: "var(--deep-sea)" }}
+                      >
+                        <span aria-hidden style={{ width: 9, height: 9, borderRadius: 99, background: GAP_DOT[gap.kind], flexShrink: 0 }} />
+                        {href ? (
+                          <a
+                            href={href}
+                            data-testid="today-gap-action"
+                            style={{ color: "var(--koast-trench)", fontWeight: 600, textDecoration: "none" }}
+                          >
+                            {gapLine(gap)} &rarr;
+                          </a>
+                        ) : (
+                          <span>{gapLine(gap)}</span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {upcomingGapCount > 0 && (
                   <a

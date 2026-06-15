@@ -26,6 +26,10 @@ export type TodayHomeData = {
    * "Add your first property" CTA (distinct from the "all caught up" empty
    * state, which means ≥1 property with nothing scheduled). */
   hasNoProperties: boolean;
+  /** P7.5: property nickname → id, so the read-only "missing check-in details"
+   * gap (the agenda carries nicknames only, no ids) can deep-link to that
+   * property's access-info form. */
+  propertyIdByName: Record<string, string>;
 };
 
 export async function readTodayHome(
@@ -37,16 +41,21 @@ export async function readTodayHome(
   const [rollup, sufficiency, propRes] = await Promise.all([
     buildAgendaRollup(supabase, hostId),
     classifySufficiency(supabase, hostId),
-    supabase.from("properties").select("name, cover_photo_url").eq("user_id", hostId),
+    supabase.from("properties").select("id, name, cover_photo_url").eq("user_id", hostId),
   ]);
   const missingEssentials = sufficiency.per_property
     .filter((p) => p.missing_count > 0)
     .map((p) => p.property_name ?? "a property");
   const payload = toAgendaRenderPayload(rollup, missingEssentials);
-  const places = toPlacesMap(
-    (propRes.data ?? []) as { name: string | null; cover_photo_url: string | null }[],
-  );
+  const propRows = (propRes.data ?? []) as {
+    id: string;
+    name: string | null;
+    cover_photo_url: string | null;
+  }[];
+  const places = toPlacesMap(propRows);
+  const propertyIdByName: Record<string, string> = {};
+  for (const r of propRows) if (r.name) propertyIdByName[r.name] = r.id;
   const greeting = deriveGreeting(payload, opts.name, opts.hourLocal);
-  const hasNoProperties = (propRes.data ?? []).length === 0;
-  return { payload, places, greeting, hasNoProperties };
+  const hasNoProperties = propRows.length === 0;
+  return { payload, places, greeting, hasNoProperties, propertyIdByName };
 }

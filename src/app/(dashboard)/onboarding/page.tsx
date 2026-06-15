@@ -76,6 +76,7 @@ export default function OnboardingPage() {
   const [bathrooms, setBathrooms] = useState(1);
   const [maxGuests, setMaxGuests] = useState(4);
   const [propertyType, setPropertyType] = useState("entire_home");
+  const [baseRate, setBaseRate] = useState("");
   const [latitude, setLatitude] = useState<string | null>(null);
   const [longitude, setLongitude] = useState<string | null>(null);
 
@@ -176,6 +177,7 @@ export default function OnboardingPage() {
           bathrooms,
           max_guests: maxGuests,
           property_type: propertyType,
+          base_rate: baseRate || null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -502,6 +504,19 @@ export default function OnboardingPage() {
             <option value="private_room">Private Room</option>
             <option value="shared_room">Shared Room</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Base nightly rate
+          </label>
+          <input
+            type="number"
+            value={baseRate}
+            onChange={(e) => setBaseRate(e.target.value)}
+            className={inputClass}
+            min="0"
+            placeholder="Optional — seeds your calendar"
+          />
         </div>
       </div>
     </div>
