@@ -50,6 +50,27 @@ zero-dep) per the approved decision.
   caps Free at 1 and the route surfaces it as a friendly 403. The Done step
   states "Free plan includes 1 property."
 
+### P7.5 — access-info item actionable + self-clearing; Calendar seed (`c8d9709`)
+Surfaced during Cesar's first-look probe: the Today "missing check-in details"
+item wasn't tappable, AND it sat on a real disconnect — the item
+(`classifySufficiency` → `evaluateCapabilities`) and the M8 C3 check-in draft
+gate read **memory_facts** capabilities, while the host access-info form
+(`/api/properties/[id]/access`) writes **property_details** columns (which the
+draft route ALSO reads for the actual content). So the gate checked a different
+store than where the content lives.
+- **Read-bridge** (no memory_facts writes): `evaluateCapabilities` now also
+  accepts `property_details`; a capability is present if EITHER a memory_fact OR
+  the matching column carries it. `checkRequiredCapabilities` +
+  `classifySufficiency` fetch and pass it. Filling the form now clears the Today
+  item AND keeps the check-in draft gate consistent with the content it reads.
+- **Tappable**: the item deep-links → `/properties/[id]?settings=access`
+  (`essentialsHref` + a nickname→id map; falls back to `/properties`).
+- **Calendar seed**: a "Base nightly rate" field in the wizard → bootstrap seeds
+  the `calendar_rates` base layer, so a wizard-created property's Calendar isn't
+  empty.
+- Full memory_facts convergence (one store) is a later phase; the read-bridge is
+  the launch-correct, low-risk fix. +10 tests.
+
 ## Deferred (flagged, not silently dropped)
 - **Airbnb new-host connect** — behind the flag above; its own spike.
 - **Persistent sidebar "Add property" item** — deferred. It's awkward under the
@@ -57,11 +78,16 @@ zero-dep) per the approved decision.
   another) and tangles with the tab-visibility filter. The first-run card +
   the `/properties` "Add property" modal cover discoverability for v1. Add the
   persistent item when Pro/multi-property unlocks (it pairs with the quota lift).
-- **Wizard base-rate field** — the rate-seed plumbing is live (manual form seeds
-  via `base_rate`); the wizard doesn't collect a rate yet, so a wizard-created
-  property has an empty Calendar until the host sets rates / the engine runs.
-  Today (the acceptance bar) is unaffected (agenda ≠ rates). One optional field
-  closes it — small follow-up.
+- ~~**Wizard base-rate field**~~ — DONE in P7.5c (the wizard now collects an
+  optional base nightly rate → bootstrap seeds the Calendar grid).
+- **Pricing recommendations for new-host properties** — a brand-new property has
+  `pricing_rules` auto-created on first Pricing-tab visit, but **0
+  recommendations** until the daily VPS validator runs (6am ET). Could not read
+  `pricing_validator.py` from the dev box (no SSH to the Virginia VPS), so
+  **verify the validator's property query enumerates ALL properties (new hosts
+  included), not just the original fleet, before host #2** — observe whether the
+  new test property gets recs after the next 6am ET / 10:00 UTC run, or check on
+  the VPS directly. A hardcoded/host-filtered query would be a one-line VPS fix.
 
 ## LIVE new-host acceptance probe (run with Cesar)
 Fresh account → working Today, then the paused A5 billing gate. Each step has a
@@ -82,6 +108,10 @@ verifiable expectation.
    - EXPECT: the first-run card is GONE; the property is agenda-visible (its
      check-ins/turnovers show if the iCal had upcoming bookings; otherwise the
      calm "all set" state — but the property is no longer invisible).
+   - EXPECT (P7.5): if access info is blank, "missing check-in details" shows as
+     a TAPPABLE item → the access form. Fill door/wifi/parking → the item CLEARS
+     on next load (and the agent can now draft check-in messages). If a base
+     rate was entered in the wizard, the Calendar grid is populated.
 6. **(P7.3, hard-floor, gated like A4) BDC fresh-connect.** On the property page →
    Connect Booking.com → Hotel ID → the connect flow **scaffolds a Channex
    property** (the never-run-on-a-fresh-property path) → test → activate.
