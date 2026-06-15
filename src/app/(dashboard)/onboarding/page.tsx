@@ -800,6 +800,22 @@ export default function OnboardingPage() {
           <Home className="w-4 h-4" />
           Go to Dashboard
         </button>
+
+        {/* P7.3/P7.4: iCal (this flow) keeps the calendar in sync on every plan;
+            two-way rate + availability pushing is the Booking.com connect on the
+            property page. Airbnb connect is deferred for v1 (see connect-flags). */}
+        <div className="mt-6 max-w-sm mx-auto">
+          <a
+            href={propertyId ? `/properties/${propertyId}` : "/properties"}
+            className="text-sm font-medium text-coastal hover:text-deep-sea transition-colors"
+          >
+            Connect Booking.com for two-way rate &amp; availability sync &rarr;
+          </a>
+          <p className="mt-3 text-xs text-neutral-400">
+            Your Free plan includes 1 property. iCal keeps your calendar in sync;
+            connect Booking.com when you want Koast pushing rates back to the channel.
+          </p>
+        </div>
       </div>
     );
   };
