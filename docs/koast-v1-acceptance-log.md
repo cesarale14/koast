@@ -81,12 +81,29 @@ Audit verification (prod, byte-exact in SQL):
 - Equality: sent `messages` content == proposal final `messageText` == edit `final_text`
   (TRUE); `final_text != original_text` (TRUE — the edit was real and is what was sent).
 
+## A4 — OTA write flip (agent price → Channel) — ✅ PASS (hard-floor)
+The OTA write gate (`KOAST_ALLOW_BDC_CALENDAR_PUSH`, 1 flag → isCalendarPushEnabled →
+isOtaWriteEnabled) was flipped ON in Vercel. Controlled verification against Villa Jamaica:
+- **Pre-flip dry-run** (read-only `buildSafeBdcRestrictions` vs live BDC): of the 5 pending
+  agent adjust_price proposals, 2 under-±10% would push, 3 over-threshold REFUSED
+  (`rate_delta_exceeds_threshold`) — safe-restrictions proven before any write.
+- **Controlled write** — host approved the Aug-3 proposal in prod UI (BDC 218 → 210, −3.7%).
+  Verified (independent BDC re-read + DB): BDC Aug-3 = 210; Aug 4/5/6 still CLOSED (avail=0 —
+  host-closed dates preserved); Aug 1/2 untouched; pushed `["BDC","ABB"]`; proposal executed;
+  audit `actor=host, autonomy=confirmed, succeeded`.
+- **Gap found + fixed (`e9cd698`):** the proposals-lane OTA execution wrote NO
+  `pricing_performance` row (only the legacy /api/pricing/apply route did) — agent-applied
+  prices were invisible to the outcome flywheel + the host performance view.
+  `adjust_price` execute now upserts pricing_performance on push success (mirroring the apply
+  route); block_dates/set_min_stay don't (no rate). Aug-3 row backfilled. +2 deterministic tests.
+
 ## Inline ProposalCard (pre-acceptance build) — SHIPPED (`635a135` + `46b768a`)
 Live render of the real ProposalCard in the thread, edit-before-approve for send_guest_reply,
 refetch-on-focus consistency. Live-verification script:
 `docs/koast-v1-inline-proposalcard-live-verification.md`.
 
 ## Remaining NEEDS-CESAR
-PITR toggle · Stripe test-mode env · the A4 OTA-flag flip. (Optional: rotate the VAPID keypair
+PITR toggle · Stripe test-mode env. (A4 OTA flag now FLIPPED ON in prod — verified via the
+Aug-3 controlled write.) (Optional: rotate the VAPID keypair
 before public launch — the working pair was generated in-channel during the A1-5 fix; it's a
 low-stakes, trivially-rotatable notification key.)
