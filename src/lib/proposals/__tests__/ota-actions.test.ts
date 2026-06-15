@@ -102,6 +102,56 @@ describe("OTA op → per-date restriction wiring (gate on)", () => {
     expect(opts.perDate.get("2026-07-01")).toEqual({ rate: 250, availability: 1, stop_sell: false });
   });
 
+  test("adjust_price RECORDS pricing_performance on push success (A4 outcome-flywheel gap)", async () => {
+    mockApply.mockResolvedValue({
+      ok: true, pushedChannels: ["BDC", "ABB"], failedChannels: [], skipped: [],
+      successByDate: new Map(), failedByDate: new Map(),
+      targets: [{ channel_code: "BDC", rate_plan_id: "rp" }], bdcPlans: [], priorStateByChannel: new Map(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const upserts: Array<{ rows: any[]; opts: any }> = [];
+    const perfSvc = {
+      from: (table: string) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        upsert: (rows: any[], opts: any) => {
+          if (table === "pricing_performance") upserts.push({ rows, opts });
+          return Promise.resolve({ error: null });
+        },
+      }),
+    } as unknown as Parameters<typeof executeProposal>[0];
+
+    await executeProposal(perfSvc, {
+      proposal: otaRow("adjust_price", { propertyId: "prop-1", dates: ["2026-07-01", "2026-07-02"], rate: 250 }),
+      hostId: HOST,
+    });
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].opts.onConflict).toBe("property_id,date");
+    expect(upserts[0].rows.map((r) => r.date)).toEqual(["2026-07-01", "2026-07-02"]);
+    const row = upserts[0].rows[0];
+    expect(row.property_id).toBe("prop-1");
+    expect(row.suggested_rate).toBe(250);
+    expect(row.applied_rate).toBe(250);
+    expect(row.booked).toBe(false);
+    expect(row.channels_pushed).toEqual(["booking_com", "airbnb"]); // BDC/ABB → slugs
+  });
+
+  test("block_dates does NOT write pricing_performance (no rate to record)", async () => {
+    const upserts: unknown[] = [];
+    const perfSvc = {
+      from: (table: string) => ({
+        upsert: (rows: unknown) => {
+          if (table === "pricing_performance") upserts.push(rows);
+          return Promise.resolve({ error: null });
+        },
+      }),
+    } as unknown as Parameters<typeof executeProposal>[0];
+    await executeProposal(perfSvc, {
+      proposal: otaRow("block_dates", { propertyId: "prop-1", dates: ["2026-07-01"] }),
+      hostId: HOST,
+    });
+    expect(upserts).toHaveLength(0);
+  });
+
   test("set_min_stay builds min_stay_arrival per date", async () => {
     await executeProposal(svc, {
       proposal: otaRow("set_min_stay", { propertyId: "prop-1", dates: ["2026-07-01"], minStay: 3 }),

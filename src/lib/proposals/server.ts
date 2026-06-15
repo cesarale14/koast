@@ -125,6 +125,52 @@ async function executeOtaOp(
   return { ok: true, summary: { pushed_channels: r.pushedChannels, dates: action.dates, ...summaryExtra } };
 }
 
+/** channel code → the lower-case slug pricing_performance.channels_pushed uses
+ *  (matches channelSlugFor in /api/pricing/apply + revert). */
+function perfChannelSlug(code: string): string {
+  const c = code.toUpperCase();
+  if (c === "BDC") return "booking_com";
+  if (c === "ABB") return "airbnb";
+  if (c === "VRBO") return "vrbo";
+  if (c === "DIRECT") return "direct";
+  return code.toLowerCase();
+}
+
+/**
+ * Record an agent-applied rate in pricing_performance — the SAME outcome capture
+ * /api/pricing/apply does, so AGENT-applied prices feed the flywheel (the
+ * booking_new webhook + nightly reconciler attach actual_rate/booked) and show in
+ * the host performance view. Without this the proposals lane (the agent's path)
+ * silently skipped outcome tracking. Best-effort: a perf-write failure must NEVER
+ * fail a proposal whose OTA push already succeeded. Upsert on (property_id, date).
+ */
+async function recordRateApplyPerformance(
+  svc: Svc,
+  args: { propertyId: string; dates: string[]; rate: number; pushedChannels: string[] },
+): Promise<void> {
+  if (!args.propertyId || args.dates.length === 0) return;
+  try {
+    const slugs = args.pushedChannels.map(perfChannelSlug);
+    const appliedAt = new Date().toISOString();
+    const rows = args.dates.map((date) => ({
+      property_id: args.propertyId,
+      date,
+      suggested_rate: args.rate,
+      applied_rate: args.rate,
+      applied_at: appliedAt,
+      booked: false,
+      channels_pushed: slugs,
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (svc.from("pricing_performance") as any).upsert(rows, {
+      onConflict: "property_id,date",
+    });
+    if (error) console.warn("[proposals] pricing_performance upsert failed:", error.message);
+  } catch (err) {
+    console.warn("[proposals] pricing_performance write threw:", err instanceof Error ? err.message : err);
+  }
+}
+
 /** The action registry — action_type → how it executes + its risk shape. */
 export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
   assign_cleaner: {
@@ -323,7 +369,7 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
       "Push the nightly rate Koast recommends to your connected channels, without asking first.",
     otaTouching: true,
     stakesClass: "high",
-    execute: (svc, { payload }) => {
+    execute: async (svc, { payload }) => {
       // The rate is whiplash-bounded at PROPOSE time (against pricing_rules), so
       // the value carried here is already clamped — the model's raw number never
       // reaches Channex unbounded. availability=1/stop_sell=false are no-ops
@@ -332,14 +378,29 @@ export const PROPOSAL_ACTIONS: Record<string, ProposalActionDef> = {
         ((payload as { action?: { rate?: unknown } })?.action?.rate),
       );
       if (!Number.isFinite(rate) || rate <= 0) {
-        return Promise.resolve({ ok: false, error: "Proposal payload missing a positive action.rate" });
+        return { ok: false, error: "Proposal payload missing a positive action.rate" };
       }
-      return executeOtaOp(
+      const r = await executeOtaOp(
         svc,
         payload,
         () => ({ rate, availability: 1, stop_sell: false }),
         { op: "price", rate },
       );
+      // A4 gap fix: record the apply in pricing_performance so AGENT-applied
+      // prices feed the outcome flywheel (the apply route does the same).
+      if (r.ok) {
+        const action = ((payload as { action?: unknown })?.action ?? {}) as OtaActionFields;
+        const pushed = Array.isArray((r.summary as { pushed_channels?: unknown }).pushed_channels)
+          ? ((r.summary as { pushed_channels: unknown[] }).pushed_channels as string[])
+          : [];
+        await recordRateApplyPerformance(svc, {
+          propertyId: action.propertyId ?? "",
+          dates: action.dates ?? [],
+          rate,
+          pushedChannels: pushed,
+        });
+      }
+      return r;
     },
   },
   set_min_stay: {
