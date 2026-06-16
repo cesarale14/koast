@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { isLowConfidenceRec, LOW_CONFIDENCE_LABEL } from "@/lib/pricing/confidence";
 
 type Signal = { key: string; label: string; score: number; weight: number; reason?: string | null };
 
@@ -45,18 +46,43 @@ function directionGlyph(score: number): { glyph: string; color: string } {
   return { glyph: "▬", color: "var(--tideline)" };
 }
 
+function LowConfidenceChip() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 6 }}>
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "2px 8px",
+          borderRadius: 999,
+          border: "1px solid var(--amber-tide)",
+          color: "var(--amber-tide)",
+          fontSize: 11,
+          fontWeight: 600,
+        }}
+      >
+        {LOW_CONFIDENCE_LABEL}
+      </span>
+      <span style={{ fontSize: 11, color: "var(--tideline)" }}>limited market data so far</span>
+    </div>
+  );
+}
+
 export default function WhyThisRate({ factors }: Props) {
   const [open, setOpen] = useState(false);
   const signals = parseSignals(factors);
+  const lowConfidence = isLowConfidenceRec(factors);
   if (signals.length === 0) {
     return (
       <div style={{ fontSize: 12, color: "var(--tideline)", padding: "10px 0" }}>
+        {lowConfidence && <LowConfidenceChip />}
         No signals available for this date.
       </div>
     );
   }
   return (
     <div style={{ paddingTop: 8 }}>
+      {lowConfidence && <LowConfidenceChip />}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

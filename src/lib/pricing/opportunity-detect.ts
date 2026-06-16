@@ -23,6 +23,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createProposal } from "@/lib/proposals/server";
+import { isLowConfidenceRec, LOW_CONFIDENCE_NOTE } from "./confidence";
 import { applyPricingRules, type PricingRulesRow } from "./apply-rules";
 import { isRecFresh, todayStrUTC } from "./freshness";
 import type { BlockData } from "@/lib/agent/render/blocks";
@@ -56,6 +57,10 @@ export interface DetectedOpportunity {
   /** proposedRate − currentRate (negative for a gap-night discount). */
   deltaAbs: number;
   rationale: string;
+  /** P7: the source rec has an insufficient comp set — the proposal carries an
+   * "Early estimate" chip + a low-confidence note so a new host's first
+   * auto-proposals read as estimates. */
+  lowConfidence: boolean;
 }
 
 export interface DetectResult {
@@ -88,8 +93,8 @@ function signalReason(rs: Record<string, unknown> | null, key: string): string |
   return sig && typeof sig.reason === "string" ? sig.reason : null;
 }
 
-function calendarChangeBlock(property: string, date: string, rate: number): BlockData {
-  return { kind: "calendar_change", data: { property, date, change: "price", value: rate, dateCount: 1 } };
+function calendarChangeBlock(property: string, date: string, rate: number, lowConfidence: boolean): BlockData {
+  return { kind: "calendar_change", data: { property, date, change: "price", value: rate, dateCount: 1, lowConfidence } };
 }
 
 /** Is `date` (YYYY-MM-DD) a Friday or Saturday in UTC? */
@@ -225,6 +230,7 @@ export async function detectPricingOpportunities(
         proposedRate: proposed,
         deltaAbs,
         rationale: `Gap night (${gapReason.toLowerCase()}) — drop $${current} → $${proposed} to fill it before it goes empty.`,
+        lowConfidence: isLowConfidenceRec(rec.reason_signals),
       });
       continue; // gap-night is the more specific signal; don't also flag stale-weekend
     }
@@ -243,6 +249,7 @@ export async function detectPricingOpportunities(
           proposedRate: proposed,
           deltaAbs,
           rationale: `Weekend below market — raise $${current} → $${proposed}${basis}.`,
+          lowConfidence: isLowConfidenceRec(rec.reason_signals),
         });
       }
     }
@@ -256,7 +263,7 @@ export async function detectPricingOpportunities(
   const created: Array<{ proposalId: string; opportunity: DetectedOpportunity }> = [];
   for (const opp of toEmit) {
     const payload = {
-      block: calendarChangeBlock(propertyName, opp.date, opp.proposedRate),
+      block: calendarChangeBlock(propertyName, opp.date, opp.proposedRate, opp.lowConfidence),
       action: { propertyId: args.propertyId, dates: [opp.date], rate: opp.proposedRate, channel: null },
     };
     const { proposal } = await createProposal(svc, {
@@ -264,7 +271,7 @@ export async function detectPricingOpportunities(
       propertyId: args.propertyId,
       actionType: "adjust_price",
       payload,
-      rationale: opp.rationale,
+      rationale: opp.lowConfidence ? `${opp.rationale} ${LOW_CONFIDENCE_NOTE}` : opp.rationale,
       createdBy: "worker",
     });
     created.push({ proposalId: proposal.id, opportunity: opp });

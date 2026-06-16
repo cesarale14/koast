@@ -14,6 +14,7 @@
 import { KoastRate } from "@/components/polish/KoastRate";
 import type { CalendarChangeBlockData } from "./types";
 import { fmtWeekdayMonthDay } from "./format";
+import { LOW_CONFIDENCE_LABEL } from "@/lib/pricing/confidence";
 
 function rangeLabel(date: string, dateCount: number | null | undefined): string {
   const base = fmtWeekdayMonthDay(date);
@@ -49,6 +50,23 @@ export function CalendarChangeBlock({ data }: { data: CalendarChangeBlockData })
         <div style={{ color: "var(--tideline)", fontSize: 13, marginTop: 2 }}>
           {rangeLabel(data.date, data.dateCount)}
         </div>
+        {data.lowConfidence && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              marginTop: 6,
+              padding: "2px 8px",
+              borderRadius: 999,
+              border: "1px solid var(--amber-tide)",
+              color: "var(--amber-tide)",
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            {LOW_CONFIDENCE_LABEL}
+          </span>
+        )}
       </div>
       <div style={{ flexShrink: 0 }}>
         {data.change === "block" && (

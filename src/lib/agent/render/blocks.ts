@@ -70,6 +70,10 @@ export const calendarChangeBlockDataSchema = z.object({
   value: z.number().nullable().optional(),
   /** Dates spanned when >1 (renders "3 nights"); omit/1 for a single date. */
   dateCount: z.number().int().positive().nullable().optional(),
+  /** P7: the underlying rec is low-confidence (insufficient comp set) — the card
+   * renders an "Early estimate" chip so a new host's first auto-proposals read
+   * as estimates, not confident calls. */
+  lowConfidence: z.boolean().optional(),
 });
 
 /**
