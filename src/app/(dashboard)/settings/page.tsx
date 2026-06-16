@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
+import { PLANS, type PlanName } from "@/lib/billing/plans";
 import { AutoApproveSettings } from "@/components/settings/AutoApproveSettings";
 import {
   User,
@@ -55,6 +56,42 @@ const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
   sms_enabled: false,
   push_enabled: false,
 };
+
+/** The live Pro price object from /api/billing/status (derived from Stripe). */
+interface ProPrice {
+  amountCents: number;
+  currency: string;
+  interval: string | null;
+}
+/** /api/billing/status payload (AccessResolution + the live proPrice). */
+interface BillingStatus {
+  plan: PlanName;
+  proAccess: boolean;
+  comped: boolean;
+  billingEnabled: boolean;
+  status: string | null;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
+  proPrice: ProPrice | null;
+}
+
+/**
+ * Format the Pro price for display — the ONLY place a price string is built,
+ * and it's built from the live Stripe price object (operator msg 3730). Never
+ * a hardcoded amount. Returns null when no price is known, so callers render
+ * the button without a price rather than asserting one that could diverge from
+ * the actual charge.
+ */
+function formatProPrice(p: ProPrice | null): string | null {
+  if (!p) return null;
+  const amount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: (p.currency || "usd").toUpperCase(),
+    minimumFractionDigits: p.amountCents % 100 === 0 ? 0 : 2,
+  }).format(p.amountCents / 100);
+  const interval = p.interval === "month" ? "mo" : p.interval === "year" ? "yr" : p.interval;
+  return interval ? `${amount}/${interval}` : amount;
+}
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -110,6 +147,8 @@ export default function SettingsPage() {
 
   // Plan
   const [propertyCount, setPropertyCount] = useState(0);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   // Notifications
   const [notifs, setNotifs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATIONS);
@@ -148,6 +187,12 @@ export default function SettingsPage() {
         .select("id", { count: "exact", head: true });
       setPropertyCount(count ?? 0);
 
+      // Live plan + Stripe-derived Pro price for the Plan & Billing card.
+      try {
+        const bRes = await fetch("/api/billing/status");
+        if (bRes.ok) setBilling(await bRes.json());
+      } catch {}
+
       const { data: icalData } = await supabase
         .from("ical_feeds")
         .select("id, platform, feed_url, last_synced, is_active, property_id, properties(name)");
@@ -183,6 +228,54 @@ export default function SettingsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Post-checkout return (Stripe redirects to /settings?billing=success|cancelled).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const b = params.get("billing");
+    if (b === "success") {
+      toast("Welcome to Pro — your subscription is active.");
+      router.replace("/settings");
+    } else if (b === "cancelled") {
+      toast("Checkout cancelled — no charge was made.", "error");
+      router.replace("/settings");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Start a real Stripe Checkout Session (Free → Pro). Test mode through A5.
+  const handleUpgrade = async () => {
+    setBillingBusy(true);
+    try {
+      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const json = await res.json();
+      if (res.ok && json.url) {
+        window.location.href = json.url;
+        return;
+      }
+      toast(json.error ?? "Couldn't start checkout.", "error");
+    } catch {
+      toast("Couldn't start checkout.", "error");
+    }
+    setBillingBusy(false);
+  };
+
+  // Open the Stripe Customer Portal (manage / cancel an active subscription).
+  const handleManageBilling = async () => {
+    setBillingBusy(true);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const json = await res.json();
+      if (res.ok && json.url) {
+        window.location.href = json.url;
+        return;
+      }
+      toast(json.error ?? "Couldn't open the billing portal.", "error");
+    } catch {
+      toast("Couldn't open the billing portal.", "error");
+    }
+    setBillingBusy(false);
+  };
 
   const saveNotifs = async (updated: NotificationPrefs) => {
     setNotifs(updated);
@@ -375,17 +468,29 @@ export default function SettingsPage() {
     return "bg-neutral-100 text-neutral-700";
   };
 
+  // Plan + price derived from the live billing status (Stripe is the source
+  // of the price — never a hardcoded string). Defaults to Free until loaded.
+  const plan: PlanName = billing?.plan ?? "free";
+  const planConfig = PLANS[plan];
+  const maxProps = planConfig.maxProperties;
+  const limitLabel = maxProps === -1 ? "unlimited" : String(maxProps);
+  const planLabel = planConfig.name;
+  const proPriceLabel = formatProPrice(billing?.proPrice ?? null);
+
   const featureList = [
-    { label: "1 property", included: true },
+    {
+      label: `${maxProps === -1 ? "Unlimited" : maxProps} ${maxProps === 1 ? "property" : "properties"}`,
+      included: true,
+    },
     { label: "iCal sync", included: true },
     { label: "AI messaging", included: true },
     { label: "Cleaning tasks", included: true },
-    { label: "Multi-property", included: false },
-    { label: "Channex integration", included: false },
-    { label: "Priority support", included: false },
+    { label: "Multi-property", included: maxProps !== 1 },
+    { label: "Channex integration", included: planConfig.calendarSync === "channex" },
+    { label: "Priority support", included: plan !== "free" },
   ];
 
-  const usagePercent = Math.min((propertyCount / 1) * 100, 100);
+  const usagePercent = maxProps === -1 ? 0 : Math.min((propertyCount / maxProps) * 100, 100);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -441,20 +546,24 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-success-light text-[var(--positive)]">
-              Free
+              {planLabel}
             </span>
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-neutral-600">{propertyCount} of 1 properties used</span>
-              <span className="text-neutral-400">{usagePercent}%</span>
+              <span className="text-neutral-600">
+                {propertyCount} of {limitLabel} {maxProps === 1 ? "property" : "properties"} used
+              </span>
+              {maxProps !== -1 && <span className="text-neutral-400">{Math.round(usagePercent)}%</span>}
             </div>
-            <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-coastal rounded-full transition-all duration-500"
-                style={{ width: `${usagePercent}%` }}
-              />
-            </div>
+            {maxProps !== -1 && (
+              <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-coastal rounded-full transition-all duration-500"
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             {featureList.map((f) => (
@@ -469,15 +578,42 @@ export default function SettingsPage() {
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <button
-              disabled
-              className="h-9 px-4 text-sm font-semibold text-white bg-coastal rounded-lg opacity-50 cursor-not-allowed"
-            >
-              Upgrade to Pro &mdash; $79/mo
-            </button>
-            <span className="text-xs font-medium text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">
-              Coming Soon
-            </span>
+            {!billing ? (
+              <span className="text-sm text-neutral-400">Loading plan&hellip;</span>
+            ) : billing.proAccess ? (
+              <>
+                {billing.comped ? (
+                  <span className="text-sm text-neutral-500">Pro access &mdash; complimentary.</span>
+                ) : billing.billingEnabled ? (
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={billingBusy}
+                    className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {billingBusy ? "Opening…" : "Manage billing"}
+                  </button>
+                ) : null}
+                {billing.cancelAtPeriodEnd && (
+                  <span className="text-xs font-medium text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                    Cancels at period end
+                  </span>
+                )}
+              </>
+            ) : billing.billingEnabled ? (
+              <button
+                onClick={handleUpgrade}
+                disabled={billingBusy}
+                className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50"
+              >
+                {billingBusy
+                  ? "Starting…"
+                  : proPriceLabel
+                    ? `Upgrade to Pro — ${proPriceLabel}`
+                    : "Upgrade to Pro"}
+              </button>
+            ) : (
+              <span className="text-sm text-neutral-400">Upgrade unavailable &mdash; billing not configured.</span>
+            )}
           </div>
         </div>
       </SectionCard>
@@ -535,7 +671,7 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
-        <p className="text-xs text-neutral-400 mt-3">Part of the Pro plan ($79/mo). Includes rate pushing, availability sync, real-time booking webhooks, and guest messaging.</p>
+        <p className="text-xs text-neutral-400 mt-3">Part of the Pro plan. Includes rate pushing, availability sync, real-time booking webhooks, and guest messaging.</p>
       </SectionCard>
 
       {/* NOTIFICATIONS */}
