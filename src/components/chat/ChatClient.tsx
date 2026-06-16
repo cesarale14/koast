@@ -1050,6 +1050,7 @@ export function ChatClient({
           onSelectConversation={onSelectConversation}
           onNewConversation={onNewConversation}
           onDeleteConversation={onDeleteConversation}
+          onNavigate={() => setDrawerOpen(false)}
         />
       </div>
       {drawerOpen && (

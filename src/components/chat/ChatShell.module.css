@@ -128,6 +128,43 @@
 }
 .rail-head .new-btn svg { width: 12px; height: 12px; stroke-width: 1.8; }
 
+/* ---------- Rail nav (mobile-only global tab navigation) ----------
+   The global tab nav folded into the conversation drawer so the single
+   chat hamburger surfaces tabs + conversations (operator msg 3725/3727).
+   display:none on desktop — the 60px global icon rail (DesktopSidebar)
+   handles nav there; this block is revealed only inside the <768px
+   drawer (see the @media (max-width: 767.98px) section below). */
+.rail-nav {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 8px 6px;
+  border-bottom: 0.5px solid var(--rule);
+  flex-shrink: 0;
+}
+.rail-nav-label {
+  padding: 10px 10px 4px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--fg-3);
+}
+.rail-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: 13.5px; font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--fg-2);
+  text-decoration: none;
+  transition:
+    background var(--dur-base) var(--ease-default),
+    color var(--dur-base) var(--ease-default);
+}
+.rail-nav-item:hover { background: var(--koast-shore); color: var(--fg); }
+.rail-nav-item.is-active { background: var(--koast-shore); color: var(--fg); }
+.rail-nav-item svg { flex-shrink: 0; color: var(--fg-3); }
+.rail-nav-item.is-active svg { color: var(--fg); }
+
 .rail-list {
   flex: 1;
   overflow-y: auto;
@@ -927,6 +964,9 @@
     height: 100%;
     border-right: none;
   }
+
+  /* Reveal the folded-in global tab nav inside the mobile drawer. */
+  .rail-nav { display: flex; }
 
   .scrim { display: block; }
 

@@ -21,9 +21,9 @@ export const STATIC_ROUTES: CmdKEntry[] = [
   {
     id: "route:/",
     kind: "route",
-    label: "Chat",
-    hint: "Conversation with Koast",
-    keywords: ["chat", "home", "conversation", "koast"],
+    label: "Home",
+    hint: "Today + conversation with Koast",
+    keywords: ["home", "today", "chat", "conversation", "koast", "dashboard"],
     href: "/",
   },
   {

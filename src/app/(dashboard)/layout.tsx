@@ -16,45 +16,17 @@ import { useAuditPoll } from "@/components/chat/useAuditPoll";
 import { useSurfaceTelemetry } from "@/hooks/useSurfaceTelemetry";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { filterNavGroupsByVisibility } from "@/lib/tab-visibility";
-import {
-  LayoutDashboard, CalendarDays, MessageCircle,
-  Home, DollarSign, Star, Sparkles,
-  TrendingUp, GitCompare,
-  Settings, Menu, ChevronLeft, X,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { navGroups, isNavItemActive, type NavItem, type NavGroup } from "@/lib/nav/nav-config";
+import { Settings, Menu, ChevronLeft, X } from "lucide-react";
 import { KoastMark } from "@/components/chat/KoastMark";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { createClient } from "@/lib/supabase/client";
 
-interface NavItem { name: string; href: string; icon: LucideIcon; external?: boolean; badge?: number | null; }
-interface NavGroup { label?: string; items: NavItem[]; }
-
-const navGroups: NavGroup[] = [
-  {
-    items: [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Calendar", href: "/calendar", icon: CalendarDays },
-      { name: "Messages", href: "/messages", icon: MessageCircle },
-    ],
-  },
-  {
-    label: "MANAGE",
-    items: [
-      { name: "Properties", href: "/properties", icon: Home },
-      { name: "Pricing", href: "/pricing", icon: DollarSign },
-      { name: "Reviews", href: "/reviews", icon: Star },
-      { name: "Turnovers", href: "/turnovers", icon: Sparkles },
-    ],
-  },
-  {
-    label: "INSIGHTS",
-    items: [
-      { name: "Market Intel", href: "/market-intel", icon: TrendingUp },
-      { name: "Comp Sets", href: "/comp-sets", icon: GitCompare },
-    ],
-  },
-];
+/* Nav source (navGroups) + active-state helper (isNavItemActive) live in
+   @/lib/nav/nav-config — single definition shared with the chat drawer's
+   RailNav so the icon rail, the mobile drawer, and this legacy sidebar
+   can never drift. NavItem / NavGroup types re-imported for the link
+   component props below. */
 
 const SIDEBAR_BG = "linear-gradient(180deg, var(--deep-sea) 0%, var(--abyss) 100%)";
 const SIDEBAR_RIGHT_EDGE = "inset -1px 0 0 rgba(76,196,204,0.15)";
@@ -227,7 +199,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
                   {group.label && <GroupLabel label={group.label} />}
                   <div className="space-y-0.5">
                     {group.items.map((item) => {
-                      const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                      const isActive = isNavItemActive(item.href, pathname);
                       return <NavLinkExpanded key={item.name} item={item} isActive={isActive} />;
                     })}
                   </div>
@@ -249,7 +221,7 @@ function DesktopSidebar({ pathname, expanded, onToggle, groups }: { pathname: st
                 <div key={gi} className={`w-full flex flex-col items-center ${gi > 0 ? "mt-2 pt-2" : ""}`} style={gi > 0 ? { borderTop: "1px solid rgba(76,196,204,0.1)" } : {}}>
                   <div className="flex flex-col items-center gap-0.5">
                     {group.items.map((item) => {
-                      const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                      const isActive = isNavItemActive(item.href, pathname);
                       return <NavLinkCollapsed key={item.name} item={item} isActive={isActive} />;
                     })}
                   </div>
@@ -316,7 +288,7 @@ function MobileSidebar({ pathname, onClose, groups }: { pathname: string; onClos
               {group.label && <GroupLabel label={group.label} />}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const isActive = isNavItemActive(item.href, pathname);
                   return <NavLinkExpanded key={item.name} item={item} isActive={isActive} onClick={onClose} />;
                 })}
               </div>
@@ -399,14 +371,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const chatPrimary = isChatPrimary(pathname);
 
   // M13 Phase 1.A follow-on (operator msg 3521 FIX 2): chat-primary OWNS
-  // the viewport. The legacy StayCommand chrome (DesktopSidebar +
-  // MobileSidebar + global topbar header) is stripped on `/` and
-  // `/chat/*`. The chat surface's own ChatShell.Topbar provides the
-  // single nav affordance (hamburger opens Rail with conversation
-  // list + property dropdown + audit log + new thread + SearchAffordance
-  // which dispatches the OPEN_EVENT to the globally-mounted
-  // CommandPalette below). Inspect routes keep the legacy chrome
-  // unchanged.
+  // the viewport. The legacy global TOPBAR header is stripped on `/` and
+  // `/chat/*` — the chat surface's own ChatShell.Topbar provides the
+  // property dropdown + audit log + new thread + SearchAffordance (which
+  // dispatches the OPEN_EVENT to the globally-mounted CommandPalette).
+  //
+  // Nav-blocker fix (operator msg 3725 / 3727): the chat-primary surface
+  // previously had NO persistent global nav — tabs were reachable only
+  // via ⌘K / the palette, which a new host never discovers (same
+  // "works-because-I-know-the-URL" class as the onboarding dead-end). We
+  // now mount the SAME collapsed 60px icon rail (DesktopSidebar,
+  // desktop-only via `hidden md:flex`) the inspect surfaces use, as a
+  // quiet additional doorway, and offset the chat by its width. On mobile
+  // the tabs fold into the chat hamburger drawer (RailNav) — no second
+  // trigger. The rail does NOT replace the palette; ⌘K, the property
+  // picker, and the command strip are untouched. MobileSidebar is NOT
+  // mounted here (the chat drawer covers mobile). Inspect routes keep the
+  // full legacy chrome unchanged.
   //
   // M13 Phase 1.B Step 2: CommandPalette is mounted at the outer
   // dashboard layout scope (not branched), so ⌘K + the OPEN_EVENT
@@ -440,8 +421,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               primary branch and replaces the dropped page's role. */}
           <ChatURLSync />
           <AuditPollMount />
+          {/* Persistent global nav — the quiet collapsed icon rail. Same
+              component + same dynamicNavGroups (tab-visibility filtered) as
+              the inspect surfaces, so nav never drifts. `hidden md:flex`
+              inside, so it self-removes on mobile where the chat drawer's
+              RailNav takes over. */}
+          <DesktopSidebar
+            pathname={pathname}
+            expanded={sidebarExpanded}
+            onToggle={toggleSidebar}
+            groups={dynamicNavGroups}
+          />
+          {/* Offset the chat by the rail width at md+ only (rail is
+              desktop-only). Mirrors the legacy branch's `.main-offset`
+              pattern; transitions with the rail expand/collapse. */}
+          <style>{`@media(min-width:768px){.chat-primary-offset{margin-left:${sidebarWidth}px}}`}</style>
           <div
-            className="flex flex-col overflow-hidden"
+            className="chat-primary-offset flex flex-col overflow-hidden transition-[margin-left] duration-200 ease-out"
             style={{
               height: "100dvh",
               backgroundColor: "var(--shore)",
@@ -503,7 +499,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Menu size={20} strokeWidth={1.5} />
                 </button>
                 <span className="md:hidden text-sm font-medium" style={{ color: "var(--coastal)" }}>
-                  {navGroups.flatMap((g) => g.items).find((i) => i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))?.name ?? "Koast"}
+                  {navGroups.flatMap((g) => g.items).find((i) => isNavItemActive(i.href, pathname))?.name ?? "Koast"}
                 </span>
               </div>
               <TopBarSearch />
