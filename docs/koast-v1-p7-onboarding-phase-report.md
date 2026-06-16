@@ -5,6 +5,41 @@ Investigation + ultraplan: `docs/koast-v1-p7-onboarding-investigation-and-ultrap
 Built merge-on-green, hard gates only (tsc + lint + full jest). Decisions per
 Cesar's §7 sign-off.
 
+## P7 — COMPLETE (final summary)
+A brand-new account now goes: **fresh signup → first-run card → wizard →
+property visible on Today → tap the access nag → fill the form → nag clears +
+the check-in draft gate stops demanding it → Calendar shows seeded rates →
+Pricing produces recs (marked low-confidence while comps are thin).** Everything
+shipped merge-on-green; commits in each section below.
+
+1. **Entry point (P7.1, `db983b1`)** — first-run "Add your first property" card
+   on the empty Today → the (previously unreachable) `/onboarding` wizard;
+   `todayView` keeps first-run distinct from all-set.
+2. **Bootstrap + timezone invariant (P7.2, `db983b1`)** — one shared
+   `bootstrapNewProperty` on all four creation paths sets a non-null IANA tz
+   (offline `tz-lookup`), ensures `property_details`, seeds `calendar_rates` when
+   a base rate is given. tz-never-null makes the property agenda-visible.
+3. **iCal-on-Free + channel connect (P7.3, `9c7d65b`)** — iCal is the Free path;
+   Booking.com two-way is the post-onboarding connect (scaffold-on-connect);
+   Airbnb deferred behind `KOAST_ENABLE_AIRBNB_CONNECT` (off).
+4. **Plan gating (P7.4, `9c7d65b`)** — property #1 onboards on Free, no Stripe;
+   the quota trigger caps Free at 1 with a friendly 403.
+5. **Store read-bridge (P7.5, `c8d9709`)** — the capability gate (Today nag + the
+   M8 C3 check-in draft gate) now reads `property_details` too, so filling the
+   host access form clears the nag AND lets the agent draft; the nag is a tappable
+   deep-link. Wizard base-rate field seeds the Calendar.
+6. **Validator broadened (`koast-workers bc5bc8b`)** — daily validator covers ALL
+   properties (calendar_rates baseline for non-Channex), `--all-properties` now on
+   the timer ExecStart (detector on); generation does NOT widen apply.
+7. **Low-confidence chip (`cef424e`)** — "Early estimate" chip + rationale note on
+   recs and auto-proposals when comps are insufficient; verified live (3 capped,
+   chipped proposals).
+8. **Pattern named + swept** — tz-skip / store-split / validator-filter are one
+   class (works for the founding 2, silent no-op for new hosts). Only the
+   validator was an active dead-end; **`koast-workers/db.py get_active_properties()`
+   is the same shape but DEAD (no callers) — noted as a latent trap**;
+   reviews/messages sync filter to channex by design.
+
 ## What shipped
 
 ### P7.1 + P7.2 — entry point + the never-null-timezone invariant (`db983b1`)
@@ -115,19 +150,20 @@ coverage 60 from the calendar_rates baseline, live=0), **no proposals/bells**.
 - *Apply surface NOT widened* — `applyOtaRestrictions` belt 3 refuses a
   no-Channex property (`property_not_connected`) even with the OTA flag ON;
   `isOtaWriteEnabled` delegates to the single gate. Generation ≠ apply.
-- *Coherent + low-confidence* — the new property's recs are coherent (140–150
-  around a 150 baseline; max 6.7% delta, no wild numbers). Low confidence is
-  captured in data (`competitor.confidence=0`, `comp_set_insufficient`, most
-  signals "no data"); `WhyThisRate` shows the per-signal reasons; NULL `urgency`
-  sorts them as `review` (lowest). **Open UX call:** no prominent
-  "early-estimate / limited-data" badge yet — recommend adding one driven by
-  `comp_set_quality='insufficient'` so a new host's first recs read as estimates,
-  not confident calls. Coherent + not confidently-wrong today; the badge is the
-  remaining polish.
+- *Coherent + low-confidence, SURFACED* — the new property's recs are coherent
+  (140–150 around a 150 baseline; max 6.7% delta). Low confidence (`competitor.
+  confidence=0` / `comp_set_insufficient`) is now rendered as an **"Early
+  estimate" chip** (shared `isLowConfidenceRec` predicate) on BOTH surfaces:
+  `WhyThisRate` (the Pricing review panel) and the auto-proposal
+  `CalendarChangeBlock` (+ a low-confidence note folded into the proposal
+  rationale). Fallback comps (confidence 0.5) are not flagged. `cef424e`.
 
-**Remaining to declare P7 done:** enable `--all-properties` on the daily timer's
-ExecStart (deliberate one-line change, post-review) so new hosts get recs on the
-6am ET tick; the controlled run already covered the acceptance property.
+**Timer enabled + auto-wave verified.** The daily service ExecStart now runs
+`--all-properties` (detector ON), so new hosts get recs on the 06:00 ET tick.
+Controlled detector run on the new property: **3 proposals** (cap is 8 — no
+flood), **all carrying the chip** (`lowConfidence=true`) and the rationale note,
+coherent ("drop $150 → $145 to fill a gap night"). Apply stays refused
+(no-Channex). **P7 is done.**
 
 ## Deferred (flagged, not silently dropped)
 - **Airbnb new-host connect** — behind the flag above; its own spike.
