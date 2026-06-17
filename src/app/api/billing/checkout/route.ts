@@ -59,11 +59,31 @@ export async function POST() {
         metadata: { koast_user_id: user.id },
       });
       customerId = customer.id;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("user_subscriptions") as any).upsert(
-        { user_id: user.id, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" },
-      );
+      // Persist the customer id so the post-payment webhook can map the
+      // subscription back to this user. This MUST succeed: user_subscriptions.tier
+      // is NOT NULL with no default, so a fresh INSERT has to carry tier
+      // ('free' — the host stays Free until the webhook flips them). When a row
+      // already exists we only set the customer id (never touch tier — don't
+      // clobber a comped/pro row). If the write fails we ABORT rather than open
+      // a checkout we can't reconcile — otherwise the host pays and stays Free
+      // (the A5 failure: the prior code used .upsert WITHOUT tier and ignored
+      // the error, so the NOT-NULL violation failed silently).
+      const nowIso = new Date().toISOString();
+      const persist = subRow
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? await (supabase.from("user_subscriptions") as any)
+            .update({ stripe_customer_id: customerId, updated_at: nowIso })
+            .eq("user_id", user.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : await (supabase.from("user_subscriptions") as any)
+            .insert({ user_id: user.id, tier: "free", stripe_customer_id: customerId, updated_at: nowIso });
+      if (persist.error) {
+        console.error("[billing/checkout] failed to persist stripe_customer_id:", persist.error.message);
+        return NextResponse.json(
+          { error: `Could not start checkout: ${persist.error.message}` },
+          { status: 500 },
+        );
+      }
     }
 
     const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.koasthq.com";

@@ -107,3 +107,45 @@ test("handler failure → claim rolled back + 500 (Stripe retries)", async () =>
   expect(res.status).toBe(500);
   expect(calls.deleted).toBe(true); // claim rolled back so the retry reprocesses
 });
+
+test("missing row → self-heals via customer.koast_user_id metadata, then syncs", async () => {
+  const event = {
+    id: "evt_h",
+    type: "customer.subscription.updated",
+    data: { object: { id: "sub_1", customer: "cus_1", status: "active" } },
+  };
+  const stripe = {
+    webhooks: { constructEvent: jest.fn(() => event) },
+    subscriptions: { retrieve: jest.fn(async () => ({ id: "sub_1", status: "active" })) },
+    customers: { retrieve: jest.fn(async () => ({ id: "cus_1", metadata: { koast_user_id: "u-heal" } })) },
+  };
+  (getStripe as jest.Mock).mockReturnValue(stripe);
+
+  const usInsert = jest.fn(async () => ({ error: null }));
+  const us = {
+    select: () => us,
+    eq: () => us,
+    maybeSingle: async () => ({ data: null }), // no row yet → heal inserts one
+    insert: usInsert,
+  };
+  const events = {
+    insert: jest.fn(async () => ({ error: null })),
+    delete: () => ({ eq: async () => ({ error: null }) }),
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = { from: (t: string) => (t === "stripe_events" ? events : us) } as any;
+  (createServiceClient as jest.Mock).mockReturnValue(client);
+
+  // First sync: no row for the customer. After heal creates the row: ok.
+  mockSync
+    .mockResolvedValueOnce({ ok: false, reason: "no user_subscriptions row for customer cus_1" })
+    .mockResolvedValueOnce({ ok: true, userId: "u-heal", tier: "pro", comped: false });
+
+  const res = await POST(req(JSON.stringify(event)));
+  expect(res.status).toBe(200);
+  expect(stripe.customers.retrieve).toHaveBeenCalledWith("cus_1");
+  expect(usInsert).toHaveBeenCalledWith(
+    expect.objectContaining({ user_id: "u-heal", tier: "free", stripe_customer_id: "cus_1" }),
+  );
+  expect(mockSync).toHaveBeenCalledTimes(2);
+});

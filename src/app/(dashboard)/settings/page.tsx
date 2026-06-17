@@ -230,16 +230,46 @@ export default function SettingsPage() {
   }, []);
 
   // Post-checkout return (Stripe redirects to /settings?billing=success|cancelled).
+  // The success toast is gated on ACTUAL Pro state, not the redirect param — the
+  // webhook flips the plan asynchronously, so we poll /api/billing/status for a
+  // short window and only claim "Pro" once proAccess is truly true.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const b = params.get("billing");
-    if (b === "success") {
-      toast("Welcome to Pro — your subscription is active.");
-      router.replace("/settings");
-    } else if (b === "cancelled") {
+    if (b === "cancelled") {
       toast("Checkout cancelled — no charge was made.", "error");
       router.replace("/settings");
+      return;
     }
+    if (b !== "success") return;
+    router.replace("/settings"); // clean the URL immediately
+
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await fetch("/api/billing/status");
+        if (res.ok) {
+          const data: BillingStatus = await res.json();
+          if (!cancelled && data.proAccess) {
+            setBilling(data);
+            toast("Welcome to Pro — your subscription is active.");
+            return;
+          }
+        }
+      } catch {}
+      if (cancelled) return;
+      if (attempts < 8) {
+        window.setTimeout(poll, 1500);
+      } else {
+        toast("Payment received — finalizing your upgrade. Refresh in a moment if it hasn't updated.", "error");
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

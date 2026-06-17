@@ -17,10 +17,15 @@ import { resolveAccess } from "@/lib/billing/plan";
 const mockResolve = resolveAccess as jest.MockedFunction<typeof resolveAccess>;
 
 function svcMock(customerId: string | null) {
-  const sub = {
-    select: () => sub, eq: () => sub,
+  // One object backs from("user_subscriptions") for the select (maybeSingle),
+  // the INSERT (no row yet), and the UPDATE (row exists) persist paths.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sub: any = {
+    select: () => sub,
+    eq: () => sub,
     maybeSingle: async () => ({ data: customerId ? { stripe_customer_id: customerId } : null }),
-    upsert: jest.fn(async () => ({ error: null })),
+    insert: jest.fn(async () => ({ error: null })),
+    update: jest.fn(() => ({ eq: jest.fn(async () => ({ error: null })) })),
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { from: () => sub, __sub: sub } as any;
@@ -76,10 +81,29 @@ test("happy path: creates customer (none yet) + checkout session → url", async
   expect(res.status).toBe(200);
   expect((await res.json()).url).toBe("https://checkout.stripe/x");
   expect(stripe.customers.create).toHaveBeenCalled();
+  // The customer→user mapping row is created carrying the NOT-NULL tier
+  // ('free') + the new customer id, so the webhook can later flip the plan.
+  expect(svc.__sub.insert).toHaveBeenCalledWith(
+    expect.objectContaining({ user_id: "u1", tier: "free", stripe_customer_id: "cus_new" }),
+  );
   // trial wired
   const sessionArg = stripe.checkout.sessions.create.mock.calls[0][0] as { subscription_data: { trial_period_days: number }; line_items: Array<{ price: string }> };
   expect(sessionArg.subscription_data.trial_period_days).toBe(14);
   expect(sessionArg.line_items[0].price).toBe("price_pro");
+});
+
+test("persist failure → 500, checkout session NOT opened (never charge an unmappable customer)", async () => {
+  const stripe = stripeMock();
+  (getStripe as jest.Mock).mockReturnValue(stripe);
+  const svc = svcMock(null);
+  svc.__sub.insert = jest.fn(async () => ({ error: { message: 'null value in column "tier"' } }));
+  (createServiceClient as jest.Mock).mockReturnValue(svc);
+
+  const res = await POST();
+  expect(res.status).toBe(500);
+  // Aborted before opening the session — the A5 bug (charge a customer we
+  // can't map back) is structurally prevented.
+  expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
 });
 
 test("existing customer → reuses it, no customers.create", async () => {
