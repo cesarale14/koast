@@ -18,6 +18,7 @@ import {
   Check,
   AlertTriangle,
   Cable,
+  LogOut,
 } from "lucide-react";
 
 interface ICalFeed {
@@ -307,6 +308,13 @@ export default function SettingsPage() {
     setBillingBusy(false);
   };
 
+  // Sign out — clears the session and returns to /login. Easy account switching
+  // (operator msg 3737). Same pattern the delete-account flow already uses.
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
   const saveNotifs = async (updated: NotificationPrefs) => {
     setNotifs(updated);
     try {
@@ -561,13 +569,22 @@ export default function SettingsPage() {
               placeholder="+1 (555) 000-0000"
             />
           </div>
-          <button
-            onClick={handleSaveProfile}
-            disabled={savingProfile}
-            className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50"
-          >
-            {savingProfile ? "Saving..." : "Save Profile"}
-          </button>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              className="h-9 px-4 text-sm font-semibold text-white bg-coastal hover:bg-deep-sea rounded-lg transition-colors disabled:opacity-50"
+            >
+              {savingProfile ? "Saving..." : "Save Profile"}
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="h-9 px-4 text-sm font-medium text-neutral-700 border border-[var(--border)] hover:border-neutral-300 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <LogOut size={14} strokeWidth={1.8} />
+              Sign out
+            </button>
+          </div>
         </div>
       </SectionCard>
 
