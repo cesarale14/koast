@@ -20,8 +20,19 @@ export async function POST() {
   try {
     const stripe = getStripe();
     const priceId = getProPriceId();
-    if (!isBillingEnabled() || !stripe || !priceId) {
-      return NextResponse.json({ error: "Billing is not configured." }, { status: 503 });
+    // Name the missing piece so a 503 is instantly diagnosable (config var
+    // NAME only — never a secret value; both live in Vercel env, not code).
+    if (!isBillingEnabled() || !stripe) {
+      return NextResponse.json(
+        { error: "Billing is not configured — STRIPE_SECRET_KEY is missing in this environment." },
+        { status: 503 },
+      );
+    }
+    if (!priceId) {
+      return NextResponse.json(
+        { error: "Billing is not configured — STRIPE_PRO_PRICE_ID is missing in this environment." },
+        { status: 503 },
+      );
     }
 
     const { user } = await getAuthenticatedUser();

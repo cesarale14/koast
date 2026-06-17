@@ -13,7 +13,10 @@ export async function POST() {
   try {
     const stripe = getStripe();
     if (!isBillingEnabled() || !stripe) {
-      return NextResponse.json({ error: "Billing is not configured." }, { status: 503 });
+      return NextResponse.json(
+        { error: "Billing is not configured — STRIPE_SECRET_KEY is missing in this environment." },
+        { status: 503 },
+      );
     }
 
     const { user } = await getAuthenticatedUser();
