@@ -11,8 +11,10 @@
  * execution stays actionable — the error shows and Approve re-enables. Dismiss
  * closes with zero side effects.
  *
- * Color law: trench = proposing (frame), lume = interactive (Approve), lagoon =
- * done, coral = error. No new hues.
+ * Color law (design pass Q1): deep teal --coastal/--koast-trench = proposing
+ * (the frame) AND commit (the Approve — sober, white-text-safe, "you meant
+ * this"), NOT the bright --lume cyan. Gold appears only on a money delta inside
+ * the block (a rate RAISE = found money). lagoon = done, coral = error.
  */
 
 import { useEffect, useState } from "react";
@@ -197,12 +199,6 @@ export function ProposalCard({
         Koast suggests
       </div>
 
-      {proposal.rationale && (
-        <div style={{ color: "var(--deep-sea)", fontSize: 14, lineHeight: 1.5 }}>
-          {proposal.rationale}
-        </div>
-      )}
-
       {editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <textarea
@@ -227,7 +223,7 @@ export function ProposalCard({
             <button
               onClick={saveEdit}
               disabled={savingEdit || draft.trim().length === 0}
-              style={{ fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", background: "var(--lume)", color: "var(--deep-sea)", opacity: savingEdit ? 0.7 : 1 }}
+              style={{ fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", background: "var(--coastal)", color: "#fff", opacity: savingEdit ? 0.7 : 1 }}
             >
               {savingEdit ? "Saving…" : "Save edit"}
             </button>
@@ -242,6 +238,12 @@ export function ProposalCard({
         </div>
       ) : (
         block && <Block block={block} />
+      )}
+
+      {proposal.rationale && !editing && (
+        <div style={{ color: "var(--tideline)", fontSize: 13.5, lineHeight: 1.5 }}>
+          {proposal.rationale}
+        </div>
       )}
 
       {error && <div style={{ color: "var(--coral-reef)", fontSize: 13 }}>{error}</div>}
@@ -273,8 +275,8 @@ export function ProposalCard({
                   borderRadius: 8,
                   border: "none",
                   cursor: busy ? "default" : "pointer",
-                  background: "var(--lume)",
-                  color: "var(--deep-sea)",
+                  background: "var(--coastal)",
+                  color: "#fff",
                   opacity: busy === "approve" ? 0.7 : 1,
                 }}
               >

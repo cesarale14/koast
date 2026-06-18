@@ -93,8 +93,17 @@ function signalReason(rs: Record<string, unknown> | null, key: string): string |
   return sig && typeof sig.reason === "string" ? sig.reason : null;
 }
 
-function calendarChangeBlock(property: string, date: string, rate: number, lowConfidence: boolean): BlockData {
-  return { kind: "calendar_change", data: { property, date, change: "price", value: rate, dateCount: 1, lowConfidence } };
+function calendarChangeBlock(
+  property: string,
+  date: string,
+  rate: number,
+  lowConfidence: boolean,
+  currentValue: number | null,
+): BlockData {
+  return {
+    kind: "calendar_change",
+    data: { property, date, change: "price", value: rate, currentValue, dateCount: 1, lowConfidence },
+  };
 }
 
 /** Is `date` (YYYY-MM-DD) a Friday or Saturday in UTC? */
@@ -263,7 +272,7 @@ export async function detectPricingOpportunities(
   const created: Array<{ proposalId: string; opportunity: DetectedOpportunity }> = [];
   for (const opp of toEmit) {
     const payload = {
-      block: calendarChangeBlock(propertyName, opp.date, opp.proposedRate, opp.lowConfidence),
+      block: calendarChangeBlock(propertyName, opp.date, opp.proposedRate, opp.lowConfidence, opp.currentRate),
       action: { propertyId: args.propertyId, dates: [opp.date], rate: opp.proposedRate, channel: null },
     };
     const { proposal } = await createProposal(svc, {

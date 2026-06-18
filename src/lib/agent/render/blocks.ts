@@ -68,6 +68,11 @@ export const calendarChangeBlockDataSchema = z.object({
   change: z.enum(["block", "price", "min_stay"]),
   /** price → dollar rate; min_stay → nights; block → null. */
   value: z.number().nullable().optional(),
+  /** The CURRENT value before the change (price → current rate; min_stay →
+   * current nights) so the card can render the before→after delta as the focal
+   * point (design pass Phase 2). Optional/back-compat: when absent the card
+   * shows only the new value. */
+  currentValue: z.number().nullable().optional(),
   /** Dates spanned when >1 (renders "3 nights"); omit/1 for a single date. */
   dateCount: z.number().int().positive().nullable().optional(),
   /** P7: the underlying rec is low-confidence (insufficient comp set) — the card
@@ -91,6 +96,11 @@ export const guestReplyBlockDataSchema = z.object({
   propertyName: z.string().nullable(),
   /** The drafted reply (post voice-judge filter) the host approves to send. */
   messageText: z.string(),
+  /** P2 confidence: first contact with this guest (no prior thread history) —
+   * the card surfaces a "First message to this guest" cue so the draft reads as
+   * a calibrated first attempt, not a confident familiar reply. Optional/back-
+   * compat. */
+  firstContact: z.boolean().optional(),
 });
 
 /**
