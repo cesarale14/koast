@@ -1,6 +1,29 @@
 # Koast — DESIGN_SYSTEM.md
 # Read this file COMPLETELY before touching ANY UI code.
-# Last updated: April 14, 2026
+# Last updated: 2026-06-18 (reconciled-system header added — design pass Phase 1)
+
+---
+
+## ⚠ RECONCILED SYSTEM (2026-06-18) — READ FIRST. Supersedes the color + brand-signature guidance in the sections below.
+
+A June 2026 recolor + the v1 design pass moved Koast to a **teal accent system**. The golden/glass guidance in the sections below predates this and is being migrated surface-by-surface — **where they conflict, THIS section wins.** Canonical token contract lives in `src/app/globals.css` (the reconciled accent block); rationale in `docs/koast-v1-design-pass-build-plan.md`.
+
+**Accent = TEAL** (one system accent, **including primary CTAs**):
+- **Commit / primary CTA** → `--coastal` (= `--koast-trench`, `#0e7a8a`) — deep, white-text-safe, sober. Approve, send, primary buttons. NOT bright cyan.
+- **Interactive / AI accent** → `--koast-tide` / `--lume` (`#4cc4cc`) — links, active, focus, streaming / "thinking". A **highlight**, never a primary-button fill.
+- (mid step `--koast-reef` `#2ba2ad` for hovers / gradient stops.)
+
+**GOLD = MONEY ONLY.** `--golden` is reserved **exclusively** for monetary/value moments (revenue a proposal captures, "+$X on the table", the pricing scorecard figure) — the learnable "Koast found money" signal. **NOT CTAs, NOT emphasis. Rule: if it's not money, it's teal.** The old "golden section label = #1 brand signature" is **RETIRED** — the teal label is the system. (`--driftwood`/`--sandbar` are legacy names already remapped to teal — they are NOT gold.)
+
+**Semantic state axis** (orthogonal to accent — NOT "gold", not swept): error → `--coral-reef` · warning → `--amber-tide` · success → `--lagoon` · info → `--deep-water`. `--amber-tide` is the **warning** color, distinct from gold; it stays.
+
+**Register (Q2 hybrid):** monospace (`--font-mono`) **only** for machine truth (timestamps, latencies, IDs, inline code, tool-calls, the audit trail). Warm sans (Plus Jakarta) for **all** human-facing text (labels, rationale, copy). Fraunces stays display-only (dashboard greeting / pricing-intelligence title / calendar date header).
+
+**One token layer (Q3):** color/type/radius/motion are shared across all surfaces (layout may still differ spine-vs-inspect). Two gotchas the recolor created:
+- The legacy tokens are **already teal by role** — `bg-coastal` `#0e7a8a`, `text-tideline` `#6e7976` neutral gray, `--deep-sea` `#0a262c` cool-near-black. They render **teal/neutral, NOT green**.
+- `neutral-*` is remapped to **warm Koast sand/ink tones** (`tailwind.config.ts`), so `text-neutral-800` is NOT a banned cold gray — **do not mass-sweep `neutral-*`.** The genuine banned colors are stock `red-*`/`indigo-*`/`blue-*`/`purple-*`/`yellow-*` literals and any emoji.
+
+---
 
 ## CRITICAL RULES
 1. **Never use default Tailwind grays.** All borders, backgrounds, and text use Koast tokens.
