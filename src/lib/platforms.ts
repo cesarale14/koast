@@ -8,9 +8,10 @@ export const PLATFORMS = {
     color: "#FF385C",
     colorLight: "rgba(255,56,92,0.1)",
     // tileColor backs the 22×22 brand-colored tile used on Dashboard
-    // + Properties cards. For Airbnb + Booking.com it matches `color`;
-    // for Direct we override to Koast deep-sea (the 'Direct' tile is
-    // a Koast moment, not a golden-accent surface — see Spec Correction 33).
+    // + Properties cards. For Airbnb + Booking.com it matches `color`.
+    // Direct is Koast's OWN channel, so its color + tile are Koast teal
+    // (teal = Koast vs the commissioned OTAs; design pass Q1 — gold is
+    // money-only, so the old golden Direct color was retired).
     tileColor: "#FF385C",
     icon: "/icons/platforms/airbnb.svg",
     iconWhite: "/icons/platforms/airbnb-white.svg",
@@ -31,9 +32,9 @@ export const PLATFORMS = {
   // aliases and returns null so DB rows with those codes don't crash.
   direct: {
     name: "Direct",
-    color: "#c49a5a",
-    colorLight: "rgba(196,154,90,0.1)",
-    tileColor: "#132e20",
+    color: "#0e7a8a",
+    colorLight: "rgba(14,122,138,0.1)",
+    tileColor: "#0e7a8a",
     icon: "/icons/platforms/koast-tile.svg",
     iconWhite: "/icons/platforms/koast-tile.svg",
     tile: "/icons/platforms/koast-tile.svg",
