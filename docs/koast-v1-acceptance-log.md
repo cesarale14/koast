@@ -102,8 +102,66 @@ Live render of the real ProposalCard in the thread, edit-before-approve for send
 refetch-on-focus consistency. Live-verification script:
 `docs/koast-v1-inline-proposalcard-live-verification.md`.
 
-## Remaining NEEDS-CESAR
-PITR toggle · Stripe test-mode env. (A4 OTA flag now FLIPPED ON in prod — verified via the
-Aug-3 controlled write.) (Optional: rotate the VAPID keypair
-before public launch — the working pair was generated in-channel during the A1-5 fix; it's a
-low-stakes, trivially-rotatable notification key.)
+## A5 — billing / Pro upgrade (Stripe, test mode) — ✅ PASS
+Checkout → webhook → sync → gating, proven end to end on a fresh account.
+- **"Upgrade to Pro" was a Coming-Soon stub** — FIXED (`d600a32`). The button was hardcoded
+  `disabled` and never called the (already-built, inert-safe) `/api/billing/checkout`. Wired:
+  button POSTs checkout → Stripe Checkout Session redirect; "Manage billing" → portal when Pro;
+  success/cancel toast on return; the card reads `/api/billing/status` for the real plan badge /
+  usage / features. **Pricing integrity:** the shown price now DERIVES from the Stripe price
+  object (`getProPrice` → unit_amount/currency/interval), never a static string — both hardcoded
+  "$79/mo" literals removed.
+- **Clearer 503** (`a400499`): the generic "Billing is not configured" now names the missing var
+  (STRIPE_SECRET_KEY vs STRIPE_PRO_PRICE_ID) — diagnosed the first failed run instantly.
+- **Plan didn't flip after a successful test charge** (the real bug) — FIXED (`9593ef9`).
+  Diagnosed against prod: BOTH webhook events were in `stripe_events` (delivery + signature +
+  claim all fine), but NO `user_subscriptions` row existed → the webhook sync had nothing to map
+  the customer to. Root cause: `user_subscriptions.tier` is NOT NULL with no default; the
+  checkout route upserted the customer→user mapping WITHOUT `tier` and did `await upsert(...)`
+  without checking `.error`, so the NOT-NULL violation failed SILENTLY and the mapping was never
+  saved. Fix: checkout creates the row with `tier:'free'` (UPDATE only the customer id when a row
+  exists — never clobber a comped/pro tier), CHECKS the error, ABORTS 500 if persist fails;
+  webhook self-heals via the Stripe customer's `koast_user_id` metadata; the success toast polls
+  `/api/billing/status` and only claims Pro when `proAccess` is truly true. +2 tests.
+- **✅ PASS evidence (prod DB, fresh account `45693416…`):** `user_subscriptions` row
+  `tier=pro, status=trialing`, `stripe_customer_id=cus_UiwxAzMtOxvlcv`,
+  `stripe_subscription_id=sub_1TjVAgFZPxpA17gf9FMBW1BK`, `price_id=price_1Thc7s…`, 14-day trial
+  through 2026-07-02. `stripe_events` recorded the run's `checkout.session.completed` +
+  `customer.subscription.created` (01:55) and two `customer.subscription.updated` (01:58).
+  `resolveAccess` keys off `status` → `trialing` = Pro. Plan flipped.
+
+## A6 — cleaner-token rotation (hardening) — ✅ PASS
+The one manual hardening verification: rotating a turnover's `cleaner_token` must instantly kill
+the old link and re-push the new one.
+- **Live proof (prod, test task `3aacfe3d`, assigned to the "Cesar Santana" test cleaner —
+  0 registered devices, so nobody was stranded or pinged):**
+  - OLD link before rotation → **HTTP 200** (live).
+  - Rotated the token (new `cleaner_token`, cleared `token_invalidated_at` / `token_expires_at` —
+    the exact mutation `POST /api/turnover/rotate-token` performs).
+  - OLD link after rotation → **HTTP 403** `{"error":"Invalid task or token"}` (dead).
+  - NEW link → **HTTP 200** (live). Control: a random token → 403 (the matcher is sound).
+- **Re-push:** wiring-verified — `rotate-token` → `notifyCleaner` → `sendAssignmentPush(url=
+  /clean/{taskId}/{newToken})`; web-push delivery is the A1-PASS path. A live delivery target
+  exists (cleaner Karem Gutierrez has 1 active `cleaner_push_subscriptions` row); the test cleaner
+  used here has 0, so no real cleaner's device was disturbed.
+
+## v1 ACCEPTED — closeout (2026-06-18)
+Every acceptance item cleared, plus the two launch blockers caught mid-pass:
+- **A1** cleaner web-push · **A2** host states · **A3** agent + live guest send · **A4** OTA flag
+  flip (hard-floor) · **A5** billing upgrade · **A6** token rotation.
+- **Launch blockers found during the pass** (both fixed): new-host **onboarding** dead-ends
+  (P7 — first-run entry + null-timezone agenda invisibility + validator/store gaps) and the
+  missing **persistent global navigation** on the chat-primary shell (icon rail + mobile drawer).
+- **Tagged `v1.0.0`.**
+
+### Launch gates (before / at public launch)
+1. **Stripe → live + $79 Pro price.** Currently TEST mode, and `STRIPE_PRO_PRICE_ID` points at the
+   **$149 Business** price object. Before launch: swap to live keys AND repoint the env at a
+   **$79/mo Pro** recurring price. The displayed price derives from whatever the env charges, so
+   this is an env swap — no code change. (Logged per operator msg 3741: A5 passed on the mapping
+   fix; the $79 swap is a launch gate, not an A5 blocker.)
+2. **Supabase PITR** — enable point-in-time recovery at/before the first EXTERNAL host onboards.
+3. **Per-property A4 posture** — `KOAST_ALLOW_BDC_CALENDAR_PUSH` is a single global flag; revisit
+   per-property OTA-write posture as the fleet grows past the founding 2.
+4. **(Optional) Rotate the VAPID keypair** generated in-channel during the A1-5 fix before public
+   launch — low-stakes, trivially rotatable.
