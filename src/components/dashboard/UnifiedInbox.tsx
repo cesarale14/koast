@@ -873,8 +873,8 @@ function ThreadColumn({
                 className="flex items-center justify-center flex-shrink-0 self-center transition-opacity"
                 style={{
                   width: 40, height: 40, borderRadius: "50%",
-                  background: "linear-gradient(135deg, var(--koast-trench), #a87d3a)",
-                  color: "var(--deep-sea)", fontWeight: 800, fontSize: 15,
+                  background: "linear-gradient(135deg, var(--koast-trench), var(--koast-reef))",
+                  color: "#fff", fontWeight: 800, fontSize: 15,
                   opacity: drafting ? 0.65 : canDraft ? 1 : 0.45,
                   cursor: canDraft ? "pointer" : "not-allowed",
                   boxShadow: "0 2px 8px rgba(76,196,204,0.25)",

@@ -149,7 +149,7 @@ function PropertyCard({
   const isTurnover = !!cleaningToday && cleaningToday.status !== "completed";
   const isOccupied = !!currentBooking && !isTurnover;
 
-  let statusTone: "lagoon" | "golden" | "amber-tide" = "golden";
+  let statusTone: "lagoon" | "tideline" | "amber-tide" = "tideline";
   let statusText = "Vacant";
   let statusRight: string | null = null;
 
@@ -172,13 +172,13 @@ function PropertyCard({
       statusRight = `Next: ${firstNameLastInitial(nextCheckin.guest)}`;
     }
   } else if (nextCheckin) {
-    statusTone = "golden";
+    statusTone = "tideline";
     statusText = `Vacant — next: ${shortDate(nextCheckin.date)}`;
     if (tonightRate > 0) {
       statusRight = `$${tonightRate}/night`;
     }
   } else if (tonightRate > 0) {
-    statusTone = "golden";
+    statusTone = "tideline";
     statusText = `Open tonight — $${tonightRate}/night`;
   } else {
     statusText = "Vacant";

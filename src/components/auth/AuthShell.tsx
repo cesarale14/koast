@@ -190,8 +190,8 @@ export function GoldenButton({
       style={{
         padding: "14px 16px",
         borderRadius: 12,
-        background: "linear-gradient(135deg, var(--golden), #a87d3a)",
-        color: "var(--deep-sea)",
+        background: "linear-gradient(135deg, var(--koast-trench), var(--koast-reef))",
+        color: "#fff",
         fontSize: 14,
         fontWeight: 700,
         border: "none",
@@ -200,7 +200,7 @@ export function GoldenButton({
       onMouseEnter={(e) => {
         if (disabled) return;
         e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = "0 4px 20px rgba(196,154,90,0.4)";
+        e.currentTarget.style.boxShadow = "0 4px 20px rgba(14,122,138,0.4)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "";

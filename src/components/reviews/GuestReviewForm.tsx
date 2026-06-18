@@ -243,7 +243,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
               onChange={(e) => setPublicReview(e.target.value)}
               rows={5}
               placeholder="Write a balanced review. This appears on the guest's Airbnb profile."
-              className="w-full px-3 py-2 text-[13px] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-golden/30"
+              className="w-full px-3 py-2 text-[13px] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-coastal/30"
               style={{ border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
             />
             <div className="flex items-center justify-between mt-1">
@@ -274,7 +274,7 @@ export default function GuestReviewForm({ review, onClose, onSubmitted }: GuestR
               onChange={(e) => setPrivateReview(e.target.value)}
               rows={3}
               placeholder="Only Airbnb sees this. Not shown to the guest."
-              className="w-full px-3 py-2 text-[13px] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-golden/30"
+              className="w-full px-3 py-2 text-[13px] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-coastal/30"
               style={{ border: "1px solid var(--dry-sand)", color: "var(--coastal)" }}
             />
             <div className="text-[11px] mt-1" style={{ color: "var(--tideline)" }}>

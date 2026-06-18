@@ -400,8 +400,8 @@ export default function TurnoverBoard({ tasks: initialTasks, properties, booking
             {cleaners.length === 0 && <p className="text-sm" style={{ color: "var(--tideline)" }}>No cleaners added yet.</p>}
           </div>
           <div className="flex gap-2">
-            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-golden/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
-            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-golden/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
+            <input type="text" value={newCleanerName} onChange={(e) => setNewCleanerName(e.target.value)} placeholder="Name" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-coastal/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
+            <input type="text" value={newCleanerPhone} onChange={(e) => setNewCleanerPhone(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-coastal/30" style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }} />
             <button onClick={addCleaner} disabled={addingCleaner || !newCleanerName || !newCleanerPhone}
               className="px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors hover:opacity-90"
               style={{ backgroundColor: "var(--coastal)", color: "var(--shore)", borderRadius: 10 }}>
@@ -805,7 +805,7 @@ function TaskCard({ task, propMap, bookingMap, cleanerMap, cleaners, expanded, o
                   value={task.cleaner_id ?? ""}
                   onChange={(e) => { if (e.target.value) onAssign(task.id, e.target.value); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full sm:w-64 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-golden/30"
+                  className="w-full sm:w-64 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-coastal/30"
                   style={{ border: "1px solid var(--dry-sand)", borderRadius: 10 }}
                 >
                   <option value="">Select cleaner...</option>

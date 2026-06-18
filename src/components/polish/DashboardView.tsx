@@ -1014,7 +1014,7 @@ function Sparkline({ series, direction }: { series: number[]; direction: "up" | 
   const points = series.map((v, i) => `${i * step},${h - ((v - min) / range) * h}`);
   const linePath = `M ${points.join(" L ")}`;
   const areaPath = `${linePath} L ${w},${h} L 0,${h} Z`;
-  const stroke = direction === "up" ? "#1a7a5a" : direction === "down" ? "#c44040" : "#c49a5a";
+  const stroke = direction === "up" ? "#1a7a5a" : direction === "down" ? "#c44040" : "#6e7976";
   return (
     <svg
       viewBox={`0 0 ${w} ${h}`}

@@ -52,14 +52,33 @@
   --mangrove: #176d7a;       /* secondary dark / hover — white text safe */
   --tideline: #6e7976;       /* muted text / icons / secondary text → neutral gray (legible on light) */
 
-  /* Accent — golden retained as a token but reserved for the primary
-   * CTA ONLY (logo glow retired with the gold K-tile in the logo
-   * unification; --shadow-logo-glow below is now unused). Structural
-   * feeders are remapped to teal below (section labels, sidebar-active,
-   * focus → tide; ink → near-black). */
-  --golden: #c49a5a;         /* gold — primary CTA ONLY (rare warm pop) */
-  --driftwood: #a8e0e3;      /* light accent → shoal teal */
-  --sandbar: #d4eef0;        /* accent backgrounds → shore-mist blueish-white */
+  /* ============================================================
+     RECONCILED ACCENT + SEMANTIC AXES (2026-06-18, design pass Q1/Q3).
+     ONE accent = TEAL. ONE money signal = GOLD. Semantics are a separate
+     axis. See DESIGN_SYSTEM.md for the canonical write-up.
+
+     TEAL accent (the system accent, INCLUDING primary CTAs):
+       commit / primary CTA   → --coastal (= --koast-trench, #0e7a8a) —
+                                 deep, white-text-safe, sober. Approve,
+                                 send, primary buttons. NOT bright cyan.
+       interactive / AI accent → --koast-tide / --lume (#4cc4cc) — links,
+                                 active, focus, streaming/thinking. A
+                                 HIGHLIGHT, never a primary-button fill.
+       (mid step --koast-reef #2ba2ad for hovers / gradient stops.)
+
+     GOLD (--golden) = MONEY ONLY. Revenue/value moments ("+$X on the
+       table", the captured-revenue delta on a proposal, the pricing
+       scorecard figure). The learnable "Koast found money" signal.
+       NOT CTAs, NOT emphasis. Rule: if it's not money, it's teal.
+
+     SEMANTIC state axis (ORTHOGONAL to accent — NOT "gold", not swept):
+       error → --coral-reef · warning → --amber-tide · success → --lagoon
+       · info → --deep-water. (--amber-tide is the WARNING color, distinct
+       from gold; it stays.)
+     ============================================================ */
+  --golden: #c49a5a;         /* gold — MONEY / value moments ONLY */
+  --driftwood: #a8e0e3;      /* (legacy name) light teal — NOT gold */
+  --sandbar: #d4eef0;        /* (legacy name) teal-white — NOT gold */
 
   /* Neutral — sandy shore */
   --shore: #f7f3ec;          /* product page background */
