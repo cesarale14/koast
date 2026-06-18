@@ -144,7 +144,7 @@
 }
 .rail-nav-label {
   padding: 10px 10px 4px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--fg-3);
 }
@@ -236,7 +236,7 @@
 
 .rail-section-label {
   padding: 12px 12px 6px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--fg-3);
 }
@@ -257,7 +257,7 @@
 .rail-foot .who { font-size: 12.5px; color: var(--fg); }
 .rail-foot .org {
   font-size: 11px; color: var(--fg-3); margin-left: auto;
-  font-family: var(--font-mono); letter-spacing: 0.04em;
+  letter-spacing: 0.04em;
 }
 
 /* ---------- 2. Chat surface ---------- */
@@ -292,7 +292,7 @@
   flex-shrink: 0;
 }
 .ctx-name { font-weight: 500; letter-spacing: -0.005em; }
-.ctx-meta { color: var(--fg-3); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; }
+.ctx-meta { color: var(--fg-3); font-size: 10.5px; letter-spacing: 0.04em; }
 .ctx-chev { color: var(--fg-3); font-size: 10px; }
 
 /* Property context dropdown panel (D18 — list of host's properties).
@@ -328,7 +328,7 @@
   letter-spacing: -0.003em;
 }
 .ctx-option-meta {
-  font-family: var(--font-mono); font-size: 10.5px;
+  font-size: 10.5px;
   color: var(--fg-3); letter-spacing: 0.04em;
 }
 
@@ -377,7 +377,7 @@
 /* day divider */
 .day {
   display: flex; align-items: center; gap: 12px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   color: var(--fg-3); letter-spacing: 0.18em; text-transform: uppercase;
   margin: 4px 0 -4px;
 }
@@ -396,7 +396,7 @@
 
 .meta {
   display: flex; align-items: center; gap: 7px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.06em; color: var(--fg-3);
 }
 .turn.user .meta { flex-direction: row-reverse; }
@@ -410,7 +410,7 @@
   color: #fff; display: grid; place-items: center;
   font-family: var(--font-mono); font-weight: 500; font-size: 8.5px;
 }
-.meta .stamp { font-variant-numeric: tabular-nums; }
+.meta .stamp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* user bubble */
 .user-msg {
@@ -582,7 +582,7 @@
   max-width: 56ch;
 }
 .proposal-why .label {
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--fg-3);
   margin-right: 6px;
@@ -641,7 +641,7 @@
 }
 .memory-label {
   display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--accent-deep);
 }
@@ -660,7 +660,7 @@
 .memory-actions { display: flex; gap: 6px; align-items: center; }
 .memory-saved {
   display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--font-mono); font-size: 10.5px;
+  font-size: 10.5px;
   letter-spacing: 0.06em; color: var(--accent-deep);
 }
 .memory-saved .check {
@@ -689,7 +689,7 @@
 }
 .guest-message-label {
   display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--accent-deep);
 }
@@ -700,7 +700,7 @@
   word-wrap: break-word;
 }
 .guest-message-edited-by-host {
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.06em; color: var(--fg-3);
   font-style: italic;
 }
@@ -723,7 +723,7 @@
 }
 .guest-message-sent {
   display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--font-mono); font-size: 10.5px;
+  font-size: 10.5px;
   letter-spacing: 0.06em; color: var(--accent-deep);
 }
 .guest-message-failed {
@@ -755,7 +755,7 @@
    Just a subtle tag at the top so eyes know to read it as scoped. */
 .refusal-tag {
   display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--fg-3);
   margin: 0 0 8px;
@@ -805,7 +805,7 @@
 .composer-tools .icon-btn svg { width: 13px; height: 13px; }
 .composer-send { display: flex; align-items: center; gap: 9px; }
 .composer-hint {
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   color: var(--fg-3); letter-spacing: 0.06em;
 }
 .send-btn {
@@ -830,7 +830,7 @@
 .responding-row {
   max-width: 720px; margin: 6px auto 0;
   display: flex; align-items: center; gap: 9px;
-  font-family: var(--font-mono); font-size: 10.5px;
+  font-size: 10.5px;
   letter-spacing: 0.06em; color: var(--accent-deep);
 }
 .responding-row :global(.k-mark) { width: 12px; height: 12px; }
@@ -838,7 +838,7 @@
 .responding-row .stop-btn {
   margin-left: auto; padding: 3px 9px; border-radius: 6px;
   background: transparent; border: 0.5px solid var(--rule);
-  color: var(--fg-2); font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--fg-2); font-size: 10.5px;
   letter-spacing: 0.06em; cursor: pointer;
   transition:
     background var(--dur-base) var(--ease-default),
@@ -850,7 +850,7 @@
 .footnote {
   max-width: 720px; margin: 8px auto 0;
   display: flex; justify-content: space-between;
-  font-family: var(--font-mono); font-size: 10px;
+  font-size: 10px;
   color: var(--fg-3); letter-spacing: 0.04em;
 }
 
