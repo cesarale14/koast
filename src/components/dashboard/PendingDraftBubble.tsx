@@ -23,12 +23,10 @@
 // transitions). Animation work tracked separately.
 
 import { Sparkles } from "lucide-react";
-import { KoastChip } from "@/components/polish/KoastChip";
 import StatusDot from "@/components/polish/StatusDot";
-import {
-  CONFIDENCE_LABEL,
-  type DraftEnvelope,
-} from "@/components/dashboard/draft-envelope-labels";
+import { type DraftEnvelope } from "@/components/dashboard/draft-envelope-labels";
+import { ConfidenceCue } from "@/components/chat/ConfidenceCue";
+import { guestConfidenceEnvelope } from "@/lib/agent/confidence/envelope";
 
 interface PendingDraftBubbleMessage {
   id: string;
@@ -41,10 +39,14 @@ export default function PendingDraftBubble({
   msg,
   onApprove,
   onDiscard,
+  firstContact,
 }: {
   msg: PendingDraftBubbleMessage;
   onApprove: () => void;
   onDiscard: () => void;
+  /** First contact with this guest (no prior inbound on the thread) — drives the
+   *  shared new_guest ConfidenceCue. Phase 2b unify. */
+  firstContact?: boolean;
 }) {
   const body = (msg.ai_draft ?? msg.content ?? "").trim();
 
@@ -52,11 +54,13 @@ export default function PendingDraftBubble({
   // envelope presence (historical drafts NULL → clean per STEP 6 nullable-
   // permanent / M3-outcome-3-family 2nd instance).
   const envelope = msg.envelope;
-  const confidenceCfg = envelope?.confidence
-    ? CONFIDENCE_LABEL[envelope.confidence]
-    : null;
-  // judge_results verdict='fail' on any entry → review-needed indicator
-  // (activates Phase B Q3 inert flag — first UI consumer of envelope.judge_results).
+  // Confidence/honesty SYSTEM (Phase 2b): the draft bubble now shares the ONE
+  // ConfidenceCue + register (new_guest), replacing the old amber/coral
+  // generation-confidence chip (the warning-register anti-pattern the cue
+  // explicitly retires). Silent when not first contact — certainty needs no chrome.
+  const confidence = guestConfidenceEnvelope(firstContact);
+  // judge_results verdict='fail' on any entry → review-needed indicator (separate
+  // from confidence — a voice-judge flag, not an honesty signal). Unchanged.
   const failJudge = envelope?.judge_results?.find((r) => r.verdict === "fail");
 
   return (
@@ -80,17 +84,9 @@ export default function PendingDraftBubble({
           Suggested · Pending approval
         </div>
         <p className="whitespace-pre-wrap">{body}</p>
-        {(confidenceCfg || failJudge) && (
-          <div className="mt-2 flex items-center gap-2 flex-wrap" data-testid="draft-envelope-indicators">
-            {confidenceCfg && (
-              <KoastChip
-                variant={confidenceCfg.variant}
-                data-testid="draft-confidence-badge"
-                aria-label={`Draft confidence: ${confidenceCfg.label}`}
-              >
-                {confidenceCfg.label}
-              </KoastChip>
-            )}
+        {(confidence.tier === "early" || failJudge) && (
+          <div className="mt-2 flex flex-col gap-2 items-start" data-testid="draft-envelope-indicators">
+            <ConfidenceCue envelope={confidence} onDark />
             {failJudge && (
               <span
                 className="inline-flex items-center gap-1 text-[11px] font-medium"

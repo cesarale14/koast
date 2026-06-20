@@ -16,12 +16,29 @@ import type { ConfidenceEnvelope } from "@/lib/agent/confidence/envelope";
 export function ConfidenceCue({
   envelope,
   compact = false,
+  onDark = false,
 }: {
   envelope: ConfidenceEnvelope;
   /** compact: chip only, no note line (for dense inline blocks). */
   compact?: boolean;
+  /** onDark: the cue sits on a dark surface (the draft bubble) — same neutral,
+   *  non-alarm register, just light-on-dark so it reads as competence, not a
+   *  warning. Keeps it the ONE cue across light cards and the dark bubble. */
+  onDark?: boolean;
 }) {
   if (envelope.tier !== "early") return null;
+  const chipStyle = onDark
+    ? {
+        border: "1px solid rgba(247,243,236,0.30)",
+        background: "rgba(247,243,236,0.12)",
+        color: "rgba(247,243,236,0.92)",
+      }
+    : {
+        border: "1px solid var(--hairline)",
+        background: "var(--shore-soft)",
+        color: "var(--tideline)",
+      };
+  const noteColor = onDark ? "rgba(247,243,236,0.78)" : "var(--tideline)";
   return (
     <div
       data-testid="confidence-cue"
@@ -34,19 +51,17 @@ export function ConfidenceCue({
           alignItems: "center",
           padding: "2px 9px",
           borderRadius: 999,
-          border: "1px solid var(--hairline)",
-          background: "var(--shore-soft)",
-          color: "var(--tideline)",
           fontSize: 11,
           fontWeight: 600,
           letterSpacing: "0.01em",
           whiteSpace: "nowrap",
+          ...chipStyle,
         }}
       >
         {envelope.label}
       </span>
       {!compact && envelope.note ? (
-        <span style={{ color: "var(--tideline)", fontSize: 12, lineHeight: 1.45 }}>
+        <span style={{ color: noteColor, fontSize: 12, lineHeight: 1.45 }}>
           {envelope.note}
         </span>
       ) : null}

@@ -739,6 +739,14 @@ function ThreadColumn({
     return groups;
   }, [messages]);
 
+  // Phase 2b confidence: first contact = no inbound (guest) message on this
+  // thread yet → a pending draft surfaces the shared new_guest cue ("First
+  // message to this guest"). A reply (guest has written) stays silent.
+  const firstContact = useMemo(
+    () => !messages.some((m) => m.direction === "inbound"),
+    [messages],
+  );
+
   // Mobile: hidden when no thread selected (ConversationList takes
   // full screen); full-width and active when one is open.
   // Desktop: flex-1 fills the middle column always; renders
@@ -836,6 +844,7 @@ function ThreadColumn({
                         msg={msg}
                         onApprove={() => onApproveDraft(msg)}
                         onDiscard={() => onDiscardDraft(msg)}
+                        firstContact={firstContact}
                       />
                     ) : (
                       <MessageBubble key={msg.__optimistic?.clientId ?? msg.id} msg={msg} platform={platform} onRetry={onRetry} />
