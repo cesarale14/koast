@@ -74,10 +74,19 @@ export async function TodayHomeServer() {
   const hourLocal = hourInTz(tz);
   const todayLocal = dateInTz(tz);
 
-  const [data, todayTurnovers] = await Promise.all([
+  const [data, todayTurnovers, pendingCountRes] = await Promise.all([
     readTodayHome(supabase, user.id, { name, hourLocal }),
     readTodayTurnovers(supabase, user.id, todayLocal),
+    // Pending-proposal count for the greeting (so "you're clear today" doesn't
+    // sit above a stack of suggestions). Same host_id + status=pending filter as
+    // TodaySuggests' own fetch; head+count avoids pulling the rows.
+    supabase
+      .from("proposals")
+      .select("id", { count: "exact", head: true })
+      .eq("host_id", user.id)
+      .eq("status", "pending"),
   ]);
+  const suggestsCount = pendingCountRes.count ?? 0;
 
   // S4 + S5: the turnover strip — assign+dispatch for an uncovered turnover,
   // status reflection (dispatched → in-progress → done) for the rest. Only
@@ -96,6 +105,7 @@ export async function TodayHomeServer() {
       propertyIdByName={data.propertyIdByName}
       actionSlot={actionSlot}
       suggestsSlot={<TodaySuggests />}
+      suggestsCount={suggestsCount}
     />
   );
 }

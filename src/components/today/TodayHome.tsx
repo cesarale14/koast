@@ -39,6 +39,10 @@ export type TodayHomeProps = {
   /** P2.3: optional "Koast suggests" proposal surface (TodaySuggests). Self-
    * fetching; renders nothing when there are no pending proposals. */
   suggestsSlot?: React.ReactNode;
+  /** Count of pending proposals (server snapshot) so the greeting can acknowledge
+   * them instead of contradicting them with "you're clear today". Matches the
+   * suggestsSlot's own pending fetch; 0/undefined = greeting unchanged. */
+  suggestsCount?: number;
   /** P7.1: the host owns zero properties. Replaces the "all caught up" empty
    * state with the first-run "Add your first property" CTA — the fix for the
    * onboarding dead-end (a brand-new account stranded on an empty Today). */
@@ -59,9 +63,19 @@ function gapPhrase(category: GapCategory, count: number): string {
       return `${count} guest${count > 1 ? "s" : ""} waiting on a reply`;
   }
 }
-function greetingLine(g: GreetingFacts): string {
+function greetingLine(g: GreetingFacts, suggestsCount = 0): string {
   const hello = g.name ? `${g.timeOfDay}, ${g.name}` : `Good ${g.timeOfDay.toLowerCase()}`;
-  if (g.tone === "clear" || g.gaps.length === 0) return `${hello} — you're clear today.`;
+  // Operational gaps lead (most pressing). A clear OPERATIONAL day that still
+  // has pending Koast suggestions must NOT read "you're clear today" with a stack
+  // of proposals below it (the headline contradiction) — acknowledge them as the
+  // distinct opportunity layer they are.
+  if (g.tone === "clear" || g.gaps.length === 0) {
+    if (suggestsCount > 0) {
+      const n = suggestsCount === 1 ? "opportunity" : "opportunities";
+      return `${hello} — you're clear today, and Koast flagged ${suggestsCount} ${n} below.`;
+    }
+    return `${hello} — you're clear today.`;
+  }
   return `${hello} — ${gapPhrase(g.gaps[0].category, g.gaps[0].count)}.`;
 }
 
@@ -160,7 +174,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRun, propertyIdByName }: TodayHomeProps) {
+export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, suggestsCount, firstRun, propertyIdByName }: TodayHomeProps) {
   const c = curateToday(payload);
   const view = todayView(firstRun, c.empty);
   // S4: when the interactive assign strip is present, no_cleaner gaps are
@@ -185,7 +199,7 @@ export function TodayHome({ payload, greeting, actionSlot, suggestsSlot, firstRu
           data-testid="today-greeting"
           style={{ fontSize: 30, lineHeight: 1.25, fontWeight: 600, color: "var(--deep-sea)", margin: 0, letterSpacing: "-0.01em" }}
         >
-          {greetingLine(greeting)}
+          {greetingLine(greeting, suggestsCount)}
         </h1>
 
         {suggestsSlot}

@@ -23,7 +23,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createProposal } from "@/lib/proposals/server";
-import { isLowConfidenceRec, LOW_CONFIDENCE_NOTE } from "./confidence";
+import { isLowConfidenceRec } from "./confidence";
 import { applyPricingRules, type PricingRulesRow } from "./apply-rules";
 import { isRecFresh, todayStrUTC } from "./freshness";
 import type { BlockData } from "@/lib/agent/render/blocks";
@@ -91,6 +91,19 @@ function signalScore(rs: Record<string, unknown> | null, key: string): number | 
 function signalReason(rs: Record<string, unknown> | null, key: string): string | null {
   const sig = rs?.[key] as { reason?: unknown } | undefined;
   return sig && typeof sig.reason === "string" ? sig.reason : null;
+}
+
+/**
+ * Render a signal's `reason` as clean host-facing PROSE. The engine's signal
+ * reasons carry a trailing strategy/metadata tag in parens (e.g. "Short 3-day
+ * gap (moderate discount)") — that tag is MACHINE METADATA and must never leak
+ * into the sentence the host reads (it was the "Gap night (short 3-day gap
+ * (moderate discount))" nested-paren bug). Strip the trailing parenthetical and
+ * sentence-case the lead so the reason reads as the opening of one clean line.
+ */
+function humanReason(reason: string): string {
+  const stripped = reason.replace(/\s*\([^()]*\)\s*$/, "").trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
 function calendarChangeBlock(
@@ -238,7 +251,10 @@ export async function detectPricingOpportunities(
         currentRate: current,
         proposedRate: proposed,
         deltaAbs,
-        rationale: `Gap night (${gapReason.toLowerCase()}) — drop $${current} → $${proposed} to fill it before it goes empty.`,
+        // ONE clean sentence — the WHY. The before→after numbers are the focal
+        // element of the card BLOCK now (CalendarChangeBlock), so the rationale
+        // stays pure reason and never repeats them as gray text. No strategy tag.
+        rationale: `${humanReason(gapReason)} — drop the rate to fill those nights before they go empty.`,
         lowConfidence: isLowConfidenceRec(rec.reason_signals),
       });
       continue; // gap-night is the more specific signal; don't also flag stale-weekend
@@ -249,15 +265,15 @@ export async function detectPricingOpportunities(
     if (isWeekend(rec.date) && proposed > current) {
       const pctOver = current > 0 ? (proposed - current) / current : 0;
       if (proposed - current >= STALE_WEEKEND_MIN_DELTA_ABS && pctOver >= STALE_WEEKEND_MIN_DELTA_PCT) {
-        const compReason = signalReason(rec.reason_signals, "competitor");
-        const basis = compReason ? ` (${compReason})` : "";
         opportunities.push({
           kind: "stale_weekend",
           date: rec.date,
           currentRate: current,
           proposedRate: proposed,
           deltaAbs,
-          rationale: `Weekend below market — raise $${current} → $${proposed}${basis}.`,
+          // Clean WHY only — the before→after + the gold "found money" delta live
+          // in the card block; the competitor comp-basis is metadata, not prose.
+          rationale: `Weekend priced below market — raise it before the date slips.`,
           lowConfidence: isLowConfidenceRec(rec.reason_signals),
         });
       }
@@ -280,7 +296,10 @@ export async function detectPricingOpportunities(
       propertyId: args.propertyId,
       actionType: "adjust_price",
       payload,
-      rationale: opp.lowConfidence ? `${opp.rationale} ${LOW_CONFIDENCE_NOTE}` : opp.rationale,
+      // The low-confidence note is rendered ONCE, by the block's ConfidenceCue
+      // (driven by block.data.lowConfidence) — not appended to the rationale, so
+      // it never reads twice on the card. The rationale stays the clean WHY.
+      rationale: opp.rationale,
       createdBy: "worker",
     });
     created.push({ proposalId: proposal.id, opportunity: opp });

@@ -70,7 +70,12 @@ test("gap night: orphan night with a below-current suggestion → discount propo
   expect(arg.actionType).toBe("adjust_price");
   expect(arg.createdBy).toBe("worker");
   expect((arg.payload as { action: { dates: string[]; rate: number } }).action).toMatchObject({ dates: ["2026-07-07"], rate: 150 });
-  expect(arg.rationale).toMatch(/Gap night/i);
+  // Q-A #1: ONE clean human sentence. The signal's strategy tag ("(heavy
+  // discount)") is metadata — it must NOT leak into prose, and there must be NO
+  // parentheses at all (the "Gap night (… (moderate discount))" nested-paren bug).
+  expect(arg.rationale).toMatch(/Orphan night — 2-day gap/);
+  expect(arg.rationale).not.toMatch(/discount/i);
+  expect(arg.rationale).not.toMatch(/[()]/);
 });
 
 test("stale weekend: Friday priced well below suggestion → raise proposal", async () => {
@@ -82,8 +87,11 @@ test("stale weekend: Friday priced well below suggestion → raise proposal", as
   expect(r.detected).toBe(1);
   const arg = mockCreate.mock.calls[0][1];
   expect((arg.payload as { action: { rate: number } }).action.rate).toBe(280);
-  expect(arg.rationale).toMatch(/Weekend below market/i);
-  expect(arg.rationale).toMatch(/underpriced/);
+  // Q-A #1: clean WHY only — the competitor comp-basis ("20th pctl, underpriced")
+  // is metadata and must NOT leak into prose; no parenthetical tag.
+  expect(arg.rationale).toMatch(/Weekend priced below market/i);
+  expect(arg.rationale).not.toMatch(/underpriced|pctl/i);
+  expect(arg.rationale).not.toMatch(/[()]/);
 });
 
 test("whiplash bounds the proposed rate against max_rate", async () => {
