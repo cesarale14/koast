@@ -117,18 +117,23 @@ export function CalendarChangeBlock({ data }: { data: CalendarChangeBlockData })
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, paddingLeft: 19, flexWrap: "wrap" }}>
           {hasDelta && (
             <>
+              {/* The "before" carries real weight so $X → $Y reads as ONE from-to
+                  motion (not a tiny strikethrough the eye skips to land on the
+                  endpoint). It recedes by treatment — struck + muted tideline —
+                  not by being small. The "after" stays the committed, dominant
+                  value (Q-B weight tune). */}
               <span
                 style={{
                   color: "var(--tideline)",
                   textDecoration: "line-through",
-                  fontSize: 17,
-                  fontWeight: 500,
+                  fontSize: 20,
+                  fontWeight: 600,
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {usd.format(data.currentValue as number)}
               </span>
-              <span aria-hidden style={{ color: "var(--tideline)", fontSize: 15 }}>→</span>
+              <span aria-hidden style={{ color: "var(--tideline)", fontSize: 17 }}>→</span>
             </>
           )}
           <span
@@ -147,7 +152,10 @@ export function CalendarChangeBlock({ data }: { data: CalendarChangeBlockData })
       )}
 
       {envelope.tier === "early" && (
-        <div style={{ paddingLeft: isPrice ? 19 : 0 }}>
+        // A hair more space ABOVE than below (gap 10 + marginTop 6 = 16 above vs
+        // the block's 12 bottom padding) so the cue reads as THIS proposal's
+        // confidence grouping downward with the why, not a divider (Q-B micro-note).
+        <div style={{ paddingLeft: isPrice ? 19 : 0, marginTop: 6 }}>
           <ConfidenceCue envelope={envelope} />
         </div>
       )}
