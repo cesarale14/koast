@@ -162,13 +162,19 @@ export const proposeGuestReplyTool: Tool<Input, Output> = {
 
     const { data: threadRows } = await supabase
       .from("message_threads")
-      .select("channel_code")
+      .select("channel_code, last_message_received_at")
       .eq("booking_id", input.booking_id)
       .order("last_message_received_at", { ascending: false, nullsFirst: false })
       .limit(1);
-    const channel = canonicalChannel(
-      ((threadRows ?? []) as { channel_code: string | null }[])[0]?.channel_code ?? booking.platform,
-    );
+    const thread = ((threadRows ?? []) as {
+      channel_code: string | null;
+      last_message_received_at: string | null;
+    }[])[0];
+    const channel = canonicalChannel(thread?.channel_code ?? booking.platform);
+    // P2b confidence (new_guest): first contact = no thread, or the guest hasn't
+    // written yet (no received message) — matches the cue's "no past messages
+    // from them yet" note. A soft honesty signal on the card, never a gate.
+    const firstContact = !thread || thread.last_message_received_at == null;
 
     // 4. Voice judges at PROPOSE time. J1 (emoji) filters the draft text; J2-J6
     //    annotate the envelope. The FILTERED text is what's stored + sent.
@@ -195,6 +201,7 @@ export const proposeGuestReplyTool: Tool<Input, Output> = {
         guestName: booking.guest_name ?? null,
         propertyName,
         messageText: finalText,
+        firstContact,
       },
     };
 

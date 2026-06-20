@@ -10,9 +10,16 @@
  * The drafted text is shown verbatim (already voice-judge-filtered upstream) so
  * the host approves exactly what will be sent. Design-system tokens only; the
  * channel reads as a quiet chip, never a platform-colored badge.
+ *
+ * Confidence (design pass Phase 2b): a first-contact draft surfaces the SHARED
+ * ConfidenceCue (new_guest) in the same neutral "Early estimate"-register the
+ * rate cue uses — "First message to this guest … drafted in your voice." One
+ * vocabulary across proposals / drafts / recs. Silent when not first contact.
  */
 
 import type { GuestReplyBlockData } from "./types";
+import { guestConfidenceEnvelope } from "@/lib/agent/confidence/envelope";
+import { ConfidenceCue } from "@/components/chat/ConfidenceCue";
 
 function channelLabel(channel: string): string {
   switch (channel) {
@@ -31,6 +38,7 @@ function channelLabel(channel: string): string {
 
 export function GuestReplyBlock({ data }: { data: GuestReplyBlockData }) {
   const to = data.guestName?.trim() || "the guest";
+  const confidence = guestConfidenceEnvelope(data.firstContact);
   return (
     <div
       style={{
@@ -77,6 +85,13 @@ export function GuestReplyBlock({ data }: { data: GuestReplyBlockData }) {
       >
         {data.messageText}
       </div>
+      {confidence.tier === "early" && (
+        // Locked register: a hair more space above than below so the cue groups
+        // downward with the why, reading as this draft's confidence, not a divider.
+        <div style={{ marginTop: 6 }}>
+          <ConfidenceCue envelope={confidence} />
+        </div>
+      )}
     </div>
   );
 }

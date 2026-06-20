@@ -119,6 +119,20 @@ test("happy path → send_guest_reply proposal with guest_reply block + FILTERED
   expect(p.action).toEqual({ bookingId: BOOKING, messageText: "3pm works great" });
   // judge_results persisted for the deferred inline ProposalCard.
   expect(p.judge_results).toHaveLength(1);
+  // P2b new_guest confidence: the default thread has no received message yet →
+  // first contact, so the card surfaces the shared "First message" cue.
+  expect(p.block.data.firstContact).toBe(true);
+});
+
+test("prior guest message on the thread → firstContact:false (no new_guest cue)", async () => {
+  setSvc({ threads: [{ channel_code: "ABB", last_message_received_at: "2026-07-01T10:00:00Z" }] });
+  await proposeGuestReplyTool.handler(
+    { booking_id: BOOKING, message_text: "Sounds good, see you then", rationale: "x" },
+    ctx,
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = mockCreate.mock.calls[0][1].payload as any;
+  expect(p.block.data.firstContact).toBe(false);
 });
 
 test("voice judges (J1-J6) run at PROPOSE time against the model's draft, host-to-guest", async () => {
