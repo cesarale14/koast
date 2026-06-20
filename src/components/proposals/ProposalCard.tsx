@@ -18,9 +18,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
-import { Block } from "@/components/chat/blocks/registry";
 import { useToast } from "@/components/ui/Toast";
+import { ProposalCardView } from "./ProposalCardView";
 import type { NormalizedProposal } from "@/lib/proposals/server";
 import type { ProposalStatus } from "@/lib/db/schema";
 
@@ -172,159 +171,28 @@ export function ProposalCard({
   // executable is computed server-side (getProposalActionDef + the unified gate).
   const canApprove = proposal.executable !== false;
 
+  // The PROPOSALS-lane wrapper: owns state + the fetch handlers (approve hits the
+  // atomic-claim route — UNCHANGED by the presentational extract), renders the
+  // ONE canonical ProposalCardView.
   return (
-    <div
-      data-testid="proposal-card"
-      style={{
-        border: "1px solid var(--hairline)",
-        borderLeftWidth: 4,
-        borderLeftColor: "var(--koast-trench)",
-        borderRadius: 12,
-        background: "var(--shore)",
-        padding: "14px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: "var(--koast-trench)",
-        }}
-      >
-        Koast suggests
-      </div>
-
-      {editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={5}
-            autoFocus
-            style={{
-              width: "100%",
-              fontSize: 14,
-              lineHeight: 1.5,
-              padding: "10px 12px",
-              borderRadius: 8,
-              border: "1px solid var(--hairline)",
-              resize: "vertical",
-              fontFamily: "inherit",
-              color: "var(--deep-sea)",
-              background: "white",
-            }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={saveEdit}
-              disabled={savingEdit || draft.trim().length === 0}
-              style={{ fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", background: "var(--coastal)", color: "#fff", opacity: savingEdit ? 0.7 : 1 }}
-            >
-              {savingEdit ? "Saving…" : "Save edit"}
-            </button>
-            <button
-              onClick={() => { setEditing(false); setError(null); }}
-              disabled={savingEdit}
-              style={{ fontSize: 13, fontWeight: 600, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--hairline)", cursor: "pointer", background: "white", color: "var(--tideline)" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        block && <Block block={block} />
-      )}
-
-      {proposal.rationale && !editing && (
-        <div style={{ color: "var(--tideline)", fontSize: 13.5, lineHeight: 1.5 }}>
-          {proposal.rationale}
-        </div>
-      )}
-
-      {error && <div style={{ color: "var(--coral-reef)", fontSize: 13 }}>{error}</div>}
-
-      {done ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--lagoon)", fontSize: 14, fontWeight: 600 }}>
-          <Check size={16} strokeWidth={2.2} />
-          Done
-        </div>
-      ) : editing ? null : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {!canApprove && (
-            <div style={{ color: "var(--tideline)", fontSize: 12.5 }}>
-              Channel changes are turned off — turn them on in Settings to approve this.
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            {canApprove && (
-              <button
-                onClick={approve}
-                disabled={busy !== null}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: busy ? "default" : "pointer",
-                  background: "var(--coastal)",
-                  color: "#fff",
-                  opacity: busy === "approve" ? 0.7 : 1,
-                }}
-              >
-                <Check size={15} strokeWidth={2.2} />
-                {busy === "approve" ? "Approving…" : error ? "Try again" : "Approve"}
-              </button>
-            )}
-            {canEdit && (
-              <button
-                onClick={startEdit}
-                disabled={busy !== null}
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  border: "1px solid var(--hairline)",
-                  cursor: busy ? "default" : "pointer",
-                  background: "white",
-                  color: "var(--tideline)",
-                }}
-              >
-                Edit
-              </button>
-            )}
-            <button
-              onClick={dismiss}
-              disabled={busy !== null}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 13,
-                fontWeight: 600,
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--hairline)",
-                cursor: busy ? "default" : "pointer",
-                background: "white",
-                color: "var(--tideline)",
-              }}
-            >
-              <X size={15} strokeWidth={2} />
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <ProposalCardView
+      block={block}
+      rationale={proposal.rationale}
+      editing={editing}
+      draft={draft}
+      onDraftChange={setDraft}
+      onSaveEdit={saveEdit}
+      onCancelEdit={() => { setEditing(false); setError(null); }}
+      savingEdit={savingEdit}
+      done={done}
+      error={error}
+      canApprove={canApprove}
+      onApprove={approve}
+      canEdit={canEdit}
+      onEdit={startEdit}
+      onDismiss={dismiss}
+      busy={busy}
+      notApprovableNote="Channel changes are turned off — turn them on in Settings to approve this."
+    />
   );
 }

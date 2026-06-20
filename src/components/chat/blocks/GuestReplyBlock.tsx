@@ -38,6 +38,7 @@ function channelLabel(channel: string): string {
 
 export function GuestReplyBlock({ data }: { data: GuestReplyBlockData }) {
   const to = data.guestName?.trim() || "the guest";
+  const channelText = data.channel ? channelLabel(data.channel) : "";
   const confidence = guestConfidenceEnvelope(data.firstContact);
   return (
     <div
@@ -55,19 +56,21 @@ export function GuestReplyBlock({ data }: { data: GuestReplyBlockData }) {
         <span style={{ fontWeight: 600, color: "var(--deep-sea)", fontSize: 14 }}>
           Reply to {to}
         </span>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "var(--tideline)",
-            background: "var(--shore)",
-            border: "1px solid var(--hairline)",
-            borderRadius: 999,
-            padding: "1px 8px",
-          }}
-        >
-          {channelLabel(data.channel)}
-        </span>
+        {channelText && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--tideline)",
+              background: "var(--shore)",
+              border: "1px solid var(--hairline)",
+              borderRadius: 999,
+              padding: "1px 8px",
+            }}
+          >
+            {channelText}
+          </span>
+        )}
         {data.propertyName && (
           <span style={{ color: "var(--tideline)", fontSize: 12.5, marginLeft: "auto" }}>
             {data.propertyName}
