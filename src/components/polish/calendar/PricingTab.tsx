@@ -15,7 +15,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import { PLATFORMS, type PlatformKey } from "@/lib/platforms";
 import WhyThisRate from "./WhyThisRate";
 import BulkRateConfirmModal, { type DateDiff, type BulkModalMode } from "./BulkRateConfirmModal";
@@ -418,12 +418,31 @@ export default function PricingTab({
               userSelect: "none",
             }}
           >
+            {/* DS form control: the native input is visually hidden (a11y
+                intact); the custom box carries the teal-on-check treatment. */}
             <input
               type="checkbox"
               checked={masterPush}
               onChange={(e) => setMasterPush(e.target.checked)}
-              style={{ width: 14, height: 14, accentColor: "var(--coastal)" }}
+              style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
             />
+            <span
+              aria-hidden
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 5,
+                flexShrink: 0,
+                border: `1.5px solid ${masterPush ? "var(--coastal)" : "var(--dry-sand)"}`,
+                background: masterPush ? "var(--coastal)" : "#fff",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.12s, border-color 0.12s",
+              }}
+            >
+              {masterPush && <Check size={11} strokeWidth={3} color="#fff" />}
+            </span>
             <span>{masterPushLabel}</span>
           </label>
         )}

@@ -9,7 +9,9 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { isLowConfidenceRec, LOW_CONFIDENCE_LABEL } from "@/lib/pricing/confidence";
+import { isLowConfidenceRec } from "@/lib/pricing/confidence";
+import { ConfidenceCue } from "@/components/chat/ConfidenceCue";
+import { rateConfidenceEnvelope } from "@/lib/agent/confidence/envelope";
 
 type Signal = { key: string; label: string; score: number; weight: number; reason?: string | null };
 
@@ -46,24 +48,13 @@ function directionGlyph(score: number): { glyph: string; color: string } {
   return { glyph: "▬", color: "var(--tideline)" };
 }
 
+// Design pass: the rate low-confidence signal renders through the ONE shared
+// neutral ConfidenceCue (competence-not-apology), retiring the last amber
+// "Early estimate" chip — confidence is never a warning color.
 function LowConfidenceChip() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 6 }}>
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          padding: "2px 8px",
-          borderRadius: 999,
-          border: "1px solid var(--amber-tide)",
-          color: "var(--amber-tide)",
-          fontSize: 11,
-          fontWeight: 600,
-        }}
-      >
-        {LOW_CONFIDENCE_LABEL}
-      </span>
-      <span style={{ fontSize: 11, color: "var(--tideline)" }}>limited market data so far</span>
+    <div style={{ paddingBottom: 6 }}>
+      <ConfidenceCue envelope={rateConfidenceEnvelope(true)} />
     </div>
   );
 }
