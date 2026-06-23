@@ -6,7 +6,7 @@
 
 ## ⚠ RECONCILED SYSTEM (2026-06-18) — READ FIRST. Supersedes the color + brand-signature guidance in the sections below.
 
-A June 2026 recolor + the v1 design pass moved Koast to a **teal accent system**. The golden/glass guidance in the sections below predates this and is being migrated surface-by-surface — **where they conflict, THIS section wins.** Canonical token contract lives in `src/app/globals.css` (the reconciled accent block); rationale in `docs/koast-v1-design-pass-build-plan.md`.
+A June 2026 recolor + the v1 design pass moved Koast to a **teal accent system**. The golden/glass guidance in the sections below predates this and is being migrated surface-by-surface — **where they conflict, THIS section wins.** Canonical token contract lives in `src/app/globals.css` (the reconciled accent block); rationale in `docs/koast-v1-design-pass-build-plan.md`. **Decision record + the two hard invariants (gold=money-only; confidence-never-a-warning-color):** koast-vault `decisions/2026-06-23-design-system-reconciliation.md` (the durable hub — this file is the live *values* contract; that note is the *decision + why*).
 
 **Accent = TEAL** (one system accent, **including primary CTAs**):
 - **Commit / primary CTA** → `--coastal` (= `--koast-trench`, `#0e7a8a`) — deep, white-text-safe, sober. Approve, send, primary buttons. NOT bright cyan.
